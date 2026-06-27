@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
@@ -6,7 +8,6 @@ import 'package:collectiq_ai/features/ai/domain/repositories/recognition_reposit
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
-import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -158,25 +159,48 @@ class ScannerController extends Notifier<ScannerState> {
   /// Opens the camera capture page and stores the captured image path.
   Future<void> startCameraScan(BuildContext context) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
-    final imagePath = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const CameraCapturePage()),
-    );
+    try {
+      final capturedImage = await _cameraService.pickImageFromCamera();
+      if (capturedImage == null || capturedImage.path.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Camera capture cancelled.',
+        );
+        return;
+      }
 
-    if (imagePath == null || imagePath.isEmpty) {
-      state = state.copyWith(isLoading: false);
-      return;
+      final image = await _cameraService.persistCapturedImage(capturedImage);
+      final selectedImagePath = _displayPathFor(image);
+      debugPrint(
+        '[Scanner] selectedImagePath after camera capture: '
+        '$selectedImagePath',
+      );
+      state = state.copyWith(
+        selectedImage: image,
+        selectedImagePath: selectedImagePath,
+        selectedItemTitle: 'Captured image',
+        selectedItemStatus: 'Ready for AI analysis',
+        isLoading: false,
+        clearScanResult: true,
+        clearAiRecommendation: true,
+      );
+    } on ScannerException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.message,
+        clearSelectedImage: true,
+        clearSelectedImagePath: true,
+        clearSelectedItemTitle: true,
+        clearSelectedItemStatus: true,
+        clearScanResult: true,
+        clearAiRecommendation: true,
+      );
+    } on Exception {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to open the camera.',
+      );
     }
-
-    final image = XFile(imagePath);
-    state = state.copyWith(
-      selectedImage: image,
-      selectedImagePath: imagePath,
-      selectedItemTitle: 'Captured image',
-      selectedItemStatus: 'Ready for AI analysis',
-      isLoading: false,
-      clearScanResult: true,
-      clearAiRecommendation: true,
-    );
   }
 
   /// Creates a sample selected scan for development and UI testing.
@@ -249,7 +273,7 @@ class ScannerController extends Notifier<ScannerState> {
         selectedImagePath: selectedImagePath,
         recognitionImageUrl: recognition.imageUrl,
       );
-      debugPrint('[Scanner] scan result thumbnail/imagePath: $thumbnail');
+      debugPrint('[Scanner] ScanResult.thumbnail: $thumbnail');
       state = state.copyWith(
         isLoading: false,
         scanResult: ScanResult(
@@ -302,8 +326,12 @@ class ScannerController extends Notifier<ScannerState> {
     );
 
     debugPrint(
-      '[Scanner] CollectibleItem.imagePath before saving: '
+      '[Scanner] CollectibleItem.imagePath before save: '
       '${item.imagePath}',
+    );
+    debugPrint(
+      '[Scanner] image file exists before save: '
+      '${await _localFileExists(item.imagePath)}',
     );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
   }
@@ -359,15 +387,24 @@ class ScannerController extends Notifier<ScannerState> {
 
   bool _isUsableSelectedImagePath(String imagePath) {
     final normalizedPath = imagePath.trim();
-    if (normalizedPath.isEmpty) {
+    if (normalizedPath.isEmpty || normalizedPath == 'selected-image') {
       return false;
     }
 
-    if (normalizedPath.startsWith('sample://')) {
+    return !normalizedPath.startsWith('sample://');
+  }
+
+  Future<bool> _localFileExists(String imagePath) async {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty ||
+        normalizedPath.startsWith('sample://') ||
+        normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://') ||
+        normalizedPath.startsWith('assets/')) {
       return false;
     }
 
-    return normalizedPath != 'selected-image';
+    return File(normalizedPath).exists();
   }
 
   String _messageForNetworkError(NetworkException error) {

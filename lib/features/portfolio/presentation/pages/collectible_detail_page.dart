@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -5,10 +7,13 @@ import 'package:flutter/material.dart';
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends StatelessWidget {
   /// Creates a collectible detail page.
-  const CollectibleDetailPage({required this.item, super.key});
+  const CollectibleDetailPage({required this.item, this.onDelete, super.key});
 
   /// Item displayed on the detail page.
   final CollectibleItem item;
+
+  /// Called when the user asks to delete the item.
+  final Future<bool> Function(String itemId)? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +21,17 @@ class CollectibleDetailPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(title: const Text('Collectible Details')),
+      appBar: AppBar(
+        title: const Text('Collectible Details'),
+        actions: [
+          if (onDelete != null)
+            IconButton(
+              onPressed: () => onDelete!(item.id),
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete item',
+            ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
@@ -37,7 +52,7 @@ class CollectibleDetailPage extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xl),
                   const _PriceHistorySection(),
                   const SizedBox(height: AppSpacing.xl),
-                  _ActionButtons(),
+                  _ActionButtons(onDelete: onDelete, itemId: item.id),
                 ],
               ),
             ),
@@ -66,9 +81,44 @@ class _ImagePreview extends StatelessWidget {
         border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: AppElevation.level1,
       ),
-      child: Center(
-        child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
-      ),
+      clipBehavior: Clip.antiAlias,
+      child: _imageForPath(colorScheme),
+    );
+  }
+
+  Widget _imageForPath(ColorScheme colorScheme) {
+    final normalizedPath = item.imagePath.trim();
+    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
+      return _placeholder(colorScheme);
+    }
+
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return Image.network(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholder(colorScheme),
+      );
+    }
+
+    if (normalizedPath.startsWith('assets/')) {
+      return Image.asset(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholder(colorScheme),
+      );
+    }
+
+    return Image.file(
+      File(normalizedPath),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => _placeholder(colorScheme),
+    );
+  }
+
+  Widget _placeholder(ColorScheme colorScheme) {
+    return Center(
+      child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
     );
   }
 }
@@ -112,10 +162,10 @@ class _DetailCard extends StatelessWidget {
             value: '${(item.confidence * 100).toStringAsFixed(0)}%',
           ),
           _DetailRow(label: 'Condition', value: item.condition),
-          _DetailRow(label: 'Created', value: _formatDate(item.createdAt)),
+          _DetailRow(label: 'Date Saved', value: _formatDate(item.createdAt)),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Recommendation',
+            'Notes',
             style: textTheme.labelLarge?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -356,6 +406,11 @@ class _PriceBars extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
+  const _ActionButtons({required this.itemId, this.onDelete});
+
+  final String itemId;
+  final Future<bool> Function(String itemId)? onDelete;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -381,6 +436,14 @@ class _ActionButtons extends StatelessWidget {
           },
           child: const Text('Sell Item'),
         ),
+        if (onDelete != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          OutlinedButton.icon(
+            onPressed: () => onDelete!(itemId),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Delete Item'),
+          ),
+        ],
       ],
     );
   }

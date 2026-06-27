@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -69,9 +71,7 @@ class PortfolioController extends Notifier<PortfolioState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final items = await _repository.getItems();
-      for (final item in items) {
-        debugPrint('[Portfolio] loaded item.imagePath: ${item.imagePath}');
-      }
+      await _logLoadedImagePaths(items);
       state = state.copyWith(items: items, isLoading: false);
     } catch (_) {
       state = state.copyWith(
@@ -87,9 +87,7 @@ class PortfolioController extends Notifier<PortfolioState> {
     try {
       await _repository.addItem(item);
       final items = await _repository.getItems();
-      for (final item in items) {
-        debugPrint('[Portfolio] loaded item.imagePath: ${item.imagePath}');
-      }
+      await _logLoadedImagePaths(items);
       state = state.copyWith(items: items, isLoading: false);
     } catch (_) {
       state = state.copyWith(
@@ -105,6 +103,7 @@ class PortfolioController extends Notifier<PortfolioState> {
     try {
       await _repository.removeItem(id);
       final items = await _repository.getItems();
+      await _logLoadedImagePaths(items);
       state = state.copyWith(items: items, isLoading: false);
     } catch (_) {
       state = state.copyWith(
@@ -126,6 +125,29 @@ class PortfolioController extends Notifier<PortfolioState> {
         errorMessage: 'Unable to clear portfolio.',
       );
     }
+  }
+
+  Future<void> _logLoadedImagePaths(List<CollectibleItem> items) async {
+    for (final item in items) {
+      debugPrint('[Portfolio] loaded item.imagePath: ${item.imagePath}');
+      debugPrint(
+        '[Portfolio] loaded image file exists: '
+        '${await _localFileExists(item.imagePath)}',
+      );
+    }
+  }
+
+  Future<bool> _localFileExists(String imagePath) async {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty ||
+        normalizedPath.startsWith('sample://') ||
+        normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://') ||
+        normalizedPath.startsWith('assets/')) {
+      return false;
+    }
+
+    return File(normalizedPath).exists();
   }
 }
 

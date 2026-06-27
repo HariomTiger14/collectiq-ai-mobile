@@ -153,6 +153,47 @@ class PortfolioEmptyState extends StatelessWidget {
   }
 }
 
+/// Empty state shown when search filters hide all saved items.
+class PortfolioNoSearchResultsState extends StatelessWidget {
+  /// Creates a no search results state.
+  const PortfolioNoSearchResultsState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.search_off, size: 44, color: colorScheme.primary),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'No matching collectibles',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Try a different title or category.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Error state shown when local portfolio loading fails.
 class PortfolioErrorState extends StatelessWidget {
   /// Creates a portfolio error state.
