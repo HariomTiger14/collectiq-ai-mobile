@@ -45,6 +45,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (selectedImagePath != null &&
         selectedImagePath != _lastSelectedImagePath) {
       _lastSelectedImagePath = selectedImagePath;
+      ScanImagePreview.precacheSelectedImage(
+        context,
+        imagePath: selectedImagePath,
+        image: next.selectedImage,
+      );
       setState(() {
         _highlightPreview = true;
       });
@@ -106,45 +111,50 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             switchOutCurve: AppMotion.fastCurve,
             child: selectedImagePath == null
                 ? const SizedBox.shrink(key: ValueKey('no-selected-image'))
-                : _AnimatedScanSection(
-                    key: _previewKey,
-                    child: AppResponsiveColumn(
-                      spacing: AppSpacing.md,
-                      children: [
-                        ScanSelectedImageCard(
-                          imagePath: selectedImagePath,
-                          image: scannerState.selectedImage,
-                          title:
-                              scannerState.selectedItemTitle ??
-                              'Captured image',
-                          status:
-                              scannerState.selectedItemStatus ??
-                              'Ready for AI analysis',
-                          isHighlighted: _highlightPreview,
+                : KeyedSubtree(
+                    key: ValueKey('selected-preview-$selectedImagePath'),
+                    child: _AnimatedScanSection(
+                      child: Container(
+                        key: _previewKey,
+                        child: AppResponsiveColumn(
+                          spacing: AppSpacing.md,
+                          children: [
+                            ScanSelectedImageCard(
+                              imagePath: selectedImagePath,
+                              image: scannerState.selectedImage,
+                              title:
+                                  scannerState.selectedItemTitle ??
+                                  'Captured image',
+                              status:
+                                  scannerState.selectedItemStatus ??
+                                  'Ready for AI analysis',
+                              isHighlighted: _highlightPreview,
+                            ),
+                            const ScanAnalyzeButton(),
+                            AnimatedSwitcher(
+                              duration: AppMotion.slideDuration,
+                              switchInCurve: AppMotion.standardCurve,
+                              switchOutCurve: AppMotion.fastCurve,
+                              child: isAnalyzing
+                                  ? const _AnimatedScanSection(
+                                      key: ValueKey('processing-panel'),
+                                      child: LoadingPanel(
+                                        title: 'Analyzing your collectible',
+                                        messages: [
+                                          'Scanning collectible',
+                                          'Identifying item',
+                                          'Estimating value',
+                                        ],
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey('processing-panel-empty'),
+                                    ),
+                            ),
+                          ],
                         ),
-                        const ScanAnalyzeButton(),
-                      ],
+                      ),
                     ),
-                  ),
-          ),
-          AnimatedSwitcher(
-            duration: AppMotion.slideDuration,
-            switchInCurve: AppMotion.standardCurve,
-            switchOutCurve: AppMotion.fastCurve,
-            child: isAnalyzing
-                ? const _AnimatedScanSection(
-                    key: ValueKey('processing-panel'),
-                    child: LoadingPanel(
-                      title: 'Analyzing your collectible',
-                      messages: [
-                        'Scanning collectible...',
-                        'Identifying item...',
-                        'Estimating value...',
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(
-                    key: ValueKey('processing-panel-empty'),
                   ),
           ),
           AnimatedSwitcher(
@@ -168,6 +178,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         recommendation:
                             scannerState.aiRecommendation ??
                             'Consider grading before selling.',
+                        image: selectedImagePath == null
+                            ? null
+                            : AspectRatio(
+                                aspectRatio: 4 / 3,
+                                child: ScanImagePreview(
+                                  imagePath: selectedImagePath,
+                                  image: scannerState.selectedImage,
+                                ),
+                              ),
                       ),
                     ),
                   ),

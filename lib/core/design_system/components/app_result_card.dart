@@ -9,6 +9,7 @@ class ResultCard extends StatelessWidget {
     required this.category,
     required this.estimatedValue,
     required this.confidence,
+    this.condition,
     this.image,
     this.action,
     super.key,
@@ -18,6 +19,7 @@ class ResultCard extends StatelessWidget {
   final String category;
   final String estimatedValue;
   final String confidence;
+  final String? condition;
   final Widget? image;
   final Widget? action;
 
@@ -49,17 +51,89 @@ class ResultCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          _EstimatedValuePanel(value: estimatedValue),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              Flexible(child: ValueBadge(value: estimatedValue)),
-              const SizedBox(width: AppSpacing.sm),
               Flexible(child: ConfidenceBadge(confidence: confidence)),
+              if (condition != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Flexible(
+                  child: StatusChip(
+                    label: condition!,
+                    icon: Icons.workspace_premium_outlined,
+                  ),
+                ),
+              ],
             ],
           ),
           if (action != null) ...[
             const SizedBox(height: AppSpacing.lg),
             action!,
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimatedValuePanel extends StatelessWidget {
+  const _EstimatedValuePanel({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.estimatedValueGold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        border: Border.all(
+          color: AppColors.estimatedValueGold.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.estimatedValueGold.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.medium),
+            ),
+            child: const Icon(
+              Icons.paid_outlined,
+              color: AppColors.estimatedValueGold,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Estimated Value',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  value,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: AppColors.estimatedValueGold,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

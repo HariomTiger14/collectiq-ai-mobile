@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
@@ -258,11 +260,7 @@ class ScanSelectedImageCard extends StatelessWidget {
             aspectRatio: 4 / 3,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.medium),
-              child: _ScanPreviewImage(
-                imagePath: imagePath,
-                image: image,
-                colorScheme: colorScheme,
-              ),
+              child: ScanImagePreview(imagePath: imagePath, image: image),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -352,12 +350,11 @@ class ScannerResultPanel extends ConsumerWidget {
           category: category,
           estimatedValue: estimatedValue,
           confidence: confidence,
+          condition: condition,
           image: image,
           action: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ResultDetail(label: 'Condition', value: condition),
-              const SizedBox(height: AppSpacing.md),
               Text(
                 'Recommendation',
                 style: textTheme.labelLarge?.copyWith(
@@ -387,88 +384,92 @@ class ScannerResultPanel extends ConsumerWidget {
   }
 }
 
-class _ResultDetail extends StatelessWidget {
-  const _ResultDetail({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.medium),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: textTheme.labelMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScanPreviewImage extends StatelessWidget {
-  const _ScanPreviewImage({
+class ScanImagePreview extends StatelessWidget {
+  const ScanImagePreview({
     required this.imagePath,
     required this.image,
-    required this.colorScheme,
+    super.key,
   });
 
   final String imagePath;
   final XFile? image;
-  final ColorScheme colorScheme;
+
+  static final Map<String, Uint8List> _byteCache = {};
+  static final Map<String, Future<Uint8List>> _byteFutureCache = {};
+
+  static Future<void> precacheSelectedImage(
+    BuildContext context, {
+    required String imagePath,
+    required XFile? image,
+  }) async {
+    if (imagePath.startsWith('sample://') || image == null) {
+      return;
+    }
+
+    final bytes = await _bytesFor(imagePath, image);
+    if (!context.mounted) {
+      return;
+    }
+    await precacheImage(MemoryImage(bytes), context);
+  }
+
+  static Future<Uint8List> _bytesFor(String imagePath, XFile image) {
+    final cachedBytes = _byteCache[imagePath];
+    if (cachedBytes != null) {
+      return Future.value(cachedBytes);
+    }
+
+    return _byteFutureCache.putIfAbsent(imagePath, () async {
+      final bytes = await image.readAsBytes();
+      _byteCache[imagePath] = bytes;
+      return bytes;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (imagePath.startsWith('sample://')) {
-      return _fallback(Icons.style_outlined);
+      return _fallback(colorScheme, Icons.style_outlined);
     }
 
     final selectedImage = image;
     if (selectedImage == null) {
-      return _fallback(Icons.image_outlined);
+      return _fallback(colorScheme, Icons.image_outlined);
+    }
+
+    final cachedBytes = _byteCache[imagePath];
+    if (cachedBytes != null) {
+      return _memoryImage(cachedBytes, colorScheme);
     }
 
     return FutureBuilder(
-      future: selectedImage.readAsBytes(),
+      future: _bytesFor(imagePath, selectedImage),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return _fallback(Icons.image_outlined);
+          return _fallback(colorScheme, Icons.image_outlined);
         }
 
-        return Image.memory(
-          snapshot.data!,
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return _fallback(Icons.broken_image_outlined);
-          },
-        );
+        return _memoryImage(snapshot.data!, colorScheme);
       },
     );
   }
 
-  Widget _fallback(IconData icon) {
+  Widget _memoryImage(Uint8List bytes, ColorScheme colorScheme) {
+    return Image.memory(
+      bytes,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) {
+        return _fallback(colorScheme, Icons.broken_image_outlined);
+      },
+    );
+  }
+
+  Widget _fallback(ColorScheme colorScheme, IconData icon) {
     return Container(
       width: double.infinity,
       height: double.infinity,

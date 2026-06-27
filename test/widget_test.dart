@@ -221,9 +221,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Analyzing your collectible'), findsOneWidget);
-    expect(find.text('Scanning collectible...'), findsOneWidget);
-    expect(find.text('Identifying item...'), findsOneWidget);
-    expect(find.text('Estimating value...'), findsOneWidget);
+    expect(find.text('Scanning collectible'), findsOneWidget);
+    expect(find.text('Identifying item'), findsOneWidget);
+    expect(find.text('Estimating value'), findsOneWidget);
 
     final analyzeButton = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Analyzing...'),
