@@ -11,6 +11,7 @@ class AppScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.padding,
+    this.controller,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class AppScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
   final EdgeInsetsGeometry? padding;
+  final ScrollController? controller;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class AppScaffold extends StatelessWidget {
       floatingActionButton: floatingActionButton,
       body: SafeArea(
         child: AppResponsivePage(
+          controller: controller,
           padding: padding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

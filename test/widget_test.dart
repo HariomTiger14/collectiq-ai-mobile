@@ -52,11 +52,13 @@ void main() {
 
     expect(find.text('Scan Collectible'), findsOneWidget);
     expect(
-      find.text('Choose camera or gallery, then analyze your item.'),
+      find.text(
+        'Capture or upload a collectible to identify and estimate value.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Camera'), findsOneWidget);
-    expect(find.text('Choose from Gallery'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
     expect(find.text('Sample Scan'), findsOneWidget);
   });
 
@@ -102,9 +104,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.ensureVisible(find.text('Gallery'));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.text('Gallery'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -185,9 +187,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.ensureVisible(find.text('Gallery'));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.text('Gallery'));
     await tester.pump();
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
@@ -209,9 +211,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.ensureVisible(find.text('Gallery'));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.text('Gallery'));
     await tester.pump();
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
@@ -273,9 +275,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.ensureVisible(find.text('Gallery'));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.text('Gallery'));
     await tester.pump();
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();

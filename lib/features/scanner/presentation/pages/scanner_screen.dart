@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:flutter/material.dart';
@@ -50,7 +50,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       });
       _scrollTo(_previewKey, alignment: 0.08);
       _highlightTimer?.cancel();
-      _highlightTimer = Timer(const Duration(milliseconds: 900), () {
+      _highlightTimer = Timer(AppMotion.scaleDuration * 4, () {
         if (!mounted) {
           return;
         }
@@ -76,8 +76,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
       Scrollable.ensureVisible(
         context,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
+        duration: AppMotion.slideDuration * 2,
+        curve: AppMotion.standardCurve,
         alignment: alignment,
       );
     });
@@ -91,145 +91,108 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final scanResult = scannerState.scanResult;
     final isAnalyzing = scannerState.isAnalyzing;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth >= 700
-                ? AppSpacing.xxl
-                : AppSpacing.lg;
-
-            return SingleChildScrollView(
-              controller: _scrollController,
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.xl,
-                horizontalPadding,
-                AppSpacing.xxl,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const ScannerHeader(),
-                      const SizedBox(height: AppSpacing.xl),
-                      const ScanHeroCard(),
-                      const SizedBox(height: AppSpacing.xl),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child: selectedImagePath == null
-                            ? const SizedBox.shrink(
-                                key: ValueKey('no-selected-image'),
-                              )
-                            : _AnimatedScanSection(
-                                key: _previewKey,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    ScanPreviewCard(
-                                      imagePath: selectedImagePath,
-                                      image: scannerState.selectedImage,
-                                      title:
-                                          scannerState.selectedItemTitle ??
-                                          'Captured image',
-                                      status:
-                                          scannerState.selectedItemStatus ??
-                                          'Ready for AI analysis',
-                                      isHighlighted: _highlightPreview,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    const ScanAnalyzeButton(),
-                                  ],
-                                ),
-                              ),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 240),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child: isAnalyzing
-                            ? const Padding(
-                                key: ValueKey('processing-panel'),
-                                padding: EdgeInsets.only(top: AppSpacing.md),
-                                child: ProcessingPanel(),
-                              )
-                            : const SizedBox.shrink(
-                                key: ValueKey('processing-panel-empty'),
-                              ),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child: scanResult == null
-                            ? const SizedBox.shrink(key: ValueKey('no-result'))
-                            : Padding(
-                                key: ValueKey(scanResult.id),
-                                padding: const EdgeInsets.only(
-                                  top: AppSpacing.xl,
-                                ),
-                                child: KeyedSubtree(
-                                  key: _resultKey,
-                                  child: AiResultCard(
-                                    item: scanResult.title,
-                                    category: scanResult.category,
-                                    estimatedValue:
-                                        'AUD ${scanResult.estimatedValue.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}',
-                                    confidence:
-                                        '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
-                                    condition: scanResult.condition,
-                                    recommendation:
-                                        scannerState.aiRecommendation ??
-                                        'Consider grading before selling.',
-                                  ),
-                                ),
-                              ),
-                      ),
-                      if (selectedImagePath == null) ...[
-                        const SizedBox(height: AppSpacing.xxl),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.tips_and_updates_outlined,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Text(
-                                  'Use a clear, well-lit photo for the best valuation.',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
+    return AppScaffold(
+      controller: _scrollController,
+      title: 'Scan Collectible',
+      subtitle:
+          'Capture or upload a collectible to identify and estimate value.',
+      child: AppResponsiveColumn(
+        spacing: AppSpacing.xl,
+        children: [
+          const ScannerActionCards(),
+          AnimatedSwitcher(
+            duration: AppMotion.slideDuration,
+            switchInCurve: AppMotion.standardCurve,
+            switchOutCurve: AppMotion.fastCurve,
+            child: selectedImagePath == null
+                ? const SizedBox.shrink(key: ValueKey('no-selected-image'))
+                : _AnimatedScanSection(
+                    key: _previewKey,
+                    child: AppResponsiveColumn(
+                      spacing: AppSpacing.md,
+                      children: [
+                        ScanSelectedImageCard(
+                          imagePath: selectedImagePath,
+                          image: scannerState.selectedImage,
+                          title:
+                              scannerState.selectedItemTitle ??
+                              'Captured image',
+                          status:
+                              scannerState.selectedItemStatus ??
+                              'Ready for AI analysis',
+                          isHighlighted: _highlightPreview,
                         ),
+                        const ScanAnalyzeButton(),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+          ),
+          AnimatedSwitcher(
+            duration: AppMotion.slideDuration,
+            switchInCurve: AppMotion.standardCurve,
+            switchOutCurve: AppMotion.fastCurve,
+            child: isAnalyzing
+                ? const _AnimatedScanSection(
+                    key: ValueKey('processing-panel'),
+                    child: LoadingPanel(
+                      title: 'Analyzing your collectible',
+                      messages: [
+                        'Scanning collectible...',
+                        'Identifying item...',
+                        'Estimating value...',
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(
+                    key: ValueKey('processing-panel-empty'),
+                  ),
+          ),
+          AnimatedSwitcher(
+            duration: AppMotion.slideDuration,
+            switchInCurve: AppMotion.standardCurve,
+            switchOutCurve: AppMotion.fastCurve,
+            child: scanResult == null
+                ? const SizedBox.shrink(key: ValueKey('no-result'))
+                : KeyedSubtree(
+                    key: _resultKey,
+                    child: _AnimatedScanSection(
+                      key: ValueKey(scanResult.id),
+                      child: ScannerResultPanel(
+                        title: scanResult.title,
+                        category: scanResult.category,
+                        estimatedValue:
+                            'AUD ${scanResult.estimatedValue.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}',
+                        confidence:
+                            '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
+                        condition: scanResult.condition,
+                        recommendation:
+                            scannerState.aiRecommendation ??
+                            'Consider grading before selling.',
+                      ),
+                    ),
+                  ),
+          ),
+          if (selectedImagePath == null)
+            AppCard(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.tips_and_updates_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      'Use a clear, well-lit photo for the best valuation.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -244,8 +207,8 @@ class _AnimatedScanSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
+      duration: AppMotion.slideDuration,
+      curve: AppMotion.standardCurve,
       builder: (context, value, child) {
         return Opacity(
           opacity: value,

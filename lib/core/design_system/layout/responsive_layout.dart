@@ -38,18 +38,21 @@ class AppResponsivePage extends StatelessWidget {
     required this.child,
     this.padding,
     this.maxWidth = AppBreakpoints.maxContentWidth,
+    this.controller,
     super.key,
   });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final double maxWidth;
+  final ScrollController? controller;
 
   @override
   Widget build(BuildContext context) {
     final horizontalPadding = AppResponsive.horizontalPadding(context);
 
     return SingleChildScrollView(
+      controller: controller,
       padding:
           padding ??
           EdgeInsets.fromLTRB(
