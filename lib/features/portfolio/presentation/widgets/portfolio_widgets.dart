@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 
@@ -189,9 +190,9 @@ class PortfolioErrorState extends StatelessWidget {
   }
 }
 
-/// Responsive grid of saved portfolio items.
+/// Full-width list of saved portfolio items.
 class PortfolioItemsGrid extends StatelessWidget {
-  /// Creates a portfolio items grid.
+  /// Creates a portfolio items list.
   const PortfolioItemsGrid({
     required this.items,
     required this.onRemoveItem,
@@ -210,29 +211,20 @@ class PortfolioItemsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720 ? 2 : 1;
-        final spacing = AppSpacing.lg;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final item in items)
-              SizedBox(
-                width: itemWidth,
-                child: _PortfolioItemCard(
-                  item: item,
-                  onTap: () => onOpenItem(item),
-                  onRemove: () => onRemoveItem(item.id),
-                ),
-              ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        for (final item in items) ...[
+          SizedBox(
+            width: double.infinity,
+            child: _PortfolioItemCard(
+              item: item,
+              onTap: () => onOpenItem(item),
+              onRemove: () => onRemoveItem(item.id),
+            ),
+          ),
+          if (item != items.last) const SizedBox(height: AppSpacing.lg),
+        ],
+      ],
     );
   }
 }
@@ -251,7 +243,6 @@ class _PortfolioItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Material(
       color: Colors.transparent,
@@ -266,61 +257,227 @@ class _PortfolioItemCard extends StatelessWidget {
             border: Border.all(color: colorScheme.outlineVariant),
             boxShadow: AppElevation.level1,
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(Icons.style_outlined, color: colorScheme.primary),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${item.category} / ${item.condition}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      _formatAud(item.estimatedValue),
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final useVerticalLayout = constraints.maxWidth < 460;
+
+              final details = _PortfolioItemDetails(item: item);
+              final image = _PortfolioItemImage(imagePath: item.imagePath);
+              final removeButton = IconButton(
                 onPressed: onRemove,
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Remove item',
-              ),
-            ],
+              );
+
+              if (useVerticalLayout) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: image),
+                        const SizedBox(width: AppSpacing.md),
+                        removeButton,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    details,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  image,
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(child: details),
+                  const SizedBox(width: AppSpacing.md),
+                  removeButton,
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
+}
+
+class _PortfolioItemImage extends StatelessWidget {
+  const _PortfolioItemImage({required this.imagePath});
+
+  final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final image = _imageForPath();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        width: 104,
+        height: 104,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: image,
+      ),
+    );
+  }
+
+  Widget _imageForPath() {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
+      return const _PortfolioImagePlaceholder();
+    }
+
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return Image.network(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    if (normalizedPath.startsWith('assets/')) {
+      return Image.asset(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    return buildLocalPortfolioImage(
+      imagePath: normalizedPath,
+      fit: BoxFit.cover,
+      placeholderBuilder: () => const _PortfolioImagePlaceholder(),
+    );
+  }
+}
+
+class _PortfolioImagePlaceholder extends StatelessWidget {
+  const _PortfolioImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: colorScheme.primary,
+        size: 32,
+      ),
+    );
+  }
+}
+
+class _PortfolioItemDetails extends StatelessWidget {
+  const _PortfolioItemDetails({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '${item.category} / ${item.condition}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _PortfolioItemMetric(
+              label: 'Value',
+              value: _formatAud(item.estimatedValue),
+              isEmphasized: true,
+            ),
+            _PortfolioItemMetric(
+              label: 'Confidence',
+              value: '${(item.confidence * 100).toStringAsFixed(0)}%',
+            ),
+            _PortfolioItemMetric(
+              label: 'Saved',
+              value: _formatDate(item.createdAt),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PortfolioItemMetric extends StatelessWidget {
+  const _PortfolioItemMetric({
+    required this.label,
+    required this.value,
+    this.isEmphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isEmphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      width: 128,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall?.copyWith(
+              color: isEmphasized ? colorScheme.primary : colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day/$month/${date.year}';
 }
 
 String _formatAud(double value) {

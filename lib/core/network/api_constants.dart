@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Supported backend environments for CollectIQ AI.
 enum AppEnvironment {
   /// Local development and developer testing.
@@ -68,9 +70,17 @@ class ApiConstants {
   /// Returns the base URL for an environment.
   static String baseUrlFor(AppEnvironment environment) {
     return switch (environment) {
-      AppEnvironment.development => 'http://127.0.0.1:8000',
+      AppEnvironment.development => _developmentBaseUrl,
       AppEnvironment.staging => 'https://staging-api.collectiq.ai',
       AppEnvironment.production => 'https://api.collectiq.ai',
     };
+  }
+
+  static String get _developmentBaseUrl {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://192.168.0.81:8000';
+    }
+
+    return 'http://127.0.0.1:8000';
   }
 }

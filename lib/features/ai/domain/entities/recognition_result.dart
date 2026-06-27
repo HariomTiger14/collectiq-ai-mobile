@@ -51,7 +51,7 @@ class RecognitionResult {
     return RecognitionResult(
       success: json['success'] as bool? ?? true,
       filename: json['filename'] as String?,
-      imageUrl: json['imageUrl'] as String?,
+      imageUrl: (json['imageUrl'] ?? json['image_url']) as String?,
       title: json['title'] as String,
       category: json['category'] as String,
       confidence: confidence > 1 ? confidence / 100 : confidence,

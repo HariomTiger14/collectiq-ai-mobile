@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
@@ -194,6 +196,36 @@ void main() {
     expect(find.text('AUD 1,850'), findsWidgets);
   });
 
+  testWidgets('saves gallery image path to portfolio item', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.pump();
+    await tester.tap(find.text('Choose from Gallery'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pump();
+
+    final preferences = await SharedPreferences.getInstance();
+    final encodedItems = preferences.getString('portfolio_items');
+    final decodedItems = jsonDecode(encodedItems!) as List<dynamic>;
+    final item = decodedItems.single as Map<String, dynamic>;
+
+    expect(item['imagePath'], 'test/fixtures/card.jpg');
+  });
+
   testWidgets('loads saved portfolio items from local storage', (
     WidgetTester tester,
   ) async {
@@ -337,7 +369,7 @@ class _FakeAIRecognitionService implements AIRecognitionService {
     return const RecognitionResult(
       success: true,
       filename: 'scan.png',
-      imageUrl: 'http://127.0.0.1:8000/uploads/scan.png',
+      imageUrl: 'http://192.168.0.81:8000/uploads/scan.png',
       title: '1999 Pokémon Charizard',
       category: 'Trading Card',
       confidence: 0.94,

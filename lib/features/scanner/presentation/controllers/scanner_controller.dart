@@ -10,9 +10,9 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 
 /// Immutable presentation state for the scanner workflow.
 class ScannerState {
@@ -204,6 +204,7 @@ class ScannerController extends Notifier<ScannerState> {
 
       await _galleryService.validateImage(image);
       final selectedImagePath = _displayPathFor(image);
+      debugPrint('[Scanner] selected image path: $selectedImagePath');
       state = state.copyWith(
         selectedImage: image,
         selectedImagePath: selectedImagePath,
@@ -244,7 +245,11 @@ class ScannerController extends Notifier<ScannerState> {
       final recognition = selectedImagePath.startsWith('sample://')
           ? _sampleRecognitionResult()
           : await _recognizeSelectedImage();
-      final thumbnail = recognition.imageUrl ?? selectedImagePath;
+      final thumbnail = _portfolioImagePathFor(
+        selectedImagePath: selectedImagePath,
+        recognitionImageUrl: recognition.imageUrl,
+      );
+      debugPrint('[Scanner] scan result thumbnail/imagePath: $thumbnail');
       state = state.copyWith(
         isLoading: false,
         scanResult: ScanResult(
@@ -296,6 +301,10 @@ class ScannerController extends Notifier<ScannerState> {
       createdAt: DateTime.now(),
     );
 
+    debugPrint(
+      '[Scanner] CollectibleItem.imagePath before saving: '
+      '${item.imagePath}',
+    );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
   }
 
@@ -329,6 +338,36 @@ class ScannerController extends Notifier<ScannerState> {
     }
 
     return image.name.isEmpty ? 'selected-image' : image.name;
+  }
+
+  String _portfolioImagePathFor({
+    required String selectedImagePath,
+    required String? recognitionImageUrl,
+  }) {
+    if (_isUsableSelectedImagePath(selectedImagePath)) {
+      return selectedImagePath;
+    }
+
+    final normalizedRecognitionImageUrl = recognitionImageUrl?.trim();
+    if (normalizedRecognitionImageUrl != null &&
+        normalizedRecognitionImageUrl.isNotEmpty) {
+      return normalizedRecognitionImageUrl;
+    }
+
+    return selectedImagePath;
+  }
+
+  bool _isUsableSelectedImagePath(String imagePath) {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty) {
+      return false;
+    }
+
+    if (normalizedPath.startsWith('sample://')) {
+      return false;
+    }
+
+    return normalizedPath != 'selected-image';
   }
 
   String _messageForNetworkError(NetworkException error) {

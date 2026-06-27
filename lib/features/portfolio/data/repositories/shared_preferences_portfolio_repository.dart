@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local portfolio repository backed by shared preferences.
@@ -13,6 +14,10 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
 
   @override
   Future<void> addItem(CollectibleItem item) async {
+    debugPrint(
+      '[PortfolioRepository] saving item.imagePath: '
+      '${item.imagePath}',
+    );
     final items = await getItems();
     final updatedItems = [
       item,
@@ -30,9 +35,16 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
     }
 
     final decodedItems = jsonDecode(encodedItems) as List<dynamic>;
-    return decodedItems
+    final items = decodedItems
         .map((item) => CollectibleItem.fromJson(item as Map<String, dynamic>))
         .toList(growable: false);
+    for (final item in items) {
+      debugPrint(
+        '[PortfolioRepository] loaded item.imagePath: '
+        '${item.imagePath}',
+      );
+    }
+    return items;
   }
 
   @override
