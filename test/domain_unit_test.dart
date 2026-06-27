@@ -99,7 +99,7 @@ void main() {
       final result = RecognitionResult.fromJson({
         'success': true,
         'filename': 'scan.png',
-        'imageUrl': 'http://127.0.0.1:8000/uploads/scan.png',
+        'imageUrl': 'http://192.168.0.81:8000/uploads/scan.png',
         'title': '1999 Pokémon Charizard',
         'category': 'Trading Card',
         'confidence': 94,
@@ -111,7 +111,7 @@ void main() {
       expect(result.title, '1999 Pokémon Charizard');
       expect(result.success, isTrue);
       expect(result.filename, 'scan.png');
-      expect(result.imageUrl, 'http://127.0.0.1:8000/uploads/scan.png');
+      expect(result.imageUrl, 'http://192.168.0.81:8000/uploads/scan.png');
       expect(result.category, 'Trading Card');
       expect(result.confidence, 0.94);
       expect(result.description, isEmpty);

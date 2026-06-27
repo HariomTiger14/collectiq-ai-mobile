@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/ai/services/ai_recognition_service.dart';
+import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
@@ -111,6 +114,39 @@ void main() {
     expect(find.text('Gallery picker coming next'), findsNothing);
   });
 
+  testWidgets('scanner camera capture shows preview', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.tap(find.text('Scan with Camera'));
+    await tester.pump();
+
+    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Ready for AI analysis'), findsOneWidget);
+    expect(find.text('Analyze with AI'), findsOneWidget);
+  });
+
+  testWidgets('scanner camera cancellation shows friendly message', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _CancelledCameraService());
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.tap(find.text('Scan with Camera'));
+    await tester.pump();
+
+    expect(find.text('Camera capture cancelled.'), findsOneWidget);
+    expect(find.text('Analyze with AI'), findsNothing);
+  });
+
   testWidgets('scanner sample scan shows fake AI result', (
     WidgetTester tester,
   ) async {
@@ -182,7 +218,7 @@ void main() {
     await tester.ensureVisible(find.text('Save to Portfolio'));
     await tester.pump();
     await tester.tap(find.text('Save to Portfolio'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Saved to portfolio'), findsOneWidget);
 
@@ -193,6 +229,40 @@ void main() {
     expect(find.text('Total Value'), findsOneWidget);
     expect(find.text('Total Items'), findsOneWidget);
     expect(find.text('AUD 1,850'), findsWidgets);
+  });
+
+  testWidgets('saves persistent camera image path to portfolio', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.tap(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+
+    final preferences = await SharedPreferences.getInstance();
+    final encodedItems = preferences.getString('portfolio_items');
+    final decodedItems = jsonDecode(encodedItems!) as List<dynamic>;
+    final item = decodedItems.single as Map<String, dynamic>;
+
+    expect(item['imagePath'], 'test/fixtures/persistent-camera-card.jpg');
   });
 
   testWidgets('loads saved portfolio items from local storage', (
@@ -372,18 +442,40 @@ extension on WidgetTester {
   Future<void> pumpCollectIqApp({
     AIRecognitionService aiRecognitionService =
         const _FakeAIRecognitionService(),
+    CameraService? cameraService,
     GalleryService? galleryService,
   }) {
     return pumpWidget(
       ProviderScope(
         overrides: [
           aiRecognitionServiceProvider.overrideWithValue(aiRecognitionService),
+          if (cameraService != null)
+            cameraServiceProvider.overrideWithValue(cameraService),
           if (galleryService != null)
             galleryServiceProvider.overrideWithValue(galleryService),
         ],
         child: const CollectIqApp(),
       ),
     );
+  }
+}
+
+class _SelectedCameraService extends CameraService {
+  @override
+  Future<XFile?> pickImageFromCamera() async {
+    return XFile('test/fixtures/camera-card.jpg');
+  }
+
+  @override
+  Future<XFile> persistCapturedImage(XFile image) async {
+    return XFile('test/fixtures/persistent-camera-card.jpg');
+  }
+}
+
+class _CancelledCameraService extends CameraService {
+  @override
+  Future<XFile?> pickImageFromCamera() async {
+    return null;
   }
 }
 
@@ -404,7 +496,7 @@ class _FakeAIRecognitionService implements AIRecognitionService {
     return const RecognitionResult(
       success: true,
       filename: 'scan.png',
-      imageUrl: 'http://127.0.0.1:8000/uploads/scan.png',
+      imageUrl: 'http://192.168.0.81:8000/uploads/scan.png',
       title: '1999 Pokémon Charizard',
       category: 'Trading Card',
       confidence: 0.94,
