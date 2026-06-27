@@ -298,47 +298,19 @@ class _PortfolioItemCard extends StatelessWidget {
             border: Border.all(color: colorScheme.outlineVariant),
             boxShadow: AppElevation.level1,
           ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final useVerticalLayout = constraints.maxWidth < 460;
-
-              final details = _PortfolioItemDetails(item: item);
-              final image = _PortfolioItemImage(imagePath: item.imagePath);
-              final removeButton = IconButton(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PortfolioItemImage(imagePath: item.imagePath),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(child: _PortfolioItemDetails(item: item)),
+              const SizedBox(width: AppSpacing.md),
+              IconButton(
                 onPressed: onRemove,
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Remove item',
-              );
-
-              if (useVerticalLayout) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: image),
-                        const SizedBox(width: AppSpacing.md),
-                        removeButton,
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    details,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  image,
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(child: details),
-                  const SizedBox(width: AppSpacing.md),
-                  removeButton,
-                ],
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
@@ -359,8 +331,8 @@ class _PortfolioItemImage extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
-        width: 104,
-        height: 104,
+        width: 110,
+        height: 110,
         decoration: BoxDecoration(
           color: colorScheme.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppRadius.md),
