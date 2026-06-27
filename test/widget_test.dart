@@ -5,6 +5,7 @@ import 'package:collectiq_ai/features/ai/services/ai_recognition_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -226,11 +227,77 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.tap(find.byTooltip('Remove item'));
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Persisted Charizard'), findsNothing);
     expect(find.text('No collectibles saved yet'), findsOneWidget);
+  });
+
+  testWidgets('filters portfolio items by search query', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"coin-1","title":"Silver Eagle","category":"Coin","estimatedValue":300,"confidence":0.82,"condition":"Mint","recommendation":"Store safely.","imagePath":"sample://coin","createdAt":"2026-06-26T00:00:00.000"},{"id":"card-1","title":"Charizard Holo","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading.","imagePath":"sample://card","createdAt":"2026-06-27T00:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(find.byType(TextFormField).first, 'coin');
+    await tester.pump();
+
+    expect(find.text('Silver Eagle'), findsOneWidget);
+    expect(find.text('Charizard Holo'), findsNothing);
+
+    await tester.enterText(find.byType(TextFormField).first, 'watch');
+    await tester.pump();
+
+    expect(find.text('No matching collectibles'), findsOneWidget);
+  });
+
+  testWidgets('sorts portfolio items by value and confidence', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"new-low","title":"Newest Low","category":"Comic","estimatedValue":100,"confidence":0.50,"condition":"Good","recommendation":"Hold.","imagePath":"sample://new","createdAt":"2026-06-27T00:00:00.000"},{"id":"old-high","title":"Old High Value","category":"Coin","estimatedValue":2000,"confidence":0.40,"condition":"Mint","recommendation":"Insure.","imagePath":"sample://old","createdAt":"2026-06-26T00:00:00.000"},{"id":"confident","title":"Best Confidence","category":"Card","estimatedValue":500,"confidence":0.99,"condition":"Near Mint","recommendation":"Grade.","imagePath":"sample://confident","createdAt":"2026-06-25T00:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      tester.getTopLeft(find.text('Newest Low')).dy,
+      lessThan(tester.getTopLeft(find.text('Old High Value')).dy),
+    );
+
+    await tester.tap(find.text('Newest first'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Value high to low').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.text('Old High Value')).dy,
+      lessThan(tester.getTopLeft(find.text('Newest Low')).dy),
+    );
+
+    await tester.tap(find.text('Value high to low'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confidence high to low').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.text('Best Confidence')).dy,
+      lessThan(tester.getTopLeft(find.text('Old High Value')).dy),
+    );
   });
 
   testWidgets('opens portfolio item detail page actions', (
@@ -254,8 +321,8 @@ void main() {
     expect(find.text('Estimated Value'), findsOneWidget);
     expect(find.text('Confidence'), findsOneWidget);
     expect(find.text('Condition'), findsOneWidget);
-    expect(find.text('Recommendation'), findsOneWidget);
-    expect(find.text('Created'), findsOneWidget);
+    expect(find.text('Notes'), findsOneWidget);
+    expect(find.text('Date Saved'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Price History'));
     await tester.pump();

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -152,6 +154,47 @@ class PortfolioEmptyState extends StatelessWidget {
   }
 }
 
+/// Empty state shown when search filters hide all saved items.
+class PortfolioNoSearchResultsState extends StatelessWidget {
+  /// Creates a no search results state.
+  const PortfolioNoSearchResultsState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.search_off, size: 44, color: colorScheme.primary),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'No matching collectibles',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Try a different title or category.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Error state shown when local portfolio loading fails.
 class PortfolioErrorState extends StatelessWidget {
   /// Creates a portfolio error state.
@@ -210,29 +253,20 @@ class PortfolioItemsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720 ? 2 : 1;
-        final spacing = AppSpacing.lg;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final item in items)
-              SizedBox(
-                width: itemWidth,
-                child: _PortfolioItemCard(
-                  item: item,
-                  onTap: () => onOpenItem(item),
-                  onRemove: () => onRemoveItem(item.id),
-                ),
-              ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        for (final item in items) ...[
+          SizedBox(
+            width: double.infinity,
+            child: _PortfolioItemCard(
+              item: item,
+              onTap: () => onOpenItem(item),
+              onRemove: () => onRemoveItem(item.id),
+            ),
+          ),
+          if (item != items.last) const SizedBox(height: AppSpacing.lg),
+        ],
+      ],
     );
   }
 }
@@ -268,15 +302,7 @@ class _PortfolioItemCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(Icons.style_outlined, color: colorScheme.primary),
-              ),
+              _PortfolioItemImage(imagePath: item.imagePath),
               const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
@@ -320,6 +346,71 @@ class _PortfolioItemCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PortfolioItemImage extends StatelessWidget {
+  const _PortfolioItemImage({required this.imagePath});
+
+  final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: _imageForPath(),
+      ),
+    );
+  }
+
+  Widget _imageForPath() {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
+      return const _PortfolioImagePlaceholder();
+    }
+
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return Image.network(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    if (normalizedPath.startsWith('assets/')) {
+      return Image.asset(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    return Image.file(
+      File(normalizedPath),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+    );
+  }
+}
+
+class _PortfolioImagePlaceholder extends StatelessWidget {
+  const _PortfolioImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Icon(Icons.style_outlined, color: colorScheme.primary);
   }
 }
 
