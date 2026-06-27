@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -268,15 +270,7 @@ class _PortfolioItemCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(Icons.style_outlined, color: colorScheme.primary),
-              ),
+              _PortfolioItemImage(imagePath: item.imagePath),
               const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
@@ -320,6 +314,71 @@ class _PortfolioItemCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PortfolioItemImage extends StatelessWidget {
+  const _PortfolioItemImage({required this.imagePath});
+
+  final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: _imageForPath(),
+      ),
+    );
+  }
+
+  Widget _imageForPath() {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
+      return const _PortfolioImagePlaceholder();
+    }
+
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return Image.network(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    if (normalizedPath.startsWith('assets/')) {
+      return Image.asset(
+        normalizedPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+      );
+    }
+
+    return Image.file(
+      File(normalizedPath),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
+    );
+  }
+}
+
+class _PortfolioImagePlaceholder extends StatelessWidget {
+  const _PortfolioImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Icon(Icons.style_outlined, color: colorScheme.primary);
   }
 }
 

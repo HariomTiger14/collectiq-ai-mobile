@@ -231,6 +231,15 @@ class _ScanActions extends ConsumerWidget {
               ? null
               : () async {
                   await scannerController.startCameraScan(context);
+                  if (!context.mounted) {
+                    return;
+                  }
+                  final errorMessage = ref
+                      .read(scannerControllerProvider)
+                      .errorMessage;
+                  if (errorMessage != null) {
+                    _showScannerSnackBar(context, errorMessage);
+                  }
                 },
         ),
         const SizedBox(height: AppSpacing.md),
