@@ -21,6 +21,7 @@ class ScannerState {
   const ScannerState({
     this.isCameraInitialized = false,
     this.isLoading = false,
+    this.isAnalyzing = false,
     this.selectedImage,
     this.selectedImagePath,
     this.selectedItemTitle,
@@ -35,6 +36,9 @@ class ScannerState {
 
   /// Whether the scanner workflow is currently loading.
   final bool isLoading;
+
+  /// Whether the selected image is currently being analyzed.
+  final bool isAnalyzing;
 
   /// Image selected from camera or gallery.
   final XFile? selectedImage;
@@ -61,6 +65,7 @@ class ScannerState {
   ScannerState copyWith({
     bool? isCameraInitialized,
     bool? isLoading,
+    bool? isAnalyzing,
     XFile? selectedImage,
     String? selectedImagePath,
     String? selectedItemTitle,
@@ -79,6 +84,7 @@ class ScannerState {
     return ScannerState(
       isCameraInitialized: isCameraInitialized ?? this.isCameraInitialized,
       isLoading: isLoading ?? this.isLoading,
+      isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       selectedImage: clearSelectedImage
           ? null
           : selectedImage ?? this.selectedImage,
@@ -264,7 +270,13 @@ class ScannerController extends Notifier<ScannerState> {
       return;
     }
 
-    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    state = state.copyWith(
+      isLoading: true,
+      isAnalyzing: true,
+      clearScanResult: true,
+      clearAiRecommendation: true,
+      clearErrorMessage: true,
+    );
     try {
       final recognition = selectedImagePath.startsWith('sample://')
           ? _sampleRecognitionResult()
@@ -276,6 +288,7 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint('[Scanner] ScanResult.thumbnail: $thumbnail');
       state = state.copyWith(
         isLoading: false,
+        isAnalyzing: false,
         scanResult: ScanResult(
           id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
           title: recognition.title,
@@ -291,6 +304,7 @@ class ScannerController extends Notifier<ScannerState> {
     } on NetworkException catch (error) {
       state = state.copyWith(
         isLoading: false,
+        isAnalyzing: false,
         errorMessage: _messageForNetworkError(error),
         clearScanResult: true,
         clearAiRecommendation: true,
@@ -298,6 +312,7 @@ class ScannerController extends Notifier<ScannerState> {
     } on Exception {
       state = state.copyWith(
         isLoading: false,
+        isAnalyzing: false,
         errorMessage: 'Something went wrong. Please try again.',
         clearScanResult: true,
         clearAiRecommendation: true,

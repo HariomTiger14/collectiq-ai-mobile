@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:collectiq_ai/main.dart';
@@ -49,17 +50,14 @@ void main() {
     await tester.tap(find.text('Scan'));
     await tester.pump();
 
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('Scan Collectible'), findsOneWidget);
     expect(
-      find.text('Instantly identify and value collectibles.'),
+      find.text('Choose camera or gallery, then analyze your item.'),
       findsOneWidget,
     );
-    expect(find.text('Scan with Camera'), findsOneWidget);
+    expect(find.text('Camera'), findsOneWidget);
     expect(find.text('Choose from Gallery'), findsOneWidget);
-    expect(find.text('Use Sample Scan'), findsOneWidget);
-    expect(find.text('Supported Categories'), findsOneWidget);
-    expect(find.text('How It Works'), findsOneWidget);
-    expect(find.text('Unlimited AI Scans'), findsOneWidget);
+    expect(find.text('Sample Scan'), findsOneWidget);
   });
 
   testWidgets('shows portfolio empty state', (WidgetTester tester) async {
@@ -121,9 +119,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.ensureVisible(find.text('Camera'));
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(find.text('Camera'));
     await tester.pump();
 
     expect(find.text('Captured image'), findsOneWidget);
@@ -138,9 +136,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.ensureVisible(find.text('Camera'));
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(find.text('Camera'));
     await tester.pump();
 
     expect(find.text('Camera capture cancelled.'), findsOneWidget);
@@ -154,9 +152,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.ensureVisible(find.text('Sample Scan'));
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(find.text('Sample Scan'));
     await tester.pump();
 
     expect(find.text('Sample Sports Card'), findsOneWidget);
@@ -200,14 +198,51 @@ void main() {
     expect(find.text('AI Result'), findsNothing);
   });
 
+  testWidgets('scanner shows processing state while analyzing', (
+    WidgetTester tester,
+  ) async {
+    final aiRecognitionService = _PendingAIRecognitionService();
+    await tester.pumpCollectIqApp(
+      aiRecognitionService: aiRecognitionService,
+      galleryService: _SelectedGalleryService(),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.pump();
+    await tester.tap(find.text('Choose from Gallery'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+
+    expect(find.text('Analyzing your collectible'), findsOneWidget);
+    expect(find.text('Scanning collectible...'), findsOneWidget);
+    expect(find.text('Identifying item...'), findsOneWidget);
+    expect(find.text('Estimating value...'), findsOneWidget);
+
+    final analyzeButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Analyzing...'),
+    );
+    expect(analyzeButton.onPressed, isNull);
+
+    aiRecognitionService.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('AI Result'), findsOneWidget);
+  });
+
   testWidgets('saves scanner result to portfolio', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.ensureVisible(find.text('Sample Scan'));
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(find.text('Sample Scan'));
     await tester.pump();
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
@@ -272,9 +307,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.ensureVisible(find.text('Camera'));
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(find.text('Camera'));
     await tester.pump();
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
@@ -538,6 +573,32 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       estimatedValue: 1850,
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',
+    );
+  }
+}
+
+class _PendingAIRecognitionService implements AIRecognitionService {
+  final Completer<RecognitionResult> _completer = Completer();
+
+  @override
+  Future<RecognitionResult> recognizeCollectible(XFile image) {
+    return _completer.future;
+  }
+
+  void complete() {
+    _completer.complete(
+      const RecognitionResult(
+        success: true,
+        filename: 'scan.png',
+        imageUrl: 'http://192.168.0.81:8000/uploads/scan.png',
+        title: '1999 PokÃ©mon Charizard',
+        category: 'Trading Card',
+        confidence: 0.94,
+        description: 'Likely a PokÃ©mon Base Set Charizard.',
+        estimatedValue: 1850,
+        condition: 'Near Mint',
+        recommendation: 'Consider grading before selling.',
+      ),
     );
   }
 }

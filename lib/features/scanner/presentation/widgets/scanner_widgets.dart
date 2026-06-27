@@ -46,7 +46,7 @@ class ScannerHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'AI Scanner',
+          'Scan Collectible',
           style: textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             height: 1.12,
@@ -54,7 +54,7 @@ class ScannerHeader extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Instantly identify and value collectibles.',
+          'Choose camera or gallery, then analyze your item.',
           style: textTheme.bodyLarge?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -74,126 +74,14 @@ class ScanHeroCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xxl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: [...AppElevation.level1, ...AppElevation.accentGlow],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 700;
-          final illustration = const _ScanIllustration();
-          final actions = _ScanActions(textTheme: textTheme);
-
-          if (isWide) {
-            return Row(
-              children: [
-                Expanded(child: illustration),
-                const SizedBox(width: AppSpacing.xxl),
-                Expanded(child: actions),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              illustration,
-              const SizedBox(height: AppSpacing.xl),
-              actions,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ScanIllustration extends StatelessWidget {
-  const _ScanIllustration();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AspectRatio(
-      aspectRatio: 1.24,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 176,
-              height: 176,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary.withValues(alpha: 0.14),
-                    colorScheme.secondary.withValues(alpha: 0.18),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-              ),
-            ),
-            Container(
-              width: 112,
-              height: 148,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: colorScheme.outlineVariant),
-                boxShadow: AppElevation.level1,
-              ),
-              child: Icon(
-                Icons.document_scanner_outlined,
-                size: 48,
-                color: colorScheme.primary,
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 52,
-              child: _SignalDot(icon: Icons.auto_awesome_outlined),
-            ),
-            Positioned(
-              bottom: 44,
-              left: 48,
-              child: _SignalDot(icon: Icons.query_stats_outlined),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SignalDot extends StatelessWidget {
-  const _SignalDot({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        shape: BoxShape.circle,
-        border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: AppElevation.level1,
       ),
-      child: Icon(icon, size: 19, color: colorScheme.primary),
+      child: _ScanActions(textTheme: textTheme),
     );
   }
 }
@@ -214,18 +102,18 @@ class _ScanActions extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Start a new scan',
+          'Start scan',
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Capture or upload a collectible to receive a structured AI valuation workflow.',
+          'Pick the best image source for this collectible.',
           style: textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: AppSpacing.xl),
-        _GradientScanButton(
+        const SizedBox(height: AppSpacing.lg),
+        _PrimaryScanActionCard(
           isLoading: scannerState.isLoading,
           onPressed: scannerState.isLoading
               ? null
@@ -243,7 +131,10 @@ class _ScanActions extends ConsumerWidget {
                 },
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
+        _SecondaryScanActionCard(
+          icon: Icons.photo_library_outlined,
+          title: 'Choose from Gallery',
+          subtitle: 'Import a saved collectible photo',
           onPressed: scannerState.isLoading
               ? null
               : () async {
@@ -258,70 +149,183 @@ class _ScanActions extends ConsumerWidget {
                     _showScannerSnackBar(context, errorMessage);
                   }
                 },
-          icon: const Icon(Icons.photo_library_outlined),
-          label: const Text('Choose from Gallery'),
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
+        _SecondaryScanActionCard(
+          icon: Icons.science_outlined,
+          title: 'Sample Scan',
+          subtitle: 'Try the flow with demo data',
           onPressed: scannerState.isLoading
               ? null
               : scannerController.useSampleScan,
-          icon: const Icon(Icons.science_outlined),
-          label: const Text('Use Sample Scan'),
         ),
       ],
     );
   }
 }
 
-class _GradientScanButton extends StatelessWidget {
-  const _GradientScanButton({required this.isLoading, required this.onPressed});
+class _PrimaryScanActionCard extends StatelessWidget {
+  const _PrimaryScanActionCard({
+    required this.isLoading,
+    required this.onPressed,
+  });
 
   final bool isLoading;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: AppGradients.primary,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        boxShadow: AppElevation.accentGlow,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: onPressed == null ? 0.62 : 1,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: AppGradients.primary,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppElevation.accentGlow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.lg,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: isLoading
+                          ? const SizedBox(
+                              key: ValueKey('camera-loading'),
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.4,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.photo_camera_outlined,
+                              key: ValueKey('camera-icon'),
+                              color: Colors.white,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Camera',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Capture a fresh photo',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
+    );
+  }
+}
+
+class _SecondaryScanActionCard extends StatelessWidget {
+  const _SecondaryScanActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: onPressed == null ? 0.58 : 1,
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          child: Padding(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            width: double.infinity,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.lg,
               vertical: AppSpacing.lg,
             ),
-            child: isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.4,
-                    ),
-                  )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(icon, color: colorScheme.primary),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.photo_camera_outlined, color: Colors.white),
-                      SizedBox(width: AppSpacing.sm),
                       Text(
-                        'Scan with Camera',
-                        style: TextStyle(
-                          color: Colors.white,
+                        title,
+                        style: textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        subtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
+                ),
+                Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+              ],
+            ),
           ),
         ),
       ),
@@ -343,6 +347,7 @@ class ScanPreviewCard extends ConsumerWidget {
     required this.image,
     required this.title,
     required this.status,
+    this.isHighlighted = false,
     super.key,
   });
 
@@ -358,77 +363,307 @@ class ScanPreviewCard extends ConsumerWidget {
   /// Display status for the selected scan.
   final String status;
 
+  /// Whether the selected image card should show a temporary highlight.
+  final bool isHighlighted;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isLoading = ref.watch(
-      scannerControllerProvider.select((state) => state.isLoading),
-    );
-    final scannerController = ref.read(scannerControllerProvider.notifier);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+        border: Border.all(
+          color: isHighlighted
+              ? colorScheme.primary
+              : colorScheme.outlineVariant,
+          width: isHighlighted ? 1.6 : 1,
+        ),
+        boxShadow: isHighlighted
+            ? [...AppElevation.level1, ...AppElevation.accentGlow]
+            : AppElevation.level1,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            child: _ScanPreviewThumbnail(
-              imagePath: imagePath,
-              image: image,
-              colorScheme: colorScheme,
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(
+                  Icons.check_circle_outline,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Image selected',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Review your image, then tap Analyze.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AspectRatio(
+            aspectRatio: 4 / 3,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: _ScanPreviewThumbnail(
+                imagePath: imagePath,
+                image: image,
+                colorScheme: colorScheme,
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
           ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            status,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ScanAnalyzeButton extends ConsumerWidget {
+  const ScanAnalyzeButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLoading = ref.watch(
+      scannerControllerProvider.select((state) => state.isLoading),
+    );
+    final scannerController = ref.read(scannerControllerProvider.notifier);
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      child: SizedBox(
+        key: ValueKey(isLoading),
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: isLoading
+              ? null
+              : () async {
+                  await scannerController.analyzeWithAi();
+                  if (!context.mounted) {
+                    return;
+                  }
+                  final errorMessage = ref
+                      .read(scannerControllerProvider)
+                      .errorMessage;
+                  if (errorMessage != null) {
+                    _showScannerSnackBar(context, errorMessage);
+                  }
+                },
+          icon: isLoading
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.auto_awesome_outlined),
+          label: Text(isLoading ? 'Analyzing...' : 'Analyze with AI'),
+        ),
+      ),
+    );
+  }
+}
+
+class ProcessingPanel extends StatelessWidget {
+  const ProcessingPanel({super.key});
+
+  static const _messages = [
+    _ProcessingMessage(
+      icon: Icons.center_focus_strong_outlined,
+      label: 'Scanning collectible...',
+    ),
+    _ProcessingMessage(
+      icon: Icons.manage_search_outlined,
+      label: 'Identifying item...',
+    ),
+    _ProcessingMessage(
+      icon: Icons.price_check_outlined,
+      label: 'Estimating value...',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.97, end: 1),
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          alignment: Alignment.topCenter,
+          child: child,
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+          boxShadow: [...AppElevation.level1, ...AppElevation.accentGlow],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.6,
+                      color: colorScheme.primary,
+                    ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  status,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Analyzing your collectible',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Hold tight while CollectIQ reads the image and market signals.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                FilledButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          await scannerController.analyzeWithAi();
-                          if (!context.mounted) {
-                            return;
-                          }
-                          final errorMessage = ref
-                              .read(scannerControllerProvider)
-                              .errorMessage;
-                          if (errorMessage != null) {
-                            _showScannerSnackBar(context, errorMessage);
-                          }
-                        },
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Analyze with AI'),
                 ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            for (var index = 0; index < _messages.length; index++) ...[
+              _ProcessingStatusRow(
+                message: _messages[index],
+                delay: Duration(milliseconds: 120 * index),
+              ),
+              if (index != _messages.length - 1)
+                const SizedBox(height: AppSpacing.sm),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProcessingMessage {
+  const _ProcessingMessage({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+}
+
+class _ProcessingStatusRow extends StatelessWidget {
+  const _ProcessingStatusRow({required this.message, required this.delay});
+
+  final _ProcessingMessage message;
+  final Duration delay;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        final adjustedValue = (value - delay.inMilliseconds / 1000).clamp(
+          0.0,
+          1.0,
+        );
+        return Opacity(
+          opacity: adjustedValue,
+          child: Transform.translate(
+            offset: Offset(0, 8 * (1 - adjustedValue)),
+            child: child,
+          ),
+        );
+      },
+      child: Row(
+        children: [
+          Icon(message.icon, size: 19, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message.label,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 54,
+            child: LinearProgressIndicator(
+              minHeight: 4,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              color: colorScheme.primary,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
             ),
           ),
         ],
@@ -442,18 +677,22 @@ class _ScanPreviewThumbnail extends StatelessWidget {
     required this.imagePath,
     required this.image,
     required this.colorScheme,
+    this.width = 104,
+    this.height = 104,
   });
 
   final String imagePath;
   final XFile? image;
   final ColorScheme colorScheme;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     if (imagePath.startsWith('sample://')) {
       return Container(
-        width: 88,
-        height: 88,
+        width: width,
+        height: height,
         color: colorScheme.primaryContainer,
         child: Icon(Icons.style_outlined, color: colorScheme.primary),
       );
@@ -473,8 +712,8 @@ class _ScanPreviewThumbnail extends StatelessWidget {
 
         return Image.memory(
           snapshot.data!,
-          width: 88,
-          height: 88,
+          width: width,
+          height: height,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return _fallbackThumbnail();
@@ -486,8 +725,8 @@ class _ScanPreviewThumbnail extends StatelessWidget {
 
   Widget _fallbackThumbnail() {
     return Container(
-      width: 88,
-      height: 88,
+      width: width,
+      height: height,
       color: colorScheme.primaryContainer,
       child: Icon(Icons.image_outlined, color: colorScheme.primary),
     );
@@ -531,47 +770,146 @@ class AiResultCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final scannerController = ref.read(scannerControllerProvider.notifier);
 
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: colorScheme.outlineVariant),
+          boxShadow: AppElevation.level1,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(Icons.auto_awesome, color: colorScheme.primary),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    'AI Result',
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _ResultHeroMetric(
+              label: 'Estimated Value',
+              value: estimatedValue,
+              icon: Icons.paid_outlined,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ResultMiniMetric(label: 'Item', value: item),
+            const SizedBox(height: AppSpacing.md),
+            _ResultMiniMetric(label: 'Category', value: category),
+            const SizedBox(height: AppSpacing.md),
+            _ResultMiniMetric(label: 'Confidence', value: confidence),
+            const SizedBox(height: AppSpacing.md),
+            _ResultMiniMetric(label: 'Condition', value: condition),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Recommendation',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(recommendation, style: textTheme.bodyMedium),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  await scannerController.saveScanResultToPortfolio();
+                  if (!context.mounted) {
+                    return;
+                  }
+                  _showScannerSnackBar(context, 'Saved to portfolio');
+                },
+                icon: const Icon(Icons.bookmark_add_outlined),
+                label: const Text('Save to Portfolio'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultHeroMetric extends StatelessWidget {
+  const _ResultHeroMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'AI Result',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _AiResultRow(label: 'Item', value: item),
-          _AiResultRow(label: 'Category', value: category),
-          _AiResultRow(label: 'Estimated Value', value: estimatedValue),
-          _AiResultRow(label: 'Confidence', value: confidence),
-          _AiResultRow(label: 'Condition', value: condition),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Recommendation',
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  value,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(recommendation, style: textTheme.bodyMedium),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: () async {
-              await scannerController.saveScanResultToPortfolio();
-              if (!context.mounted) {
-                return;
-              }
-              _showScannerSnackBar(context, 'Saved to portfolio');
-            },
-            child: const Text('Save to Portfolio'),
           ),
         ],
       ),
@@ -579,8 +917,8 @@ class AiResultCard extends ConsumerWidget {
   }
 }
 
-class _AiResultRow extends StatelessWidget {
-  const _AiResultRow({required this.label, required this.value});
+class _ResultMiniMetric extends StatelessWidget {
+  const _ResultMiniMetric({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -590,27 +928,31 @@ class _AiResultRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
         ],
       ),

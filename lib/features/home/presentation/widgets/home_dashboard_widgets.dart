@@ -155,29 +155,46 @@ class PortfolioSummaryCard extends StatelessWidget {
         border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: [...AppElevation.level1, ...AppElevation.accentGlow],
       ),
-      child: Wrap(
-        spacing: AppSpacing.xl,
-        runSpacing: AppSpacing.lg,
-        alignment: WrapAlignment.spaceBetween,
-        children: [
-          _PortfolioMetric(
-            label: 'Portfolio Value',
-            value: portfolioValue,
-            icon: Icons.account_balance_wallet_outlined,
-            valueColor: colorScheme.primary,
-          ),
-          _PortfolioMetric(
-            label: 'Total Items',
-            value: totalItems,
-            icon: Icons.grid_view_outlined,
-          ),
-          _PortfolioMetric(
-            label: 'Monthly Change',
-            value: monthlyChange,
-            icon: Icons.trending_up,
-            valueColor: AppColors.success,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 720 ? 3 : 1;
+          final spacing = columns == 1 ? AppSpacing.md : AppSpacing.lg;
+          final itemWidth =
+              (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioMetric(
+                  label: 'Portfolio Value',
+                  value: portfolioValue,
+                  icon: Icons.account_balance_wallet_outlined,
+                  valueColor: colorScheme.primary,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioMetric(
+                  label: 'Total Items',
+                  value: totalItems,
+                  icon: Icons.grid_view_outlined,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioMetric(
+                  label: 'Monthly Change',
+                  value: monthlyChange,
+                  icon: Icons.trending_up,
+                  valueColor: AppColors.success,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -201,47 +218,44 @@ class _PortfolioMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return SizedBox(
-      width: 220,
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(icon, color: colorScheme.primary),
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.74),
-                  ),
+          child: Icon(icon, color: colorScheme.primary),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.74),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleLarge?.copyWith(
-                    color: valueColor ?? colorScheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleLarge?.copyWith(
+                  color: valueColor ?? colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -311,14 +325,20 @@ class _QuickActionTile extends StatelessWidget {
       child: InkWell(
         onTap: () {},
         borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Padding(
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 124),
           padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: action.color.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -331,7 +351,7 @@ class _QuickActionTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -481,6 +501,7 @@ class _RecentScanTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
@@ -524,9 +545,16 @@ class _RecentScanTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          Text(
-            scan.estimatedValue,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              scan.estimatedValue,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -550,49 +578,73 @@ class PremiumBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [...AppElevation.level2, ...AppElevation.accentGlow],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Unlock unlimited AI scans',
-                  style: textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final content = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Upgrade for deeper valuations and faster collection insights.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
-                  ),
+                child: const Icon(Icons.auto_awesome, color: Colors.white),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Unlock unlimited AI scans',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Upgrade for deeper valuations and faster collection insights.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.76),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          FilledButton(
+              ),
+            ],
+          );
+
+          final button = FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: AppColors.ink,
             ),
             onPressed: () {},
             child: const Text('Upgrade'),
-          ),
-        ],
+          );
+
+          if (constraints.maxWidth >= 560) {
+            return Row(
+              children: [
+                Expanded(child: content),
+                const SizedBox(width: AppSpacing.lg),
+                button,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              content,
+              const SizedBox(height: AppSpacing.lg),
+              button,
+            ],
+          );
+        },
       ),
     );
   }

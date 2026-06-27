@@ -152,17 +152,24 @@ class _DetailCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _DetailRow(label: 'Category', value: item.category),
-          _DetailRow(
-            label: 'Estimated Value',
-            value: _formatAud(item.estimatedValue),
+          _DetailMetricsGrid(
+            metrics: [
+              _DetailMetricData(label: 'Category', value: item.category),
+              _DetailMetricData(
+                label: 'Estimated Value',
+                value: _formatAud(item.estimatedValue),
+              ),
+              _DetailMetricData(
+                label: 'Confidence',
+                value: '${(item.confidence * 100).toStringAsFixed(0)}%',
+              ),
+              _DetailMetricData(label: 'Condition', value: item.condition),
+              _DetailMetricData(
+                label: 'Date Saved',
+                value: _formatDate(item.createdAt),
+              ),
+            ],
           ),
-          _DetailRow(
-            label: 'Confidence',
-            value: '${(item.confidence * 100).toStringAsFixed(0)}%',
-          ),
-          _DetailRow(label: 'Condition', value: item.condition),
-          _DetailRow(label: 'Date Saved', value: _formatDate(item.createdAt)),
           const SizedBox(height: AppSpacing.md),
           Text(
             'Notes',
@@ -178,8 +185,45 @@ class _DetailCard extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
+class _DetailMetricData {
+  const _DetailMetricData({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+class _DetailMetricsGrid extends StatelessWidget {
+  const _DetailMetricsGrid({required this.metrics});
+
+  final List<_DetailMetricData> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 560 ? 2 : 1;
+        final spacing = AppSpacing.md;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final metric in metrics)
+              SizedBox(
+                width: itemWidth,
+                child: _DetailMetric(label: metric.label, value: metric.value),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DetailMetric extends StatelessWidget {
+  const _DetailMetric({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -189,27 +233,31 @@ class _DetailRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -260,24 +308,22 @@ class _PriceHistorySection extends StatelessWidget {
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.md,
-            children: [
-              _PriceMetric(
+          _PriceMetricsGrid(
+            metrics: [
+              _PriceMetricData(
                 label: 'Current Value',
                 value: _formatAud(currentValue.toDouble()),
               ),
-              _PriceMetric(
+              _PriceMetricData(
                 label: '6-month Change',
                 value:
                     '+${_formatAud(change.toDouble())} (${changePercent.toStringAsFixed(0)}%)',
               ),
-              _PriceMetric(
+              _PriceMetricData(
                 label: 'Highest Value',
                 value: _formatAud(highestValue.toDouble()),
               ),
-              _PriceMetric(
+              _PriceMetricData(
                 label: 'Lowest Value',
                 value: _formatAud(lowestValue.toDouble()),
               ),
@@ -317,6 +363,43 @@ class _PricePoint {
   final int value;
 }
 
+class _PriceMetricData {
+  const _PriceMetricData({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+class _PriceMetricsGrid extends StatelessWidget {
+  const _PriceMetricsGrid({required this.metrics});
+
+  final List<_PriceMetricData> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 560 ? 2 : 1;
+        final spacing = AppSpacing.md;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final metric in metrics)
+              SizedBox(
+                width: itemWidth,
+                child: _PriceMetric(label: metric.label, value: metric.value),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _PriceMetric extends StatelessWidget {
   const _PriceMetric({required this.label, required this.value});
 
@@ -328,13 +411,21 @@ class _PriceMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return SizedBox(
-      width: 190,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -342,6 +433,8 @@ class _PriceMetric extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text(
             value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
@@ -416,25 +509,28 @@ class _ActionButtons extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton(
+        FilledButton.icon(
           onPressed: () {
             _showDetailSnackBar(context, 'Re-analysis coming next');
           },
-          child: const Text('Re-analyze'),
+          icon: const Icon(Icons.auto_awesome_outlined),
+          label: const Text('Re-analyze'),
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
+        OutlinedButton.icon(
           onPressed: () {
             _showDetailSnackBar(context, 'Price tracking coming next');
           },
-          child: const Text('Track Price'),
+          icon: const Icon(Icons.show_chart_outlined),
+          label: const Text('Track Price'),
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
+        OutlinedButton.icon(
           onPressed: () {
             _showDetailSnackBar(context, 'Marketplace listing coming next');
           },
-          child: const Text('Sell Item'),
+          icon: const Icon(Icons.storefront_outlined),
+          label: const Text('Sell Item'),
         ),
         if (onDelete != null) ...[
           const SizedBox(height: AppSpacing.md),

@@ -31,21 +31,36 @@ class PortfolioSummaryCard extends StatelessWidget {
         border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: [...AppElevation.level1, ...AppElevation.accentGlow],
       ),
-      child: Wrap(
-        spacing: AppSpacing.xl,
-        runSpacing: AppSpacing.lg,
-        children: [
-          _PortfolioMetric(
-            label: 'Total Value',
-            value: _formatAud(totalValue),
-            icon: Icons.account_balance_wallet_outlined,
-          ),
-          _PortfolioMetric(
-            label: 'Total Items',
-            value: itemCount.toString(),
-            icon: Icons.inventory_2_outlined,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 560 ? 2 : 1;
+          final spacing = columns == 1 ? AppSpacing.md : AppSpacing.lg;
+          final itemWidth =
+              (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioMetric(
+                  label: 'Total Value',
+                  value: _formatAud(totalValue),
+                  icon: Icons.account_balance_wallet_outlined,
+                ),
+              ),
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioMetric(
+                  label: 'Total Items',
+                  value: itemCount.toString(),
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -67,43 +82,44 @@ class _PortfolioMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return SizedBox(
-      width: 220,
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(icon, color: colorScheme.primary),
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+          child: Icon(icon, color: colorScheme.primary),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  value,
-                  style: textTheme.titleLarge?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -420,26 +436,70 @@ class _PortfolioItemDetails extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.sm,
-          children: [
-            _PortfolioItemMetric(
+        _PortfolioItemMetricsGrid(
+          metrics: [
+            _PortfolioItemMetricData(
               label: 'Value',
               value: _formatAud(item.estimatedValue),
               isEmphasized: true,
             ),
-            _PortfolioItemMetric(
+            _PortfolioItemMetricData(
               label: 'Confidence',
               value: '${(item.confidence * 100).toStringAsFixed(0)}%',
             ),
-            _PortfolioItemMetric(
+            _PortfolioItemMetricData(
               label: 'Saved',
               value: _formatDate(item.createdAt),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _PortfolioItemMetricData {
+  const _PortfolioItemMetricData({
+    required this.label,
+    required this.value,
+    this.isEmphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isEmphasized;
+}
+
+class _PortfolioItemMetricsGrid extends StatelessWidget {
+  const _PortfolioItemMetricsGrid({required this.metrics});
+
+  final List<_PortfolioItemMetricData> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 430 ? 3 : 1;
+        final spacing = columns == 1 ? AppSpacing.sm : AppSpacing.md;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final metric in metrics)
+              SizedBox(
+                width: itemWidth,
+                child: _PortfolioItemMetric(
+                  label: metric.label,
+                  value: metric.value,
+                  isEmphasized: metric.isEmphasized,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -460,29 +520,28 @@ class _PortfolioItemMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return SizedBox(
-      width: 128,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleSmall?.copyWith(
-              color: isEmphasized ? colorScheme.primary : colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleSmall?.copyWith(
+            color: isEmphasized ? colorScheme.primary : colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
