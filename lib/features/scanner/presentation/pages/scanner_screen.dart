@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
-  const ScannerScreen({super.key});
+  const ScannerScreen({this.onViewPortfolio, super.key});
+
+  final VoidCallback? onViewPortfolio;
 
   @override
   ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
@@ -21,6 +23,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Timer? _highlightTimer;
   String? _lastSelectedImagePath;
   String? _lastScanResultId;
+  String? _savedScanResultId;
+  bool _isSaving = false;
   bool _highlightPreview = false;
 
   @override
@@ -45,6 +49,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (selectedImagePath != null &&
         selectedImagePath != _lastSelectedImagePath) {
       _lastSelectedImagePath = selectedImagePath;
+      _savedScanResultId = null;
       ScanImagePreview.precacheSelectedImage(
         context,
         imagePath: selectedImagePath,
@@ -68,8 +73,49 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final scanResultId = next.scanResult?.id;
     if (scanResultId != null && scanResultId != _lastScanResultId) {
       _lastScanResultId = scanResultId;
+      _savedScanResultId = null;
       _scrollTo(_resultKey, alignment: 0.08);
     }
+  }
+
+  Future<void> _saveResultToPortfolio(String scanResultId) async {
+    if (_isSaving || _savedScanResultId == scanResultId) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    await ref
+        .read(scannerControllerProvider.notifier)
+        .saveScanResultToPortfolio();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = false;
+      _savedScanResultId = scanResultId;
+    });
+    _showScannerSnackBar(context, 'Saved to portfolio');
+  }
+
+  void _scanAnother() {
+    ref.read(scannerControllerProvider.notifier).resetScan();
+    _highlightTimer?.cancel();
+    setState(() {
+      _highlightPreview = false;
+      _isSaving = false;
+      _savedScanResultId = null;
+      _lastSelectedImagePath = null;
+      _lastScanResultId = null;
+    });
+    _scrollController.animateTo(
+      0,
+      duration: AppMotion.slideDuration * 2,
+      curve: AppMotion.standardCurve,
+    );
   }
 
   void _scrollTo(GlobalKey key, {required double alignment}) {
@@ -178,6 +224,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         recommendation:
                             scannerState.aiRecommendation ??
                             'Consider grading before selling.',
+                        isSaved: _savedScanResultId == scanResult.id,
+                        isSaving: _isSaving,
+                        onSave: () => _saveResultToPortfolio(scanResult.id),
+                        onViewPortfolio: widget.onViewPortfolio,
+                        onScanAnother: _scanAnother,
                         image: selectedImagePath == null
                             ? null
                             : AspectRatio(
@@ -215,6 +266,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       ),
     );
   }
+}
+
+void _showScannerSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _AnimatedScanSection extends StatelessWidget {

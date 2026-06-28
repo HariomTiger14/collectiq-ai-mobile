@@ -351,6 +351,21 @@ class ScannerController extends Notifier<ScannerState> {
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
   }
 
+  /// Clears the current scan selection, processing state, and result.
+  void resetScan() {
+    state = state.copyWith(
+      isLoading: false,
+      isAnalyzing: false,
+      clearSelectedImage: true,
+      clearSelectedImagePath: true,
+      clearSelectedItemTitle: true,
+      clearSelectedItemStatus: true,
+      clearScanResult: true,
+      clearAiRecommendation: true,
+      clearErrorMessage: true,
+    );
+  }
+
   /// Switches between available cameras.
   Future<void> switchCameras() {
     return _cameraService.switchCameras();

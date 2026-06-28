@@ -195,23 +195,24 @@ class _PortfolioItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PortfolioThumbnail(
-            size: 110,
-            placeholderIcon: Icons.image_not_supported_outlined,
-            child: _thumbnailForPath(item.imagePath),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: _PortfolioItemDetails(item: item)),
-          const SizedBox(width: AppSpacing.xs),
-          AppIconButton(
-            icon: Icons.delete_outline,
-            onPressed: onRemove,
-            tooltip: 'Remove item',
-          ),
-        ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.topLeft,
+              child: PortfolioThumbnail(
+                size: 110,
+                placeholderIcon: Icons.image_not_supported_outlined,
+                child: _thumbnailForPath(item.imagePath),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _PortfolioItemDetails(item: item, onRemove: onRemove),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -250,9 +251,10 @@ Widget? _thumbnailForPath(String imagePath) {
 }
 
 class _PortfolioItemDetails extends StatelessWidget {
-  const _PortfolioItemDetails({required this.item});
+  const _PortfolioItemDetails({required this.item, required this.onRemove});
 
   final CollectibleItem item;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -262,11 +264,32 @@ class _PortfolioItemDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          item.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, size: 20),
+                tooltip: 'Remove item',
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
@@ -277,7 +300,8 @@ class _PortfolioItemDetails extends StatelessWidget {
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
+        const Spacer(),
+        const SizedBox(height: AppSpacing.sm),
         Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,

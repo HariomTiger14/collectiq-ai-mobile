@@ -285,6 +285,83 @@ void main() {
     expect(find.text('AUD 1,850'), findsWidgets);
   });
 
+  testWidgets('scanner result shows post-save actions', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('View in Portfolio'), findsOneWidget);
+    expect(find.text('Scan Another'), findsOneWidget);
+    expect(find.text('Saved to portfolio'), findsOneWidget);
+
+    final savedButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Saved'),
+    );
+    expect(savedButton.onPressed, isNull);
+
+    await tester.pump(const Duration(seconds: 4));
+    await tester.ensureVisible(find.text('View in Portfolio'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'View in Portfolio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total collection value'), findsOneWidget);
+    expect(find.text('AUD 1,850'), findsWidgets);
+  });
+
+  testWidgets('scan another clears scanner result', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.ensureVisible(find.text('Scan Another'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Scan Another'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Image selected'), findsNothing);
+    expect(find.text('AI Result'), findsNothing);
+    expect(
+      find.text('Use a clear, well-lit photo for the best valuation.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('saves gallery image path to portfolio item', (
     WidgetTester tester,
   ) async {
@@ -481,30 +558,10 @@ void main() {
     expect(find.text('Condition'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
     expect(find.text('Date Saved'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Price History'));
-    await tester.pump();
-    expect(find.text('Price History'), findsOneWidget);
-    expect(find.text('Current Value'), findsOneWidget);
-    expect(find.text('6-month Change'), findsOneWidget);
-    expect(find.text('Highest Value'), findsOneWidget);
-    expect(find.text('Lowest Value'), findsOneWidget);
-    expect(find.text('AUD 1,200'), findsWidgets);
-    expect(find.text('Jan'), findsOneWidget);
-    expect(find.text('Jun'), findsOneWidget);
-
-    await tester.ensureVisible(
-      find.text(
-        'Market trend looks positive. Consider holding or grading before selling.',
-      ),
-    );
-    await tester.pump();
-    expect(
-      find.text(
-        'Market trend looks positive. Consider holding or grading before selling.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Asset Details'), findsOneWidget);
+    expect(find.text('Near Mint'), findsWidgets);
+    expect(find.text('AUD 1,850'), findsOneWidget);
+    expect(find.text('Consider grading before selling.'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Re-analyze'));
     await tester.pump();

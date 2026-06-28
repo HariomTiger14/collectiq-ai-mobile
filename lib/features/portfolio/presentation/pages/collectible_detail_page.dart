@@ -1,6 +1,5 @@
-import 'dart:io';
-
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 
@@ -17,54 +16,45 @@ class CollectibleDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: const Text('Collectible Details'),
-        actions: [
-          if (onDelete != null)
-            IconButton(
-              onPressed: () => onDelete!(item.id),
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete item',
-            ),
+    return AppScaffold(
+      child: AppResponsiveColumn(
+        spacing: AppSpacing.xl,
+        children: [
+          const _DetailNavigationHeader(),
+          _HeroImage(item: item),
+          _AssetHeader(item: item),
+          _EstimatedValueCard(item: item),
+          _DetailsCard(item: item),
+          _NotesCard(item: item),
+          _ActionButtons(onDelete: onDelete, itemId: item.id),
         ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.xl,
-            AppSpacing.lg,
-            AppSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ImagePreview(item: item),
-                  const SizedBox(height: AppSpacing.xl),
-                  _DetailCard(item: item),
-                  const SizedBox(height: AppSpacing.xl),
-                  const _PriceHistorySection(),
-                  const SizedBox(height: AppSpacing.xl),
-                  _ActionButtons(onDelete: onDelete, itemId: item.id),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
 }
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.item});
+class _DetailNavigationHeader extends StatelessWidget {
+  const _DetailNavigationHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppIconButton(
+          icon: Icons.arrow_back,
+          tooltip: 'Back to portfolio',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        const Expanded(child: SectionHeader(title: 'Collectible Details')),
+      ],
+    );
+  }
+}
+
+class _HeroImage extends StatelessWidget {
+  const _HeroImage({required this.item});
 
   final CollectibleItem item;
 
@@ -72,17 +62,15 @@ class _ImagePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      width: double.infinity,
-      height: 220,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.large),
+          child: _imageForPath(colorScheme),
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: _imageForPath(colorScheme),
     );
   }
 
@@ -97,6 +85,7 @@ class _ImagePreview extends StatelessWidget {
       return Image.network(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
     }
@@ -105,26 +94,30 @@ class _ImagePreview extends StatelessWidget {
       return Image.asset(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
     }
 
-    return Image.file(
-      File(normalizedPath),
+    return buildLocalPortfolioImage(
+      imagePath: normalizedPath,
       fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => _placeholder(colorScheme),
+      placeholderBuilder: () => _placeholder(colorScheme),
     );
   }
 
   Widget _placeholder(ColorScheme colorScheme) {
-    return Center(
-      child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
+    return Container(
+      color: colorScheme.primary.withValues(alpha: 0.08),
+      child: Center(
+        child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
+      ),
     );
   }
 }
 
-class _DetailCard extends StatelessWidget {
-  const _DetailCard({required this.item});
+class _AssetHeader extends StatelessWidget {
+  const _AssetHeader({required this.item});
 
   final CollectibleItem item;
 
@@ -133,365 +126,160 @@ class _DetailCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             item.title,
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            item.category,
+            style: textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _DetailMetricsGrid(
-            metrics: [
-              _DetailMetricData(label: 'Category', value: item.category),
-              _DetailMetricData(
-                label: 'Estimated Value',
-                value: _formatAud(item.estimatedValue),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              ConfidenceBadge(
+                confidence: '${(item.confidence * 100).toStringAsFixed(0)}%',
               ),
-              _DetailMetricData(
-                label: 'Confidence',
-                value: '${(item.confidence * 100).toStringAsFixed(0)}%',
+              StatusChip(
+                label: item.condition,
+                icon: Icons.workspace_premium_outlined,
               ),
-              _DetailMetricData(label: 'Condition', value: item.condition),
-              _DetailMetricData(
-                label: 'Date Saved',
-                value: _formatDate(item.createdAt),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Notes',
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(item.recommendation, style: textTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailMetricData {
-  const _DetailMetricData({required this.label, required this.value});
-
-  final String label;
-  final String value;
-}
-
-class _DetailMetricsGrid extends StatelessWidget {
-  const _DetailMetricsGrid({required this.metrics});
-
-  final List<_DetailMetricData> metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 2 : 1;
-        final spacing = AppSpacing.md;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final metric in metrics)
-              SizedBox(
-                width: itemWidth,
-                child: _DetailMetric(label: metric.label, value: metric.value),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _DetailMetric extends StatelessWidget {
-  const _DetailMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PriceHistorySection extends StatelessWidget {
-  const _PriceHistorySection();
-
-  static const _prices = [
-    _PricePoint(month: 'Jan', value: 1200),
-    _PricePoint(month: 'Feb', value: 1350),
-    _PricePoint(month: 'Mar', value: 1480),
-    _PricePoint(month: 'Apr', value: 1620),
-    _PricePoint(month: 'May', value: 1760),
-    _PricePoint(month: 'Jun', value: 1850),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final currentValue = _prices.last.value;
-    final lowestValue = _prices
-        .map((point) => point.value)
-        .reduce((current, next) => current < next ? current : next);
-    final highestValue = _prices
-        .map((point) => point.value)
-        .reduce((current, next) => current > next ? current : next);
-    final change = currentValue - _prices.first.value;
-    final changePercent = change / _prices.first.value * 100;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Price History',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _PriceMetricsGrid(
-            metrics: [
-              _PriceMetricData(
-                label: 'Current Value',
-                value: _formatAud(currentValue.toDouble()),
-              ),
-              _PriceMetricData(
-                label: '6-month Change',
-                value:
-                    '+${_formatAud(change.toDouble())} (${changePercent.toStringAsFixed(0)}%)',
-              ),
-              _PriceMetricData(
-                label: 'Highest Value',
-                value: _formatAud(highestValue.toDouble()),
-              ),
-              _PriceMetricData(
-                label: 'Lowest Value',
-                value: _formatAud(lowestValue.toDouble()),
+              StatusChip(
+                label: _formatDate(item.createdAt),
+                icon: Icons.calendar_today_outlined,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
-          _PriceBars(points: _prices, highestValue: highestValue),
-          const SizedBox(height: AppSpacing.xl),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.38),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Text(
-              'Market trend looks positive. Consider holding or grading before selling.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _PricePoint {
-  const _PricePoint({required this.month, required this.value});
+class _EstimatedValueCard extends StatelessWidget {
+  const _EstimatedValueCard({required this.item});
 
-  final String month;
-  final int value;
-}
-
-class _PriceMetricData {
-  const _PriceMetricData({required this.label, required this.value});
-
-  final String label;
-  final String value;
-}
-
-class _PriceMetricsGrid extends StatelessWidget {
-  const _PriceMetricsGrid({required this.metrics});
-
-  final List<_PriceMetricData> metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 2 : 1;
-        final spacing = AppSpacing.md;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final metric in metrics)
-              SizedBox(
-                width: itemWidth,
-                child: _PriceMetric(label: metric.label, value: metric.value),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _PriceMetric extends StatelessWidget {
-  const _PriceMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
+  final CollectibleItem item;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PriceBars extends StatelessWidget {
-  const _PriceBars({required this.points, required this.highestValue});
-
-  final List<_PricePoint> points;
-  final int highestValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SizedBox(
-      height: 156,
+    return AppCard(
+      backgroundColor: AppColors.estimatedValueGold.withValues(alpha: 0.1),
+      borderColor: AppColors.estimatedValueGold.withValues(alpha: 0.18),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          for (final point in points) ...[
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    _formatAud(point.value.toDouble()),
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    width: 24,
-                    height: 88 * point.value / highestValue,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    point.month,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.estimatedValueGold.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppRadius.medium),
             ),
-            if (point != points.last) const SizedBox(width: AppSpacing.sm),
-          ],
+            child: const Icon(
+              Icons.paid_outlined,
+              color: AppColors.estimatedValueGold,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Estimated Value',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _formatAud(item.estimatedValue),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineMedium?.copyWith(
+                    color: AppColors.estimatedValueGold,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailsCard extends StatelessWidget {
+  const _DetailsCard({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: AppResponsiveColumn(
+        spacing: AppSpacing.md,
+        children: [
+          const SectionHeader(title: 'Asset Details'),
+          MetricTile(
+            label: 'Category',
+            value: item.category,
+            icon: Icons.category_outlined,
+          ),
+          MetricTile(
+            label: 'Confidence',
+            value: '${(item.confidence * 100).toStringAsFixed(0)}%',
+            icon: Icons.verified_outlined,
+            valueColor: AppColors.confidenceBlue,
+          ),
+          MetricTile(
+            label: 'Condition',
+            value: item.condition,
+            icon: Icons.workspace_premium_outlined,
+          ),
+          MetricTile(
+            label: 'Date Saved',
+            value: _formatDate(item.createdAt),
+            icon: Icons.calendar_today_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotesCard extends StatelessWidget {
+  const _NotesCard({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'Notes'),
+          const SizedBox(height: AppSpacing.md),
+          Text(item.recommendation, style: textTheme.bodyMedium),
         ],
       ),
     );
@@ -506,40 +294,44 @@ class _ActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return AppResponsiveColumn(
+      spacing: AppSpacing.md,
       children: [
-        FilledButton.icon(
+        PrimaryButton(
+          label: 'Re-analyze',
+          icon: Icons.auto_awesome_outlined,
           onPressed: () {
             _showDetailSnackBar(context, 'Re-analysis coming next');
           },
-          icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('Re-analyze'),
         ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
+        SecondaryButton(
+          label: 'Track Price',
+          icon: Icons.show_chart_outlined,
           onPressed: () {
             _showDetailSnackBar(context, 'Price tracking coming next');
           },
-          icon: const Icon(Icons.show_chart_outlined),
-          label: const Text('Track Price'),
         ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
+        SecondaryButton(
+          label: 'Sell Item',
+          icon: Icons.storefront_outlined,
           onPressed: () {
             _showDetailSnackBar(context, 'Marketplace listing coming next');
           },
-          icon: const Icon(Icons.storefront_outlined),
-          label: const Text('Sell Item'),
         ),
-        if (onDelete != null) ...[
-          const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: () => onDelete!(itemId),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Delete Item'),
+        if (onDelete != null)
+          AppCard(
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.error.withValues(alpha: 0.08),
+            borderColor: Theme.of(
+              context,
+            ).colorScheme.error.withValues(alpha: 0.2),
+            child: SecondaryButton(
+              label: 'Delete Item',
+              icon: Icons.delete_outline,
+              onPressed: () => onDelete!(itemId),
+            ),
           ),
-        ],
       ],
     );
   }

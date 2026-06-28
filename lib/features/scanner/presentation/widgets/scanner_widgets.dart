@@ -315,7 +315,7 @@ class ScanAnalyzeButton extends ConsumerWidget {
   }
 }
 
-class ScannerResultPanel extends ConsumerWidget {
+class ScannerResultPanel extends StatelessWidget {
   const ScannerResultPanel({
     required this.title,
     required this.category,
@@ -323,7 +323,12 @@ class ScannerResultPanel extends ConsumerWidget {
     required this.confidence,
     required this.condition,
     required this.recommendation,
+    required this.isSaved,
+    required this.isSaving,
+    required this.onSave,
+    required this.onScanAnother,
     this.image,
+    this.onViewPortfolio,
     super.key,
   });
 
@@ -333,11 +338,15 @@ class ScannerResultPanel extends ConsumerWidget {
   final String confidence;
   final String condition;
   final String recommendation;
+  final bool isSaved;
+  final bool isSaving;
+  final VoidCallback onSave;
+  final VoidCallback onScanAnother;
+  final VoidCallback? onViewPortfolio;
   final Widget? image;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scannerController = ref.read(scannerControllerProvider.notifier);
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -365,16 +374,49 @@ class ScannerResultPanel extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xs),
               Text(recommendation, style: textTheme.bodyMedium),
               const SizedBox(height: AppSpacing.lg),
-              PrimaryButton(
-                label: 'Save to Portfolio',
-                icon: Icons.bookmark_add_outlined,
-                onPressed: () async {
-                  await scannerController.saveScanResultToPortfolio();
-                  if (!context.mounted) {
-                    return;
-                  }
-                  _showScannerSnackBar(context, 'Saved to portfolio');
-                },
+              AnimatedSwitcher(
+                duration: AppMotion.fadeDuration,
+                child: PrimaryButton(
+                  key: ValueKey('save-button-$isSaved-$isSaving'),
+                  label: isSaved
+                      ? 'Saved'
+                      : isSaving
+                      ? 'Saving...'
+                      : 'Save to Portfolio',
+                  icon: isSaved
+                      ? Icons.check_circle_outline
+                      : Icons.bookmark_add_outlined,
+                  isLoading: false,
+                  onPressed: isSaved || isSaving ? null : onSave,
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: AppMotion.slideDuration,
+                switchInCurve: AppMotion.standardCurve,
+                switchOutCurve: AppMotion.fastCurve,
+                child: isSaved
+                    ? Padding(
+                        key: const ValueKey('post-save-actions'),
+                        padding: const EdgeInsets.only(top: AppSpacing.md),
+                        child: AppResponsiveColumn(
+                          spacing: AppSpacing.md,
+                          children: [
+                            SecondaryButton(
+                              label: 'View in Portfolio',
+                              icon: Icons.inventory_2_outlined,
+                              onPressed: onViewPortfolio,
+                            ),
+                            SecondaryButton(
+                              label: 'Scan Another',
+                              icon: Icons.refresh,
+                              onPressed: onScanAnother,
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(
+                        key: ValueKey('post-save-actions-empty'),
+                      ),
               ),
             ],
           ),
