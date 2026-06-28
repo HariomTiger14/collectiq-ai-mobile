@@ -106,6 +106,31 @@ void main() {
         'estimatedValue': 1850,
         'condition': 'Near Mint',
         'recommendation': 'Consider grading before selling.',
+        'description': 'Likely a Pokemon card.',
+        'primaryMatch': '1999 Pokemon Charizard Holo',
+        'alternativeMatches': [
+          {
+            'title': '2016 Pokemon Evolutions Charizard',
+            'category': 'Trading Card',
+            'confidence': 68,
+            'reason': 'Similar artwork.',
+          },
+          {
+            'title': 'Pokemon Charizard Promo',
+            'category': 'Trading Card',
+            'confidence': 61,
+            'reason': 'Character match.',
+          },
+          {
+            'title': 'Pokemon Expedition Charizard',
+            'category': 'Trading Card',
+            'confidence': 58,
+            'reason': 'Fire-type cues.',
+          },
+        ],
+        'confidenceExplanation': 'Strong visual match.',
+        'detectionQuality': 'Good',
+        'aiReasoning': 'Card frame and character cues match.',
       });
 
       expect(result.title, '1999 Pokémon Charizard');
@@ -114,10 +139,34 @@ void main() {
       expect(result.imageUrl, 'http://192.168.0.81:8000/uploads/scan.png');
       expect(result.category, 'Trading Card');
       expect(result.confidence, 0.94);
-      expect(result.description, isEmpty);
+      expect(result.description, 'Likely a Pokemon card.');
       expect(result.estimatedValue, 1850);
       expect(result.condition, 'Near Mint');
       expect(result.recommendation, 'Consider grading before selling.');
+      expect(result.primaryMatch, '1999 Pokemon Charizard Holo');
+      expect(result.alternativeMatches, hasLength(3));
+      expect(result.alternativeMatches.first.confidence, 0.68);
+      expect(result.confidenceExplanation, 'Strong visual match.');
+      expect(result.detectionQuality, 'Good');
+      expect(result.aiReasoning, 'Card frame and character cues match.');
+    });
+
+    test('fromJson keeps compatibility with older backend response', () {
+      final result = RecognitionResult.fromJson({
+        'success': true,
+        'title': 'Vintage Coin',
+        'category': 'Coin',
+        'confidence': 82,
+        'estimatedValue': 120,
+        'condition': 'Very Fine',
+        'recommendation': 'Store safely.',
+      });
+
+      expect(result.primaryMatch, 'Vintage Coin');
+      expect(result.alternativeMatches, isEmpty);
+      expect(result.confidenceExplanation, isNotEmpty);
+      expect(result.detectionQuality, isNotEmpty);
+      expect(result.aiReasoning, isEmpty);
     });
   });
 

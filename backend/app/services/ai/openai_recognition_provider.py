@@ -9,6 +9,7 @@ import httpx
 from app.core.config import settings
 from app.services.ai.base_recognition_service import (
     AIRecognitionProvider,
+    AlternativeMatch,
     RecognitionResult,
 )
 
@@ -108,7 +109,9 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "text": (
                                 "Identify this collectible and estimate its "
                                 "collector profile. Return conservative, "
-                                "realistic values in Australian dollars."
+                                "realistic values in Australian dollars. "
+                                "Include reasoning, detection quality, and "
+                                "exactly three plausible alternative matches."
                             ),
                         },
                         {
@@ -135,6 +138,11 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "recommendation",
                             "description",
                             "detectedObjects",
+                            "primaryMatch",
+                            "alternativeMatches",
+                            "confidenceExplanation",
+                            "detectionQuality",
+                            "aiReasoning",
                         ],
                         "properties": {
                             "title": {"type": "string"},
@@ -155,6 +163,35 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                                 "type": "array",
                                 "items": {"type": "string"},
                             },
+                            "primaryMatch": {"type": "string"},
+                            "alternativeMatches": {
+                                "type": "array",
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "required": [
+                                        "title",
+                                        "category",
+                                        "confidence",
+                                        "reason",
+                                    ],
+                                    "properties": {
+                                        "title": {"type": "string"},
+                                        "category": {"type": "string"},
+                                        "confidence": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                        },
+                                        "reason": {"type": "string"},
+                                    },
+                                },
+                            },
+                            "confidenceExplanation": {"type": "string"},
+                            "detectionQuality": {"type": "string"},
+                            "aiReasoning": {"type": "string"},
                         },
                     },
                 }
@@ -205,6 +242,10 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             "condition",
             "recommendation",
             "description",
+            "primaryMatch",
+            "confidenceExplanation",
+            "detectionQuality",
+            "aiReasoning",
         ]
         for field in required_string_fields:
             value = payload.get(field)
@@ -220,6 +261,8 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             raise OpenAIInvalidResponseError(
                 "OpenAI structured output missing detectedObjects list."
             )
+
+        alternative_matches = self._parse_alternative_matches(payload)
 
         try:
             confidence = int(payload["confidence"])
@@ -240,7 +283,56 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             detectedObjects=[item.strip() for item in detected_objects],
             aiProvider=self.provider_name,
             processingTimeMs=max(1, processing_time_ms),
+            primaryMatch=payload["primaryMatch"].strip(),
+            alternativeMatches=alternative_matches,
+            confidenceExplanation=payload["confidenceExplanation"].strip(),
+            detectionQuality=payload["detectionQuality"].strip(),
+            aiReasoning=payload["aiReasoning"].strip(),
         )
+
+    def _parse_alternative_matches(
+        self,
+        payload: dict[str, Any],
+    ) -> list[AlternativeMatch]:
+        raw_matches = payload.get("alternativeMatches")
+        if not isinstance(raw_matches, list) or len(raw_matches) != 3:
+            raise OpenAIInvalidResponseError(
+                "OpenAI structured output must include exactly three alternative matches."
+            )
+
+        matches: list[AlternativeMatch] = []
+        for raw_match in raw_matches:
+            if not isinstance(raw_match, dict):
+                raise OpenAIInvalidResponseError(
+                    "OpenAI alternative matches must be JSON objects."
+                )
+
+            required_fields = ["title", "category", "reason"]
+            for field in required_fields:
+                value = raw_match.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise OpenAIInvalidResponseError(
+                        "OpenAI alternative match missing string field "
+                        f"'{field}'."
+                    )
+
+            try:
+                confidence = int(raw_match["confidence"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise OpenAIInvalidResponseError(
+                    "OpenAI alternative match had invalid confidence."
+                ) from exc
+
+            matches.append(
+                AlternativeMatch(
+                    title=raw_match["title"].strip(),
+                    category=raw_match["category"].strip(),
+                    confidence=max(0, min(confidence, 100)),
+                    reason=raw_match["reason"].strip(),
+                )
+            )
+
+        return matches
 
     def _media_type_for(self, image_path: Path) -> str:
         extension = image_path.suffix.lower()

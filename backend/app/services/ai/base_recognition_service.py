@@ -4,6 +4,14 @@ from typing import Protocol
 
 
 @dataclass(frozen=True)
+class AlternativeMatch:
+    title: str
+    category: str
+    confidence: int
+    reason: str
+
+
+@dataclass(frozen=True)
 class RecognitionResult:
     title: str
     category: str
@@ -15,6 +23,11 @@ class RecognitionResult:
     detectedObjects: list[str]
     aiProvider: str
     processingTimeMs: int
+    primaryMatch: str
+    alternativeMatches: list[AlternativeMatch]
+    confidenceExplanation: str
+    detectionQuality: str
+    aiReasoning: str
 
 
 class AIRecognitionProvider(Protocol):

@@ -125,4 +125,17 @@ async def analyze_scanner_image(
         detectedObjects=recognition.detectedObjects,
         aiProvider=recognition.aiProvider,
         processingTimeMs=recognition.processingTimeMs,
+        primaryMatch=recognition.primaryMatch,
+        alternativeMatches=[
+            {
+                "title": match.title,
+                "category": match.category,
+                "confidence": match.confidence,
+                "reason": match.reason,
+            }
+            for match in recognition.alternativeMatches
+        ],
+        confidenceExplanation=recognition.confidenceExplanation,
+        detectionQuality=recognition.detectionQuality,
+        aiReasoning=recognition.aiReasoning,
     )

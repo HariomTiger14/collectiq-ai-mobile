@@ -12,6 +12,11 @@ class ScanResultModel extends ScanResult {
     required super.condition,
     required super.thumbnail,
     required super.scanDate,
+    required super.primaryMatch,
+    required super.alternativeMatches,
+    required super.confidenceExplanation,
+    required super.detectionQuality,
+    required super.aiReasoning,
   });
 
   /// Creates a model from a JSON map.
@@ -25,6 +30,28 @@ class ScanResultModel extends ScanResult {
       condition: json['condition'] as String,
       thumbnail: json['thumbnail'] as String,
       scanDate: DateTime.parse(json['scanDate'] as String),
+      primaryMatch: json['primaryMatch'] as String? ?? json['title'] as String,
+      alternativeMatches: (json['alternativeMatches'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (match) => ScanAlternativeMatch(
+              title: match['title'] as String? ?? 'Unknown alternative',
+              category: match['category'] as String? ?? 'Collectible',
+              confidence: (match['confidence'] as num? ?? 0).toDouble(),
+              reason: match['reason'] as String? ?? '',
+            ),
+          )
+          .toList(),
+      confidenceExplanation:
+          json['confidenceExplanation'] as String? ??
+          'Confidence is based on visible collectible details.',
+      detectionQuality:
+          json['detectionQuality'] as String? ??
+          'Image quality was sufficient for analysis.',
+      aiReasoning:
+          json['aiReasoning'] as String? ??
+          json['description'] as String? ??
+          '',
     );
   }
 
@@ -39,6 +66,19 @@ class ScanResultModel extends ScanResult {
       'condition': condition,
       'thumbnail': thumbnail,
       'scanDate': scanDate.toIso8601String(),
+      'primaryMatch': primaryMatch,
+      'alternativeMatches': [
+        for (final match in alternativeMatches)
+          {
+            'title': match.title,
+            'category': match.category,
+            'confidence': match.confidence,
+            'reason': match.reason,
+          },
+      ],
+      'confidenceExplanation': confidenceExplanation,
+      'detectionQuality': detectionQuality,
+      'aiReasoning': aiReasoning,
     };
   }
 }

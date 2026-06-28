@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -503,6 +504,11 @@ class AiResultCard extends ConsumerWidget {
     required this.estimatedValue,
     required this.confidence,
     required this.condition,
+    required this.primaryMatch,
+    required this.alternativeMatches,
+    required this.confidenceExplanation,
+    required this.detectionQuality,
+    required this.aiReasoning,
     required this.recommendation,
     super.key,
   });
@@ -521,6 +527,21 @@ class AiResultCard extends ConsumerWidget {
 
   /// Result condition.
   final String condition;
+
+  /// Primary AI match label.
+  final String primaryMatch;
+
+  /// Top alternative matches.
+  final List<ScanAlternativeMatch> alternativeMatches;
+
+  /// Explanation for the confidence score.
+  final String confidenceExplanation;
+
+  /// Image and detection quality assessment.
+  final String detectionQuality;
+
+  /// AI reasoning for the primary match.
+  final String aiReasoning;
 
   /// Result recommendation.
   final String recommendation;
@@ -548,20 +569,57 @@ class AiResultCard extends ConsumerWidget {
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.md),
-          _AiResultRow(label: 'Item', value: item),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      primaryMatch,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _ConfidenceBadge(label: confidence),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
           _AiResultRow(label: 'Category', value: category),
           _AiResultRow(label: 'Estimated Value', value: estimatedValue),
-          _AiResultRow(label: 'Confidence', value: confidence),
           _AiResultRow(label: 'Condition', value: condition),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Recommendation',
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+          const SizedBox(height: AppSpacing.md),
+          _AiReviewSection(
+            title: 'Why this match?',
+            body:
+                '$confidenceExplanation\n\nDetection quality: $detectionQuality\n\n$aiReasoning',
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(recommendation, style: textTheme.bodyMedium),
+          if (alternativeMatches.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Alternative matches',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final match in alternativeMatches.take(3))
+              _AlternativeMatchTile(match: match),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          _AiReviewSection(title: 'Recommendation', body: recommendation),
           const SizedBox(height: AppSpacing.lg),
           FilledButton(
             onPressed: () async {
@@ -574,6 +632,123 @@ class AiResultCard extends ConsumerWidget {
             child: const Text('Save to Portfolio'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConfidenceBadge extends StatelessWidget {
+  const _ConfidenceBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _AiReviewSection extends StatelessWidget {
+  const _AiReviewSection({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: textTheme.labelLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(body, style: textTheme.bodyMedium),
+      ],
+    );
+  }
+}
+
+class _AlternativeMatchTile extends StatelessWidget {
+  const _AlternativeMatchTile({required this.match});
+
+  final ScanAlternativeMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    match.title,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  '${(match.confidence * 100).toStringAsFixed(0)}%',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              match.category,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(match.reason, style: textTheme.bodySmall),
+          ],
+        ),
       ),
     );
   }

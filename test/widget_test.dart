@@ -170,10 +170,14 @@ void main() {
     await tester.pump();
 
     expect(find.text('1999 Pokémon Charizard'), findsOneWidget);
-    expect(find.text('Trading Card'), findsOneWidget);
+    expect(find.text('Trading Card'), findsWidgets);
     expect(find.text('AUD 1,850'), findsOneWidget);
     expect(find.text('94%'), findsOneWidget);
     expect(find.text('Near Mint'), findsOneWidget);
+    expect(find.text('Why this match?'), findsOneWidget);
+    expect(find.text('Alternative matches'), findsOneWidget);
+    expect(find.text('2016 Pokemon Evolutions Charizard'), findsOneWidget);
+    expect(find.textContaining('High confidence'), findsOneWidget);
     expect(find.text('Consider grading before selling.'), findsOneWidget);
   });
 
@@ -538,6 +542,32 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       estimatedValue: 1850,
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',
+      primaryMatch: '1999 Pokemon Charizard Holo',
+      alternativeMatches: [
+        RecognitionAlternativeMatch(
+          title: '2016 Pokemon Evolutions Charizard',
+          category: 'Trading Card',
+          confidence: 0.68,
+          reason: 'Similar artwork and card layout.',
+        ),
+        RecognitionAlternativeMatch(
+          title: 'Pokemon Charizard Promo',
+          category: 'Trading Card',
+          confidence: 0.61,
+          reason: 'Character match is plausible.',
+        ),
+        RecognitionAlternativeMatch(
+          title: 'Pokemon Expedition Charizard',
+          category: 'Trading Card',
+          confidence: 0.58,
+          reason: 'Shares fire-type character cues.',
+        ),
+      ],
+      confidenceExplanation:
+          'High confidence from character artwork and holographic cues.',
+      detectionQuality: 'Good',
+      aiReasoning:
+          'The image shows a Charizard-like Pokemon card with collector cues.',
     );
   }
 }

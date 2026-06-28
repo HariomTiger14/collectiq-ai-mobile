@@ -1,6 +1,13 @@
 from pydantic import BaseModel
 
 
+class AlternativeMatchResponse(BaseModel):
+    title: str
+    category: str
+    confidence: int
+    reason: str
+
+
 class ScannerAnalysisResponse(BaseModel):
     success: bool
     filename: str
@@ -15,3 +22,8 @@ class ScannerAnalysisResponse(BaseModel):
     detectedObjects: list[str]
     aiProvider: str
     processingTimeMs: int
+    primaryMatch: str
+    alternativeMatches: list[AlternativeMatchResponse]
+    confidenceExplanation: str
+    detectionQuality: str
+    aiReasoning: str

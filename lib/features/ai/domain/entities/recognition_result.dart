@@ -1,3 +1,38 @@
+/// Alternative collectible match returned by the AI review system.
+class RecognitionAlternativeMatch {
+  /// Creates an immutable alternative match.
+  const RecognitionAlternativeMatch({
+    required this.title,
+    required this.category,
+    required this.confidence,
+    required this.reason,
+  });
+
+  /// Alternative collectible title.
+  final String title;
+
+  /// Alternative collectible category.
+  final String category;
+
+  /// Alternative confidence score from 0.0 to 1.0.
+  final double confidence;
+
+  /// Short explanation for why this alternative may fit.
+  final String reason;
+
+  /// Creates an alternative match from backend JSON.
+  factory RecognitionAlternativeMatch.fromJson(Map<String, dynamic> json) {
+    final confidence = (json['confidence'] as num? ?? 0).toDouble();
+
+    return RecognitionAlternativeMatch(
+      title: json['title'] as String? ?? 'Unknown alternative',
+      category: json['category'] as String? ?? 'Collectible',
+      confidence: confidence > 1 ? confidence / 100 : confidence,
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+}
+
 /// Domain entity for AI collectible recognition output.
 class RecognitionResult {
   /// Creates an immutable recognition result.
@@ -12,6 +47,11 @@ class RecognitionResult {
     required this.estimatedValue,
     required this.condition,
     required this.recommendation,
+    required this.primaryMatch,
+    required this.alternativeMatches,
+    required this.confidenceExplanation,
+    required this.detectionQuality,
+    required this.aiReasoning,
   });
 
   /// Whether the backend completed analysis successfully.
@@ -44,9 +84,29 @@ class RecognitionResult {
   /// Suggested next action returned by the backend.
   final String recommendation;
 
+  /// Primary AI match label.
+  final String primaryMatch;
+
+  /// Top alternative matches returned by the AI.
+  final List<RecognitionAlternativeMatch> alternativeMatches;
+
+  /// Explanation for the confidence score.
+  final String confidenceExplanation;
+
+  /// Image and detection quality assessment.
+  final String detectionQuality;
+
+  /// AI reasoning for the selected match.
+  final String aiReasoning;
+
   /// Creates a recognition result from backend JSON.
   factory RecognitionResult.fromJson(Map<String, dynamic> json) {
     final confidence = (json['confidence'] as num).toDouble();
+    final alternativeMatches =
+        (json['alternativeMatches'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(RecognitionAlternativeMatch.fromJson)
+            .toList();
 
     return RecognitionResult(
       success: json['success'] as bool? ?? true,
@@ -59,6 +119,17 @@ class RecognitionResult {
       estimatedValue: (json['estimatedValue'] as num).toDouble(),
       condition: json['condition'] as String,
       recommendation: json['recommendation'] as String,
+      primaryMatch: json['primaryMatch'] as String? ?? json['title'] as String,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation:
+          json['confidenceExplanation'] as String? ??
+          'Confidence is based on visible collectible details.',
+      detectionQuality:
+          json['detectionQuality'] as String? ??
+          'Image quality was sufficient for analysis.',
+      aiReasoning:
+          json['aiReasoning'] as String? ??
+          (json['description'] as String? ?? ''),
     );
   }
 }

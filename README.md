@@ -62,7 +62,31 @@ requests strict structured JSON with these Flutter-compatible fields:
   "description": "Classic baseball card with strong collector demand.",
   "detectedObjects": ["Card", "Baseball", "Yankees"],
   "aiProvider": "openai",
-  "processingTimeMs": 1240
+  "processingTimeMs": 1240,
+  "primaryMatch": "1952 Topps Mickey Mantle",
+  "alternativeMatches": [
+    {
+      "title": "1953 Topps Mickey Mantle",
+      "category": "Sports Card",
+      "confidence": 73,
+      "reason": "Same player and similar vintage card styling."
+    },
+    {
+      "title": "1951 Bowman Mickey Mantle",
+      "category": "Sports Card",
+      "confidence": 68,
+      "reason": "Same player rookie-era issue with related portrait cues."
+    },
+    {
+      "title": "1952 Topps Baseball Common",
+      "category": "Sports Card",
+      "confidence": 56,
+      "reason": "Same set layout, but player identity may differ."
+    }
+  ],
+  "confidenceExplanation": "Strong card layout and player cues, but print details need confirmation.",
+  "detectionQuality": "Good - subject and border are visible.",
+  "aiReasoning": "The image matches vintage baseball card proportions and Yankees-era Mantle visual cues."
 }
 ```
 

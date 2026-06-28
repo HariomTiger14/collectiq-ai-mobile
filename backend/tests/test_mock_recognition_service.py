@@ -35,6 +35,11 @@ class MockRecognitionProviderTest(unittest.TestCase):
         self.assertTrue(result.detectedObjects)
         self.assertEqual(result.aiProvider, "mock")
         self.assertGreater(result.processingTimeMs, 0)
+        self.assertEqual(result.primaryMatch, result.title)
+        self.assertEqual(len(result.alternativeMatches), 3)
+        self.assertTrue(result.confidenceExplanation)
+        self.assertTrue(result.detectionQuality)
+        self.assertTrue(result.aiReasoning)
 
     def test_recognize_returns_varied_mock_results(self) -> None:
         provider = MockRecognitionProvider()

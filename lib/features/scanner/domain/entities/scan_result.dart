@@ -1,3 +1,26 @@
+/// Alternative match displayed in the scan result review.
+class ScanAlternativeMatch {
+  /// Creates an immutable scan alternative match.
+  const ScanAlternativeMatch({
+    required this.title,
+    required this.category,
+    required this.confidence,
+    required this.reason,
+  });
+
+  /// Alternative collectible title.
+  final String title;
+
+  /// Alternative collectible category.
+  final String category;
+
+  /// Alternative confidence score from 0.0 to 1.0.
+  final double confidence;
+
+  /// Explanation for why the alternative may fit.
+  final String reason;
+}
+
 /// Domain entity representing the result of a completed collectible scan.
 class ScanResult {
   /// Creates an immutable scan result.
@@ -10,6 +33,11 @@ class ScanResult {
     required this.condition,
     required this.thumbnail,
     required this.scanDate,
+    required this.primaryMatch,
+    required this.alternativeMatches,
+    required this.confidenceExplanation,
+    required this.detectionQuality,
+    required this.aiReasoning,
   });
 
   /// Unique scan identifier.
@@ -35,4 +63,19 @@ class ScanResult {
 
   /// Date and time when the scan was created.
   final DateTime scanDate;
+
+  /// Primary AI match label.
+  final String primaryMatch;
+
+  /// Top alternative AI matches.
+  final List<ScanAlternativeMatch> alternativeMatches;
+
+  /// Explanation of the confidence score.
+  final String confidenceExplanation;
+
+  /// Image and detection quality assessment.
+  final String detectionQuality;
+
+  /// AI reasoning behind the primary match.
+  final String aiReasoning;
 }

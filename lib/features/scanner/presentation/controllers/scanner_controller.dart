@@ -285,6 +285,19 @@ class ScannerController extends Notifier<ScannerState> {
           condition: recognition.condition,
           thumbnail: thumbnail,
           scanDate: DateTime.now(),
+          primaryMatch: recognition.primaryMatch,
+          alternativeMatches: [
+            for (final match in recognition.alternativeMatches)
+              ScanAlternativeMatch(
+                title: match.title,
+                category: match.category,
+                confidence: match.confidence,
+                reason: match.reason,
+              ),
+          ],
+          confidenceExplanation: recognition.confidenceExplanation,
+          detectionQuality: recognition.detectionQuality,
+          aiReasoning: recognition.aiReasoning,
         ),
         aiRecommendation: recognition.recommendation,
       );
@@ -427,6 +440,32 @@ class ScannerController extends Notifier<ScannerState> {
       estimatedValue: 1850,
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',
+      primaryMatch: '1999 PokÃ©mon Charizard',
+      alternativeMatches: [
+        RecognitionAlternativeMatch(
+          title: '2016 Pokemon Evolutions Charizard',
+          category: 'Trading Card',
+          confidence: 0.68,
+          reason: 'Similar artwork and card layout.',
+        ),
+        RecognitionAlternativeMatch(
+          title: 'Pokemon Charizard Promo',
+          category: 'Trading Card',
+          confidence: 0.61,
+          reason: 'Character match is plausible.',
+        ),
+        RecognitionAlternativeMatch(
+          title: 'Pokemon Expedition Charizard',
+          category: 'Trading Card',
+          confidence: 0.58,
+          reason: 'Shares fire-type character cues.',
+        ),
+      ],
+      confidenceExplanation:
+          'High confidence from the character artwork, card frame, and holographic cues.',
+      detectionQuality: 'Good - sample image is clear enough for review.',
+      aiReasoning:
+          'The sample shows a Charizard-like Pokemon card with collector-relevant holo and border details.',
     );
   }
 }

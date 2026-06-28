@@ -71,6 +71,30 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
             "recommendation": "Authenticate and insure before sale.",
             "description": "Classic baseball card with strong collector demand.",
             "detectedObjects": ["Card", "Baseball", "Yankees"],
+            "primaryMatch": "1952 Topps Mickey Mantle",
+            "alternativeMatches": [
+                {
+                    "title": "1953 Topps Mickey Mantle",
+                    "category": "Sports Card",
+                    "confidence": 73,
+                    "reason": "Same player and similar vintage card styling.",
+                },
+                {
+                    "title": "1951 Bowman Mickey Mantle",
+                    "category": "Sports Card",
+                    "confidence": 68,
+                    "reason": "Same player rookie-era issue with related portrait cues.",
+                },
+                {
+                    "title": "1952 Topps Baseball Common",
+                    "category": "Sports Card",
+                    "confidence": 56,
+                    "reason": "Same set layout, but player identity may differ.",
+                },
+            ],
+            "confidenceExplanation": "Strong card layout and player cues, but print details need confirmation.",
+            "detectionQuality": "Good - subject and border are visible.",
+            "aiReasoning": "The image matches vintage baseball card proportions and Yankees-era Mantle visual cues.",
         }
         client = FakeClient(
             response=FakeResponse(body={"output_text": json.dumps(output)})
@@ -97,6 +121,12 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
         self.assertEqual(result.detectedObjects, ["Card", "Baseball", "Yankees"])
         self.assertEqual(result.aiProvider, "openai")
         self.assertGreater(result.processingTimeMs, 0)
+        self.assertEqual(result.primaryMatch, "1952 Topps Mickey Mantle")
+        self.assertEqual(len(result.alternativeMatches), 3)
+        self.assertEqual(result.alternativeMatches[0].confidence, 73)
+        self.assertEqual(result.confidenceExplanation, output["confidenceExplanation"])
+        self.assertEqual(result.detectionQuality, output["detectionQuality"])
+        self.assertEqual(result.aiReasoning, output["aiReasoning"])
         self.assertIsNotNone(client.last_request)
         self.assertEqual(client.last_request["url"], provider.responses_url)
         self.assertEqual(client.last_request["json"]["model"], "gpt-test")
@@ -114,6 +144,30 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
             "recommendation": "Store in a non-PVC holder.",
             "description": "Silver dollar with classic Morgan profile.",
             "detectedObjects": ["Coin", "Silver"],
+            "primaryMatch": "1921 Morgan Silver Dollar",
+            "alternativeMatches": [
+                {
+                    "title": "Peace Silver Dollar",
+                    "category": "Coin",
+                    "confidence": 70,
+                    "reason": "Similar size and silver tone.",
+                },
+                {
+                    "title": "1878 Morgan Silver Dollar",
+                    "category": "Coin",
+                    "confidence": 66,
+                    "reason": "Same coin type with uncertain date.",
+                },
+                {
+                    "title": "American Silver Eagle",
+                    "category": "Coin",
+                    "confidence": 52,
+                    "reason": "Silver coin appearance overlaps.",
+                },
+            ],
+            "confidenceExplanation": "Morgan dollar design cues are visible.",
+            "detectionQuality": "Fair - reflective surface obscures details.",
+            "aiReasoning": "The portrait and silver dollar format indicate Morgan dollar.",
         }
         client = FakeClient(
             response=FakeResponse(

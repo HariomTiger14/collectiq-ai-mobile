@@ -135,6 +135,12 @@ class ScannerScreen extends ConsumerWidget {
                           confidence:
                               '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
                           condition: scanResult.condition,
+                          primaryMatch: scanResult.primaryMatch,
+                          alternativeMatches: scanResult.alternativeMatches,
+                          confidenceExplanation:
+                              scanResult.confidenceExplanation,
+                          detectionQuality: scanResult.detectionQuality,
+                          aiReasoning: scanResult.aiReasoning,
                           recommendation:
                               scannerState.aiRecommendation ??
                               'Consider grading before selling.',
