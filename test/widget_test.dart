@@ -101,6 +101,23 @@ void main() {
     await tester.pump();
 
     expect(find.text('Settings'), findsWidgets);
+    expect(
+      find.text('Manage your app preferences and account options.'),
+      findsOneWidget,
+    );
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('App Preferences'), findsOneWidget);
+    expect(find.text('AI & Scanning'), findsOneWidget);
+    expect(find.text('Data & Privacy'), findsOneWidget);
+    expect(find.text('About'), findsOneWidget);
+    expect(find.text('Profile / Account'), findsOneWidget);
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('AI Model'), findsOneWidget);
+    expect(find.text('Export Portfolio'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.text('Terms'), findsOneWidget);
+    expect(find.text('App Version'), findsOneWidget);
   });
 
   testWidgets('switches between feature placeholders', (
