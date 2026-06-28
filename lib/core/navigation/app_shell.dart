@@ -19,7 +19,7 @@ class _AppShellState extends State<AppShell> {
     final tabs = <Widget>[
       HomeScreen(onScanPressed: () => _selectTab(1)),
       const ScannerScreen(),
-      const PortfolioScreen(),
+      PortfolioScreen(onScanPressed: () => _selectTab(1)),
       const SettingsScreen(),
     ];
 

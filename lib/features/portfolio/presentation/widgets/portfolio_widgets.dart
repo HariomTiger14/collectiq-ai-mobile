@@ -1,4 +1,4 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ class PortfolioSummaryCard extends StatelessWidget {
   const PortfolioSummaryCard({
     required this.totalValue,
     required this.itemCount,
+    required this.averageConfidence,
     super.key,
   });
 
@@ -18,44 +19,55 @@ class PortfolioSummaryCard extends StatelessWidget {
   /// Number of saved items.
   final int itemCount;
 
+  /// Average AI confidence across saved items.
+  final String averageConfidence;
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: [...AppElevation.level1, ...AppElevation.accentGlow],
+    return AppResponsiveSplit(
+      primary: MetricTile(
+        label: 'Total collection value',
+        value: _formatAud(totalValue),
+        icon: Icons.account_balance_wallet_outlined,
+        valueColor: AppColors.estimatedValueGold,
       ),
-      child: LayoutBuilder(
+      secondary: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 560 ? 2 : 1;
-          final spacing = columns == 1 ? AppSpacing.md : AppSpacing.lg;
-          final itemWidth =
-              (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-          return Wrap(
-            spacing: spacing,
-            runSpacing: spacing,
-            children: [
-              SizedBox(
-                width: itemWidth,
-                child: _PortfolioMetric(
-                  label: 'Total Value',
-                  value: _formatAud(totalValue),
-                  icon: Icons.account_balance_wallet_outlined,
-                ),
-              ),
-              SizedBox(
-                width: itemWidth,
-                child: _PortfolioMetric(
-                  label: 'Total Items',
+          if (constraints.maxWidth < 520) {
+            return AppResponsiveColumn(
+              spacing: AppSpacing.md,
+              children: [
+                MetricTile(
+                  label: 'Total items',
                   value: itemCount.toString(),
                   icon: Icons.inventory_2_outlined,
+                ),
+                MetricTile(
+                  label: 'Average confidence',
+                  value: averageConfidence,
+                  icon: Icons.verified_outlined,
+                  valueColor: AppColors.confidenceBlue,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: MetricTile(
+                  label: 'Total items',
+                  value: itemCount.toString(),
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: MetricTile(
+                  label: 'Average confidence',
+                  value: averageConfidence,
+                  icon: Icons.verified_outlined,
+                  valueColor: AppColors.confidenceBlue,
                 ),
               ),
             ],
@@ -66,104 +78,24 @@ class PortfolioSummaryCard extends StatelessWidget {
   }
 }
 
-class _PortfolioMetric extends StatelessWidget {
-  const _PortfolioMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Icon(icon, color: colorScheme.primary),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleLarge?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Empty state shown before items are saved to the portfolio.
 class PortfolioEmptyState extends StatelessWidget {
   /// Creates the portfolio empty state.
-  const PortfolioEmptyState({super.key});
+  const PortfolioEmptyState({this.onScanPressed, super.key});
+
+  /// Opens the scanner tab.
+  final VoidCallback? onScanPressed;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.inventory_2_outlined,
-            size: 44,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No collectibles saved yet',
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Analyze a scan and save it to start your portfolio.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+    return EmptyState(
+      icon: Icons.inventory_2_outlined,
+      title: 'No collectibles yet.',
+      message: 'Scan and save your first item to start your collector library.',
+      action: PrimaryButton(
+        label: 'Scan Collectible',
+        icon: Icons.document_scanner_outlined,
+        onPressed: onScanPressed,
       ),
     );
   }
@@ -172,39 +104,21 @@ class PortfolioEmptyState extends StatelessWidget {
 /// Empty state shown when search filters hide all saved items.
 class PortfolioNoSearchResultsState extends StatelessWidget {
   /// Creates a no search results state.
-  const PortfolioNoSearchResultsState({super.key});
+  const PortfolioNoSearchResultsState({required this.onResetSearch, super.key});
+
+  /// Clears the active search query.
+  final VoidCallback onResetSearch;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.search_off, size: 44, color: colorScheme.primary),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No matching collectibles',
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Try a different title or category.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+    return EmptyState(
+      icon: Icons.search_off,
+      title: 'No matching collectibles',
+      message: 'Try a different title or category.',
+      action: SecondaryButton(
+        label: 'Reset Search',
+        icon: Icons.refresh,
+        onPressed: onResetSearch,
       ),
     );
   }
@@ -220,29 +134,10 @@ class PortfolioErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.error_outline, size: 44, color: colorScheme.error),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: Icons.error_outline,
+      title: message,
+      message: 'Please try again in a moment.',
     );
   }
 }
@@ -268,19 +163,18 @@ class PortfolioItemsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return AppResponsiveColumn(
+      spacing: AppSpacing.md,
       children: [
-        for (final item in items) ...[
-          SizedBox(
-            width: double.infinity,
+        for (var index = 0; index < items.length; index++)
+          _PortfolioListAnimation(
+            delay: Duration(milliseconds: 36 * index),
             child: _PortfolioItemCard(
-              item: item,
-              onTap: () => onOpenItem(item),
-              onRemove: () => onRemoveItem(item.id),
+              item: items[index],
+              onTap: () => onOpenItem(items[index]),
+              onRemove: () => onRemoveItem(items[index].id),
             ),
           ),
-          if (item != items.last) const SizedBox(height: AppSpacing.lg),
-        ],
       ],
     );
   }
@@ -299,112 +193,60 @@ class _PortfolioItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: colorScheme.outlineVariant),
-            boxShadow: AppElevation.level1,
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PortfolioThumbnail(
+            size: 110,
+            placeholderIcon: Icons.image_not_supported_outlined,
+            child: _thumbnailForPath(item.imagePath),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PortfolioItemImage(imagePath: item.imagePath),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(child: _PortfolioItemDetails(item: item)),
-              const SizedBox(width: AppSpacing.md),
-              IconButton(
-                onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Remove item',
-              ),
-            ],
+          const SizedBox(width: AppSpacing.md),
+          Expanded(child: _PortfolioItemDetails(item: item)),
+          const SizedBox(width: AppSpacing.xs),
+          AppIconButton(
+            icon: Icons.delete_outline,
+            onPressed: onRemove,
+            tooltip: 'Remove item',
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _PortfolioItemImage extends StatelessWidget {
-  const _PortfolioItemImage({required this.imagePath});
-
-  final String imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final image = _imageForPath();
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: Container(
-        width: 110,
-        height: 110,
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: image,
-      ),
-    );
+Widget? _thumbnailForPath(String imagePath) {
+  final normalizedPath = imagePath.trim();
+  if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
+    return null;
   }
 
-  Widget _imageForPath() {
-    final normalizedPath = imagePath.trim();
-    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
-      return const _PortfolioImagePlaceholder();
-    }
-
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return Image.network(
-        normalizedPath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    }
-
-    if (normalizedPath.startsWith('assets/')) {
-      return Image.asset(
-        normalizedPath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    }
-
-    return buildLocalPortfolioImage(
-      imagePath: normalizedPath,
+  if (normalizedPath.startsWith('http://') ||
+      normalizedPath.startsWith('https://')) {
+    return Image.network(
+      normalizedPath,
       fit: BoxFit.cover,
-      placeholderBuilder: () => const _PortfolioImagePlaceholder(),
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
   }
-}
 
-class _PortfolioImagePlaceholder extends StatelessWidget {
-  const _PortfolioImagePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Center(
-      child: Icon(
-        Icons.image_not_supported_outlined,
-        color: colorScheme.primary,
-        size: 32,
-      ),
+  if (normalizedPath.startsWith('assets/')) {
+    return Image.asset(
+      normalizedPath,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
   }
+
+  return buildLocalPortfolioImage(
+    imagePath: normalizedPath,
+    fit: BoxFit.cover,
+    placeholderBuilder: () => const SizedBox.shrink(),
+  );
 }
 
 class _PortfolioItemDetails extends StatelessWidget {
@@ -424,11 +266,11 @@ class _PortfolioItemDetails extends StatelessWidget {
           item.title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          '${item.category} / ${item.condition}',
+          item.category,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: textTheme.bodySmall?.copyWith(
@@ -436,112 +278,51 @@ class _PortfolioItemDetails extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        _PortfolioItemMetricsGrid(
-          metrics: [
-            _PortfolioItemMetricData(
-              label: 'Value',
-              value: _formatAud(item.estimatedValue),
-              isEmphasized: true,
-            ),
-            _PortfolioItemMetricData(
-              label: 'Confidence',
-              value: '${(item.confidence * 100).toStringAsFixed(0)}%',
-            ),
-            _PortfolioItemMetricData(
-              label: 'Saved',
-              value: _formatDate(item.createdAt),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PortfolioItemMetricData {
-  const _PortfolioItemMetricData({
-    required this.label,
-    required this.value,
-    this.isEmphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final bool isEmphasized;
-}
-
-class _PortfolioItemMetricsGrid extends StatelessWidget {
-  const _PortfolioItemMetricsGrid({required this.metrics});
-
-  final List<_PortfolioItemMetricData> metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 430 ? 3 : 1;
-        final spacing = columns == 1 ? AppSpacing.sm : AppSpacing.md;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
+        Wrap(
+          spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: [
-            for (final metric in metrics)
-              SizedBox(
-                width: itemWidth,
-                child: _PortfolioItemMetric(
-                  label: metric.label,
-                  value: metric.value,
-                  isEmphasized: metric.isEmphasized,
-                ),
-              ),
+            ValueBadge(value: _formatAud(item.estimatedValue)),
+            ConfidenceBadge(
+              confidence: '${(item.confidence * 100).toStringAsFixed(0)}%',
+            ),
+            StatusChip(
+              label: _formatDate(item.createdAt),
+              icon: Icons.calendar_today_outlined,
+            ),
           ],
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
-class _PortfolioItemMetric extends StatelessWidget {
-  const _PortfolioItemMetric({
-    required this.label,
-    required this.value,
-    this.isEmphasized = false,
-  });
+class _PortfolioListAnimation extends StatelessWidget {
+  const _PortfolioListAnimation({required this.child, required this.delay});
 
-  final String label;
-  final String value;
-  final bool isEmphasized;
+  final Widget child;
+  final Duration delay;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: AppMotion.slideDuration + delay,
+      curve: AppMotion.standardCurve,
+      builder: (context, value, child) {
+        final progress = delay == Duration.zero
+            ? value
+            : (value - 0.12).clamp(0.0, 1.0);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
+        return Opacity(
+          opacity: progress,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - progress)),
+            child: child,
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.titleSmall?.copyWith(
-            color: isEmphasized ? colorScheme.primary : colorScheme.onSurface,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+        );
+      },
+      child: child,
     );
   }
 }

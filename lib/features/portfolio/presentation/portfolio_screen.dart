@@ -1,4 +1,4 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum _PortfolioSortMode {
-  newest(label: 'Newest first'),
-  value(label: 'Value high to low'),
-  confidence(label: 'Confidence high to low');
+  newest(label: 'Newest'),
+  value(label: 'Value'),
+  confidence(label: 'Confidence');
 
   const _PortfolioSortMode({required this.label});
 
@@ -17,7 +17,9 @@ enum _PortfolioSortMode {
 }
 
 class PortfolioScreen extends ConsumerStatefulWidget {
-  const PortfolioScreen({super.key});
+  const PortfolioScreen({this.onScanPressed, super.key});
+
+  final VoidCallback? onScanPressed;
 
   @override
   ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
@@ -29,115 +31,79 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final portfolioState = ref.watch(portfolioControllerProvider);
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     final visibleItems = _visibleItems(portfolioState.items);
+    final averageConfidence = _averageConfidence(portfolioState.items);
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth >= 700
-                ? AppSpacing.xxl
-                : AppSpacing.lg;
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.xl,
-                horizontalPadding,
-                AppSpacing.xxl,
+    return AppScaffold(
+      title: 'Portfolio',
+      subtitle: 'Track, search, and manage your collection.',
+      child: AppResponsiveColumn(
+        spacing: AppSpacing.xl,
+        children: [
+          PortfolioSummaryCard(
+            totalValue: portfolioState.totalValue,
+            itemCount: portfolioState.itemCount,
+            averageConfidence: averageConfidence,
+          ),
+          if (portfolioState.isLoading && portfolioState.items.isEmpty)
+            const Center(child: CircularProgressIndicator())
+          else if (portfolioState.errorMessage != null)
+            PortfolioErrorState(message: portfolioState.errorMessage!)
+          else if (portfolioState.items.isEmpty)
+            PortfolioEmptyState(onScanPressed: widget.onScanPressed)
+          else ...[
+            _PortfolioControls(
+              searchQuery: _searchQuery,
+              sortMode: _sortMode,
+              onSearchChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              onSortChanged: (value) {
+                setState(() {
+                  _sortMode = value;
+                });
+              },
+            ),
+            if (visibleItems.isEmpty)
+              PortfolioNoSearchResultsState(
+                onResetSearch: () {
+                  setState(() {
+                    _searchQuery = '';
+                  });
+                },
+              )
+            else
+              PortfolioItemsGrid(
+                items: visibleItems,
+                onRemoveItem: (id) =>
+                    _confirmDelete(context, id, portfolioController),
+                onOpenItem: (item) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CollectibleDetailPage(
+                        item: item,
+                        onDelete: (id) async {
+                          final deleted = await _confirmDelete(
+                            context,
+                            id,
+                            portfolioController,
+                          );
+                          if (deleted && context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                          return deleted;
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Portfolio',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Track saved collectibles and estimated value.',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      PortfolioSummaryCard(
-                        totalValue: portfolioState.totalValue,
-                        itemCount: portfolioState.itemCount,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      if (portfolioState.isLoading &&
-                          portfolioState.items.isEmpty)
-                        const Center(child: CircularProgressIndicator())
-                      else if (portfolioState.errorMessage != null)
-                        PortfolioErrorState(
-                          message: portfolioState.errorMessage!,
-                        )
-                      else if (portfolioState.items.isEmpty)
-                        const PortfolioEmptyState()
-                      else ...[
-                        _PortfolioControls(
-                          searchQuery: _searchQuery,
-                          sortMode: _sortMode,
-                          onSearchChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                          onSortChanged: (value) {
-                            setState(() {
-                              _sortMode = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        if (visibleItems.isEmpty)
-                          const PortfolioNoSearchResultsState()
-                        else
-                          PortfolioItemsGrid(
-                            items: visibleItems,
-                            onRemoveItem: (id) => _confirmDelete(
-                              context,
-                              id,
-                              portfolioController,
-                            ),
-                            onOpenItem: (item) {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CollectibleDetailPage(
-                                    item: item,
-                                    onDelete: (id) async {
-                                      final deleted = await _confirmDelete(
-                                        context,
-                                        id,
-                                        portfolioController,
-                                      );
-                                      if (deleted && context.mounted) {
-                                        Navigator.of(context).pop();
-                                      }
-                                      return deleted;
-                                    },
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+          ],
+        ],
       ),
     );
   }
@@ -163,6 +129,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       };
     });
     return filteredItems;
+  }
+
+  String _averageConfidence(List<CollectibleItem> items) {
+    if (items.isEmpty) {
+      return '0%';
+    }
+
+    final total = items.fold<double>(0, (sum, item) => sum + item.confidence);
+    return '${((total / items.length) * 100).toStringAsFixed(0)}%';
   }
 
   Future<bool> _confirmDelete(
@@ -216,49 +191,125 @@ class _PortfolioControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final searchField = TextFormField(
-          initialValue: searchQuery,
-          onChanged: onSearchChanged,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            labelText: 'Search portfolio',
+    return AppResponsiveColumn(
+      spacing: AppSpacing.md,
+      children: [
+        SearchField(
+          key: ValueKey(
+            searchQuery.isEmpty
+                ? 'portfolio-search-empty'
+                : 'portfolio-search-active',
           ),
-        );
-        final sortMenu = DropdownButtonFormField<_PortfolioSortMode>(
-          initialValue: sortMode,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Sort by'),
-          items: [
-            for (final mode in _PortfolioSortMode.values)
-              DropdownMenuItem(value: mode, child: Text(mode.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              onSortChanged(value);
-            }
-          },
-        );
+          initialValue: searchQuery,
+          hintText: 'Search title or category',
+          onChanged: onSearchChanged,
+        ),
+        _StableSortSelector(selectedMode: sortMode, onChanged: onSortChanged),
+      ],
+    );
+  }
+}
 
-        if (constraints.maxWidth >= 680) {
-          return Row(
-            children: [
-              Expanded(child: searchField),
-              const SizedBox(width: AppSpacing.lg),
-              SizedBox(width: 240, child: sortMenu),
-            ],
-          );
-        }
+class _StableSortSelector extends StatelessWidget {
+  const _StableSortSelector({
+    required this.selectedMode,
+    required this.onChanged,
+  });
 
-        return Column(
-          children: [
-            searchField,
-            const SizedBox(height: AppSpacing.md),
-            sortMenu,
-          ],
-        );
-      },
+  final _PortfolioSortMode selectedMode;
+  final ValueChanged<_PortfolioSortMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < _PortfolioSortMode.values.length; index++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: index == 0 ? 0 : AppSpacing.xs),
+                child: _StableSortOption(
+                  mode: _PortfolioSortMode.values[index],
+                  isSelected: selectedMode == _PortfolioSortMode.values[index],
+                  onPressed: () => onChanged(_PortfolioSortMode.values[index]),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StableSortOption extends StatelessWidget {
+  const _StableSortOption({
+    required this.mode,
+    required this.isSelected,
+    required this.onPressed,
+  });
+
+  final _PortfolioSortMode mode;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: isSelected ? colorScheme.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.small),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(AppRadius.small),
+        child: SizedBox(
+          height: 44,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: Icon(
+                    Icons.check,
+                    size: 16,
+                    color: isSelected
+                        ? colorScheme.onPrimary
+                        : Colors.transparent,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    mode.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: isSelected
+                          ? colorScheme.onPrimary
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

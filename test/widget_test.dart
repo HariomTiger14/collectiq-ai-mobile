@@ -88,10 +88,10 @@ void main() {
 
     expect(find.text('Portfolio'), findsWidgets);
     expect(
-      find.text('Track saved collectibles and estimated value.'),
+      find.text('Track, search, and manage your collection.'),
       findsOneWidget,
     );
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('No collectibles yet.'), findsOneWidget);
   });
 
   testWidgets('shows settings screen content', (WidgetTester tester) async {
@@ -280,8 +280,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('1999 Pokémon Charizard'), findsOneWidget);
-    expect(find.text('Total Value'), findsOneWidget);
-    expect(find.text('Total Items'), findsOneWidget);
+    expect(find.text('Total collection value'), findsOneWidget);
+    expect(find.text('Total items'), findsOneWidget);
     expect(find.text('AUD 1,850'), findsWidgets);
   });
 
@@ -390,7 +390,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Persisted Charizard'), findsNothing);
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('No collectibles yet.'), findsOneWidget);
   });
 
   testWidgets('filters portfolio items by search query', (
@@ -437,9 +437,9 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Old High Value')).dy),
     );
 
-    await tester.tap(find.text('Newest first'));
+    await tester.tap(find.text('Newest'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Value high to low').last);
+    await tester.tap(find.text('Value'));
     await tester.pumpAndSettle();
 
     expect(
@@ -447,9 +447,9 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Newest Low')).dy),
     );
 
-    await tester.tap(find.text('Value high to low'));
+    await tester.tap(find.text('Value'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confidence high to low').last);
+    await tester.tap(find.text('Confidence'));
     await tester.pumpAndSettle();
 
     expect(
