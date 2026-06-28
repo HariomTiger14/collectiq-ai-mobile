@@ -13,7 +13,12 @@ from app.core.config import (
     UPLOAD_DIR,
 )
 from app.schemas.scanner import ScannerAnalysisResponse
-from app.services.ai.openai_recognition_provider import AIProviderNotConfiguredError
+from app.services.ai.openai_recognition_provider import (
+    AIProviderNotConfiguredError,
+    OpenAIInvalidResponseError,
+    OpenAIProviderError,
+    OpenAITimeoutError,
+)
 from app.services.ai.provider_factory import get_ai_recognition_provider
 
 
@@ -79,6 +84,24 @@ async def analyze_scanner_image(
         destination.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
+    except OpenAITimeoutError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=str(exc),
+        ) from exc
+    except OpenAIInvalidResponseError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    except OpenAIProviderError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
     logger.info(

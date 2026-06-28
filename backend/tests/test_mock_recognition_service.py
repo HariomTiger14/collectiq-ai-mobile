@@ -6,10 +6,7 @@ from app.services.ai.mock_recognition_service import (
     MockRecognitionProvider,
     MockRecognitionService,
 )
-from app.services.ai.openai_recognition_provider import (
-    AIProviderNotConfiguredError,
-    OpenAIRecognitionProvider,
-)
+from app.services.ai.openai_recognition_provider import OpenAIRecognitionProvider
 from app.services.ai.provider_factory import get_ai_recognition_provider
 
 
@@ -68,8 +65,6 @@ class ProviderFactoryTest(unittest.TestCase):
         provider = get_ai_recognition_provider("openai")
 
         self.assertIsInstance(provider, OpenAIRecognitionProvider)
-        with self.assertRaises(AIProviderNotConfiguredError):
-            provider.recognize(Path("uploads/card.png"))
 
     def test_provider_factory_rejects_unknown_provider(self) -> None:
         with self.assertRaises(ValueError):

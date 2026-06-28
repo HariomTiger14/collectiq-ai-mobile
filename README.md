@@ -27,8 +27,8 @@ POST http://127.0.0.1:8000/scanner/analyze
 multipart field: image
 ```
 
-Uploaded images are saved to `uploads/`, and the endpoint returns the existing
-mock recognition response while the real AI provider is still pending.
+Uploaded images are saved to `uploads/`, and the endpoint returns the same
+scanner analysis response shape for both mock and OpenAI providers.
 
 ### AI Provider
 
@@ -38,9 +38,33 @@ Backend AI recognition is selected with `backend/.env`:
 AI_PROVIDER=mock
 ```
 
-For now, the provider factory always returns `MockRecognitionService`. Future
-providers can implement `AIRecognitionService` and be selected by changing
-`AI_PROVIDER`.
+Mock remains the default and does not require external credentials. To enable
+OpenAI vision recognition, set:
+
+```text
+AI_PROVIDER=openai
+OPENAI_API_KEY=sk-your-key
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_TIMEOUT_SECONDS=30
+```
+
+The OpenAI provider sends the uploaded image to the OpenAI Responses API and
+requests strict structured JSON with these Flutter-compatible fields:
+
+```json
+{
+  "title": "1952 Topps Mickey Mantle",
+  "category": "Sports Card",
+  "confidence": 92,
+  "estimatedValue": 125000,
+  "condition": "Good",
+  "recommendation": "Authenticate and insure before sale.",
+  "description": "Classic baseball card with strong collector demand.",
+  "detectedObjects": ["Card", "Baseball", "Yankees"],
+  "aiProvider": "openai",
+  "processingTimeMs": 1240
+}
+```
 
 ## Getting Started
 
