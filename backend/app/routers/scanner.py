@@ -13,7 +13,8 @@ from app.core.config import (
     UPLOAD_DIR,
 )
 from app.schemas.scanner import ScannerAnalysisResponse
-from app.services.ai.provider_factory import get_ai_recognition_service
+from app.services.ai.openai_recognition_provider import AIProviderNotConfiguredError
+from app.services.ai.provider_factory import get_ai_recognition_provider
 
 
 router = APIRouter(prefix="/scanner", tags=["Scanner"])
@@ -66,7 +67,20 @@ async def analyze_scanner_image(
         await image.close()
 
     image_url = str(request.url_for("uploads", path=filename))
-    recognition = get_ai_recognition_service().recognize(destination)
+    try:
+        recognition = get_ai_recognition_provider().recognize(destination)
+    except ValueError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+    except AIProviderNotConfiguredError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=str(exc),
+        ) from exc
     logger.info(
         "Scanner analysis completed filename=%s processingTimeMs=%s aiProvider=%s",
         filename,

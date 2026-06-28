@@ -17,7 +17,12 @@ class RecognitionResult:
     processingTimeMs: int
 
 
-class AIRecognitionService(Protocol):
+class AIRecognitionProvider(Protocol):
     def recognize(self, image_path: Path) -> RecognitionResult:
         """Recognize a collectible from an uploaded image path."""
         ...
+
+
+# Backwards-compatible alias for older imports while the backend moves to the
+# provider naming used by the real AI foundation.
+AIRecognitionService = AIRecognitionProvider

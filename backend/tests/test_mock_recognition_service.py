@@ -1,23 +1,79 @@
 import unittest
 from pathlib import Path
 
-from app.services.ai.mock_recognition_service import MockRecognitionService
+from app.services.ai.mock_recognition_service import (
+    MOCK_COLLECTIBLES,
+    MockRecognitionProvider,
+    MockRecognitionService,
+)
+from app.services.ai.openai_recognition_provider import (
+    AIProviderNotConfiguredError,
+    OpenAIRecognitionProvider,
+)
+from app.services.ai.provider_factory import get_ai_recognition_provider
 
 
-class MockRecognitionServiceTest(unittest.TestCase):
+class MockRecognitionProviderTest(unittest.TestCase):
     def test_recognize_returns_complete_mock_result(self) -> None:
-        result = MockRecognitionService().recognize(Path("uploads/card.png"))
+        result = MockRecognitionProvider().recognize(Path("uploads/card.png"))
 
-        self.assertEqual(result.title, "1999 Pokémon Charizard")
-        self.assertEqual(result.category, "Trading Card")
-        self.assertEqual(result.confidence, 94)
-        self.assertEqual(result.estimatedValue, 1850)
-        self.assertEqual(result.condition, "Near Mint")
-        self.assertEqual(result.recommendation, "Consider grading before selling.")
-        self.assertEqual(result.description, "Likely a Pokémon Base Set Charizard.")
-        self.assertEqual(result.detectedObjects, ["Card", "Pokémon", "Charizard"])
+        self.assertIn(result.title, {item.title for item in MOCK_COLLECTIBLES})
+        self.assertIn(
+            result.category,
+            {
+                "Pokemon Card",
+                "Sports Card",
+                "Trading Card",
+                "Coin",
+                "Comic",
+                "Toy/Figure",
+            },
+        )
+        self.assertGreaterEqual(result.confidence, 0)
+        self.assertLessEqual(result.confidence, 100)
+        self.assertGreater(result.estimatedValue, 0)
+        self.assertTrue(result.condition)
+        self.assertTrue(result.recommendation)
+        self.assertTrue(result.description)
+        self.assertTrue(result.detectedObjects)
         self.assertEqual(result.aiProvider, "mock")
-        self.assertEqual(result.processingTimeMs, 125)
+        self.assertGreater(result.processingTimeMs, 0)
+
+    def test_recognize_returns_varied_mock_results(self) -> None:
+        provider = MockRecognitionProvider()
+
+        titles = {
+            provider.recognize(Path(f"uploads/card-{index}.png")).title
+            for index in range(8)
+        }
+
+        self.assertGreater(len(titles), 1)
+
+    def test_backwards_compatible_mock_service_alias(self) -> None:
+        self.assertIs(MockRecognitionService, MockRecognitionProvider)
+
+
+class ProviderFactoryTest(unittest.TestCase):
+    def test_provider_factory_uses_mock_by_default(self) -> None:
+        provider = get_ai_recognition_provider()
+
+        self.assertIsInstance(provider, MockRecognitionProvider)
+
+    def test_provider_factory_defaults_to_mock(self) -> None:
+        provider = get_ai_recognition_provider("mock")
+
+        self.assertIsInstance(provider, MockRecognitionProvider)
+
+    def test_provider_factory_supports_openai_placeholder(self) -> None:
+        provider = get_ai_recognition_provider("openai")
+
+        self.assertIsInstance(provider, OpenAIRecognitionProvider)
+        with self.assertRaises(AIProviderNotConfiguredError):
+            provider.recognize(Path("uploads/card.png"))
+
+    def test_provider_factory_rejects_unknown_provider(self) -> None:
+        with self.assertRaises(ValueError):
+            get_ai_recognition_provider("unknown")
 
 
 if __name__ == "__main__":

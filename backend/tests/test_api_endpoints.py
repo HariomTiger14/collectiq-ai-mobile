@@ -26,12 +26,27 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertTrue(payload["success"])
         self.assertTrue(payload["filename"].endswith(".png"))
         self.assertIn("/uploads/", payload["imageUrl"])
-        self.assertEqual(payload["title"], "1999 Pokémon Charizard")
-        self.assertEqual(payload["category"], "Trading Card")
-        self.assertEqual(payload["confidence"], 94)
-        self.assertEqual(payload["estimatedValue"], 1850)
-        self.assertEqual(payload["condition"], "Near Mint")
-        self.assertEqual(payload["recommendation"], "Consider grading before selling.")
+        self.assertTrue(payload["title"])
+        self.assertIn(
+            payload["category"],
+            [
+                "Pokemon Card",
+                "Sports Card",
+                "Trading Card",
+                "Coin",
+                "Comic",
+                "Toy/Figure",
+            ],
+        )
+        self.assertGreaterEqual(payload["confidence"], 0)
+        self.assertLessEqual(payload["confidence"], 100)
+        self.assertGreater(payload["estimatedValue"], 0)
+        self.assertTrue(payload["condition"])
+        self.assertTrue(payload["recommendation"])
+        self.assertTrue(payload["description"])
+        self.assertTrue(payload["detectedObjects"])
+        self.assertEqual(payload["aiProvider"], "mock")
+        self.assertGreater(payload["processingTimeMs"], 0)
 
     def test_scanner_analyze_invalid_extension(self) -> None:
         response = self.client.post(
