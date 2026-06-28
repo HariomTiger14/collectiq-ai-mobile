@@ -32,16 +32,33 @@ void main() {
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Good Evening, Harry'), findsOneWidget);
+    expect(find.text('Welcome back to CollectIQ AI'), findsOneWidget);
+    expect(find.text('Collection Value'), findsOneWidget);
+    expect(find.text('Estimated market value'), findsOneWidget);
+    expect(find.text('Collectibles'), findsOneWidget);
+    expect(find.text('Average Confidence'), findsOneWidget);
+    expect(find.text('Last Scan'), findsOneWidget);
+    expect(find.text('Scan Collectible'), findsOneWidget);
+    expect(find.text('Recent Activity'), findsOneWidget);
+    expect(find.text('No collectibles scanned yet.'), findsOneWidget);
+    expect(find.text('Start Scanning'), findsOneWidget);
+  });
+
+  testWidgets('home scan button opens scanner tab', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan Collectible'));
+    await tester.pump();
+
     expect(
-      find.text('Scan, value and manage your collectibles.'),
+      find.text(
+        'Capture or upload a collectible to identify and estimate value.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Portfolio Value'), findsOneWidget);
-    expect(find.text('Quick Actions'), findsOneWidget);
-    expect(find.text('Trending Collectibles'), findsOneWidget);
-    expect(find.text('Recent Scans'), findsOneWidget);
-    expect(find.text('Unlock unlimited AI scans'), findsOneWidget);
   });
 
   testWidgets('shows scanner experience content', (WidgetTester tester) async {

@@ -1,152 +1,71 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_dashboard_widgets.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({this.onScanPressed, super.key});
 
-  static const _quickActions = [
-    DashboardAction(
-      title: 'Scan Item',
-      icon: Icons.document_scanner_outlined,
-      color: AppColors.accent,
-    ),
-    DashboardAction(
-      title: 'My Collection',
-      icon: Icons.inventory_2_outlined,
-      color: AppColors.secondaryAccent,
-    ),
-    DashboardAction(
-      title: 'Watchlist',
-      icon: Icons.visibility_outlined,
-      color: Color(0xFF7C3AED),
-    ),
-    DashboardAction(
-      title: 'Price Alerts',
-      icon: Icons.notifications_active_outlined,
-      color: AppColors.danger,
-    ),
-  ];
-
-  static const _trendingCollectibles = [
-    TrendingCollectible(
-      name: 'Charizard Holo',
-      estimatedValue: r'$4,850',
-      percentageIncrease: '+18.4%',
-      icon: Icons.local_fire_department_outlined,
-      color: AppColors.accent,
-    ),
-    TrendingCollectible(
-      name: 'Jordan Rookie',
-      estimatedValue: r'$12,300',
-      percentageIncrease: '+12.1%',
-      icon: Icons.sports_basketball_outlined,
-      color: AppColors.accent,
-    ),
-    TrendingCollectible(
-      name: 'Silver Eagle',
-      estimatedValue: r'$780',
-      percentageIncrease: '+9.7%',
-      icon: Icons.monetization_on_outlined,
-      color: AppColors.accent,
-    ),
-    TrendingCollectible(
-      name: 'Vintage Omega',
-      estimatedValue: r'$3,420',
-      percentageIncrease: '-2.1%',
-      icon: Icons.watch_outlined,
-      color: AppColors.accent,
-    ),
-    TrendingCollectible(
-      name: 'First Edition',
-      estimatedValue: r'$1,260',
-      percentageIncrease: '+6.5%',
-      icon: Icons.auto_stories_outlined,
-      color: AppColors.accent,
-    ),
-  ];
-
-  static const _recentScans = [
-    RecentScan(
-      name: 'Pikachu Illustrator Card',
-      category: 'Trading Card',
-      estimatedValue: r'$8,900',
-      scannedAt: 'Today',
-      icon: Icons.style_outlined,
-    ),
-    RecentScan(
-      name: 'Rolex Submariner 1998',
-      category: 'Watch',
-      estimatedValue: r'$9,450',
-      scannedAt: 'Yesterday',
-      icon: Icons.watch_outlined,
-    ),
-    RecentScan(
-      name: 'Signed Baseball',
-      category: 'Memorabilia',
-      estimatedValue: r'$640',
-      scannedAt: 'Jun 24',
-      icon: Icons.sports_baseball_outlined,
-    ),
-  ];
+  final VoidCallback? onScanPressed;
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final portfolioState = ref.watch(portfolioControllerProvider);
+    final recentItems = [...portfolioState.items]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth >= 700
-                ? AppSpacing.xxl
-                : AppSpacing.lg;
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.xl,
-                horizontalPadding,
-                AppSpacing.xxl,
+    return AppScaffold(
+      child: AppResponsiveColumn(
+        spacing: AppSpacing.xl,
+        children: [
+          const HomeGreeting(),
+          DashboardFadeSlide(
+            child: CollectionValueHero(totalValue: portfolioState.totalValue),
+          ),
+          HomeQuickStats(
+            itemCount: portfolioState.itemCount,
+            averageConfidence: _averageConfidence(portfolioState.items),
+            lastScan: recentItems.isEmpty
+                ? 'Not yet'
+                : formatDashboardDate(recentItems.first.createdAt),
+          ),
+          PrimaryButton(
+            label: 'Scan Collectible',
+            icon: Icons.document_scanner_outlined,
+            onPressed: onScanPressed,
+          ),
+          SectionHeader(
+            title: 'Recent Activity',
+            subtitle: recentItems.isEmpty
+                ? 'Your latest saved collectibles will appear here.'
+                : 'Latest saved collectibles from your portfolio.',
+          ),
+          if (recentItems.isEmpty)
+            EmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: 'No collectibles scanned yet.',
+              message: 'Start with a quick scan to build your collection.',
+              action: PrimaryButton(
+                label: 'Start Scanning',
+                icon: Icons.document_scanner_outlined,
+                onPressed: onScanPressed,
               ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      HomeDashboardAppBar(),
-                      SizedBox(height: AppSpacing.xxl),
-                      WelcomeSection(),
-                      SizedBox(height: AppSpacing.xl),
-                      PortfolioSummaryCard(
-                        portfolioValue: r'$42,680',
-                        totalItems: '128',
-                        monthlyChange: '+14.2%',
-                      ),
-                      SizedBox(height: AppSpacing.xxl),
-                      DashboardSectionHeader(title: 'Quick Actions'),
-                      SizedBox(height: AppSpacing.md),
-                      QuickActionsGrid(actions: _quickActions),
-                      SizedBox(height: AppSpacing.xxl),
-                      DashboardSectionHeader(title: 'Trending Collectibles'),
-                      SizedBox(height: AppSpacing.md),
-                      TrendingCollectiblesList(items: _trendingCollectibles),
-                      SizedBox(height: AppSpacing.xxl),
-                      DashboardSectionHeader(title: 'Recent Scans'),
-                      SizedBox(height: AppSpacing.md),
-                      RecentScansList(items: _recentScans),
-                      SizedBox(height: AppSpacing.xxl),
-                      PremiumBanner(),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+            )
+          else
+            RecentActivityList(items: recentItems.take(3).toList()),
+        ],
       ),
     );
+  }
+
+  String _averageConfidence(List<CollectibleItem> items) {
+    if (items.isEmpty) {
+      return '0%';
+    }
+
+    final total = items.fold<double>(0, (sum, item) => sum + item.confidence);
+    return '${((total / items.length) * 100).toStringAsFixed(0)}%';
   }
 }
