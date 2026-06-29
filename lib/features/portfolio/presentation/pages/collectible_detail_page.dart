@@ -98,6 +98,7 @@ class _ImagePreview extends StatelessWidget {
       return Image.network(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
     }
@@ -106,6 +107,7 @@ class _ImagePreview extends StatelessWidget {
       return Image.asset(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
     }
@@ -113,6 +115,7 @@ class _ImagePreview extends StatelessWidget {
     return Image.file(
       File(normalizedPath),
       fit: BoxFit.cover,
+      gaplessPlayback: true,
       errorBuilder: (_, _, _) => _placeholder(colorScheme),
     );
   }

@@ -47,6 +47,32 @@ void main() {
     expect(find.text('No collectibles scanned yet.'), findsOneWidget);
   });
 
+  testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan Collectible').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('Scan with Camera'), findsOneWidget);
+  });
+
+  testWidgets('restores Scan tab after shell recreation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan Collectible').first);
+    await tester.pumpAndSettle();
+    expect(find.text('AI Scanner'), findsOneWidget);
+
+    await tester.restartAndRestore();
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('Scan with Camera'), findsOneWidget);
+  });
+
   testWidgets('shows scanner experience content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
@@ -98,8 +124,12 @@ void main() {
     expect(find.text('App Preferences'), findsOneWidget);
     expect(find.text('AI & Scanning'), findsOneWidget);
     expect(find.text('Cloud Sync'), findsOneWidget);
+    expect(find.text('Cloud status'), findsOneWidget);
+    expect(find.text('Pending uploads'), findsOneWidget);
+    expect(find.text('Last sync'), findsOneWidget);
+    expect(find.text('Never'), findsOneWidget);
     expect(find.text('Sync status'), findsOneWidget);
-    expect(find.text('Local only'), findsOneWidget);
+    expect(find.text('Local only'), findsWidgets);
     expect(find.text('Cloud backup'), findsOneWidget);
     expect(find.text('Off'), findsWidgets);
 
@@ -164,6 +194,24 @@ void main() {
     expect(find.text('Captured image'), findsOneWidget);
     expect(find.text('Ready for AI analysis'), findsOneWidget);
     expect(find.text('Analyze with AI'), findsOneWidget);
+  });
+
+  testWidgets('camera completion remains on Scan tab', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan Collectible').first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.tap(find.text('Scan with Camera'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(find.text('Welcome back to CollectIQ AI'), findsNothing);
   });
 
   testWidgets('scanner camera cancellation shows friendly message', (
@@ -250,6 +298,37 @@ void main() {
     expect(find.text('AI Result'), findsNothing);
   });
 
+  testWidgets('scan preview remains mounted during analyze', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(
+      aiRecognitionService: const _DelayedAIRecognitionService(),
+      galleryService: _SelectedGalleryService(),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Choose from Gallery'));
+    await tester.pump();
+    await tester.tap(find.text('Choose from Gallery'));
+    await tester.pump();
+
+    expect(find.text('Gallery image'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('Gallery image'), findsOneWidget);
+    expect(find.text('Analyzing image'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gallery image'), findsOneWidget);
+    expect(find.text('Analysis Complete'), findsOneWidget);
+  });
+
   testWidgets('saves scanner result to portfolio', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
@@ -279,6 +358,105 @@ void main() {
     expect(find.text('Total collection value'), findsOneWidget);
     expect(find.text('Items'), findsOneWidget);
     expect(find.text('AUD 1,850'), findsWidgets);
+  });
+
+  testWidgets('saved scan resets after navigating away from Scan', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved'), findsOneWidget);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sample Sports Card'), findsNothing);
+    expect(find.text('1999 PokÃ©mon Charizard'), findsNothing);
+    expect(find.text('Analyze with AI'), findsNothing);
+    expect(find.text('Use Sample Scan'), findsOneWidget);
+  });
+
+  testWidgets('unsaved analysis is preserved when navigating away from Scan', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sample Sports Card'), findsOneWidget);
+    expect(find.text('1999 PokÃ©mon Charizard'), findsOneWidget);
+    expect(find.text('Analysis Complete'), findsOneWidget);
+  });
+
+  testWidgets('home scan CTA starts clean after unsaved scan', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan Collectible').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sample Sports Card'), findsNothing);
+    expect(find.text('1999 PokÃ©mon Charizard'), findsNothing);
+    expect(find.text('AI Scanner'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Scan with Camera'));
+    await tester.pump();
+    await tester.tap(find.text('Scan with Camera'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Analyze with AI'), findsOneWidget);
   });
 
   testWidgets('saves gallery image path to portfolio item', (
@@ -313,6 +491,7 @@ void main() {
     final item = decodedItems.single as Map<String, dynamic>;
 
     expect(item['imagePath'], 'test/fixtures/card.jpg');
+    expect(item['cloudImageUrl'], isNull);
   });
 
   testWidgets('saves persistent camera image path to portfolio', (
@@ -347,6 +526,7 @@ void main() {
     final item = decodedItems.single as Map<String, dynamic>;
 
     expect(item['imagePath'], 'test/fixtures/persistent-camera-card.jpg');
+    expect(item['cloudImageUrl'], isNull);
   });
 
   testWidgets('loads saved portfolio items from local storage', (
@@ -570,6 +750,16 @@ class _FailingAIRecognitionService implements AIRecognitionService {
   @override
   Future<RecognitionResult> recognizeCollectible(XFile image) {
     throw const NetworkException(message: 'Network connection failed.');
+  }
+}
+
+class _DelayedAIRecognitionService implements AIRecognitionService {
+  const _DelayedAIRecognitionService();
+
+  @override
+  Future<RecognitionResult> recognizeCollectible(XFile image) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    return const _FakeAIRecognitionService().recognizeCollectible(image);
   }
 }
 

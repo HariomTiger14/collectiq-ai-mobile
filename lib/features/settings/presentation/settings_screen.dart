@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
+import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +13,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
+    final imageSyncState = ref.watch(imageSyncControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -109,6 +111,13 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Cloud Sync',
                     children: [
                       _SettingsRow(
+                        icon: Icons.cloud_done_outlined,
+                        title: 'Cloud status',
+                        subtitle:
+                            'Image uploads run in the background when cloud storage is configured.',
+                        trailing: imageSyncState.cloudStatus,
+                      ),
+                      _SettingsRow(
                         icon: Icons.sync_outlined,
                         title: 'Sync status',
                         subtitle: syncState.status.message,
@@ -122,6 +131,23 @@ class SettingsScreen extends ConsumerWidget {
                         trailing: syncState.status.isCloudBackupEnabled
                             ? 'On'
                             : 'Off',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.pending_actions_outlined,
+                        title: 'Pending uploads',
+                        subtitle:
+                            'Images keep using the local file until cloud upload completes.',
+                        trailing: imageSyncState.snapshot.pendingCount
+                            .toString(),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.schedule_outlined,
+                        title: 'Last sync',
+                        subtitle:
+                            'Most recent successful background image upload.',
+                        trailing: _formatSyncDate(
+                          imageSyncState.snapshot.lastSyncAt,
+                        ),
                       ),
                     ],
                   ),
@@ -311,4 +337,14 @@ class _SettingsRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatSyncDate(DateTime? value) {
+  if (value == null) {
+    return 'Never';
+  }
+
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  return '$day/$month/${value.year}';
 }

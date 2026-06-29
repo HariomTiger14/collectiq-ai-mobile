@@ -1,10 +1,11 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 class ScannerStep {
   const ScannerStep({
@@ -342,7 +343,6 @@ class ScanPreviewCard extends ConsumerWidget {
   /// Creates a scan preview card.
   const ScanPreviewCard({
     required this.imagePath,
-    required this.image,
     required this.title,
     required this.status,
     super.key,
@@ -350,9 +350,6 @@ class ScanPreviewCard extends ConsumerWidget {
 
   /// Local path, web display name, or sample identifier for the selected image.
   final String imagePath;
-
-  /// Selected scanner image file.
-  final XFile? image;
 
   /// Display title for the selected scan.
   final String title;
@@ -384,7 +381,6 @@ class ScanPreviewCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(AppRadius.md),
             child: _ScanPreviewThumbnail(
               imagePath: imagePath,
-              image: image,
               colorScheme: colorScheme,
             ),
           ),
@@ -527,16 +523,48 @@ class _ProcessingPanel extends StatelessWidget {
 class _ScanPreviewThumbnail extends StatelessWidget {
   const _ScanPreviewThumbnail({
     required this.imagePath,
-    required this.image,
     required this.colorScheme,
   });
 
   final String imagePath;
-  final XFile? image;
   final ColorScheme colorScheme;
 
   @override
   Widget build(BuildContext context) {
+    return _StableScanPreviewImage(
+      key: ValueKey('scan-preview-image-$imagePath'),
+      imagePath: imagePath,
+      colorScheme: colorScheme,
+    );
+  }
+}
+
+class _StableScanPreviewImage extends StatefulWidget {
+  const _StableScanPreviewImage({
+    required this.imagePath,
+    required this.colorScheme,
+    super.key,
+  });
+
+  final String imagePath;
+  final ColorScheme colorScheme;
+
+  @override
+  State<_StableScanPreviewImage> createState() =>
+      _StableScanPreviewImageState();
+}
+
+class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final imagePath = widget.imagePath;
+    final colorScheme = widget.colorScheme;
+
     if (imagePath.startsWith('sample://')) {
       return Container(
         width: 88,
@@ -546,32 +574,45 @@ class _ScanPreviewThumbnail extends StatelessWidget {
       );
     }
 
-    final selectedImage = image;
-    if (selectedImage == null) {
-      return _fallbackThumbnail();
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        width: 88,
+        height: 88,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) {
+          return _fallbackThumbnail(colorScheme);
+        },
+      );
     }
 
-    return FutureBuilder(
-      future: selectedImage.readAsBytes(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return _fallbackThumbnail();
-        }
+    if (imagePath.startsWith('assets/')) {
+      return Image.asset(
+        imagePath,
+        width: 88,
+        height: 88,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) {
+          return _fallbackThumbnail(colorScheme);
+        },
+      );
+    }
 
-        return Image.memory(
-          snapshot.data!,
-          width: 88,
-          height: 88,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return _fallbackThumbnail();
-          },
-        );
+    return Image.file(
+      File(imagePath),
+      width: 88,
+      height: 88,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) {
+        return _fallbackThumbnail(colorScheme);
       },
     );
   }
 
-  Widget _fallbackThumbnail() {
+  Widget _fallbackThumbnail(ColorScheme colorScheme) {
     return Container(
       width: 88,
       height: 88,

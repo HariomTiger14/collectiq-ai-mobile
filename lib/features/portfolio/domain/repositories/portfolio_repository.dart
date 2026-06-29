@@ -11,6 +11,13 @@ abstract interface class PortfolioRepository {
   /// Removes an item from the portfolio by [id].
   Future<void> removeItem(String id);
 
+  /// Updates cloud image metadata after background image sync completes.
+  Future<void> updateItemImageSync({
+    required String itemId,
+    required String imageStoragePath,
+    required String cloudImageUrl,
+  });
+
   /// Clears all saved portfolio items.
   Future<void> clearPortfolio();
 }

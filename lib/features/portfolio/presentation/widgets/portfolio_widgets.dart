@@ -18,7 +18,11 @@ class PortfolioThumbnail extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: _PortfolioItemImage(imagePath: imagePath, size: size),
+      child: _PortfolioItemImage(
+        key: ValueKey('portfolio-thumbnail-$imagePath-$size'),
+        imagePath: imagePath,
+        size: size,
+      ),
     );
   }
 }
@@ -229,6 +233,7 @@ class PortfolioItemsGrid extends StatelessWidget {
       children: [
         for (final item in items) ...[
           SizedBox(
+            key: ValueKey('portfolio-item-${item.id}'),
             width: double.infinity,
             child: _PortfolioItemCard(
               item: item,
@@ -274,7 +279,11 @@ class _PortfolioItemCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _PortfolioItemImage(imagePath: item.imagePath, size: 104),
+              _PortfolioItemImage(
+                key: ValueKey('portfolio-card-image-${item.id}'),
+                imagePath: item.imagePath,
+                size: 104,
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(child: _PortfolioItemDetails(item: item)),
               const SizedBox(width: AppSpacing.xs),
@@ -298,7 +307,11 @@ class _PortfolioItemCard extends StatelessWidget {
 }
 
 class _PortfolioItemImage extends StatelessWidget {
-  const _PortfolioItemImage({required this.imagePath, this.size = 110});
+  const _PortfolioItemImage({
+    required this.imagePath,
+    this.size = 110,
+    super.key,
+  });
 
   final String imagePath;
   final double size;
@@ -334,6 +347,7 @@ class _PortfolioItemImage extends StatelessWidget {
       return Image.network(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
       );
     }
@@ -342,6 +356,7 @@ class _PortfolioItemImage extends StatelessWidget {
       return Image.asset(
         normalizedPath,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
       );
     }

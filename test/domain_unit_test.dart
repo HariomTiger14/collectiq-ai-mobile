@@ -12,7 +12,11 @@ import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
+import 'package:collectiq_ai/features/image_storage/domain/repositories/image_storage_repository.dart';
+import 'package:collectiq_ai/features/image_sync/data/repositories/shared_preferences_sync_queue_repository.dart';
+import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
 import 'package:collectiq_ai/features/image_storage/data/repositories/supabase_image_storage_repository.dart';
+import 'package:collectiq_ai/features/image_sync/domain/services/upload_worker.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -37,6 +41,8 @@ void main() {
       expect(json['condition'], 'Near Mint');
       expect(json['recommendation'], 'Consider grading before selling.');
       expect(json['imagePath'], 'sample://sports-card');
+      expect(json['imageStoragePath'], isNull);
+      expect(json['cloudImageUrl'], isNull);
       expect(json['createdAt'], '2026-06-27T00:00:00.000');
       expect(json['year'], '1999');
       expect(json['brand'], 'Pokemon');
@@ -61,6 +67,9 @@ void main() {
         'condition': 'Near Mint',
         'recommendation': 'Consider grading before selling.',
         'imagePath': 'sample://sports-card',
+        'imageStoragePath': 'collectible-images/item-1/card.jpg',
+        'cloudImageUrl':
+            'https://example.supabase.co/storage/v1/object/public/collectible-images/item-1/card.jpg',
         'createdAt': '2026-06-27T00:00:00.000',
         'year': '1999',
         'brand': 'Pokemon',
@@ -88,6 +97,11 @@ void main() {
       expect(item.condition, 'Near Mint');
       expect(item.recommendation, 'Consider grading before selling.');
       expect(item.imagePath, 'sample://sports-card');
+      expect(item.imageStoragePath, 'collectible-images/item-1/card.jpg');
+      expect(
+        item.cloudImageUrl,
+        'https://example.supabase.co/storage/v1/object/public/collectible-images/item-1/card.jpg',
+      );
       expect(item.createdAt, DateTime.parse('2026-06-27T00:00:00.000'));
       expect(item.year, '1999');
       expect(item.brand, 'Pokemon');
@@ -493,6 +507,66 @@ void main() {
     });
   });
 
+  group('ImageSyncQueue', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('persists pending image upload tasks', () async {
+      const repository = SharedPreferencesSyncQueueRepository();
+
+      final task = await repository.enqueueImageUpload(
+        collectibleId: 'item-1',
+        localPath: 'test/fixtures/persistent-camera-card.jpg',
+      );
+      final snapshot = await repository.snapshot();
+
+      expect(task.status, ImageUploadTaskStatus.pending);
+      expect(snapshot.pendingCount, 1);
+      expect(snapshot.tasks.single.collectibleId, 'item-1');
+    });
+
+    test('worker uploads image and stores cloud metadata locally', () async {
+      const portfolioRepository = SharedPreferencesPortfolioRepository();
+      const queueRepository = SharedPreferencesSyncQueueRepository();
+      await portfolioRepository.addItem(
+        CollectibleItem(
+          id: 'item-1',
+          title: 'Camera Card',
+          category: 'Trading Card',
+          estimatedValue: 50,
+          confidence: 0.8,
+          condition: 'Good',
+          recommendation: 'Keep protected.',
+          imagePath: 'test/fixtures/persistent-camera-card.jpg',
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      );
+      await queueRepository.enqueueImageUpload(
+        collectibleId: 'item-1',
+        localPath: 'test/fixtures/persistent-camera-card.jpg',
+      );
+      final worker = UploadWorker(
+        queueRepository: queueRepository,
+        imageStorageRepository: const _SuccessfulImageStorageRepository(),
+        portfolioRepository: portfolioRepository,
+      );
+
+      await worker.processQueue();
+
+      final snapshot = await queueRepository.snapshot();
+      final items = await portfolioRepository.getItems();
+      expect(snapshot.uploadedCount, 1);
+      expect(snapshot.lastSyncAt, isNotNull);
+      expect(
+        items.single.imagePath,
+        'test/fixtures/persistent-camera-card.jpg',
+      );
+      expect(items.single.imageStoragePath, 'remote/item-1.jpg');
+      expect(items.single.cloudImageUrl, 'https://cdn.example.com/item-1.jpg');
+    });
+  });
+
   group('Local-first portfolio mode', () {
     test('saves portfolio items while no auth user is signed in', () async {
       SharedPreferences.setMockInitialValues({});
@@ -538,4 +612,30 @@ CollectibleItem _testItem() {
       lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
     ),
   );
+}
+
+class _SuccessfulImageStorageRepository implements ImageStorageRepository {
+  const _SuccessfulImageStorageRepository();
+
+  @override
+  Future<ImageStorageReference> saveLocalImage(String localPath) async {
+    return ImageStorageReference(path: localPath, isRemote: false);
+  }
+
+  @override
+  Future<ImageStorageReference> uploadImage({
+    required String localPath,
+    required String collectibleId,
+  }) async {
+    return const ImageStorageReference(
+      path: 'remote/item-1.jpg',
+      isRemote: true,
+      publicUrl: 'https://cdn.example.com/item-1.jpg',
+    );
+  }
+
+  @override
+  Future<String?> publicUrlFor(String storagePath) async {
+    return 'https://cdn.example.com/item-1.jpg';
+  }
 }

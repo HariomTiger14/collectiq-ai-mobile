@@ -1,38 +1,63 @@
+import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
-  int _selectedIndex = 0;
+class _AppShellState extends ConsumerState<AppShell> with RestorationMixin {
+  final RestorableInt _selectedIndex = RestorableInt(0);
+
+  @override
+  String? get restorationId => 'app_shell';
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_selectedIndex, 'selected_tab_index');
+  }
+
+  @override
+  void dispose() {
+    _selectedIndex.dispose();
+    super.dispose();
+  }
+
+  void _startNewScan() {
+    ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
+    _selectTab(1);
+  }
 
   void _selectTab(int index) {
+    if (_selectedIndex.value == 1 && index != 1) {
+      ref.read(scannerControllerProvider.notifier).resetAfterSaved();
+    }
+
     setState(() {
-      _selectedIndex = index;
+      _selectedIndex.value = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final tabs = <Widget>[
-      HomeScreen(onScanPressed: () => _selectTab(1)),
+      HomeScreen(onScanPressed: _startNewScan),
       ScannerScreen(onViewPortfolio: () => _selectTab(2)),
-      PortfolioScreen(onScanPressed: () => _selectTab(1)),
+      PortfolioScreen(onScanPressed: _startNewScan),
       const SettingsScreen(),
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: tabs),
+      body: IndexedStack(index: _selectedIndex.value, children: tabs),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: _selectedIndex.value,
         onDestinationSelected: _selectTab,
         destinations: const [
           NavigationDestination(

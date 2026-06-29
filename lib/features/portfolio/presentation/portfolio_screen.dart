@@ -46,6 +46,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                 : AppSpacing.lg;
 
             return SingleChildScrollView(
+              key: const PageStorageKey<String>('portfolio-scroll-position'),
               padding: EdgeInsets.fromLTRB(
                 horizontalPadding,
                 AppSpacing.xl,

@@ -6,6 +6,7 @@ import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/domain/repositories/recognition_repository.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
+import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
@@ -411,6 +412,9 @@ class ScannerController extends Notifier<ScannerState> {
       '${await _localFileExists(item.imagePath)}',
     );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+    await ref
+        .read(imageSyncControllerProvider.notifier)
+        .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
     state = state.copyWith(isSavedToPortfolio: true);
     return true;
   }
@@ -428,6 +432,20 @@ class ScannerController extends Notifier<ScannerState> {
       clearErrorMessage: true,
       isSavedToPortfolio: false,
     );
+  }
+
+  /// Clears completed saved work when the user leaves the scan tab.
+  void resetAfterSaved() {
+    if (!state.isSavedToPortfolio) {
+      return;
+    }
+
+    resetScan();
+  }
+
+  /// Clears stale scanner state before a deliberate new scan.
+  void resetWhenStartingNewScan() {
+    resetScan();
   }
 
   /// Switches between available cameras.

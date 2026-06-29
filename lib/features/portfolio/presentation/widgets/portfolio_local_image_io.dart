@@ -10,6 +10,7 @@ Widget buildPlatformLocalPortfolioImage({
   return Image.file(
     File(imagePath),
     fit: fit,
+    gaplessPlayback: true,
     errorBuilder: (_, _, _) => placeholderBuilder(),
   );
 }

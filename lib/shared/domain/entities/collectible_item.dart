@@ -45,6 +45,8 @@ class CollectibleItem {
     required this.recommendation,
     required this.imagePath,
     required this.createdAt,
+    this.imageStoragePath,
+    this.cloudImageUrl,
     this.pricing,
     this.primaryMatch,
     this.alternativeMatches = const [],
@@ -91,6 +93,12 @@ class CollectibleItem {
   /// Local image path or sample image identifier.
   final String imagePath;
 
+  /// Supabase Storage object path after background upload completes.
+  final String? imageStoragePath;
+
+  /// Public cloud image URL after background upload completes.
+  final String? cloudImageUrl;
+
   /// Date and time the item was added.
   final DateTime createdAt;
 
@@ -128,6 +136,8 @@ class CollectibleItem {
       condition: json['condition'] as String,
       recommendation: json['recommendation'] as String,
       imagePath: json['imagePath'] as String,
+      imageStoragePath: _optionalString(json['imageStoragePath']),
+      cloudImageUrl: _optionalString(json['cloudImageUrl']),
       createdAt: DateTime.parse(json['createdAt'] as String),
       pricing: json['pricing'] is Map<String, dynamic>
           ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
@@ -169,6 +179,8 @@ class CollectibleItem {
       'condition': condition,
       'recommendation': recommendation,
       'imagePath': imagePath,
+      'imageStoragePath': imageStoragePath,
+      'cloudImageUrl': cloudImageUrl,
       'createdAt': createdAt.toIso8601String(),
       'pricing': pricing?.toJson(),
       'primaryMatch': primaryMatch,
@@ -193,6 +205,46 @@ class CollectibleItem {
       'material': material,
       'notes': notes,
     };
+  }
+
+  /// Creates a copy with updated background image sync metadata.
+  CollectibleItem copyWithImageSync({
+    required String imageStoragePath,
+    required String cloudImageUrl,
+  }) {
+    return CollectibleItem(
+      id: id,
+      title: title,
+      category: category,
+      estimatedValue: estimatedValue,
+      confidence: confidence,
+      condition: condition,
+      recommendation: recommendation,
+      imagePath: imagePath,
+      imageStoragePath: imageStoragePath,
+      cloudImageUrl: cloudImageUrl,
+      createdAt: createdAt,
+      pricing: pricing,
+      primaryMatch: primaryMatch,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation: confidenceExplanation,
+      detectionQuality: detectionQuality,
+      aiReasoning: aiReasoning,
+      year: year,
+      brand: brand,
+      setName: setName,
+      series: series,
+      cardNumber: cardNumber,
+      playerOrCharacter: playerOrCharacter,
+      rarity: rarity,
+      estimatedGrade: estimatedGrade,
+      language: language,
+      edition: edition,
+      country: country,
+      mint: mint,
+      material: material,
+      notes: notes,
+    );
   }
 }
 

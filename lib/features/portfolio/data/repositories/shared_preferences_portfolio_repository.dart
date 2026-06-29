@@ -55,6 +55,26 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
   }
 
   @override
+  Future<void> updateItemImageSync({
+    required String itemId,
+    required String imageStoragePath,
+    required String cloudImageUrl,
+  }) async {
+    final items = await getItems();
+    final updatedItems = [
+      for (final item in items)
+        if (item.id == itemId)
+          item.copyWithImageSync(
+            imageStoragePath: imageStoragePath,
+            cloudImageUrl: cloudImageUrl,
+          )
+        else
+          item,
+    ];
+    await _saveItems(updatedItems);
+  }
+
+  @override
   Future<void> clearPortfolio() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_itemsKey);

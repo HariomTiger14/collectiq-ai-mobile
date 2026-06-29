@@ -18,6 +18,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final _previewKey = GlobalKey();
   final _resultKey = GlobalKey();
   late final ProviderSubscription<ScannerState> _scannerSubscription;
+  String? _lastScrolledPreviewPath;
+  String? _lastScrolledResultId;
 
   static const _categories = [
     'Sports Cards',
@@ -98,20 +100,27 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _scannerSubscription = ref.listenManual<ScannerState>(
       scannerControllerProvider,
       (previous, next) {
-        if (previous?.selectedImagePath != next.selectedImagePath &&
-            next.selectedImagePath != null) {
+        final selectedImagePath = next.selectedImagePath;
+        if (selectedImagePath != null &&
+            selectedImagePath != _lastScrolledPreviewPath) {
+          _lastScrolledPreviewPath = selectedImagePath;
           _scrollTo(_previewKey);
         }
-        if (previous?.scanResult?.id != next.scanResult?.id &&
-            next.scanResult != null) {
+        final scanResultId = next.scanResult?.id;
+        if (scanResultId != null && scanResultId != _lastScrolledResultId) {
+          _lastScrolledResultId = scanResultId;
           _scrollTo(_resultKey);
         }
         if (previous?.scanResult != null && next.scanResult == null) {
-          _scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-          );
+          _lastScrolledPreviewPath = null;
+          _lastScrolledResultId = null;
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+            );
+          }
         }
       },
     );
@@ -134,7 +143,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         context,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
-        alignment: 0.12,
+        alignment: 0.08,
       );
     });
   }
@@ -177,7 +186,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         ScanPreviewCard(
                           key: _previewKey,
                           imagePath: selectedImagePath,
-                          image: scannerState.selectedImage,
                           title:
                               scannerState.selectedItemTitle ??
                               'Captured image',
@@ -188,8 +196,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       ],
                       if (scanResult != null) ...[
                         const SizedBox(height: AppSpacing.xl),
-                        AiResultCard(
+                        KeyedSubtree(
                           key: _resultKey,
+                          child: const ScannerSectionTitle(
+                            title: 'Analysis Complete',
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        AiResultCard(
+                          key: ValueKey('scan-result-${scanResult.id}'),
                           item: scanResult.title,
                           category: scanResult.category,
                           estimatedValue:

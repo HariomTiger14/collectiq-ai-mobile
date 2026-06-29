@@ -15,6 +15,7 @@ class CollectIqApp extends StatelessWidget {
     return MaterialApp(
       title: 'CollectIQ AI',
       debugShowCheckedModeBanner: false,
+      restorationScopeId: 'collectiq_ai',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: const AppShell(),
