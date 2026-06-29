@@ -19,6 +19,7 @@ load_dotenv(BACKEND_ROOT / ".env")
 @dataclass(frozen=True)
 class Settings:
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
+    pricing_provider: str = os.getenv("PRICING_PROVIDER", "mock")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     openai_timeout_seconds: float = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))

@@ -12,6 +12,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -298,6 +299,7 @@ class ScannerController extends Notifier<ScannerState> {
           confidenceExplanation: recognition.confidenceExplanation,
           detectionQuality: recognition.detectionQuality,
           aiReasoning: recognition.aiReasoning,
+          pricing: recognition.pricing,
           year: recognition.year,
           brand: recognition.brand,
           setName: recognition.setName,
@@ -350,6 +352,7 @@ class ScannerController extends Notifier<ScannerState> {
           state.aiRecommendation ?? 'Consider grading before selling.',
       imagePath: result.thumbnail,
       createdAt: DateTime.now(),
+      pricing: result.pricing,
       year: result.year,
       brand: result.brand,
       setName: result.setName,
@@ -457,7 +460,7 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   RecognitionResult _sampleRecognitionResult() {
-    return const RecognitionResult(
+    return RecognitionResult(
       success: true,
       filename: null,
       imageUrl: 'sample://sports-card',
@@ -469,7 +472,7 @@ class ScannerController extends Notifier<ScannerState> {
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',
       primaryMatch: '1999 PokÃ©mon Charizard',
-      alternativeMatches: [
+      alternativeMatches: const [
         RecognitionAlternativeMatch(
           title: '2016 Pokemon Evolutions Charizard',
           category: 'Trading Card',
@@ -494,6 +497,15 @@ class ScannerController extends Notifier<ScannerState> {
       detectionQuality: 'Good - sample image is clear enough for review.',
       aiReasoning:
           'The sample shows a Charizard-like Pokemon card with collector-relevant holo and border details.',
+      pricing: PricingInfo(
+        estimatedMarketValue: 1850,
+        lowEstimate: 1443,
+        highEstimate: 2257,
+        currency: 'AUD',
+        pricingSource: 'Mock market blend: TCGplayer + eBay comps',
+        pricingConfidence: 0.85,
+        lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+      ),
       year: '1999',
       brand: 'Pokemon',
       setName: 'Base Set',

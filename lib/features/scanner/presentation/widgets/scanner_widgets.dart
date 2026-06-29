@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -509,6 +510,7 @@ class AiResultCard extends ConsumerWidget {
     required this.confidenceExplanation,
     required this.detectionQuality,
     required this.aiReasoning,
+    required this.pricing,
     required this.recommendation,
     this.year,
     this.brand,
@@ -559,6 +561,9 @@ class AiResultCard extends ConsumerWidget {
 
   /// Result recommendation.
   final String recommendation;
+
+  /// Market pricing supplied by the pricing provider.
+  final PricingInfo pricing;
 
   final String? year;
   final String? brand;
@@ -630,6 +635,32 @@ class AiResultCard extends ConsumerWidget {
           _AiResultRow(label: 'Category', value: category),
           _AiResultRow(label: 'Estimated Value', value: estimatedValue),
           _AiResultRow(label: 'Condition', value: condition),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Market Value',
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _AiResultRow(
+            label: 'Market Value',
+            value: _formatMoney(pricing.estimatedMarketValue, pricing.currency),
+          ),
+          _AiResultRow(
+            label: 'Estimated Range',
+            value:
+                '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+          ),
+          _AiResultRow(label: 'Pricing Source', value: pricing.pricingSource),
+          _AiResultRow(
+            label: 'Pricing Confidence',
+            value: '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+          ),
+          _AiResultRow(
+            label: 'Last Updated',
+            value: _formatPricingDate(pricing.lastUpdated),
+          ),
           if (collectibleDetails.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -696,6 +727,25 @@ class AiResultCard extends ConsumerWidget {
       _MetadataDetail('Profile Notes', notes),
     ].where((detail) => detail.value.trim().isNotEmpty).toList();
   }
+}
+
+String _formatMoney(double value, String currency) {
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '$currency $withCommas';
+}
+
+String _formatPricingDate(DateTime? date) {
+  if (date == null) {
+    return 'Unknown';
+  }
+
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day/$month/${date.year}';
 }
 
 class _MetadataDetail {

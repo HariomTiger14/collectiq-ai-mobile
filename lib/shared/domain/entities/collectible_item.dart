@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+
 /// Shared domain entity representing a collectible stored in the portfolio.
 class CollectibleItem {
   /// Creates an immutable collectible item.
@@ -11,6 +13,7 @@ class CollectibleItem {
     required this.recommendation,
     required this.imagePath,
     required this.createdAt,
+    this.pricing,
     this.year,
     this.brand,
     this.setName,
@@ -54,6 +57,8 @@ class CollectibleItem {
   /// Date and time the item was added.
   final DateTime createdAt;
 
+  final PricingInfo? pricing;
+
   final String? year;
   final String? brand;
   final String? setName;
@@ -81,6 +86,9 @@ class CollectibleItem {
       recommendation: json['recommendation'] as String,
       imagePath: json['imagePath'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      pricing: json['pricing'] is Map<String, dynamic>
+          ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+          : null,
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),
@@ -110,6 +118,7 @@ class CollectibleItem {
       'recommendation': recommendation,
       'imagePath': imagePath,
       'createdAt': createdAt.toIso8601String(),
+      'pricing': pricing?.toJson(),
       'year': year,
       'brand': brand,
       'setName': setName,

@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+
 /// Alternative match displayed in the scan result review.
 class ScanAlternativeMatch {
   /// Creates an immutable scan alternative match.
@@ -38,6 +40,7 @@ class ScanResult {
     required this.confidenceExplanation,
     required this.detectionQuality,
     required this.aiReasoning,
+    required this.pricing,
     this.year,
     this.brand,
     this.setName,
@@ -92,6 +95,9 @@ class ScanResult {
 
   /// AI reasoning behind the primary match.
   final String aiReasoning;
+
+  /// Market pricing supplied by the pricing provider.
+  final PricingInfo pricing;
 
   final String? year;
   final String? brand;

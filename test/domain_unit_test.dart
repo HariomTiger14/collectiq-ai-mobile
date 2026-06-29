@@ -4,6 +4,7 @@ import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,6 +32,10 @@ void main() {
       expect(json['playerOrCharacter'], 'Charizard');
       expect(json['rarity'], 'Holo Rare');
       expect(json['notes'], 'Verify holo surface.');
+      expect(json['pricing']['estimatedMarketValue'], 1850);
+      expect(json['pricing']['lowEstimate'], 1443);
+      expect(json['pricing']['highEstimate'], 2257);
+      expect(json['pricing']['currency'], 'AUD');
     });
 
     test('fromJson restores all fields', () {
@@ -51,6 +56,15 @@ void main() {
         'playerOrCharacter': 'Charizard',
         'rarity': 'Holo Rare',
         'notes': 'Verify holo surface.',
+        'pricing': {
+          'estimatedMarketValue': 1850,
+          'lowEstimate': 1443,
+          'highEstimate': 2257,
+          'currency': 'AUD',
+          'pricingSource': 'Mock market blend',
+          'pricingConfidence': 85,
+          'lastUpdated': '2026-06-29T00:00:00Z',
+        },
       });
 
       expect(item.id, 'item-1');
@@ -69,6 +83,8 @@ void main() {
       expect(item.playerOrCharacter, 'Charizard');
       expect(item.rarity, 'Holo Rare');
       expect(item.notes, 'Verify holo surface.');
+      expect(item.pricing?.estimatedMarketValue, 1850);
+      expect(item.pricing?.pricingConfidence, 0.85);
     });
   });
 
@@ -166,6 +182,15 @@ void main() {
         'mint': '',
         'material': 'Cardstock',
         'notes': 'Verify holo surface.',
+        'pricing': {
+          'estimatedMarketValue': 1850,
+          'lowEstimate': 1443,
+          'highEstimate': 2257,
+          'currency': 'AUD',
+          'pricingSource': 'Mock market blend',
+          'pricingConfidence': 85,
+          'lastUpdated': '2026-06-29T00:00:00Z',
+        },
       });
 
       expect(result.title, '1999 Pokémon Charizard');
@@ -198,6 +223,12 @@ void main() {
       expect(result.mint, isNull);
       expect(result.material, 'Cardstock');
       expect(result.notes, 'Verify holo surface.');
+      expect(result.pricing.estimatedMarketValue, 1850);
+      expect(result.pricing.lowEstimate, 1443);
+      expect(result.pricing.highEstimate, 2257);
+      expect(result.pricing.currency, 'AUD');
+      expect(result.pricing.pricingSource, 'Mock market blend');
+      expect(result.pricing.pricingConfidence, 0.85);
     });
 
     test('fromJson keeps compatibility with older backend response', () {
@@ -216,6 +247,8 @@ void main() {
       expect(result.confidenceExplanation, isNotEmpty);
       expect(result.detectionQuality, isNotEmpty);
       expect(result.aiReasoning, isEmpty);
+      expect(result.pricing.estimatedMarketValue, 120);
+      expect(result.pricing.pricingSource, 'Legacy AI estimate');
     });
   });
 
@@ -274,5 +307,14 @@ CollectibleItem _testItem() {
     playerOrCharacter: 'Charizard',
     rarity: 'Holo Rare',
     notes: 'Verify holo surface.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 1850,
+      lowEstimate: 1443,
+      highEstimate: 2257,
+      currency: 'AUD',
+      pricingSource: 'Mock market blend',
+      pricingConfidence: 0.85,
+      lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+    ),
   );
 }

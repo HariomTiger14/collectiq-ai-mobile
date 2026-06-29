@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Data model for serializing and deserializing scanner results.
 class ScanResultModel extends ScanResult {
@@ -17,6 +18,7 @@ class ScanResultModel extends ScanResult {
     required super.confidenceExplanation,
     required super.detectionQuality,
     required super.aiReasoning,
+    required super.pricing,
     super.year,
     super.brand,
     super.setName,
@@ -66,6 +68,11 @@ class ScanResultModel extends ScanResult {
           json['aiReasoning'] as String? ??
           json['description'] as String? ??
           '',
+      pricing: json['pricing'] is Map<String, dynamic>
+          ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+          : PricingInfo.fromLegacyEstimate(
+              (json['estimatedValue'] as num).toDouble(),
+            ),
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),
@@ -107,6 +114,7 @@ class ScanResultModel extends ScanResult {
       'confidenceExplanation': confidenceExplanation,
       'detectionQuality': detectionQuality,
       'aiReasoning': aiReasoning,
+      'pricing': pricing.toJson(),
       'year': year,
       'brand': brand,
       'setName': setName,

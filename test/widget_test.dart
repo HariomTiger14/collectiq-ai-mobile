@@ -8,6 +8,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -171,7 +172,14 @@ void main() {
 
     expect(find.text('1999 Pokémon Charizard'), findsOneWidget);
     expect(find.text('Trading Card'), findsWidgets);
-    expect(find.text('AUD 1,850'), findsOneWidget);
+    expect(find.text('AUD 1,850'), findsWidgets);
+    expect(find.text('Market Value'), findsWidgets);
+    expect(find.text('AUD 1,443 - AUD 2,257'), findsOneWidget);
+    expect(
+      find.text('Mock market blend: TCGplayer + eBay comps'),
+      findsOneWidget,
+    );
+    expect(find.text('85%'), findsOneWidget);
     expect(find.text('94%'), findsOneWidget);
     expect(find.text('Near Mint'), findsOneWidget);
     expect(find.text('Collectible Details'), findsOneWidget);
@@ -312,7 +320,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"}}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -330,7 +338,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"}}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -417,7 +425,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"}}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -439,6 +447,9 @@ void main() {
     expect(find.text('Base Set'), findsOneWidget);
     expect(find.text('4/102'), findsOneWidget);
     expect(find.text('Charizard'), findsOneWidget);
+    expect(find.text('Market Pricing'), findsOneWidget);
+    expect(find.text('AUD 1,443 - AUD 2,257'), findsOneWidget);
+    expect(find.text('Mock market blend'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Price History'));
     await tester.pump();
@@ -539,7 +550,7 @@ class _FakeAIRecognitionService implements AIRecognitionService {
 
   @override
   Future<RecognitionResult> recognizeCollectible(XFile image) async {
-    return const RecognitionResult(
+    return RecognitionResult(
       success: true,
       filename: 'scan.png',
       imageUrl: 'http://192.168.0.81:8000/uploads/scan.png',
@@ -551,7 +562,7 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',
       primaryMatch: '1999 Pokemon Charizard Holo',
-      alternativeMatches: [
+      alternativeMatches: const [
         RecognitionAlternativeMatch(
           title: '2016 Pokemon Evolutions Charizard',
           category: 'Trading Card',
@@ -576,6 +587,15 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       detectionQuality: 'Good',
       aiReasoning:
           'The image shows a Charizard-like Pokemon card with collector cues.',
+      pricing: PricingInfo(
+        estimatedMarketValue: 1850,
+        lowEstimate: 1443,
+        highEstimate: 2257,
+        currency: 'AUD',
+        pricingSource: 'Mock market blend: TCGplayer + eBay comps',
+        pricingConfidence: 0.85,
+        lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+      ),
       year: '1999',
       brand: 'Pokemon',
       setName: 'Base Set',

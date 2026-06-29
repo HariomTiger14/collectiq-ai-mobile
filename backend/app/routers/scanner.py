@@ -20,6 +20,7 @@ from app.services.ai.openai_recognition_provider import (
     OpenAITimeoutError,
 )
 from app.services.ai.provider_factory import get_ai_recognition_provider
+from app.services.pricing.provider_factory import get_pricing_provider
 
 
 router = APIRouter(prefix="/scanner", tags=["Scanner"])
@@ -74,6 +75,7 @@ async def analyze_scanner_image(
     image_url = str(request.url_for("uploads", path=filename))
     try:
         recognition = get_ai_recognition_provider().recognize(destination)
+        pricing = get_pricing_provider().price(recognition)
     except ValueError as exc:
         destination.unlink(missing_ok=True)
         raise HTTPException(
@@ -118,7 +120,7 @@ async def analyze_scanner_image(
         title=recognition.title,
         category=recognition.category,
         confidence=recognition.confidence,
-        estimatedValue=recognition.estimatedValue,
+        estimatedValue=pricing.estimatedMarketValue,
         condition=recognition.condition,
         recommendation=recognition.recommendation,
         description=recognition.description,
@@ -152,4 +154,13 @@ async def analyze_scanner_image(
         mint=recognition.mint,
         material=recognition.material,
         notes=recognition.notes,
+        pricing={
+            "estimatedMarketValue": pricing.estimatedMarketValue,
+            "lowEstimate": pricing.lowEstimate,
+            "highEstimate": pricing.highEstimate,
+            "currency": pricing.currency,
+            "pricingSource": pricing.pricingSource,
+            "pricingConfidence": pricing.pricingConfidence,
+            "lastUpdated": pricing.lastUpdated,
+        },
     )

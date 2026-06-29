@@ -8,6 +8,16 @@ class AlternativeMatchResponse(BaseModel):
     reason: str
 
 
+class PricingResponse(BaseModel):
+    estimatedMarketValue: int
+    lowEstimate: int
+    highEstimate: int
+    currency: str
+    pricingSource: str
+    pricingConfidence: int
+    lastUpdated: str
+
+
 class ScannerAnalysisResponse(BaseModel):
     success: bool
     filename: str
@@ -41,3 +51,4 @@ class ScannerAnalysisResponse(BaseModel):
     mint: str | None = None
     material: str | None = None
     notes: str | None = None
+    pricing: PricingResponse

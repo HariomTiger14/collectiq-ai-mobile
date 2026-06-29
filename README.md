@@ -100,7 +100,16 @@ requests strict structured JSON with these Flutter-compatible fields:
   "country": "United States",
   "mint": null,
   "material": "Cardstock",
-  "notes": "Authentication recommended before insurance or resale."
+  "notes": "Authentication recommended before insurance or resale.",
+  "pricing": {
+    "estimatedMarketValue": 125000,
+    "lowEstimate": 97500,
+    "highEstimate": 152500,
+    "currency": "AUD",
+    "pricingSource": "Mock market blend: eBay comps + PSA guide",
+    "pricingConfidence": 83,
+    "lastUpdated": "2026-06-29T00:00:00Z"
+  }
 }
 ```
 

@@ -141,6 +141,7 @@ class ScannerScreen extends ConsumerWidget {
                               scanResult.confidenceExplanation,
                           detectionQuality: scanResult.detectionQuality,
                           aiReasoning: scanResult.aiReasoning,
+                          pricing: scanResult.pricing,
                           year: scanResult.year,
                           brand: scanResult.brand,
                           setName: scanResult.setName,

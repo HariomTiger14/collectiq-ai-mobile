@@ -58,6 +58,19 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("playerOrCharacter", payload)
         self.assertIn("material", payload)
         self.assertIn("notes", payload)
+        self.assertIn("pricing", payload)
+        pricing = payload["pricing"]
+        self.assertEqual(payload["estimatedValue"], pricing["estimatedMarketValue"])
+        self.assertGreater(pricing["lowEstimate"], 0)
+        self.assertGreaterEqual(
+            pricing["highEstimate"],
+            pricing["estimatedMarketValue"],
+        )
+        self.assertEqual(pricing["currency"], "AUD")
+        self.assertTrue(pricing["pricingSource"])
+        self.assertGreaterEqual(pricing["pricingConfidence"], 0)
+        self.assertLessEqual(pricing["pricingConfidence"], 100)
+        self.assertTrue(pricing["lastUpdated"])
 
     def test_scanner_analyze_invalid_extension(self) -> None:
         response = self.client.post(

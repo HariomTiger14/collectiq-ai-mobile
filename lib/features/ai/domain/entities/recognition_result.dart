@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+
 /// Alternative collectible match returned by the AI review system.
 class RecognitionAlternativeMatch {
   /// Creates an immutable alternative match.
@@ -52,6 +54,7 @@ class RecognitionResult {
     required this.confidenceExplanation,
     required this.detectionQuality,
     required this.aiReasoning,
+    required this.pricing,
     this.year,
     this.brand,
     this.setName,
@@ -113,6 +116,9 @@ class RecognitionResult {
   /// AI reasoning for the selected match.
   final String aiReasoning;
 
+  /// Pricing supplied by the configured pricing provider.
+  final PricingInfo pricing;
+
   final String? year;
   final String? brand;
   final String? setName;
@@ -137,6 +143,8 @@ class RecognitionResult {
             .map(RecognitionAlternativeMatch.fromJson)
             .toList();
 
+    final estimatedValue = (json['estimatedValue'] as num).toDouble();
+
     return RecognitionResult(
       success: json['success'] as bool? ?? true,
       filename: json['filename'] as String?,
@@ -145,7 +153,7 @@ class RecognitionResult {
       category: json['category'] as String,
       confidence: confidence > 1 ? confidence / 100 : confidence,
       description: json['description'] as String? ?? '',
-      estimatedValue: (json['estimatedValue'] as num).toDouble(),
+      estimatedValue: estimatedValue,
       condition: json['condition'] as String,
       recommendation: json['recommendation'] as String,
       primaryMatch: json['primaryMatch'] as String? ?? json['title'] as String,
@@ -159,6 +167,9 @@ class RecognitionResult {
       aiReasoning:
           json['aiReasoning'] as String? ??
           (json['description'] as String? ?? ''),
+      pricing: json['pricing'] is Map<String, dynamic>
+          ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+          : PricingInfo.fromLegacyEstimate(estimatedValue),
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),

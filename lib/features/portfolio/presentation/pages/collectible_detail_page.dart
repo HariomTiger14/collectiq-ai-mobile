@@ -164,6 +164,41 @@ class _DetailCard extends StatelessWidget {
           ),
           _DetailRow(label: 'Condition', value: item.condition),
           _DetailRow(label: 'Date Saved', value: _formatDate(item.createdAt)),
+          if (item.pricing != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Market Pricing',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _DetailRow(
+              label: 'Market Value',
+              value: _formatMoney(
+                item.pricing!.estimatedMarketValue,
+                item.pricing!.currency,
+              ),
+            ),
+            _DetailRow(
+              label: 'Estimated Range',
+              value:
+                  '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+            ),
+            _DetailRow(
+              label: 'Pricing Source',
+              value: item.pricing!.pricingSource,
+            ),
+            _DetailRow(
+              label: 'Pricing Confidence',
+              value:
+                  '${(item.pricing!.pricingConfidence * 100).toStringAsFixed(0)}%',
+            ),
+            _DetailRow(
+              label: 'Last Updated',
+              value: _formatPricingDate(item.pricing!.lastUpdated),
+            ),
+          ],
           if (collectibleDetails.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -507,4 +542,21 @@ String _formatDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
   return '$day/$month/${date.year}';
+}
+
+String _formatMoney(double value, String currency) {
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '$currency $withCommas';
+}
+
+String _formatPricingDate(DateTime? date) {
+  if (date == null) {
+    return 'Unknown';
+  }
+
+  return _formatDate(date);
 }
