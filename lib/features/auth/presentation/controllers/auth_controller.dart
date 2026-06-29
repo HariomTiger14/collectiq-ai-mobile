@@ -1,11 +1,14 @@
-import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the auth repository.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return const MockAuthRepository();
+  return SupabaseAuthRepository(
+    supabaseService: ref.watch(supabaseServiceProvider),
+  );
 });
 
 /// Placeholder auth state for future account support.
@@ -77,14 +80,39 @@ class AuthController extends Notifier<AuthState> {
 
   /// Placeholder sign-in action for future implementation.
   Future<void> signIn() async {
+    return signInAnonymously();
+  }
+
+  /// Starts an anonymous session or local guest placeholder.
+  Future<void> signInAnonymously() async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      final user = await _repository.signIn();
+      final user = await _repository.signInAnonymously();
       state = state.copyWith(user: user, isLoading: false);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Sign in is not available yet.',
+      );
+    }
+  }
+
+  /// Email/password foundation for future account screens.
+  Future<void> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      final user = await _repository.signInWithEmailPassword(
+        email: email,
+        password: password,
+      );
+      state = state.copyWith(user: user, isLoading: false);
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Email sign in is not available yet.',
       );
     }
   }

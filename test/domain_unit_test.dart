@@ -1,11 +1,17 @@
 import 'dart:typed_data';
 
+import 'package:collectiq_ai/core/supabase/supabase_config.dart';
+import 'package:collectiq_ai/core/supabase/supabase_schema.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
+import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
+import 'package:collectiq_ai/features/image_storage/data/repositories/supabase_image_storage_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -314,6 +320,66 @@ void main() {
     });
   });
 
+  group('Supabase foundation', () {
+    test('config remains disabled when environment is not provided', () {
+      final config = SupabaseConfig.fromEnvironment();
+
+      expect(config.isConfigured, isFalse);
+      expect(config.url, isEmpty);
+      expect(config.anonKey, isEmpty);
+    });
+
+    test('schema defines planned cloud tables', () {
+      expect(
+        SupabaseSchemaDefinition.tables.keys,
+        containsAll([
+          SupabaseTables.users,
+          SupabaseTables.collections,
+          SupabaseTables.collectibles,
+          SupabaseTables.scanHistory,
+          SupabaseTables.pricingSnapshots,
+          SupabaseTables.favorites,
+          SupabaseTables.wishlist,
+        ]),
+      );
+      expect(
+        SupabaseSchemaDefinition.tables[SupabaseTables.collectibles],
+        contains('id uuid primary key'),
+      );
+    });
+
+    test(
+      'auth repository falls back to guest mode when not configured',
+      () async {
+        final service = SupabaseService.instance(
+          config: const SupabaseConfig(url: '', anonKey: '', isEnabled: false),
+        );
+        final repository = SupabaseAuthRepository(supabaseService: service);
+
+        expect(await repository.currentUser(), isNull);
+        final user = await repository.signInAnonymously();
+
+        expect(user.displayName, 'Local Collector');
+        expect(user.isAnonymous, isTrue);
+      },
+    );
+
+    test('image storage stays local when Supabase is not configured', () async {
+      const repository = SupabaseImageStorageRepository(
+        config: SupabaseConfig(url: '', anonKey: '', isEnabled: false),
+      );
+
+      final reference = await repository.uploadImage(
+        localPath: 'test/fixtures/card.jpg',
+        collectibleId: 'item-1',
+      );
+
+      expect(reference.isRemote, isFalse);
+      expect(reference.path, 'test/fixtures/card.jpg');
+      expect(reference.publicUrl, isNull);
+    });
+  });
+
   group('AuthController', () {
     test('starts in guest mode and supports optional mock sign in', () async {
       final container = ProviderContainer();
@@ -381,6 +447,19 @@ void main() {
       expect(syncState.status.state, SyncState.localOnly);
       expect(syncState.status.pendingItemCount, 1);
       expect(syncState.status.isCloudBackupEnabled, isFalse);
+    });
+  });
+
+  group('SyncService', () {
+    test('can mark local items as pending without cloud backup', () async {
+      const repository = MockCloudPortfolioRepository();
+      const service = LocalFirstSyncService(repository: repository);
+
+      final status = await service.markPending([_testItem()]);
+
+      expect(status.state, SyncState.pending);
+      expect(status.pendingItemCount, 1);
+      expect(status.isCloudBackupEnabled, isFalse);
     });
   });
 

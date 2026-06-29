@@ -14,6 +14,9 @@ enum SyncState {
 
   /// Sync failed.
   failed,
+
+  /// Local and cloud records require user resolution.
+  conflict,
 }
 
 /// Current portfolio cloud sync status.
@@ -50,6 +53,7 @@ class SyncStatus {
       SyncState.pending => 'Pending',
       SyncState.syncing => 'Syncing',
       SyncState.failed => 'Needs attention',
+      SyncState.conflict => 'Conflict',
     };
   }
 }

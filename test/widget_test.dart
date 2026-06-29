@@ -88,10 +88,11 @@ void main() {
     expect(find.text('Settings'), findsWidgets);
     expect(find.text('Manage account and cloud sync options.'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Continue as Guest'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
     expect(find.text('Guest mode'), findsOneWidget);
     expect(
-      find.text('Optional. Continue using CollectIQ AI locally.'),
+      find.text('Use camera, scans, and local portfolio without an account.'),
       findsOneWidget,
     );
     expect(find.text('App Preferences'), findsOneWidget);
@@ -102,11 +103,17 @@ void main() {
     expect(find.text('Cloud backup'), findsOneWidget);
     expect(find.text('Off'), findsWidgets);
 
+    await tester.ensureVisible(find.text('Storage'));
+    await tester.pump();
+    expect(find.text('Storage'), findsOneWidget);
+    expect(find.text('Local images'), findsOneWidget);
+    expect(find.text('Supabase Storage'), findsOneWidget);
+
     await tester.ensureVisible(find.text('Data & Privacy'));
     await tester.pump();
     expect(find.text('Data & Privacy'), findsOneWidget);
     expect(find.text('Offline portfolio'), findsOneWidget);
-    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Active'), findsWidgets);
 
     await tester.ensureVisible(find.text('About'));
     await tester.pump();

@@ -8,6 +8,15 @@ abstract interface class AuthRepository {
   /// Placeholder sign-in action for future provider integration.
   Future<AppUser> signIn();
 
+  /// Starts an anonymous session when supported by the auth provider.
+  Future<AppUser> signInAnonymously();
+
+  /// Signs in with email and password when supported by the auth provider.
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  });
+
   /// Signs the current user out.
   Future<void> signOut();
 }

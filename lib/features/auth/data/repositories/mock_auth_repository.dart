@@ -24,5 +24,18 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> signInAnonymously() async {
+    return _mockUser;
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return AppUser(id: 'mock-email-user', displayName: email, email: email);
+  }
+
+  @override
   Future<void> signOut() async {}
 }

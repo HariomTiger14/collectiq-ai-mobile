@@ -49,11 +49,18 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Account',
                     children: [
                       _SettingsRow(
+                        icon: Icons.person_outline,
+                        title: 'Continue as Guest',
+                        subtitle:
+                            'Use camera, scans, and local portfolio without an account.',
+                        trailing: authState.isSignedIn ? 'Off' : 'Active',
+                      ),
+                      _SettingsRow(
                         icon: Icons.login_outlined,
-                        title: 'Sign in',
+                        title: authState.isSignedIn ? 'Account' : 'Sign In',
                         subtitle: authState.isSignedIn
                             ? authState.user!.displayName
-                            : 'Optional. Continue using CollectIQ AI locally.',
+                            : 'Optional Supabase account sign in is prepared.',
                         trailing: authState.statusLabel,
                       ),
                     ],
@@ -115,6 +122,26 @@ class SettingsScreen extends ConsumerWidget {
                         trailing: syncState.status.isCloudBackupEnabled
                             ? 'On'
                             : 'Off',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'Storage',
+                    children: const [
+                      _SettingsRow(
+                        icon: Icons.phone_android_outlined,
+                        title: 'Local images',
+                        subtitle:
+                            'Captured and uploaded images stay on this device by default.',
+                        trailing: 'Active',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.cloud_queue_outlined,
+                        title: 'Supabase Storage',
+                        subtitle:
+                            'Cloud image storage is prepared for future sync.',
+                        trailing: 'Ready',
                       ),
                     ],
                   ),
