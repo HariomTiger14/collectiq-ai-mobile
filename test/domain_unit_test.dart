@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -285,6 +288,48 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('MockAuthRepository', () {
+    test('defaults to no signed-in user for local-first mode', () async {
+      const repository = MockAuthRepository();
+
+      final user = await repository.currentUser();
+
+      expect(user, isNull);
+    });
+
+    test('signIn returns mock anonymous user placeholder', () async {
+      const repository = MockAuthRepository();
+
+      final user = await repository.signIn();
+
+      expect(user.id, 'mock-user');
+      expect(user.displayName, 'Local Collector');
+      expect(user.isAnonymous, isTrue);
+    });
+  });
+
+  group('MockCloudPortfolioRepository', () {
+    test('reports local-only sync status by default', () async {
+      const repository = MockCloudPortfolioRepository();
+
+      final status = await repository.getSyncStatus();
+
+      expect(status.state, SyncState.localOnly);
+      expect(status.statusLabel, 'Local only');
+      expect(status.isCloudBackupEnabled, isFalse);
+    });
+
+    test('uploadLocalItems keeps items pending while cloud backup is disabled', () async {
+      const repository = MockCloudPortfolioRepository();
+
+      final status = await repository.uploadLocalItems([_testItem()]);
+
+      expect(status.state, SyncState.localOnly);
+      expect(status.pendingItemCount, 1);
+      expect(status.isCloudBackupEnabled, isFalse);
     });
   });
 }
