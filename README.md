@@ -113,6 +113,70 @@ requests strict structured JSON with these Flutter-compatible fields:
 }
 ```
 
+## Supabase Cloud Foundation
+
+CollectIQ AI is local-first by default. Supabase is optional infrastructure for
+future account and cloud sync features; do not put real Supabase secrets in
+source control.
+
+### Create a Supabase project
+
+1. Create a project at <https://supabase.com>.
+2. Open Project Settings -> API.
+3. Copy the Project URL.
+4. Copy the anon public key.
+5. Keep service-role keys out of the Flutter app.
+
+### Run the schema
+
+Run the SQL in:
+
+```text
+supabase/migrations/202606290001_collectiq_cloud_schema.sql
+```
+
+You can paste it into the Supabase SQL Editor or run it with the Supabase CLI.
+The schema creates:
+
+- `users`
+- `collections`
+- `collectibles`
+- `scan_history`
+- `pricing_snapshots`
+- `favorites`
+- `wishlist`
+
+Row Level Security is enabled on every table. Policies restrict rows to
+`auth.uid()` so users can only read, insert, update, or delete their own data.
+The migration also creates a profile trigger that mirrors new `auth.users`
+records into `public.users`.
+
+### Run Flutter with Supabase configuration
+
+Supabase remains disabled unless explicitly enabled with dart defines:
+
+```powershell
+flutter run `
+  --dart-define=SUPABASE_ENABLED=true `
+  --dart-define=SUPABASE_URL=https://your-project-ref.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=your-anon-public-key
+```
+
+Without these values, the app continues in guest/local-first mode and stores the
+portfolio locally.
+
+### Auth test plan
+
+Use `docs/supabase_auth_test_plan.md` to validate:
+
+- guest mode
+- anonymous sign-in
+- email/password sign-in
+- sign out
+
+Authentication is foundation-only right now. The app must not require login to
+scan, save, view, search, sort, or delete local portfolio items.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

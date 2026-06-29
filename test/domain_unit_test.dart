@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
@@ -346,6 +347,35 @@ void main() {
         SupabaseSchemaDefinition.tables[SupabaseTables.collectibles],
         contains('id uuid primary key'),
       );
+    });
+
+    test('migration enables RLS and owner-scoped policies', () {
+      final migration = File(
+        'supabase/migrations/202606290001_collectiq_cloud_schema.sql',
+      ).readAsStringSync();
+
+      for (final table in [
+        'users',
+        'collections',
+        'collectibles',
+        'scan_history',
+        'pricing_snapshots',
+        'favorites',
+        'wishlist',
+      ]) {
+        expect(migration, contains('create table if not exists public.$table'));
+        expect(
+          migration,
+          contains('alter table public.$table enable row level security'),
+        );
+      }
+
+      expect(migration, contains('references auth.users(id)'));
+      expect(migration, contains('function public.handle_new_auth_user()'));
+      expect(migration, contains('on_auth_user_created'));
+      expect(migration, contains('auth.uid() = user_id'));
+      expect(migration, contains('auth.uid() = id'));
+      expect(migration, contains('with check (auth.uid() = user_id)'));
     });
 
     test(
