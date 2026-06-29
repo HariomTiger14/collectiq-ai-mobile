@@ -17,6 +17,20 @@ class ScanResultModel extends ScanResult {
     required super.confidenceExplanation,
     required super.detectionQuality,
     required super.aiReasoning,
+    super.year,
+    super.brand,
+    super.setName,
+    super.series,
+    super.cardNumber,
+    super.playerOrCharacter,
+    super.rarity,
+    super.estimatedGrade,
+    super.language,
+    super.edition,
+    super.country,
+    super.mint,
+    super.material,
+    super.notes,
   });
 
   /// Creates a model from a JSON map.
@@ -52,6 +66,20 @@ class ScanResultModel extends ScanResult {
           json['aiReasoning'] as String? ??
           json['description'] as String? ??
           '',
+      year: _optionalString(json['year']),
+      brand: _optionalString(json['brand']),
+      setName: _optionalString(json['setName']),
+      series: _optionalString(json['series']),
+      cardNumber: _optionalString(json['cardNumber']),
+      playerOrCharacter: _optionalString(json['playerOrCharacter']),
+      rarity: _optionalString(json['rarity']),
+      estimatedGrade: _optionalString(json['estimatedGrade']),
+      language: _optionalString(json['language']),
+      edition: _optionalString(json['edition']),
+      country: _optionalString(json['country']),
+      mint: _optionalString(json['mint']),
+      material: _optionalString(json['material']),
+      notes: _optionalString(json['notes']),
     );
   }
 
@@ -79,6 +107,29 @@ class ScanResultModel extends ScanResult {
       'confidenceExplanation': confidenceExplanation,
       'detectionQuality': detectionQuality,
       'aiReasoning': aiReasoning,
+      'year': year,
+      'brand': brand,
+      'setName': setName,
+      'series': series,
+      'cardNumber': cardNumber,
+      'playerOrCharacter': playerOrCharacter,
+      'rarity': rarity,
+      'estimatedGrade': estimatedGrade,
+      'language': language,
+      'edition': edition,
+      'country': country,
+      'mint': mint,
+      'material': material,
+      'notes': notes,
     };
   }
+}
+
+String? _optionalString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }

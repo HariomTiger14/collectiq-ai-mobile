@@ -11,6 +11,20 @@ class CollectibleItem {
     required this.recommendation,
     required this.imagePath,
     required this.createdAt,
+    this.year,
+    this.brand,
+    this.setName,
+    this.series,
+    this.cardNumber,
+    this.playerOrCharacter,
+    this.rarity,
+    this.estimatedGrade,
+    this.language,
+    this.edition,
+    this.country,
+    this.mint,
+    this.material,
+    this.notes,
   });
 
   /// Unique item identifier.
@@ -40,6 +54,21 @@ class CollectibleItem {
   /// Date and time the item was added.
   final DateTime createdAt;
 
+  final String? year;
+  final String? brand;
+  final String? setName;
+  final String? series;
+  final String? cardNumber;
+  final String? playerOrCharacter;
+  final String? rarity;
+  final String? estimatedGrade;
+  final String? language;
+  final String? edition;
+  final String? country;
+  final String? mint;
+  final String? material;
+  final String? notes;
+
   /// Creates a collectible item from a JSON map.
   factory CollectibleItem.fromJson(Map<String, dynamic> json) {
     return CollectibleItem(
@@ -52,6 +81,20 @@ class CollectibleItem {
       recommendation: json['recommendation'] as String,
       imagePath: json['imagePath'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      year: _optionalString(json['year']),
+      brand: _optionalString(json['brand']),
+      setName: _optionalString(json['setName']),
+      series: _optionalString(json['series']),
+      cardNumber: _optionalString(json['cardNumber']),
+      playerOrCharacter: _optionalString(json['playerOrCharacter']),
+      rarity: _optionalString(json['rarity']),
+      estimatedGrade: _optionalString(json['estimatedGrade']),
+      language: _optionalString(json['language']),
+      edition: _optionalString(json['edition']),
+      country: _optionalString(json['country']),
+      mint: _optionalString(json['mint']),
+      material: _optionalString(json['material']),
+      notes: _optionalString(json['notes']),
     );
   }
 
@@ -67,6 +110,29 @@ class CollectibleItem {
       'recommendation': recommendation,
       'imagePath': imagePath,
       'createdAt': createdAt.toIso8601String(),
+      'year': year,
+      'brand': brand,
+      'setName': setName,
+      'series': series,
+      'cardNumber': cardNumber,
+      'playerOrCharacter': playerOrCharacter,
+      'rarity': rarity,
+      'estimatedGrade': estimatedGrade,
+      'language': language,
+      'edition': edition,
+      'country': country,
+      'mint': mint,
+      'material': material,
+      'notes': notes,
     };
   }
+}
+
+String? _optionalString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }

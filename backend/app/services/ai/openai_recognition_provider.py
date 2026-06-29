@@ -111,7 +111,9 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                                 "collector profile. Return conservative, "
                                 "realistic values in Australian dollars. "
                                 "Include reasoning, detection quality, and "
-                                "exactly three plausible alternative matches."
+                                "exactly three plausible alternative matches. "
+                                "Also extract collectible profile metadata "
+                                "when visible; use null for unknown metadata."
                             ),
                         },
                         {
@@ -143,6 +145,20 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "confidenceExplanation",
                             "detectionQuality",
                             "aiReasoning",
+                            "year",
+                            "brand",
+                            "setName",
+                            "series",
+                            "cardNumber",
+                            "playerOrCharacter",
+                            "rarity",
+                            "estimatedGrade",
+                            "language",
+                            "edition",
+                            "country",
+                            "mint",
+                            "material",
+                            "notes",
                         ],
                         "properties": {
                             "title": {"type": "string"},
@@ -192,6 +208,20 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "confidenceExplanation": {"type": "string"},
                             "detectionQuality": {"type": "string"},
                             "aiReasoning": {"type": "string"},
+                            "year": {"type": ["string", "null"]},
+                            "brand": {"type": ["string", "null"]},
+                            "setName": {"type": ["string", "null"]},
+                            "series": {"type": ["string", "null"]},
+                            "cardNumber": {"type": ["string", "null"]},
+                            "playerOrCharacter": {"type": ["string", "null"]},
+                            "rarity": {"type": ["string", "null"]},
+                            "estimatedGrade": {"type": ["string", "null"]},
+                            "language": {"type": ["string", "null"]},
+                            "edition": {"type": ["string", "null"]},
+                            "country": {"type": ["string", "null"]},
+                            "mint": {"type": ["string", "null"]},
+                            "material": {"type": ["string", "null"]},
+                            "notes": {"type": ["string", "null"]},
                         },
                     },
                 }
@@ -288,7 +318,32 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             confidenceExplanation=payload["confidenceExplanation"].strip(),
             detectionQuality=payload["detectionQuality"].strip(),
             aiReasoning=payload["aiReasoning"].strip(),
+            year=self._optional_string(payload, "year"),
+            brand=self._optional_string(payload, "brand"),
+            setName=self._optional_string(payload, "setName"),
+            series=self._optional_string(payload, "series"),
+            cardNumber=self._optional_string(payload, "cardNumber"),
+            playerOrCharacter=self._optional_string(payload, "playerOrCharacter"),
+            rarity=self._optional_string(payload, "rarity"),
+            estimatedGrade=self._optional_string(payload, "estimatedGrade"),
+            language=self._optional_string(payload, "language"),
+            edition=self._optional_string(payload, "edition"),
+            country=self._optional_string(payload, "country"),
+            mint=self._optional_string(payload, "mint"),
+            material=self._optional_string(payload, "material"),
+            notes=self._optional_string(payload, "notes"),
         )
+
+    def _optional_string(self, payload: dict[str, Any], field: str) -> str | None:
+        value = payload.get(field)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise OpenAIInvalidResponseError(
+                f"OpenAI structured output field '{field}' must be a string or null."
+            )
+        normalized = value.strip()
+        return normalized or None
 
     def _parse_alternative_matches(
         self,

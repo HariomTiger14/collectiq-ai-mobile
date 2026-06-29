@@ -40,6 +40,26 @@ class MockRecognitionProviderTest(unittest.TestCase):
         self.assertTrue(result.confidenceExplanation)
         self.assertTrue(result.detectionQuality)
         self.assertTrue(result.aiReasoning)
+        self.assertTrue(
+            any(
+                [
+                    result.year,
+                    result.brand,
+                    result.setName,
+                    result.series,
+                    result.cardNumber,
+                    result.playerOrCharacter,
+                    result.rarity,
+                    result.estimatedGrade,
+                    result.language,
+                    result.edition,
+                    result.country,
+                    result.mint,
+                    result.material,
+                    result.notes,
+                ]
+            )
+        )
 
     def test_recognize_returns_varied_mock_results(self) -> None:
         provider = MockRecognitionProvider()

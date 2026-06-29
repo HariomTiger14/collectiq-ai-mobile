@@ -52,6 +52,12 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertTrue(payload["confidenceExplanation"])
         self.assertTrue(payload["detectionQuality"])
         self.assertTrue(payload["aiReasoning"])
+        self.assertIn("year", payload)
+        self.assertIn("brand", payload)
+        self.assertIn("setName", payload)
+        self.assertIn("playerOrCharacter", payload)
+        self.assertIn("material", payload)
+        self.assertIn("notes", payload)
 
     def test_scanner_analyze_invalid_extension(self) -> None:
         response = self.client.post(

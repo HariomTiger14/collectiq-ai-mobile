@@ -52,6 +52,20 @@ class RecognitionResult {
     required this.confidenceExplanation,
     required this.detectionQuality,
     required this.aiReasoning,
+    this.year,
+    this.brand,
+    this.setName,
+    this.series,
+    this.cardNumber,
+    this.playerOrCharacter,
+    this.rarity,
+    this.estimatedGrade,
+    this.language,
+    this.edition,
+    this.country,
+    this.mint,
+    this.material,
+    this.notes,
   });
 
   /// Whether the backend completed analysis successfully.
@@ -99,6 +113,21 @@ class RecognitionResult {
   /// AI reasoning for the selected match.
   final String aiReasoning;
 
+  final String? year;
+  final String? brand;
+  final String? setName;
+  final String? series;
+  final String? cardNumber;
+  final String? playerOrCharacter;
+  final String? rarity;
+  final String? estimatedGrade;
+  final String? language;
+  final String? edition;
+  final String? country;
+  final String? mint;
+  final String? material;
+  final String? notes;
+
   /// Creates a recognition result from backend JSON.
   factory RecognitionResult.fromJson(Map<String, dynamic> json) {
     final confidence = (json['confidence'] as num).toDouble();
@@ -130,6 +159,29 @@ class RecognitionResult {
       aiReasoning:
           json['aiReasoning'] as String? ??
           (json['description'] as String? ?? ''),
+      year: _optionalString(json['year']),
+      brand: _optionalString(json['brand']),
+      setName: _optionalString(json['setName']),
+      series: _optionalString(json['series']),
+      cardNumber: _optionalString(json['cardNumber']),
+      playerOrCharacter: _optionalString(json['playerOrCharacter']),
+      rarity: _optionalString(json['rarity']),
+      estimatedGrade: _optionalString(json['estimatedGrade']),
+      language: _optionalString(json['language']),
+      edition: _optionalString(json['edition']),
+      country: _optionalString(json['country']),
+      mint: _optionalString(json['mint']),
+      material: _optionalString(json['material']),
+      notes: _optionalString(json['notes']),
     );
   }
+}
+
+String? _optionalString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }

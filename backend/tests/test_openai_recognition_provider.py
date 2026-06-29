@@ -95,6 +95,20 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
             "confidenceExplanation": "Strong card layout and player cues, but print details need confirmation.",
             "detectionQuality": "Good - subject and border are visible.",
             "aiReasoning": "The image matches vintage baseball card proportions and Yankees-era Mantle visual cues.",
+            "year": "1952",
+            "brand": "Topps",
+            "setName": "Topps Baseball",
+            "series": "MLB",
+            "cardNumber": "311",
+            "playerOrCharacter": "Mickey Mantle",
+            "rarity": "Key Card",
+            "estimatedGrade": "Good",
+            "language": "English",
+            "edition": "Base",
+            "country": "United States",
+            "mint": None,
+            "material": "Cardstock",
+            "notes": "Authentication recommended.",
         }
         client = FakeClient(
             response=FakeResponse(body={"output_text": json.dumps(output)})
@@ -127,12 +141,22 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
         self.assertEqual(result.confidenceExplanation, output["confidenceExplanation"])
         self.assertEqual(result.detectionQuality, output["detectionQuality"])
         self.assertEqual(result.aiReasoning, output["aiReasoning"])
+        self.assertEqual(result.year, "1952")
+        self.assertEqual(result.brand, "Topps")
+        self.assertEqual(result.setName, "Topps Baseball")
+        self.assertEqual(result.cardNumber, "311")
+        self.assertEqual(result.playerOrCharacter, "Mickey Mantle")
+        self.assertEqual(result.mint, None)
+        self.assertEqual(result.notes, "Authentication recommended.")
         self.assertIsNotNone(client.last_request)
         self.assertEqual(client.last_request["url"], provider.responses_url)
         self.assertEqual(client.last_request["json"]["model"], "gpt-test")
         image_content = client.last_request["json"]["input"][0]["content"][1]
         self.assertEqual(image_content["type"], "input_image")
         self.assertTrue(image_content["image_url"].startswith("data:image/png;base64,"))
+        schema = client.last_request["json"]["text"]["format"]["schema"]
+        self.assertIn("year", schema["required"])
+        self.assertEqual(schema["properties"]["year"]["type"], ["string", "null"])
 
     def test_recognize_parses_nested_response_output_text(self) -> None:
         output = {
@@ -168,6 +192,20 @@ class OpenAIRecognitionProviderTest(unittest.TestCase):
             "confidenceExplanation": "Morgan dollar design cues are visible.",
             "detectionQuality": "Fair - reflective surface obscures details.",
             "aiReasoning": "The portrait and silver dollar format indicate Morgan dollar.",
+            "year": "1921",
+            "brand": "United States Mint",
+            "setName": None,
+            "series": "Morgan Dollar",
+            "cardNumber": None,
+            "playerOrCharacter": None,
+            "rarity": None,
+            "estimatedGrade": "Very Fine",
+            "language": None,
+            "edition": None,
+            "country": "United States",
+            "mint": "Philadelphia",
+            "material": "Silver",
+            "notes": "Do not clean.",
         }
         client = FakeClient(
             response=FakeResponse(

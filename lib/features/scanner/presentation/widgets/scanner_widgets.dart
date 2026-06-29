@@ -510,6 +510,20 @@ class AiResultCard extends ConsumerWidget {
     required this.detectionQuality,
     required this.aiReasoning,
     required this.recommendation,
+    this.year,
+    this.brand,
+    this.setName,
+    this.series,
+    this.cardNumber,
+    this.playerOrCharacter,
+    this.rarity,
+    this.estimatedGrade,
+    this.language,
+    this.edition,
+    this.country,
+    this.mint,
+    this.material,
+    this.notes,
     super.key,
   });
 
@@ -546,11 +560,27 @@ class AiResultCard extends ConsumerWidget {
   /// Result recommendation.
   final String recommendation;
 
+  final String? year;
+  final String? brand;
+  final String? setName;
+  final String? series;
+  final String? cardNumber;
+  final String? playerOrCharacter;
+  final String? rarity;
+  final String? estimatedGrade;
+  final String? language;
+  final String? edition;
+  final String? country;
+  final String? mint;
+  final String? material;
+  final String? notes;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final scannerController = ref.read(scannerControllerProvider.notifier);
+    final collectibleDetails = _metadataRows();
 
     return Container(
       width: double.infinity,
@@ -600,6 +630,18 @@ class AiResultCard extends ConsumerWidget {
           _AiResultRow(label: 'Category', value: category),
           _AiResultRow(label: 'Estimated Value', value: estimatedValue),
           _AiResultRow(label: 'Condition', value: condition),
+          if (collectibleDetails.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Collectible Details',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final detail in collectibleDetails)
+              _AiResultRow(label: detail.label, value: detail.value),
+          ],
           const SizedBox(height: AppSpacing.md),
           _AiReviewSection(
             title: 'Why this match?',
@@ -635,6 +677,32 @@ class AiResultCard extends ConsumerWidget {
       ),
     );
   }
+
+  List<_MetadataDetail> _metadataRows() {
+    return [
+      _MetadataDetail('Year', year),
+      _MetadataDetail('Brand', brand),
+      _MetadataDetail('Set', setName),
+      _MetadataDetail('Series', series),
+      _MetadataDetail('Card #', cardNumber),
+      _MetadataDetail('Player/Character', playerOrCharacter),
+      _MetadataDetail('Rarity', rarity),
+      _MetadataDetail('Estimated Grade', estimatedGrade),
+      _MetadataDetail('Language', language),
+      _MetadataDetail('Edition', edition),
+      _MetadataDetail('Country', country),
+      _MetadataDetail('Mint', mint),
+      _MetadataDetail('Material', material),
+      _MetadataDetail('Profile Notes', notes),
+    ].where((detail) => detail.value.trim().isNotEmpty).toList();
+  }
+}
+
+class _MetadataDetail {
+  const _MetadataDetail(this.label, String? value) : value = value ?? '';
+
+  final String label;
+  final String value;
 }
 
 class _ConfidenceBadge extends StatelessWidget {

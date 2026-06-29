@@ -132,6 +132,7 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final collectibleDetails = _metadataRows(item);
 
     return Container(
       width: double.infinity,
@@ -163,6 +164,18 @@ class _DetailCard extends StatelessWidget {
           ),
           _DetailRow(label: 'Condition', value: item.condition),
           _DetailRow(label: 'Date Saved', value: _formatDate(item.createdAt)),
+          if (collectibleDetails.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Profile Details',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final detail in collectibleDetails)
+              _DetailRow(label: detail.label, value: detail.value),
+          ],
           const SizedBox(height: AppSpacing.md),
           Text(
             'Notes',
@@ -176,6 +189,32 @@ class _DetailCard extends StatelessWidget {
       ),
     );
   }
+
+  List<_MetadataDetail> _metadataRows(CollectibleItem item) {
+    return [
+      _MetadataDetail('Year', item.year),
+      _MetadataDetail('Brand', item.brand),
+      _MetadataDetail('Set', item.setName),
+      _MetadataDetail('Series', item.series),
+      _MetadataDetail('Card #', item.cardNumber),
+      _MetadataDetail('Player/Character', item.playerOrCharacter),
+      _MetadataDetail('Rarity', item.rarity),
+      _MetadataDetail('Estimated Grade', item.estimatedGrade),
+      _MetadataDetail('Language', item.language),
+      _MetadataDetail('Edition', item.edition),
+      _MetadataDetail('Country', item.country),
+      _MetadataDetail('Mint', item.mint),
+      _MetadataDetail('Material', item.material),
+      _MetadataDetail('Profile Notes', item.notes),
+    ].where((detail) => detail.value.trim().isNotEmpty).toList();
+  }
+}
+
+class _MetadataDetail {
+  const _MetadataDetail(this.label, String? value) : value = value ?? '';
+
+  final String label;
+  final String value;
 }
 
 class _DetailRow extends StatelessWidget {

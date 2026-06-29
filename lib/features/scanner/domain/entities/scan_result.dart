@@ -38,6 +38,20 @@ class ScanResult {
     required this.confidenceExplanation,
     required this.detectionQuality,
     required this.aiReasoning,
+    this.year,
+    this.brand,
+    this.setName,
+    this.series,
+    this.cardNumber,
+    this.playerOrCharacter,
+    this.rarity,
+    this.estimatedGrade,
+    this.language,
+    this.edition,
+    this.country,
+    this.mint,
+    this.material,
+    this.notes,
   });
 
   /// Unique scan identifier.
@@ -78,4 +92,19 @@ class ScanResult {
 
   /// AI reasoning behind the primary match.
   final String aiReasoning;
+
+  final String? year;
+  final String? brand;
+  final String? setName;
+  final String? series;
+  final String? cardNumber;
+  final String? playerOrCharacter;
+  final String? rarity;
+  final String? estimatedGrade;
+  final String? language;
+  final String? edition;
+  final String? country;
+  final String? mint;
+  final String? material;
+  final String? notes;
 }

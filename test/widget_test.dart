@@ -174,6 +174,10 @@ void main() {
     expect(find.text('AUD 1,850'), findsOneWidget);
     expect(find.text('94%'), findsOneWidget);
     expect(find.text('Near Mint'), findsOneWidget);
+    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(find.text('Base Set'), findsOneWidget);
+    expect(find.text('4/102'), findsOneWidget);
+    expect(find.text('Charizard'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
     expect(find.text('Alternative matches'), findsOneWidget);
     expect(find.text('2016 Pokemon Evolutions Charizard'), findsOneWidget);
@@ -308,7 +312,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000"}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -326,7 +330,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000"}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -413,7 +417,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000"}]',
+          '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface."}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -431,6 +435,10 @@ void main() {
     expect(find.text('Condition'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
     expect(find.text('Date Saved'), findsOneWidget);
+    expect(find.text('Profile Details'), findsOneWidget);
+    expect(find.text('Base Set'), findsOneWidget);
+    expect(find.text('4/102'), findsOneWidget);
+    expect(find.text('Charizard'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Price History'));
     await tester.pump();
@@ -568,6 +576,19 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       detectionQuality: 'Good',
       aiReasoning:
           'The image shows a Charizard-like Pokemon card with collector cues.',
+      year: '1999',
+      brand: 'Pokemon',
+      setName: 'Base Set',
+      series: 'Pokemon TCG',
+      cardNumber: '4/102',
+      playerOrCharacter: 'Charizard',
+      rarity: 'Holo Rare',
+      estimatedGrade: 'PSA 8-9',
+      language: 'English',
+      edition: 'Unlimited',
+      country: 'United States',
+      material: 'Cardstock',
+      notes: 'Verify holo surface.',
     );
   }
 }

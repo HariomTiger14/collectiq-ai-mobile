@@ -27,3 +27,17 @@ class ScannerAnalysisResponse(BaseModel):
     confidenceExplanation: str
     detectionQuality: str
     aiReasoning: str
+    year: str | None = None
+    brand: str | None = None
+    setName: str | None = None
+    series: str | None = None
+    cardNumber: str | None = None
+    playerOrCharacter: str | None = None
+    rarity: str | None = None
+    estimatedGrade: str | None = None
+    language: str | None = None
+    edition: str | None = None
+    country: str | None = None
+    mint: str | None = None
+    material: str | None = None
+    notes: str | None = None

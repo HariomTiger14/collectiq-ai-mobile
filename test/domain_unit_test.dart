@@ -24,6 +24,13 @@ void main() {
       expect(json['recommendation'], 'Consider grading before selling.');
       expect(json['imagePath'], 'sample://sports-card');
       expect(json['createdAt'], '2026-06-27T00:00:00.000');
+      expect(json['year'], '1999');
+      expect(json['brand'], 'Pokemon');
+      expect(json['setName'], 'Base Set');
+      expect(json['cardNumber'], '4/102');
+      expect(json['playerOrCharacter'], 'Charizard');
+      expect(json['rarity'], 'Holo Rare');
+      expect(json['notes'], 'Verify holo surface.');
     });
 
     test('fromJson restores all fields', () {
@@ -37,6 +44,13 @@ void main() {
         'recommendation': 'Consider grading before selling.',
         'imagePath': 'sample://sports-card',
         'createdAt': '2026-06-27T00:00:00.000',
+        'year': '1999',
+        'brand': 'Pokemon',
+        'setName': 'Base Set',
+        'cardNumber': '4/102',
+        'playerOrCharacter': 'Charizard',
+        'rarity': 'Holo Rare',
+        'notes': 'Verify holo surface.',
       });
 
       expect(item.id, 'item-1');
@@ -48,6 +62,13 @@ void main() {
       expect(item.recommendation, 'Consider grading before selling.');
       expect(item.imagePath, 'sample://sports-card');
       expect(item.createdAt, DateTime.parse('2026-06-27T00:00:00.000'));
+      expect(item.year, '1999');
+      expect(item.brand, 'Pokemon');
+      expect(item.setName, 'Base Set');
+      expect(item.cardNumber, '4/102');
+      expect(item.playerOrCharacter, 'Charizard');
+      expect(item.rarity, 'Holo Rare');
+      expect(item.notes, 'Verify holo surface.');
     });
   });
 
@@ -131,6 +152,20 @@ void main() {
         'confidenceExplanation': 'Strong visual match.',
         'detectionQuality': 'Good',
         'aiReasoning': 'Card frame and character cues match.',
+        'year': '1999',
+        'brand': 'Pokemon',
+        'setName': 'Base Set',
+        'series': 'Pokemon TCG',
+        'cardNumber': '4/102',
+        'playerOrCharacter': 'Charizard',
+        'rarity': 'Holo Rare',
+        'estimatedGrade': 'PSA 8',
+        'language': 'English',
+        'edition': 'Unlimited',
+        'country': 'United States',
+        'mint': '',
+        'material': 'Cardstock',
+        'notes': 'Verify holo surface.',
       });
 
       expect(result.title, '1999 Pokémon Charizard');
@@ -149,6 +184,20 @@ void main() {
       expect(result.confidenceExplanation, 'Strong visual match.');
       expect(result.detectionQuality, 'Good');
       expect(result.aiReasoning, 'Card frame and character cues match.');
+      expect(result.year, '1999');
+      expect(result.brand, 'Pokemon');
+      expect(result.setName, 'Base Set');
+      expect(result.series, 'Pokemon TCG');
+      expect(result.cardNumber, '4/102');
+      expect(result.playerOrCharacter, 'Charizard');
+      expect(result.rarity, 'Holo Rare');
+      expect(result.estimatedGrade, 'PSA 8');
+      expect(result.language, 'English');
+      expect(result.edition, 'Unlimited');
+      expect(result.country, 'United States');
+      expect(result.mint, isNull);
+      expect(result.material, 'Cardstock');
+      expect(result.notes, 'Verify holo surface.');
     });
 
     test('fromJson keeps compatibility with older backend response', () {
@@ -218,5 +267,12 @@ CollectibleItem _testItem() {
     recommendation: 'Consider grading before selling.',
     imagePath: 'sample://sports-card',
     createdAt: DateTime.parse('2026-06-27T00:00:00.000'),
+    year: '1999',
+    brand: 'Pokemon',
+    setName: 'Base Set',
+    cardNumber: '4/102',
+    playerOrCharacter: 'Charizard',
+    rarity: 'Holo Rare',
+    notes: 'Verify holo surface.',
   );
 }

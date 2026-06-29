@@ -86,7 +86,21 @@ requests strict structured JSON with these Flutter-compatible fields:
   ],
   "confidenceExplanation": "Strong card layout and player cues, but print details need confirmation.",
   "detectionQuality": "Good - subject and border are visible.",
-  "aiReasoning": "The image matches vintage baseball card proportions and Yankees-era Mantle visual cues."
+  "aiReasoning": "The image matches vintage baseball card proportions and Yankees-era Mantle visual cues.",
+  "year": "1952",
+  "brand": "Topps",
+  "setName": "Topps Baseball",
+  "series": "MLB",
+  "cardNumber": "311",
+  "playerOrCharacter": "Mickey Mantle",
+  "rarity": "Key Card",
+  "estimatedGrade": "Good",
+  "language": "English",
+  "edition": "Base",
+  "country": "United States",
+  "mint": null,
+  "material": "Cardstock",
+  "notes": "Authentication recommended before insurance or resale."
 }
 ```
 
