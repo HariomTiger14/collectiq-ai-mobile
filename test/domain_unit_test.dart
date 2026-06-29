@@ -322,15 +322,18 @@ void main() {
       expect(status.isCloudBackupEnabled, isFalse);
     });
 
-    test('uploadLocalItems keeps items pending while cloud backup is disabled', () async {
-      const repository = MockCloudPortfolioRepository();
+    test(
+      'uploadLocalItems keeps items pending while cloud backup is disabled',
+      () async {
+        const repository = MockCloudPortfolioRepository();
 
-      final status = await repository.uploadLocalItems([_testItem()]);
+        final status = await repository.uploadLocalItems([_testItem()]);
 
-      expect(status.state, SyncState.localOnly);
-      expect(status.pendingItemCount, 1);
-      expect(status.isCloudBackupEnabled, isFalse);
-    });
+        expect(status.state, SyncState.localOnly);
+        expect(status.pendingItemCount, 1);
+        expect(status.isCloudBackupEnabled, isFalse);
+      },
+    );
   });
 }
 

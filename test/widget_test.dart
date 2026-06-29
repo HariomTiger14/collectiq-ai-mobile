@@ -32,16 +32,19 @@ void main() {
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Good Evening, Harry'), findsOneWidget);
+    expect(find.text('Welcome back to CollectIQ AI'), findsOneWidget);
+    expect(find.text('Collection Value'), findsOneWidget);
     expect(
-      find.text('Scan, value and manage your collectibles.'),
+      find.text('Estimated market value across 0 collectibles'),
       findsOneWidget,
     );
-    expect(find.text('Portfolio Value'), findsOneWidget);
-    expect(find.text('Quick Actions'), findsOneWidget);
-    expect(find.text('Trending Collectibles'), findsOneWidget);
-    expect(find.text('Recent Scans'), findsOneWidget);
-    expect(find.text('Unlock unlimited AI scans'), findsOneWidget);
+    expect(find.text('Collectibles'), findsOneWidget);
+    expect(find.text('Average Confidence'), findsOneWidget);
+    expect(find.text('Last Scan'), findsOneWidget);
+    expect(find.text('Scan Collectible'), findsOneWidget);
+    expect(find.text('Recent Activity'), findsOneWidget);
+    expect(find.text('No collectibles scanned yet.'), findsOneWidget);
   });
 
   testWidgets('shows scanner experience content', (WidgetTester tester) async {
@@ -71,11 +74,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('Portfolio'), findsWidgets);
-    expect(
-      find.text('Track saved collectibles and estimated value.'),
-      findsOneWidget,
-    );
+    expect(find.text('Your collectible library'), findsOneWidget);
     expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('Scan Collectible'), findsWidgets);
   });
 
   testWidgets('shows settings screen content', (WidgetTester tester) async {
@@ -242,8 +243,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('1999 Pokémon Charizard'), findsOneWidget);
-    expect(find.text('Total Value'), findsOneWidget);
-    expect(find.text('Total Items'), findsOneWidget);
+    expect(find.text('Total collection value'), findsOneWidget);
+    expect(find.text('Items'), findsOneWidget);
     expect(find.text('AUD 1,850'), findsWidgets);
   });
 
@@ -399,9 +400,7 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Old High Value')).dy),
     );
 
-    await tester.tap(find.text('Newest first'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Value high to low').last);
+    await tester.tap(find.text('Value'));
     await tester.pumpAndSettle();
 
     expect(
@@ -409,9 +408,7 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Newest Low')).dy),
     );
 
-    await tester.tap(find.text('Value high to low'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Confidence high to low').last);
+    await tester.tap(find.text('Confidence').first);
     await tester.pumpAndSettle();
 
     expect(
@@ -437,12 +434,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Category'), findsOneWidget);
-    expect(find.text('Estimated Value'), findsOneWidget);
-    expect(find.text('Confidence'), findsOneWidget);
-    expect(find.text('Condition'), findsOneWidget);
-    expect(find.text('Notes'), findsOneWidget);
-    expect(find.text('Date Saved'), findsOneWidget);
+    expect(find.text('Estimated market value'), findsOneWidget);
+    expect(find.text('94% confidence'), findsOneWidget);
+    expect(find.text('Saved 27/06/2026'), findsOneWidget);
     expect(find.text('Profile Details'), findsOneWidget);
     expect(find.text('Base Set'), findsOneWidget);
     expect(find.text('4/102'), findsOneWidget);
@@ -450,6 +444,7 @@ void main() {
     expect(find.text('Market Pricing'), findsOneWidget);
     expect(find.text('AUD 1,443 - AUD 2,257'), findsOneWidget);
     expect(find.text('Mock market blend'), findsOneWidget);
+    expect(find.text('Recommendation'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Price History'));
     await tester.pump();

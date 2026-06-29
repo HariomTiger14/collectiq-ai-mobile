@@ -1,4 +1,4 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -393,7 +393,7 @@ class ScanPreviewCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                AppTwoLineTitle(
                   title,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -402,37 +402,122 @@ class ScanPreviewCard extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   status,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                FilledButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          await scannerController.analyzeWithAi();
-                          if (!context.mounted) {
-                            return;
-                          }
-                          final errorMessage = ref
-                              .read(scannerControllerProvider)
-                              .errorMessage;
-                          if (errorMessage != null) {
-                            _showScannerSnackBar(context, errorMessage);
-                          }
-                        },
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            await scannerController.analyzeWithAi();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            final errorMessage = ref
+                                .read(scannerControllerProvider)
+                                .errorMessage;
+                            if (errorMessage != null) {
+                              _showScannerSnackBar(context, errorMessage);
+                            }
+                          },
+                    child: SizedBox(
+                      height: 20,
+                      child: Center(
+                        child: isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Analyze with AI'),
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
                   child: isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                      ? const Padding(
+                          key: ValueKey('processing-panel'),
+                          padding: EdgeInsets.only(top: AppSpacing.md),
+                          child: _ProcessingPanel(),
                         )
-                      : const Text('Analyze with AI'),
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProcessingPanel extends StatelessWidget {
+  const _ProcessingPanel();
+
+  static const _steps = [
+    'Scanning collectible',
+    'Identifying item',
+    'Estimating value',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Analyzing image',
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final step in _steps)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Text(
+                '$step...',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -512,6 +597,9 @@ class AiResultCard extends ConsumerWidget {
     required this.aiReasoning,
     required this.pricing,
     required this.recommendation,
+    required this.isSaved,
+    required this.onScanAnother,
+    this.onViewPortfolio,
     this.year,
     this.brand,
     this.setName,
@@ -565,6 +653,10 @@ class AiResultCard extends ConsumerWidget {
   /// Market pricing supplied by the pricing provider.
   final PricingInfo pricing;
 
+  final bool isSaved;
+  final VoidCallback? onViewPortfolio;
+  final VoidCallback onScanAnother;
+
   final String? year;
   final String? brand;
   final String? setName;
@@ -611,7 +703,7 @@ class AiResultCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    AppTwoLineTitle(
                       item,
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
@@ -694,16 +786,48 @@ class AiResultCard extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
           _AiReviewSection(title: 'Recommendation', body: recommendation),
           const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: () async {
-              await scannerController.saveScanResultToPortfolio();
-              if (!context.mounted) {
-                return;
-              }
-              _showScannerSnackBar(context, 'Saved to portfolio');
-            },
-            child: const Text('Save to Portfolio'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: isSaved
+                  ? null
+                  : () async {
+                      final didSave = await scannerController
+                          .saveScanResultToPortfolio();
+                      if (!context.mounted || !didSave) {
+                        return;
+                      }
+                      _showScannerSnackBar(context, 'Saved to portfolio');
+                    },
+              icon: Icon(
+                isSaved
+                    ? Icons.check_circle_outline
+                    : Icons.bookmark_add_outlined,
+              ),
+              label: Text(isSaved ? 'Saved' : 'Save to Portfolio'),
+            ),
           ),
+          if (isSaved) ...[
+            const SizedBox(height: AppSpacing.md),
+            if (onViewPortfolio != null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onViewPortfolio,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('View in Portfolio'),
+                ),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onScanAnother,
+                icon: const Icon(Icons.refresh_outlined),
+                label: const Text('Scan Another'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -839,7 +963,7 @@ class _AlternativeMatchTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
+                  child: AppTwoLineTitle(
                     match.title,
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
@@ -880,34 +1004,7 @@ class _AiResultRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return AppLabelValueRow(label: label, value: value);
   }
 }
 

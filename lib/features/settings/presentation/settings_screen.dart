@@ -1,4 +1,4 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +60,45 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
+                    title: 'App Preferences',
+                    children: const [
+                      _SettingsRow(
+                        icon: Icons.palette_outlined,
+                        title: 'Theme',
+                        subtitle: 'System theme is used for now.',
+                        trailing: 'System',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.notifications_none_outlined,
+                        title: 'Notifications',
+                        subtitle:
+                            'Price alerts and scan updates are placeholders.',
+                        trailing: 'Off',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'AI & Scanning',
+                    children: const [
+                      _SettingsRow(
+                        icon: Icons.auto_awesome_outlined,
+                        title: 'AI model',
+                        subtitle:
+                            'Uses the configured backend recognition provider.',
+                        trailing: 'Auto',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.document_scanner_outlined,
+                        title: 'Scan quality',
+                        subtitle:
+                            'Camera and gallery scans stay available locally.',
+                        trailing: 'High',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
                     title: 'Cloud Sync',
                     children: [
                       _SettingsRow(
@@ -81,7 +120,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
-                    title: 'Local-first mode',
+                    title: 'Data & Privacy',
                     children: const [
                       _SettingsRow(
                         icon: Icons.storage_outlined,
@@ -89,6 +128,39 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle:
                             'Camera, gallery, analyze, save, and portfolio stay available without sign in.',
                         trailing: 'Active',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.file_download_outlined,
+                        title: 'Export portfolio',
+                        subtitle:
+                            'Portfolio export will be available in a future release.',
+                        trailing: 'Soon',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy policy',
+                        subtitle:
+                            'Review privacy details when cloud accounts are enabled.',
+                        trailing: 'View',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'About',
+                    children: const [
+                      _SettingsRow(
+                        icon: Icons.article_outlined,
+                        title: 'Terms',
+                        subtitle:
+                            'Terms placeholder for the production release.',
+                        trailing: 'View',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.info_outline,
+                        title: 'App version',
+                        subtitle: 'CollectIQ AI mobile preview.',
+                        trailing: '0.1.0',
                       ),
                     ],
                   ),
@@ -133,10 +205,7 @@ class _SettingsCard extends StatelessWidget {
           for (var index = 0; index < children.length; index++) ...[
             children[index],
             if (index != children.length - 1)
-              Divider(
-                height: AppSpacing.xl,
-                color: colorScheme.outlineVariant,
-              ),
+              Divider(height: AppSpacing.xl, color: colorScheme.outlineVariant),
           ],
         ],
       ),
@@ -180,6 +249,8 @@ class _SettingsRow extends StatelessWidget {
             children: [
               Text(
                 title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -187,6 +258,8 @@ class _SettingsRow extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -195,12 +268,17 @@ class _SettingsRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.md),
-        Text(
-          trailing,
-          textAlign: TextAlign.end,
-          style: textTheme.labelLarge?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w700,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 92),
+          child: Text(
+            trailing,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

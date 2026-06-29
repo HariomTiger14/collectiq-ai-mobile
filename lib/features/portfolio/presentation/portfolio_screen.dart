@@ -1,4 +1,4 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -17,7 +17,9 @@ enum _PortfolioSortMode {
 }
 
 class PortfolioScreen extends ConsumerStatefulWidget {
-  const PortfolioScreen({super.key});
+  const PortfolioScreen({this.onScanPressed, super.key});
+
+  final VoidCallback? onScanPressed;
 
   @override
   ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
@@ -63,7 +65,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'Track saved collectibles and estimated value.',
+                        'Your collectible library',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -72,6 +74,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       PortfolioSummaryCard(
                         totalValue: portfolioState.totalValue,
                         itemCount: portfolioState.itemCount,
+                        averageConfidence: _averageConfidence(
+                          portfolioState.items,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       if (portfolioState.isLoading &&
@@ -82,7 +87,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           message: portfolioState.errorMessage!,
                         )
                       else if (portfolioState.items.isEmpty)
-                        const PortfolioEmptyState()
+                        PortfolioEmptyState(onScanPressed: widget.onScanPressed)
                       else ...[
                         _PortfolioControls(
                           searchQuery: _searchQuery,
@@ -165,6 +170,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     return filteredItems;
   }
 
+  double _averageConfidence(List<CollectibleItem> items) {
+    if (items.isEmpty) {
+      return 0;
+    }
+
+    return items.fold<double>(0, (sum, item) => sum + item.confidence) /
+        items.length;
+  }
+
   Future<bool> _confirmDelete(
     BuildContext context,
     String itemId,
@@ -226,19 +240,9 @@ class _PortfolioControls extends StatelessWidget {
             labelText: 'Search portfolio',
           ),
         );
-        final sortMenu = DropdownButtonFormField<_PortfolioSortMode>(
-          initialValue: sortMode,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Sort by'),
-          items: [
-            for (final mode in _PortfolioSortMode.values)
-              DropdownMenuItem(value: mode, child: Text(mode.label)),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              onSortChanged(value);
-            }
-          },
+        final sortSelector = _PortfolioSortSelector(
+          sortMode: sortMode,
+          onSortChanged: onSortChanged,
         );
 
         if (constraints.maxWidth >= 680) {
@@ -246,7 +250,7 @@ class _PortfolioControls extends StatelessWidget {
             children: [
               Expanded(child: searchField),
               const SizedBox(width: AppSpacing.lg),
-              SizedBox(width: 240, child: sortMenu),
+              SizedBox(width: 360, child: sortSelector),
             ],
           );
         }
@@ -255,10 +259,36 @@ class _PortfolioControls extends StatelessWidget {
           children: [
             searchField,
             const SizedBox(height: AppSpacing.md),
-            sortMenu,
+            sortSelector,
           ],
         );
       },
+    );
+  }
+}
+
+class _PortfolioSortSelector extends StatelessWidget {
+  const _PortfolioSortSelector({
+    required this.sortMode,
+    required this.onSortChanged,
+  });
+
+  final _PortfolioSortMode sortMode;
+  final ValueChanged<_PortfolioSortMode> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppStableSegmentedSelector<_PortfolioSortMode>(
+      selectedValue: sortMode,
+      onChanged: onSortChanged,
+      options: const [
+        AppSegmentOption(value: _PortfolioSortMode.newest, label: 'Newest'),
+        AppSegmentOption(value: _PortfolioSortMode.value, label: 'Value'),
+        AppSegmentOption(
+          value: _PortfolioSortMode.confidence,
+          label: 'Confidence',
+        ),
+      ],
     );
   }
 }

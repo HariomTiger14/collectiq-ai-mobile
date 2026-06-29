@@ -1,5 +1,37 @@
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
+class CollectibleAlternativeMatch {
+  const CollectibleAlternativeMatch({
+    required this.title,
+    required this.category,
+    required this.confidence,
+    required this.reason,
+  });
+
+  final String title;
+  final String category;
+  final double confidence;
+  final String reason;
+
+  factory CollectibleAlternativeMatch.fromJson(Map<String, dynamic> json) {
+    return CollectibleAlternativeMatch(
+      title: json['title'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'category': category,
+      'confidence': confidence,
+      'reason': reason,
+    };
+  }
+}
+
 /// Shared domain entity representing a collectible stored in the portfolio.
 class CollectibleItem {
   /// Creates an immutable collectible item.
@@ -14,6 +46,11 @@ class CollectibleItem {
     required this.imagePath,
     required this.createdAt,
     this.pricing,
+    this.primaryMatch,
+    this.alternativeMatches = const [],
+    this.confidenceExplanation,
+    this.detectionQuality,
+    this.aiReasoning,
     this.year,
     this.brand,
     this.setName,
@@ -59,6 +96,12 @@ class CollectibleItem {
 
   final PricingInfo? pricing;
 
+  final String? primaryMatch;
+  final List<CollectibleAlternativeMatch> alternativeMatches;
+  final String? confidenceExplanation;
+  final String? detectionQuality;
+  final String? aiReasoning;
+
   final String? year;
   final String? brand;
   final String? setName;
@@ -89,6 +132,15 @@ class CollectibleItem {
       pricing: json['pricing'] is Map<String, dynamic>
           ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
           : null,
+      primaryMatch: _optionalString(json['primaryMatch']),
+      alternativeMatches:
+          (json['alternativeMatches'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(CollectibleAlternativeMatch.fromJson)
+              .toList(),
+      confidenceExplanation: _optionalString(json['confidenceExplanation']),
+      detectionQuality: _optionalString(json['detectionQuality']),
+      aiReasoning: _optionalString(json['aiReasoning']),
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),
@@ -119,6 +171,13 @@ class CollectibleItem {
       'imagePath': imagePath,
       'createdAt': createdAt.toIso8601String(),
       'pricing': pricing?.toJson(),
+      'primaryMatch': primaryMatch,
+      'alternativeMatches': [
+        for (final match in alternativeMatches) match.toJson(),
+      ],
+      'confidenceExplanation': confidenceExplanation,
+      'detectionQuality': detectionQuality,
+      'aiReasoning': aiReasoning,
       'year': year,
       'brand': brand,
       'setName': setName,

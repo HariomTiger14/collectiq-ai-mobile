@@ -14,24 +14,26 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
-  static const _tabs = <Widget>[
-    HomeScreen(),
-    ScannerScreen(),
-    PortfolioScreen(),
-    SettingsScreen(),
-  ];
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final tabs = <Widget>[
+      HomeScreen(onScanPressed: () => _selectTab(1)),
+      ScannerScreen(onViewPortfolio: () => _selectTab(2)),
+      PortfolioScreen(onScanPressed: () => _selectTab(1)),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _tabs),
+      body: IndexedStack(index: _selectedIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        onDestinationSelected: _selectTab,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

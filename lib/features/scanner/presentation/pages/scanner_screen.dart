@@ -1,11 +1,23 @@
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ScannerScreen extends ConsumerWidget {
-  const ScannerScreen({super.key});
+class ScannerScreen extends ConsumerStatefulWidget {
+  const ScannerScreen({this.onViewPortfolio, super.key});
+
+  final VoidCallback? onViewPortfolio;
+
+  @override
+  ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
+}
+
+class _ScannerScreenState extends ConsumerState<ScannerScreen> {
+  final _scrollController = ScrollController();
+  final _previewKey = GlobalKey();
+  final _resultKey = GlobalKey();
+  late final ProviderSubscription<ScannerState> _scannerSubscription;
 
   static const _categories = [
     'Sports Cards',
@@ -81,7 +93,54 @@ class ScannerScreen extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _scannerSubscription = ref.listenManual<ScannerState>(
+      scannerControllerProvider,
+      (previous, next) {
+        if (previous?.selectedImagePath != next.selectedImagePath &&
+            next.selectedImagePath != null) {
+          _scrollTo(_previewKey);
+        }
+        if (previous?.scanResult?.id != next.scanResult?.id &&
+            next.scanResult != null) {
+          _scrollTo(_resultKey);
+        }
+        if (previous?.scanResult != null && next.scanResult == null) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _scannerSubscription.close();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollTo(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = key.currentContext;
+      if (context == null) {
+        return;
+      }
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.12,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final scannerState = ref.watch(scannerControllerProvider);
     final selectedImagePath = scannerState.selectedImagePath;
@@ -97,6 +156,7 @@ class ScannerScreen extends ConsumerWidget {
                 : AppSpacing.lg;
 
             return SingleChildScrollView(
+              controller: _scrollController,
               padding: EdgeInsets.fromLTRB(
                 horizontalPadding,
                 AppSpacing.xl,
@@ -115,6 +175,7 @@ class ScannerScreen extends ConsumerWidget {
                       if (selectedImagePath != null) ...[
                         const SizedBox(height: AppSpacing.xl),
                         ScanPreviewCard(
+                          key: _previewKey,
                           imagePath: selectedImagePath,
                           image: scannerState.selectedImage,
                           title:
@@ -128,6 +189,7 @@ class ScannerScreen extends ConsumerWidget {
                       if (scanResult != null) ...[
                         const SizedBox(height: AppSpacing.xl),
                         AiResultCard(
+                          key: _resultKey,
                           item: scanResult.title,
                           category: scanResult.category,
                           estimatedValue:
@@ -159,6 +221,11 @@ class ScannerScreen extends ConsumerWidget {
                           recommendation:
                               scannerState.aiRecommendation ??
                               'Consider grading before selling.',
+                          isSaved: scannerState.isSavedToPortfolio,
+                          onViewPortfolio: widget.onViewPortfolio,
+                          onScanAnother: ref
+                              .read(scannerControllerProvider.notifier)
+                              .resetScan,
                         ),
                       ],
                       const SizedBox(height: AppSpacing.xxl),

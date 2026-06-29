@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 
@@ -22,15 +22,8 @@ class CollectibleDetailPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
+        leading: const BackButton(),
         title: const Text('Collectible Details'),
-        actions: [
-          if (onDelete != null)
-            IconButton(
-              onPressed: () => onDelete!(item.id),
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete item',
-            ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -48,9 +41,17 @@ class CollectibleDetailPage extends StatelessWidget {
                 children: [
                   _ImagePreview(item: item),
                   const SizedBox(height: AppSpacing.xl),
-                  _DetailCard(item: item),
+                  _DetailHeader(item: item),
                   const SizedBox(height: AppSpacing.xl),
-                  const _PriceHistorySection(),
+                  AppPriceHero(
+                    label: 'Estimated market value',
+                    value: _formatAud(item.estimatedValue),
+                    subtitle: item.pricing == null
+                        ? 'Based on the saved AI estimate'
+                        : 'Market range and source details below',
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _DetailSections(item: item),
                   const SizedBox(height: AppSpacing.xl),
                   _ActionButtons(onDelete: onDelete, itemId: item.id),
                 ],
@@ -123,8 +124,8 @@ class _ImagePreview extends StatelessWidget {
   }
 }
 
-class _DetailCard extends StatelessWidget {
-  const _DetailCard({required this.item});
+class _DetailHeader extends StatelessWidget {
+  const _DetailHeader({required this.item});
 
   final CollectibleItem item;
 
@@ -132,11 +133,10 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final collectibleDetails = _metadataRows(item);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -146,117 +146,231 @@ class _DetailCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          AppTwoLineTitle(
             item.title,
             style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
+              height: 1.12,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          _DetailRow(label: 'Category', value: item.category),
-          _DetailRow(
-            label: 'Estimated Value',
-            value: _formatAud(item.estimatedValue),
-          ),
-          _DetailRow(
-            label: 'Confidence',
-            value: '${(item.confidence * 100).toStringAsFixed(0)}%',
-          ),
-          _DetailRow(label: 'Condition', value: item.condition),
-          _DetailRow(label: 'Date Saved', value: _formatDate(item.createdAt)),
-          if (item.pricing != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Market Pricing',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _DetailRow(
-              label: 'Market Value',
-              value: _formatMoney(
-                item.pricing!.estimatedMarketValue,
-                item.pricing!.currency,
-              ),
-            ),
-            _DetailRow(
-              label: 'Estimated Range',
-              value:
-                  '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
-            ),
-            _DetailRow(
-              label: 'Pricing Source',
-              value: item.pricing!.pricingSource,
-            ),
-            _DetailRow(
-              label: 'Pricing Confidence',
-              value:
-                  '${(item.pricing!.pricingConfidence * 100).toStringAsFixed(0)}%',
-            ),
-            _DetailRow(
-              label: 'Last Updated',
-              value: _formatPricingDate(item.pricing!.lastUpdated),
-            ),
-          ],
-          if (collectibleDetails.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Profile Details',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            for (final detail in collectibleDetails)
-              _DetailRow(label: detail.label, value: detail.value),
-          ],
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            'Notes',
-            style: textTheme.labelLarge?.copyWith(
+            item.category,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyLarge?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(item.recommendation, style: textTheme.bodyMedium),
+          const SizedBox(height: AppSpacing.lg),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _StatusBadge(
+                label:
+                    '${(item.confidence * 100).toStringAsFixed(0)}% confidence',
+                icon: Icons.verified_outlined,
+              ),
+              _StatusBadge(
+                label: item.condition,
+                icon: Icons.auto_awesome_outlined,
+              ),
+              _StatusBadge(
+                label: 'Saved ${_formatDate(item.createdAt)}',
+                icon: Icons.calendar_today_outlined,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+}
 
-  List<_MetadataDetail> _metadataRows(CollectibleItem item) {
+class _DetailSections extends StatelessWidget {
+  const _DetailSections({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final collectibleDetails = _metadataRows(item);
+
+    return Column(
+      children: [
+        if (item.pricing != null) ...[
+          AppProfileSection(
+            title: 'Market Pricing',
+            children: [
+              AppCompactMetadata(
+                items: [
+                  AppMetadataItem(
+                    label: 'Market Value',
+                    value: _formatMoney(
+                      item.pricing!.estimatedMarketValue,
+                      item.pricing!.currency,
+                    ),
+                  ),
+                  AppMetadataItem(
+                    label: 'Estimated Range',
+                    value:
+                        '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+                  ),
+                  AppMetadataItem(
+                    label: 'Pricing Source',
+                    value: item.pricing!.pricingSource,
+                  ),
+                  AppMetadataItem(
+                    label: 'Pricing Confidence',
+                    value:
+                        '${(item.pricing!.pricingConfidence * 100).toStringAsFixed(0)}%',
+                  ),
+                  AppMetadataItem(
+                    label: 'Last Updated',
+                    value: _formatPricingDate(item.pricing!.lastUpdated),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+        if (collectibleDetails.isNotEmpty) ...[
+          AppProfileSection(
+            title: 'Profile Details',
+            children: [AppCompactMetadata(items: collectibleDetails)],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+        if (_hasAiReview(item)) ...[
+          AppProfileSection(
+            title: 'AI Review',
+            children: [
+              if ((item.primaryMatch ?? '').trim().isNotEmpty)
+                AppLabelValueRow(
+                  label: 'Primary Match',
+                  value: item.primaryMatch!,
+                ),
+              if ((item.confidenceExplanation ?? '').trim().isNotEmpty)
+                _DetailTextBlock(
+                  title: 'Why this match?',
+                  body: item.confidenceExplanation!,
+                ),
+              if ((item.detectionQuality ?? '').trim().isNotEmpty)
+                _DetailTextBlock(
+                  title: 'Detection Quality',
+                  body: item.detectionQuality!,
+                ),
+              if ((item.aiReasoning ?? '').trim().isNotEmpty)
+                _DetailTextBlock(
+                  title: 'AI Reasoning',
+                  body: item.aiReasoning!,
+                ),
+              if (item.alternativeMatches.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                for (final match in item.alternativeMatches.take(3))
+                  _AlternativeMatchRow(match: match),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+        AppProfileSection(
+          title: 'Recommendation',
+          children: [
+            Text(
+              item.recommendation,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const _PriceHistorySection(),
+      ],
+    );
+  }
+
+  bool _hasAiReview(CollectibleItem item) {
+    return (item.primaryMatch ?? '').trim().isNotEmpty ||
+        (item.confidenceExplanation ?? '').trim().isNotEmpty ||
+        (item.detectionQuality ?? '').trim().isNotEmpty ||
+        (item.aiReasoning ?? '').trim().isNotEmpty ||
+        item.alternativeMatches.isNotEmpty;
+  }
+
+  List<AppMetadataItem> _metadataRows(CollectibleItem item) {
     return [
-      _MetadataDetail('Year', item.year),
-      _MetadataDetail('Brand', item.brand),
-      _MetadataDetail('Set', item.setName),
-      _MetadataDetail('Series', item.series),
-      _MetadataDetail('Card #', item.cardNumber),
-      _MetadataDetail('Player/Character', item.playerOrCharacter),
-      _MetadataDetail('Rarity', item.rarity),
-      _MetadataDetail('Estimated Grade', item.estimatedGrade),
-      _MetadataDetail('Language', item.language),
-      _MetadataDetail('Edition', item.edition),
-      _MetadataDetail('Country', item.country),
-      _MetadataDetail('Mint', item.mint),
-      _MetadataDetail('Material', item.material),
-      _MetadataDetail('Profile Notes', item.notes),
+      _metadataItem('Year', item.year),
+      _metadataItem('Brand', item.brand),
+      _metadataItem('Set', item.setName),
+      _metadataItem('Series', item.series),
+      _metadataItem('Card #', item.cardNumber),
+      _metadataItem('Player/Character', item.playerOrCharacter),
+      _metadataItem('Rarity', item.rarity),
+      _metadataItem('Estimated Grade', item.estimatedGrade),
+      _metadataItem('Language', item.language),
+      _metadataItem('Edition', item.edition),
+      _metadataItem('Country', item.country),
+      _metadataItem('Mint', item.mint),
+      _metadataItem('Material', item.material),
+      _metadataItem('Profile Notes', item.notes),
     ].where((detail) => detail.value.trim().isNotEmpty).toList();
+  }
+
+  AppMetadataItem _metadataItem(String label, String? value) {
+    return AppMetadataItem(label: label, value: value ?? '');
   }
 }
 
-class _MetadataDetail {
-  const _MetadataDetail(this.label, String? value) : value = value ?? '';
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, required this.icon});
 
   final String label;
-  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
+class _DetailTextBlock extends StatelessWidget {
+  const _DetailTextBlock({required this.title, required this.body});
 
-  final String label;
-  final String value;
+  final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) {
@@ -265,24 +379,73 @@ class _DetailRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+          Text(
+            title,
+            style: textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+          const SizedBox(height: AppSpacing.xs),
+          Text(body, style: textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlternativeMatchRow extends StatelessWidget {
+  const _AlternativeMatchRow({required this.match});
+
+  final CollectibleAlternativeMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppTwoLineTitle(
+                  match.title,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                '${(match.confidence * 100).toStringAsFixed(0)}%',
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${match.category} / ${match.reason}',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -334,24 +497,22 @@ class _PriceHistorySection extends StatelessWidget {
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.md,
-            children: [
-              _PriceMetric(
+          AppResponsiveMetricGroup(
+            metrics: [
+              AppMetricData(
                 label: 'Current Value',
                 value: _formatAud(currentValue.toDouble()),
               ),
-              _PriceMetric(
+              AppMetricData(
                 label: '6-month Change',
                 value:
                     '+${_formatAud(change.toDouble())} (${changePercent.toStringAsFixed(0)}%)',
               ),
-              _PriceMetric(
+              AppMetricData(
                 label: 'Highest Value',
                 value: _formatAud(highestValue.toDouble()),
               ),
-              _PriceMetric(
+              AppMetricData(
                 label: 'Lowest Value',
                 value: _formatAud(lowestValue.toDouble()),
               ),
@@ -389,39 +550,6 @@ class _PricePoint {
 
   final String month;
   final int value;
-}
-
-class _PriceMetric extends StatelessWidget {
-  const _PriceMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SizedBox(
-      width: 190,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _PriceBars extends StatelessWidget {
@@ -487,35 +615,56 @@ class _ActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AppProfileSection(
+      title: 'Actions',
       children: [
-        FilledButton(
-          onPressed: () {
-            _showDetailSnackBar(context, 'Re-analysis coming next');
-          },
-          child: const Text('Re-analyze'),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () {
+              _showDetailSnackBar(context, 'Re-analysis coming next');
+            },
+            child: const Text('Re-analyze'),
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
-          onPressed: () {
-            _showDetailSnackBar(context, 'Price tracking coming next');
-          },
-          child: const Text('Track Price'),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () {
+              _showDetailSnackBar(context, 'Price tracking coming next');
+            },
+            child: const Text('Track Price'),
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
-          onPressed: () {
-            _showDetailSnackBar(context, 'Marketplace listing coming next');
-          },
-          child: const Text('Sell Item'),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () {
+              _showDetailSnackBar(context, 'Marketplace listing coming next');
+            },
+            child: const Text('Sell Item'),
+          ),
         ),
         if (onDelete != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Divider(color: colorScheme.outlineVariant),
           const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
+          Text(
+            'Danger zone',
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppDangerAction(
+            label: 'Delete Item',
             onPressed: () => onDelete!(itemId),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Delete Item'),
           ),
         ],
       ],
