@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:flutter/foundation.dart';
 
 class SupabaseAuthRepository implements AuthRepository {
   const SupabaseAuthRepository({
@@ -15,11 +16,14 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<AppUser?> currentUser() async {
     if (!supabaseService.isConfigured) {
+      debugPrint('[Auth] Supabase not configured; current user is guest');
       return null;
     }
 
-    // Session persistence will be added when real auth screens are enabled.
-    return null;
+    debugPrint('[Auth] loading Supabase current user');
+    final session = await supabaseService.ensureAnonymousSession();
+    debugPrint('[Auth] current Supabase user id: ${session.userId}');
+    return _userFromSession(session);
   }
 
   @override
@@ -30,10 +34,13 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<AppUser> signInAnonymously() async {
     if (!supabaseService.isConfigured) {
+      debugPrint('[Auth] Supabase not configured; using local guest sign-in');
       return fallbackRepository.signInAnonymously();
     }
 
+    debugPrint('[Auth] starting Supabase anonymous sign-in');
     final session = await supabaseService.signInAnonymously();
+    debugPrint('[Auth] Supabase anonymous user id: ${session.userId}');
     return _userFromSession(session);
   }
 
@@ -62,7 +69,12 @@ class SupabaseAuthRepository implements AuthRepository {
       return fallbackRepository.signOut();
     }
 
-    // Access-token persistence will be added with real account screens.
+    final session = await supabaseService.currentSession();
+    if (session == null || session.accessToken.isEmpty) {
+      return;
+    }
+
+    await supabaseService.signOut(session.accessToken);
   }
 
   AppUser _userFromSession(SupabaseAuthSession session) {

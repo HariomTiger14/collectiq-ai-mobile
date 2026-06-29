@@ -1,7 +1,11 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,6 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
+    final portfolioState = ref.watch(portfolioControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -60,10 +65,14 @@ class SettingsScreen extends ConsumerWidget {
                       _SettingsRow(
                         icon: Icons.login_outlined,
                         title: authState.isSignedIn ? 'Account' : 'Sign In',
-                        subtitle: authState.isSignedIn
-                            ? authState.user!.displayName
-                            : 'Optional Supabase account sign in is prepared.',
-                        trailing: authState.statusLabel,
+                        subtitle:
+                            authState.errorMessage ??
+                            (authState.isSignedIn
+                                ? authState.user!.displayName
+                                : 'Optional Supabase account sign in is prepared.'),
+                        trailing: authState.errorMessage != null
+                            ? 'Needs attention'
+                            : authState.statusLabel,
                       ),
                     ],
                   ),
@@ -114,8 +123,27 @@ class SettingsScreen extends ConsumerWidget {
                         icon: Icons.cloud_done_outlined,
                         title: 'Cloud status',
                         subtitle:
+                            syncState.errorMessage ??
                             'Image uploads run in the background when cloud storage is configured.',
-                        trailing: imageSyncState.cloudStatus,
+                        trailing: syncState.status.state == SyncState.failed
+                            ? 'Needs attention'
+                            : syncState.status.isCloudConnected
+                            ? 'Cloud Connected'
+                            : syncState.status.isCloudBackupEnabled
+                            ? 'Auth required'
+                            : imageSyncState.cloudStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.badge_outlined,
+                        title: 'Anonymous User',
+                        subtitle:
+                            authState.errorMessage ??
+                            'Supabase uses an anonymous session until full accounts are enabled.',
+                        trailing: authState.errorMessage != null
+                            ? 'Needs attention'
+                            : authState.user?.isAnonymous == true
+                            ? 'Active'
+                            : 'Guest',
                       ),
                       _SettingsRow(
                         icon: Icons.sync_outlined,
@@ -141,12 +169,32 @@ class SettingsScreen extends ConsumerWidget {
                             .toString(),
                       ),
                       _SettingsRow(
+                        icon: Icons.error_outline,
+                        title: 'Failed uploads',
+                        subtitle:
+                            'Failed image uploads retry automatically and keep local images available.',
+                        trailing: imageSyncState.snapshot.failedCount
+                            .toString(),
+                      ),
+                      _SettingsRow(
                         icon: Icons.schedule_outlined,
                         title: 'Last sync',
                         subtitle:
                             'Most recent successful background image upload.',
                         trailing: _formatSyncDate(
                           imageSyncState.snapshot.lastSyncAt,
+                        ),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: syncState.isLoading
+                              ? null
+                              : () => _manualSync(ref, portfolioState.items),
+                          icon: const Icon(Icons.sync_outlined),
+                          label: Text(
+                            syncState.isLoading ? 'Syncing...' : 'Manual Sync',
+                          ),
                         ),
                       ),
                     ],
@@ -347,4 +395,25 @@ String _formatSyncDate(DateTime? value) {
   final day = value.day.toString().padLeft(2, '0');
   final month = value.month.toString().padLeft(2, '0');
   return '$day/$month/${value.year}';
+}
+
+Future<void> _manualSync(
+  WidgetRef ref,
+  List<CollectibleItem> localItems,
+) async {
+  await ref.read(imageSyncControllerProvider.notifier).processQueue();
+  await ref.read(syncControllerProvider.notifier).uploadLocalItems(localItems);
+  final downloadedItems = await ref
+      .read(syncControllerProvider.notifier)
+      .downloadCloudItems();
+  final localItemsById = {for (final item in localItems) item.id: item};
+  final portfolioController = ref.read(portfolioControllerProvider.notifier);
+  for (final item in downloadedItems) {
+    final localItem = localItemsById[item.id];
+    final resolvedItem = localItem == null
+        ? item
+        : SyncConflict(localItem: localItem, cloudItem: item).resolve();
+    await portfolioController.saveItem(resolvedItem);
+  }
+  await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/image_storage/image_storage_providers.dart';
 import 'package:collectiq_ai/features/image_sync/data/repositories/shared_preferences_sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/sync_queue_snapshot.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/services/upload_worker.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
@@ -17,6 +19,7 @@ final uploadWorkerProvider = Provider<UploadWorker>((ref) {
     queueRepository: ref.watch(syncQueueRepositoryProvider),
     imageStorageRepository: ref.watch(imageStorageRepositoryProvider),
     portfolioRepository: ref.watch(portfolioRepositoryProvider),
+    cloudPortfolioRepository: ref.watch(cloudPortfolioRepositoryProvider),
   );
 });
 
@@ -87,9 +90,15 @@ class ImageSyncController extends Notifier<ImageSyncState> {
     required String localPath,
   }) async {
     if (!_isUploadCandidate(localPath)) {
+      debugPrint(
+        '[ImageSync] upload not queued for non-local image: $localPath',
+      );
       return;
     }
 
+    debugPrint(
+      '[ImageSync] upload queued after save for collectible $collectibleId',
+    );
     await _queueRepository.enqueueImageUpload(
       collectibleId: collectibleId,
       localPath: localPath,
@@ -103,6 +112,7 @@ class ImageSyncController extends Notifier<ImageSyncState> {
       return;
     }
 
+    debugPrint('[ImageSync] processing upload queue');
     state = state.copyWith(isUploading: true, clearErrorMessage: true);
     try {
       await _uploadWorker.processQueue();

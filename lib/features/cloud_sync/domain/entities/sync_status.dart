@@ -26,6 +26,7 @@ class SyncStatus {
     required this.state,
     required this.message,
     required this.isCloudBackupEnabled,
+    this.authenticatedUserId,
     this.lastSyncedAt,
     this.pendingItemCount = 0,
   });
@@ -39,14 +40,32 @@ class SyncStatus {
   /// Whether cloud backup is enabled.
   final bool isCloudBackupEnabled;
 
+  /// Supabase authenticated user id when a real auth session exists.
+  final String? authenticatedUserId;
+
   /// Last successful sync timestamp.
   final DateTime? lastSyncedAt;
 
   /// Number of items waiting to sync.
   final int pendingItemCount;
 
+  /// Whether cloud sync is genuinely connected to an authenticated user.
+  bool get isCloudConnected {
+    final userId = authenticatedUserId?.trim();
+    return isCloudBackupEnabled &&
+        state == SyncState.synced &&
+        userId != null &&
+        userId.isNotEmpty;
+  }
+
   /// Short Settings label.
   String get statusLabel {
+    if (state == SyncState.synced &&
+        isCloudBackupEnabled &&
+        !isCloudConnected) {
+      return 'Auth required';
+    }
+
     return switch (state) {
       SyncState.localOnly => 'Local only',
       SyncState.synced => 'Synced',

@@ -2,14 +2,18 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
+import 'package:collectiq_ai/core/supabase/supabase_ids.dart';
 import 'package:collectiq_ai/core/supabase/supabase_schema.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
+import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_service.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/image_storage/domain/repositories/image_storage_repository.dart';
@@ -392,6 +396,20 @@ void main() {
       expect(migration, contains('with check (auth.uid() = user_id)'));
     });
 
+    test('storage migration scopes collectible images by auth user folder', () {
+      final migration = File(
+        'supabase/migrations/202606290002_collectible_images_storage_policies.sql',
+      ).readAsStringSync();
+
+      expect(migration, contains("bucket_id = 'collectible-images'"));
+      expect(migration, contains('(storage.foldername(name))[1]'));
+      expect(migration, contains('auth.uid()::text'));
+      expect(migration, contains('for insert'));
+      expect(migration, contains('for select'));
+      expect(migration, contains('for update'));
+      expect(migration, contains('for delete'));
+    });
+
     test(
       'auth repository falls back to guest mode when not configured',
       () async {
@@ -407,6 +425,107 @@ void main() {
         expect(user.isAnonymous, isTrue);
       },
     );
+
+    test('auth session cache is scoped to the Supabase project URL', () async {
+      SharedPreferences.setMockInitialValues({
+        'supabase_auth_session': const SupabaseAuthSession(
+          userId: 'old-user',
+          email: null,
+          accessToken: 'old-token',
+          displayName: 'Old User',
+          isAnonymous: true,
+          projectUrl: 'https://old-project.supabase.co',
+        ).toJsonString(),
+      });
+      final service = SupabaseService.instance(
+        config: const SupabaseConfig(
+          url: 'https://new-project.supabase.co',
+          anonKey: 'anon-key',
+          isEnabled: true,
+        ),
+      );
+
+      final session = await service.currentSession();
+      final preferences = await SharedPreferences.getInstance();
+
+      expect(session, isNull);
+      expect(preferences.getString('supabase_auth_session'), isNull);
+    });
+
+    test('cloud ids are valid deterministic UUIDs for local scan ids', () {
+      final first = cloudUuidFor('scan-1780000000000');
+      final second = cloudUuidFor('scan-1780000000000');
+
+      expect(first, second);
+      expect(
+        first,
+        matches(
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        ),
+      );
+    });
+
+    test('storage upload path uses expected bucket and safe object path', () {
+      final cloudId = cloudUuidFor('scan-1780000000000');
+      final path = SupabaseImageStorageRepository.storagePathFor(
+        localPath: r'C:\Users\Harry\Pictures\My Card (Final).jpg',
+        collectibleId: 'scan-1780000000000',
+        userId: '2DD0B46B-336B-463E-9F43-9D9F8D68A767',
+      );
+
+      expect(
+        path,
+        '${SupabaseStorageBuckets.collectibleImages}/'
+        '2dd0b46b-336b-463e-9f43-9d9f8d68a767/$cloudId/image.jpg',
+      );
+    });
+
+    test('cloud row parser tolerates null pricing and profile fields', () {
+      final service = SupabaseService.instance(
+        config: const SupabaseConfig(
+          url: 'https://example.supabase.co',
+          anonKey: 'anon-key',
+          isEnabled: true,
+        ),
+      );
+      final repository = SupabaseCloudPortfolioRepository(
+        supabaseService: service,
+      );
+
+      final item = repository.itemFromCloudRow({
+        'id': cloudUuidFor('scan-1780000000000'),
+        'user_id': 'user-1',
+        'title': 'Cloud Card',
+        'category': 'Trading Card',
+        'condition': null,
+        'image_path': null,
+        'image_storage_path': null,
+        'estimated_value': null,
+        'confidence': null,
+        'metadata': {'localId': 'scan-1780000000000'},
+        'ai_review': null,
+        'pricing': {
+          'estimatedMarketValue': null,
+          'lowEstimate': null,
+          'highEstimate': null,
+          'currency': null,
+          'pricingSource': null,
+          'pricingConfidence': null,
+          'lastUpdated': null,
+        },
+        'saved_at': null,
+        'created_at': null,
+      });
+
+      expect(item.id, 'scan-1780000000000');
+      expect(item.estimatedValue, 0);
+      expect(item.confidence, 0);
+      expect(item.condition, 'Unknown');
+      expect(item.pricing?.estimatedMarketValue, 0);
+      expect(item.pricing?.pricingConfidence, 0);
+    });
 
     test('image storage stays local when Supabase is not configured', () async {
       const repository = SupabaseImageStorageRepository(
@@ -492,6 +611,70 @@ void main() {
       expect(syncState.status.pendingItemCount, 1);
       expect(syncState.status.isCloudBackupEnabled, isFalse);
     });
+
+    test('cloud connected requires authenticated user id', () {
+      const status = SyncStatus(
+        state: SyncState.synced,
+        message: 'Cloud configured.',
+        isCloudBackupEnabled: true,
+      );
+
+      expect(status.isCloudConnected, isFalse);
+      expect(status.statusLabel, 'Auth required');
+    });
+
+    test('configured Supabase without user shows auth required', () async {
+      final container = ProviderContainer(
+        overrides: [
+          syncServiceProvider.overrideWithValue(
+            const LocalFirstSyncService(
+              repository: _StaticCloudPortfolioRepository(
+                status: SyncStatus(
+                  state: SyncState.synced,
+                  message: 'Cloud configured, auth required.',
+                  isCloudBackupEnabled: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(syncControllerProvider.notifier).loadStatus();
+      final syncState = container.read(syncControllerProvider);
+
+      expect(syncState.status.isCloudBackupEnabled, isTrue);
+      expect(syncState.status.isCloudConnected, isFalse);
+      expect(syncState.status.statusLabel, 'Auth required');
+    });
+
+    test('anonymous sign-in success changes status to connected', () async {
+      final container = ProviderContainer(
+        overrides: [
+          syncServiceProvider.overrideWithValue(
+            const LocalFirstSyncService(
+              repository: _StaticCloudPortfolioRepository(
+                status: SyncStatus(
+                  state: SyncState.synced,
+                  message: 'Cloud connected as anonymous user user-123.',
+                  isCloudBackupEnabled: true,
+                  authenticatedUserId: 'user-123',
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(syncControllerProvider.notifier).loadStatus();
+      final syncState = container.read(syncControllerProvider);
+
+      expect(syncState.status.isCloudBackupEnabled, isTrue);
+      expect(syncState.status.isCloudConnected, isTrue);
+      expect(syncState.status.statusLabel, 'Synced');
+    });
   });
 
   group('SyncService', () {
@@ -504,6 +687,30 @@ void main() {
       expect(status.state, SyncState.pending);
       expect(status.pendingItemCount, 1);
       expect(status.isCloudBackupEnabled, isFalse);
+    });
+  });
+
+  group('SyncConflict', () {
+    test('resolves using newest update wins', () {
+      final localItem = _testItem();
+      final cloudItem = CollectibleItem(
+        id: localItem.id,
+        title: 'Cloud Charizard',
+        category: localItem.category,
+        estimatedValue: localItem.estimatedValue,
+        confidence: localItem.confidence,
+        condition: localItem.condition,
+        recommendation: localItem.recommendation,
+        imagePath: localItem.imagePath,
+        createdAt: localItem.createdAt.add(const Duration(days: 1)),
+      );
+
+      final resolved = SyncConflict(
+        localItem: localItem,
+        cloudItem: cloudItem,
+      ).resolve();
+
+      expect(resolved.title, 'Cloud Charizard');
     });
   });
 
@@ -637,5 +844,26 @@ class _SuccessfulImageStorageRepository implements ImageStorageRepository {
   @override
   Future<String?> publicUrlFor(String storagePath) async {
     return 'https://cdn.example.com/item-1.jpg';
+  }
+}
+
+class _StaticCloudPortfolioRepository implements CloudPortfolioRepository {
+  const _StaticCloudPortfolioRepository({required this.status});
+
+  final SyncStatus status;
+
+  @override
+  Future<SyncStatus> getSyncStatus() async {
+    return status;
+  }
+
+  @override
+  Future<SyncStatus> uploadLocalItems(List<CollectibleItem> items) async {
+    return status;
+  }
+
+  @override
+  Future<List<CollectibleItem>> downloadCloudItems() async {
+    return const [];
   }
 }

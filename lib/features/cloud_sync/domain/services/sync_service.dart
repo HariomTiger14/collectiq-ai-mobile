@@ -7,4 +7,6 @@ abstract interface class SyncService {
   Future<SyncStatus> markPending(List<CollectibleItem> localItems);
 
   Future<SyncStatus> syncLocalItems(List<CollectibleItem> localItems);
+
+  Future<List<CollectibleItem>> downloadCloudItems();
 }

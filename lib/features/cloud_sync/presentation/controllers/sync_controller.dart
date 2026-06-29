@@ -1,16 +1,24 @@
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
+import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the cloud portfolio repository.
 final cloudPortfolioRepositoryProvider = Provider<CloudPortfolioRepository>((
   ref,
 ) {
-  return const MockCloudPortfolioRepository();
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  if (!supabaseService.isConfigured) {
+    return const MockCloudPortfolioRepository();
+  }
+
+  return SupabaseCloudPortfolioRepository(supabaseService: supabaseService);
 });
 
 final syncServiceProvider = Provider<SyncService>((ref) {
@@ -71,10 +79,16 @@ class SyncController extends Notifier<SyncControllerState> {
     try {
       final status = await _syncService.currentStatus();
       state = state.copyWith(status: status, isLoading: false);
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Sync] load status failed: $error');
       state = state.copyWith(
+        status: SyncStatus(
+          state: SyncState.failed,
+          message: error.toString(),
+          isCloudBackupEnabled: true,
+        ),
         isLoading: false,
-        errorMessage: 'Unable to load sync status.',
+        errorMessage: error.toString(),
       );
     }
   }
@@ -85,11 +99,40 @@ class SyncController extends Notifier<SyncControllerState> {
     try {
       final status = await _syncService.syncLocalItems(items);
       state = state.copyWith(status: status, isLoading: false);
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Sync] upload local items failed: $error');
       state = state.copyWith(
+        status: SyncStatus(
+          state: SyncState.failed,
+          message: error.toString(),
+          isCloudBackupEnabled: true,
+          pendingItemCount: items.length,
+        ),
         isLoading: false,
-        errorMessage: 'Cloud backup is not available yet.',
+        errorMessage: error.toString(),
       );
+    }
+  }
+
+  Future<List<CollectibleItem>> downloadCloudItems() async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      final items = await _syncService.downloadCloudItems();
+      final status = await _syncService.currentStatus();
+      state = state.copyWith(status: status, isLoading: false);
+      return items;
+    } on Object catch (error) {
+      debugPrint('[Sync] download cloud items failed: $error');
+      state = state.copyWith(
+        status: SyncStatus(
+          state: SyncState.failed,
+          message: error.toString(),
+          isCloudBackupEnabled: true,
+        ),
+        isLoading: false,
+        errorMessage: error.toString(),
+      );
+      return const [];
     }
   }
 }

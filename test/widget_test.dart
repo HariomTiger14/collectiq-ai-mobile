@@ -125,9 +125,12 @@ void main() {
     expect(find.text('AI & Scanning'), findsOneWidget);
     expect(find.text('Cloud Sync'), findsOneWidget);
     expect(find.text('Cloud status'), findsOneWidget);
+    expect(find.text('Anonymous User'), findsOneWidget);
     expect(find.text('Pending uploads'), findsOneWidget);
+    expect(find.text('Failed uploads'), findsOneWidget);
     expect(find.text('Last sync'), findsOneWidget);
     expect(find.text('Never'), findsOneWidget);
+    expect(find.text('Manual Sync'), findsOneWidget);
     expect(find.text('Sync status'), findsOneWidget);
     expect(find.text('Local only'), findsWidgets);
     expect(find.text('Cloud backup'), findsOneWidget);
@@ -288,7 +291,7 @@ void main() {
     await tester.ensureVisible(find.text('Choose from Gallery'));
     await tester.pump();
     await tester.tap(find.text('Choose from Gallery'));
-    await tester.pump();
+    await tester.pumpUntilFound(find.text('Analyze with AI'));
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
     await tester.tap(find.text('Analyze with AI'));
@@ -311,7 +314,7 @@ void main() {
     await tester.ensureVisible(find.text('Choose from Gallery'));
     await tester.pump();
     await tester.tap(find.text('Choose from Gallery'));
-    await tester.pump();
+    await tester.pumpUntilFound(find.text('Gallery image'));
 
     expect(find.text('Gallery image'), findsOneWidget);
 
@@ -469,7 +472,7 @@ void main() {
     await tester.ensureVisible(find.text('Choose from Gallery'));
     await tester.pump();
     await tester.tap(find.text('Choose from Gallery'));
-    await tester.pump();
+    await tester.pumpUntilFound(find.text('Analyze with AI'));
     await tester.ensureVisible(find.text('Analyze with AI'));
     await tester.pump();
     await tester.tap(find.text('Analyze with AI'));
@@ -490,7 +493,7 @@ void main() {
     final decodedItems = jsonDecode(encodedItems!) as List<dynamic>;
     final item = decodedItems.single as Map<String, dynamic>;
 
-    expect(item['imagePath'], 'test/fixtures/card.jpg');
+    expect(item['imagePath'], 'test/fixtures/persistent-gallery-card.jpg');
     expect(item['cloudImageUrl'], isNull);
   });
 
@@ -723,6 +726,20 @@ extension on WidgetTester {
       ),
     );
   }
+
+  Future<void> pumpUntilFound(
+    Finder finder, {
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final end = binding.clock.fromNowBy(timeout);
+    while (binding.clock.now().isBefore(end)) {
+      await pump(const Duration(milliseconds: 50));
+      if (finder.evaluate().isNotEmpty) {
+        return;
+      }
+    }
+    throw TestFailure('Timed out waiting for $finder');
+  }
 }
 
 class _SelectedCameraService extends CameraService {
@@ -847,5 +864,10 @@ class _SelectedGalleryService extends GalleryService {
   @override
   Future<bool> validateImage(XFile image) async {
     return true;
+  }
+
+  @override
+  Future<XFile> persistSelectedImage(XFile image) async {
+    return XFile('test/fixtures/persistent-gallery-card.jpg');
   }
 }

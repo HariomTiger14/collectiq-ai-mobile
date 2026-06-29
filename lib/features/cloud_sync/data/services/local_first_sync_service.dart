@@ -27,4 +27,9 @@ class LocalFirstSyncService implements SyncService {
   Future<SyncStatus> syncLocalItems(List<CollectibleItem> localItems) {
     return repository.uploadLocalItems(localItems);
   }
+
+  @override
+  Future<List<CollectibleItem>> downloadCloudItems() {
+    return repository.downloadCloudItems();
+  }
 }

@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Service responsible for selecting and validating gallery images.
 class GalleryService {
@@ -13,8 +17,10 @@ class GalleryService {
   final ImagePicker _imagePicker;
 
   /// Opens the gallery and returns the selected image file.
-  Future<XFile?> pickImage() {
-    return _imagePicker.pickImage(source: ImageSource.gallery);
+  Future<XFile?> pickImage() async {
+    final image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    debugPrint('[GalleryService] picker returned: ${image?.path ?? 'null'}');
+    return image;
   }
 
   /// Validates whether [image] can be used for scanner upload.
@@ -38,6 +44,52 @@ class GalleryService {
     return true;
   }
 
+  /// Copies a selected gallery image into app-owned documents storage.
+  Future<XFile> persistSelectedImage(XFile image) async {
+    final originalPath = image.path;
+    debugPrint('[GalleryService] original gallery path: $originalPath');
+
+    if (originalPath.isEmpty) {
+      throw const ScannerException(
+        message: 'Gallery image path is missing.',
+        code: 'scanner.gallery.empty_path',
+      );
+    }
+
+    final sourceFile = File(originalPath);
+    final sourceExists = await sourceFile.exists();
+    debugPrint('[GalleryService] original gallery file exists: $sourceExists');
+    if (!sourceExists) {
+      throw const ScannerException(
+        message: 'Selected image could not be found.',
+        code: 'scanner.gallery.missing_file',
+      );
+    }
+
+    final sourceSize = await sourceFile.length();
+    debugPrint('[GalleryService] original gallery file size: $sourceSize');
+
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final galleryDirectory = Directory(
+      '${documentsDirectory.path}${Platform.pathSeparator}collectiq_gallery',
+    );
+    await galleryDirectory.create(recursive: true);
+
+    final extension = _extensionForCopy(image);
+    final fileName =
+        'gallery_${DateTime.now().millisecondsSinceEpoch}$extension';
+    final copiedFile = await sourceFile.copy(
+      '${galleryDirectory.path}${Platform.pathSeparator}$fileName',
+    );
+    final copiedExists = await copiedFile.exists();
+    final copiedSize = copiedExists ? await copiedFile.length() : 0;
+    debugPrint('[GalleryService] copied persistent path: ${copiedFile.path}');
+    debugPrint('[GalleryService] copied gallery file exists: $copiedExists');
+    debugPrint('[GalleryService] copied gallery file size: $copiedSize');
+
+    return XFile(copiedFile.path, name: fileName);
+  }
+
   String _extensionFor(XFile image) {
     final candidate = image.name.isNotEmpty
         ? image.name
@@ -48,5 +100,10 @@ class GalleryService {
       return '';
     }
     return fileName.substring(dotIndex + 1);
+  }
+
+  String _extensionForCopy(XFile image) {
+    final extension = _extensionFor(image);
+    return extension.isEmpty ? '.jpg' : '.$extension';
   }
 }

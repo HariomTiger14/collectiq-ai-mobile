@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/utils/json_parse.dart';
+
 /// Market pricing information supplied by a pricing provider.
 class PricingInfo {
   /// Creates immutable pricing information.
@@ -21,15 +23,16 @@ class PricingInfo {
 
   /// Creates pricing information from backend or local JSON.
   factory PricingInfo.fromJson(Map<String, dynamic> json) {
-    final pricingConfidence = (json['pricingConfidence'] as num? ?? 0)
-        .toDouble();
+    final pricingConfidence =
+        parseNullableDouble(json['pricingConfidence']) ?? 0;
 
     return PricingInfo(
-      estimatedMarketValue: (json['estimatedMarketValue'] as num).toDouble(),
-      lowEstimate: (json['lowEstimate'] as num).toDouble(),
-      highEstimate: (json['highEstimate'] as num).toDouble(),
-      currency: json['currency'] as String? ?? 'AUD',
-      pricingSource: json['pricingSource'] as String? ?? 'Unknown',
+      estimatedMarketValue:
+          parseNullableDouble(json['estimatedMarketValue']) ?? 0,
+      lowEstimate: parseNullableDouble(json['lowEstimate']) ?? 0,
+      highEstimate: parseNullableDouble(json['highEstimate']) ?? 0,
+      currency: parseString(json['currency'], fallback: 'AUD'),
+      pricingSource: parseString(json['pricingSource'], fallback: 'Unknown'),
       pricingConfidence: pricingConfidence > 1
           ? pricingConfidence / 100
           : pricingConfidence,

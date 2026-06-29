@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the auth repository.
@@ -70,10 +71,11 @@ class AuthController extends Notifier<AuthState> {
         isLoading: false,
         clearUser: user == null,
       );
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Auth] load current user failed: $error');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Unable to load account status.',
+        errorMessage: _messageForError(error),
       );
     }
   }
@@ -89,10 +91,11 @@ class AuthController extends Notifier<AuthState> {
     try {
       final user = await _repository.signInAnonymously();
       state = state.copyWith(user: user, isLoading: false);
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Auth] anonymous sign-in failed: $error');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Sign in is not available yet.',
+        errorMessage: _messageForError(error),
       );
     }
   }
@@ -109,10 +112,11 @@ class AuthController extends Notifier<AuthState> {
         password: password,
       );
       state = state.copyWith(user: user, isLoading: false);
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Auth] email sign-in failed: $error');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Email sign in is not available yet.',
+        errorMessage: _messageForError(error),
       );
     }
   }
@@ -123,12 +127,21 @@ class AuthController extends Notifier<AuthState> {
     try {
       await _repository.signOut();
       state = state.copyWith(isLoading: false, clearUser: true);
-    } catch (_) {
+    } on Object catch (error) {
+      debugPrint('[Auth] sign out failed: $error');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Unable to sign out.',
+        errorMessage: _messageForError(error),
       );
     }
+  }
+
+  String _messageForError(Object error) {
+    if (error is SupabaseAuthException) {
+      return error.message;
+    }
+
+    return 'Unable to connect to Supabase Auth.';
   }
 }
 

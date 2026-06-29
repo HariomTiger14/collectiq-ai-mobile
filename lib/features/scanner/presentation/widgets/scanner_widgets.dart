@@ -580,6 +580,8 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
         width: 88,
         height: 88,
         fit: BoxFit.cover,
+        cacheWidth: 256,
+        cacheHeight: 256,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
           return _fallbackThumbnail(colorScheme);
@@ -593,6 +595,8 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
         width: 88,
         height: 88,
         fit: BoxFit.cover,
+        cacheWidth: 256,
+        cacheHeight: 256,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
           return _fallbackThumbnail(colorScheme);
@@ -605,6 +609,8 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
       width: 88,
       height: 88,
       fit: BoxFit.cover,
+      cacheWidth: 256,
+      cacheHeight: 256,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
         return _fallbackThumbnail(colorScheme);

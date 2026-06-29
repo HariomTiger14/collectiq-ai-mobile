@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/image_storage/domain/repositories/image_storage_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
@@ -11,12 +12,14 @@ class UploadWorker {
     required this.queueRepository,
     required this.imageStorageRepository,
     required this.portfolioRepository,
+    this.cloudPortfolioRepository,
     this.retryPolicy = const RetryPolicy(),
   });
 
   final SyncQueueRepository queueRepository;
   final ImageStorageRepository imageStorageRepository;
   final PortfolioRepository portfolioRepository;
+  final CloudPortfolioRepository? cloudPortfolioRepository;
   final RetryPolicy retryPolicy;
 
   Future<void> processQueue() async {
@@ -71,9 +74,27 @@ class UploadWorker {
         imageStoragePath: reference.path,
         cloudImageUrl: reference.publicUrl!,
       );
+      await _uploadUpdatedCollectible(task.collectibleId);
     } on Exception catch (error) {
       await _markFailed(task, error.toString());
     }
+  }
+
+  Future<void> _uploadUpdatedCollectible(String collectibleId) async {
+    final cloudRepository = cloudPortfolioRepository;
+    if (cloudRepository == null) {
+      return;
+    }
+
+    final items = await portfolioRepository.getItems();
+    final updatedItems = items
+        .where((item) => item.id == collectibleId)
+        .toList(growable: false);
+    if (updatedItems.isEmpty) {
+      return;
+    }
+
+    await cloudRepository.uploadLocalItems(updatedItems);
   }
 
   Future<void> _markFailed(ImageUploadTask task, String message) async {

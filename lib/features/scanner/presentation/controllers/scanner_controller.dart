@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -186,6 +187,9 @@ class ScannerController extends Notifier<ScannerState> {
         '[Scanner] selectedImagePath after camera capture: '
         '$selectedImagePath',
       );
+      debugPrint(
+        '[Scanner] Supabase sync triggered after camera selection: false',
+      );
       state = state.copyWith(
         selectedImage: image,
         selectedImagePath: selectedImagePath,
@@ -241,10 +245,17 @@ class ScannerController extends Notifier<ScannerState> {
       }
 
       await _galleryService.validateImage(image);
-      final selectedImagePath = _displayPathFor(image);
-      debugPrint('[Scanner] selected image path: $selectedImagePath');
+      final persistedImage = await _galleryService.persistSelectedImage(image);
+      final selectedImagePath = _displayPathFor(persistedImage);
+      debugPrint('[Scanner] gallery picker returned path: ${image.path}');
+      debugPrint(
+        '[Scanner] copied persistent gallery path: $selectedImagePath',
+      );
+      debugPrint(
+        '[Scanner] Supabase sync triggered after gallery selection: false',
+      );
       state = state.copyWith(
-        selectedImage: image,
+        selectedImage: persistedImage,
         selectedImagePath: selectedImagePath,
         selectedItemTitle: 'Gallery image',
         selectedItemStatus: 'Ready for AI analysis',
@@ -253,6 +264,7 @@ class ScannerController extends Notifier<ScannerState> {
         clearAiRecommendation: true,
         isSavedToPortfolio: false,
       );
+      unawaited(_logPersistentGalleryDiagnostics(selectedImagePath));
     } on ScannerException catch (error) {
       state = state.copyWith(
         isLoading: false,
@@ -517,6 +529,49 @@ class ScannerController extends Notifier<ScannerState> {
     }
 
     return File(normalizedPath).exists();
+  }
+
+  Future<bool> _safeLocalFileExists(String imagePath) async {
+    try {
+      return _localFileExists(imagePath);
+    } on Exception catch (error) {
+      debugPrint('[Scanner] unable to check image file exists: $error');
+      return false;
+    }
+  }
+
+  Future<int> _localFileSize(String imagePath) async {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty ||
+        normalizedPath.startsWith('sample://') ||
+        normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://') ||
+        normalizedPath.startsWith('assets/')) {
+      return 0;
+    }
+
+    final file = File(normalizedPath);
+    if (!await file.exists()) {
+      return 0;
+    }
+
+    return file.length();
+  }
+
+  Future<int> _safeLocalFileSize(String imagePath) async {
+    try {
+      return _localFileSize(imagePath);
+    } on Exception catch (error) {
+      debugPrint('[Scanner] unable to check image file size: $error');
+      return 0;
+    }
+  }
+
+  Future<void> _logPersistentGalleryDiagnostics(String imagePath) async {
+    final fileExists = await _safeLocalFileExists(imagePath);
+    debugPrint('[Scanner] persistent gallery file exists: $fileExists');
+    final fileSize = await _safeLocalFileSize(imagePath);
+    debugPrint('[Scanner] persistent gallery file size: $fileSize');
   }
 
   String _messageForNetworkError(NetworkException error) {
