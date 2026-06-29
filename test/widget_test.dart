@@ -86,6 +86,32 @@ void main() {
     await tester.pump();
 
     expect(find.text('Settings'), findsWidgets);
+    expect(find.text('Manage account and cloud sync options.'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Guest mode'), findsOneWidget);
+    expect(
+      find.text('Optional. Continue using CollectIQ AI locally.'),
+      findsOneWidget,
+    );
+    expect(find.text('App Preferences'), findsOneWidget);
+    expect(find.text('AI & Scanning'), findsOneWidget);
+    expect(find.text('Cloud Sync'), findsOneWidget);
+    expect(find.text('Sync status'), findsOneWidget);
+    expect(find.text('Local only'), findsOneWidget);
+    expect(find.text('Cloud backup'), findsOneWidget);
+    expect(find.text('Off'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Data & Privacy'));
+    await tester.pump();
+    expect(find.text('Data & Privacy'), findsOneWidget);
+    expect(find.text('Offline portfolio'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('About'));
+    await tester.pump();
+    expect(find.text('About'), findsOneWidget);
+    expect(find.text('App version'), findsOneWidget);
   });
 
   testWidgets('switches between feature placeholders', (

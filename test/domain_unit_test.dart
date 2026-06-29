@@ -1,13 +1,16 @@
 import 'dart:typed_data';
 
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
+import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -311,6 +314,29 @@ void main() {
     });
   });
 
+  group('AuthController', () {
+    test('starts in guest mode and supports optional mock sign in', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(authControllerProvider).isSignedIn, isFalse);
+      expect(container.read(authControllerProvider).statusLabel, 'Guest mode');
+
+      await container.read(authControllerProvider.notifier).signIn();
+
+      final signedInState = container.read(authControllerProvider);
+      expect(signedInState.isSignedIn, isTrue);
+      expect(signedInState.user!.displayName, 'Local Collector');
+      expect(signedInState.statusLabel, 'Signed in');
+
+      await container.read(authControllerProvider.notifier).signOut();
+
+      expect(container.read(authControllerProvider).isSignedIn, isFalse);
+      expect(container.read(authControllerProvider).statusLabel, 'Guest mode');
+    });
+  });
+
   group('MockCloudPortfolioRepository', () {
     test('reports local-only sync status by default', () async {
       const repository = MockCloudPortfolioRepository();
@@ -334,6 +360,44 @@ void main() {
         expect(status.isCloudBackupEnabled, isFalse);
       },
     );
+  });
+
+  group('SyncController', () {
+    test('keeps cloud backup local-only for placeholder uploads', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        container.read(syncControllerProvider).status.state,
+        SyncState.localOnly,
+      );
+
+      await container.read(syncControllerProvider.notifier).uploadLocalItems([
+        _testItem(),
+      ]);
+
+      final syncState = container.read(syncControllerProvider);
+      expect(syncState.status.state, SyncState.localOnly);
+      expect(syncState.status.pendingItemCount, 1);
+      expect(syncState.status.isCloudBackupEnabled, isFalse);
+    });
+  });
+
+  group('Local-first portfolio mode', () {
+    test('saves portfolio items while no auth user is signed in', () async {
+      SharedPreferences.setMockInitialValues({});
+      const authRepository = MockAuthRepository();
+      final portfolioRepository = SharedPreferencesPortfolioRepository();
+
+      expect(await authRepository.currentUser(), isNull);
+
+      await portfolioRepository.addItem(_testItem());
+      final items = await portfolioRepository.getItems();
+
+      expect(items, hasLength(1));
+      expect(items.single.title, contains('Charizard'));
+    });
   });
 }
 
