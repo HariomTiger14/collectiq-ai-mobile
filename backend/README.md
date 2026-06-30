@@ -110,6 +110,19 @@ quality, reasoning, exactly three alternatives, and rich profile metadata. The
 backend then normalizes that provider response into Flutter's
 `AiBackendAnalysisResponse` contract.
 
+The prompt also asks OpenAI to:
+
+- identify item name, franchise/brand, category, set/series, year, visible
+  number, manufacturer/publisher, language, edition/variant, and raw grading
+  likelihood;
+- return a 0-100 confidence score for each extracted field;
+- avoid inventing data and use `null` or `Unknown` when details are not visible;
+- classify confidence as `High` (90-100), `Medium` (70-89), or `Low` (<70);
+- report low-confidence reasons and missing visual evidence;
+- identify image-quality issues such as blur, glare/reflections, cropped edges,
+  dark image, low resolution, and multiple collectibles in one photo;
+- return actionable scan recommendations.
+
 ### Enable OpenAI Locally
 
 OpenAI is opt-in and may incur API cost. Keep mock mode for normal development
@@ -133,6 +146,47 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Never pass `OPENAI_API_KEY` to Flutter with `--dart-define`, local storage, or
 source code. Flutter should only know the CollectIQ backend URL.
+
+### Confidence Interpretation
+
+- `High`: 90-100. The primary identity is likely, but users should still verify
+  high-value items manually.
+- `Medium`: 70-89. The broad item family is plausible, but details such as set,
+  card number, issue, mint mark, or edition may need another scan.
+- `Low`: below 70. Treat the result as a suggestion; retake the image or inspect
+  manually before saving or valuing the item.
+
+`fieldConfidence` reports confidence for individual fields, so a result may have
+a high category match but lower confidence for year, number, edition, or grade.
+
+### Image Capture Best Practices
+
+- Use bright, even lighting.
+- Avoid glare, sleeves with reflections, and dark backgrounds.
+- Keep the full collectible inside the frame.
+- Capture one collectible at a time.
+- Retake if small text, set symbols, mint marks, issue numbers, or card numbers
+  are blurry.
+- Use a second close-up image later when adding multi-image analysis.
+
+### Known AI Limitations
+
+- AI estimates are not authentication, grading, or appraisal.
+- Small print may be unreadable from normal phone distance.
+- Reprints, variants, language differences, and editions can look very similar.
+- Market value remains mock pricing until real pricing providers are enabled.
+- Low-quality images should produce lower confidence and scan guidance rather
+  than invented details.
+
+### Prompt Engineering Guidelines
+
+- Prefer conservative identification over overconfident claims.
+- Ask for `null`/`Unknown` for unseen fields.
+- Keep schema stable for Flutter.
+- Add category-specific examples only when they improve structured output.
+- Do not log full prompts or image payloads in production.
+- Use `backend/tests/test_assets/manifest.json` as the golden dataset manifest.
+  Current rows are placeholders until licensed or user-owned images are added.
 
 ### Error Responses
 

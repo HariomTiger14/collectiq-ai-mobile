@@ -1,3 +1,5 @@
+import logging
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,6 +25,7 @@ from app.services.pricing.provider_factory import get_pricing_provider
 
 
 router = APIRouter(prefix="/api", tags=["Analyze API"])
+logger = logging.getLogger("collectiq.api.analyze")
 
 SUPPORTED_CATEGORIES = {
     "pokemon",
@@ -47,6 +50,7 @@ SUPPORTED_CATEGORIES = {
 )
 async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     _validate_contract(payload)
+    started_at = time.perf_counter()
 
     try:
         provider = get_ai_recognition_provider()
@@ -124,6 +128,17 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
         comps=comparable_sales,
     )
 
+    total_processing_time_ms = int((time.perf_counter() - started_at) * 1000)
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Analyze completed provider=%s model=%s latencyMs=%s "
+            "overallProcessingTimeMs=%s",
+            getattr(provider, "provider_name", "unknown"),
+            getattr(provider, "_model", "mock"),
+            getattr(recognition, "processingTimeMs", total_processing_time_ms),
+            total_processing_time_ms,
+        )
+
     return ApiAnalyzeResponse(
         id=f"backend-{uuid4()}",
         itemName=recognition.title,
@@ -155,6 +170,20 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
         comparableSales=comparable_sales,
         imageUrl=None,
         timestamp=payload.request.timestamp,
+        fieldConfidence=_field_confidence(recognition),
+        confidenceLevel=_confidence_level(recognition.confidence),
+        lowConfidenceReasons=(
+            recognition.lowConfidenceReasons
+            or _low_confidence_reasons(recognition.confidence, recognition.detectionQuality)
+        ),
+        imageQualityIssues=(
+            recognition.imageQualityIssues
+            or _image_quality_issues(recognition.detectionQuality)
+        ),
+        scanRecommendations=(
+            recognition.scanRecommendations
+            or _scan_recommendations(recognition.confidence, recognition.detectionQuality)
+        ),
     )
 
 
@@ -247,6 +276,81 @@ def _key_attributes(recognition) -> dict[str, str]:
         for key, value in attributes.items()
         if isinstance(value, str) and value.strip()
     }
+
+
+def _field_confidence(recognition) -> dict[str, int]:
+    if recognition.fieldConfidence:
+        return {
+            key: _clamp_confidence(value)
+            for key, value in recognition.fieldConfidence.items()
+        }
+
+    return {
+        "itemName": _clamp_confidence(recognition.confidence),
+        "category": _clamp_confidence(recognition.confidence),
+        "brand": _clamp_confidence(recognition.confidence - 5),
+        "setName": _clamp_confidence(recognition.confidence - 10),
+        "year": _clamp_confidence(recognition.confidence - 12),
+        "cardNumber": _clamp_confidence(recognition.confidence - 15),
+        "condition": _clamp_confidence(recognition.confidence - 20),
+        "estimatedGrade": _clamp_confidence(recognition.confidence - 25),
+        "language": _clamp_confidence(recognition.confidence - 20),
+        "edition": _clamp_confidence(recognition.confidence - 20),
+    }
+
+
+def _confidence_level(confidence: int) -> str:
+    if confidence >= 90:
+        return "High"
+    if confidence >= 70:
+        return "Medium"
+    return "Low"
+
+
+def _low_confidence_reasons(confidence: int, detection_quality: str) -> list[str]:
+    reasons: list[str] = []
+    if confidence < 90:
+        reasons.append("Some collectible details could not be verified from the image.")
+    normalized_quality = detection_quality.lower()
+    if any(term in normalized_quality for term in ["fair", "blurry", "glare", "dark"]):
+        reasons.append(detection_quality)
+    if confidence < 70:
+        reasons.append("Important identifiers such as set, number, or edition may be missing.")
+    return reasons
+
+
+def _image_quality_issues(detection_quality: str) -> list[str]:
+    normalized = detection_quality.lower()
+    issues: list[str] = []
+    checks = {
+        "blurry": "blurry image",
+        "glare": "glare/reflections",
+        "reflection": "glare/reflections",
+        "cropped": "cropped edges",
+        "dark": "dark image",
+        "low resolution": "low resolution",
+        "multiple": "multiple collectibles in one photo",
+        "fair": "fine details may be hard to read",
+    }
+    for needle, label in checks.items():
+        if needle in normalized and label not in issues:
+            issues.append(label)
+    return issues
+
+
+def _scan_recommendations(confidence: int, detection_quality: str) -> list[str]:
+    recommendations = [
+        "Use bright, even lighting.",
+        "Keep the collectible flat and fully inside the frame.",
+    ]
+    if confidence < 90 or _image_quality_issues(detection_quality):
+        recommendations.append("Retake the image closer and avoid glare.")
+        recommendations.append("Capture small text such as set name, date, card number, or mint mark.")
+    return recommendations
+
+
+def _clamp_confidence(value: int) -> int:
+    return max(0, min(100, int(value)))
 
 
 def _mock_comparable_sales(

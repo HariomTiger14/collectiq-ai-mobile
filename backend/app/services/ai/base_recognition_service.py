@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -42,6 +42,11 @@ class RecognitionResult:
     mint: str | None = None
     material: str | None = None
     notes: str | None = None
+    fieldConfidence: dict[str, int] = field(default_factory=dict)
+    confidenceLevel: str | None = None
+    lowConfidenceReasons: list[str] = field(default_factory=list)
+    imageQualityIssues: list[str] = field(default_factory=list)
+    scanRecommendations: list[str] = field(default_factory=list)
 
 
 class AIRecognitionProvider(Protocol):

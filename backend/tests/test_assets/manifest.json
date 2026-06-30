@@ -1,0 +1,35 @@
+[
+  {
+    "imageFilename": "pokemon_card_placeholder.jpg",
+    "expectedCategory": "Pokemon Card",
+    "expectedItem": "1999 Pokemon Charizard Holo",
+    "expectedConfidenceRange": {
+      "min": 80,
+      "max": 100
+    },
+    "status": "placeholder",
+    "notes": "Replace with a licensed or user-owned test image before real AI validation."
+  },
+  {
+    "imageFilename": "sports_card_placeholder.jpg",
+    "expectedCategory": "Sports Card",
+    "expectedItem": "1986 Fleer Michael Jordan Rookie",
+    "expectedConfidenceRange": {
+      "min": 70,
+      "max": 95
+    },
+    "status": "placeholder",
+    "notes": "Placeholder manifest row for future golden-image validation."
+  },
+  {
+    "imageFilename": "coin_placeholder.jpg",
+    "expectedCategory": "Coin",
+    "expectedItem": "1921 Morgan Silver Dollar",
+    "expectedConfidenceRange": {
+      "min": 70,
+      "max": 95
+    },
+    "status": "placeholder",
+    "notes": "Placeholder manifest row for future golden-image validation."
+  }
+]

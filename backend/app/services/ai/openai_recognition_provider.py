@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,8 @@ from app.services.ai.base_recognition_service import (
     AlternativeMatch,
     RecognitionResult,
 )
+
+logger = logging.getLogger("collectiq.ai.openai")
 
 
 class AIProviderNotConfiguredError(RuntimeError):
@@ -84,6 +87,8 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
         payload: dict[str, Any],
         started_at: float,
     ) -> RecognitionResult:
+        prompt_text = self._prompt_from_payload(payload)
+        prompt_token_estimate = _estimate_tokens(prompt_text)
 
         try:
             response = self._client.post(
@@ -115,8 +120,22 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                 "OpenAI response body was not valid JSON."
             ) from exc
 
-        result_payload = self._extract_structured_output(response_body)
+        output_text = self._extract_structured_output_text(response_body)
+        completion_token_estimate = _estimate_tokens(output_text)
+        result_payload = self._parse_json_object(output_text)
         processing_time_ms = int((time.perf_counter() - started_at) * 1000)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "OpenAI recognition provider=%s model=%s latencyMs=%s "
+                "promptTokensEstimate=%s completionTokensEstimate=%s "
+                "processingTimeMs=%s",
+                self.provider_name,
+                self._model,
+                processing_time_ms,
+                prompt_token_estimate,
+                completion_token_estimate,
+                processing_time_ms,
+            )
         return self._to_recognition_result(result_payload, processing_time_ms)
 
     def _build_payload(self, image_path: Path) -> dict[str, Any]:
@@ -192,6 +211,11 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "recommendation",
                             "description",
                             "detectedObjects",
+                            "fieldConfidence",
+                            "confidenceLevel",
+                            "lowConfidenceReasons",
+                            "imageQualityIssues",
+                            "scanRecommendations",
                             "primaryMatch",
                             "alternativeMatches",
                             "confidenceExplanation",
@@ -228,6 +252,42 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                             "recommendation": {"type": "string"},
                             "description": {"type": "string"},
                             "detectedObjects": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "fieldConfidence": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                },
+                            },
+                            "confidenceLevel": {
+                                "type": "string",
+                                "enum": ["High", "Medium", "Low"],
+                            },
+                            "lowConfidenceReasons": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "imageQualityIssues": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "blurry image",
+                                        "glare/reflections",
+                                        "cropped edges",
+                                        "dark image",
+                                        "low resolution",
+                                        "multiple collectibles in one photo",
+                                        "fine details may be hard to read",
+                                        "none",
+                                    ],
+                                },
+                            },
+                            "scanRecommendations": {
                                 "type": "array",
                                 "items": {"type": "string"},
                             },
@@ -284,13 +344,22 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
         return (
             "You are CollectIQ AI, a careful collectible identification and "
             "valuation assistant. Analyze the provided image for a real "
-            "collector. Launch categories are Pokemon/TCG cards, sports cards, "
-            "coins, comics, memorabilia, toys/figures, and other collectibles. "
-            "Use conservative Australian-dollar estimates. Prefer uncertainty "
-            "over overclaiming. Return strict JSON that matches the provided "
-            "schema only. Include exactly three plausible alternative matches. "
-            "Explain confidence, image detection quality, and reasoning. Extract "
-            "rich metadata when visible; use null when unknown. Context: "
+            "collector. Identify the collectible and extract item name, "
+            "franchise/brand, category, set or series, visible year, visible "
+            "card/issue/coin number, manufacturer or publisher, language, "
+            "edition or variant, and raw grading likelihood. Never invent "
+            "information: use null or 'Unknown' when a field is not visible. "
+            "Return confidence for each extracted field from 0 to 100. Classify "
+            "overall confidence as High for >=90, Medium for 70-89, and Low "
+            "for <70. If confidence is not High, explain why. Evaluate image "
+            "quality for blurry image, glare/reflections, cropped edges, dark "
+            "image, low resolution, and multiple collectibles in one photo. "
+            "Return actionable scan recommendations. Launch categories are "
+            "Pokemon/TCG cards, sports cards, coins, comics, memorabilia, "
+            "toys/figures, and other collectibles. Use conservative "
+            "Australian-dollar estimates. Prefer uncertainty over overclaiming. "
+            "Return strict JSON that matches the provided schema only and "
+            "include exactly three plausible alternative matches. Context: "
             f"imageSource={context.get('imageSource')}; "
             f"requestedCategory={context.get('requestedCategory')}; "
             f"fileName={context.get('fileName')}; "
@@ -322,10 +391,10 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             "Provide a stored file path or base64Image in the backend payload."
         )
 
-    def _extract_structured_output(self, response_body: dict[str, Any]) -> dict[str, Any]:
+    def _extract_structured_output_text(self, response_body: dict[str, Any]) -> str:
         output_text = response_body.get("output_text")
         if isinstance(output_text, str) and output_text.strip():
-            return self._parse_json_object(output_text)
+            return output_text
 
         for output_item in response_body.get("output", []):
             if not isinstance(output_item, dict):
@@ -335,7 +404,7 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                     continue
                 text = content_item.get("text")
                 if isinstance(text, str) and text.strip():
-                    return self._parse_json_object(text)
+                    return text
 
         raise OpenAIInvalidResponseError(
             "OpenAI response did not include structured output text."
@@ -426,6 +495,18 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             mint=self._optional_string(payload, "mint"),
             material=self._optional_string(payload, "material"),
             notes=self._optional_string(payload, "notes"),
+            fieldConfidence=self._parse_field_confidence(payload),
+            confidenceLevel=self._confidence_level(
+                payload.get("confidenceLevel"),
+                confidence,
+            ),
+            lowConfidenceReasons=self._parse_string_list(
+                payload.get("lowConfidenceReasons")
+            ),
+            imageQualityIssues=self._parse_string_list(payload.get("imageQualityIssues")),
+            scanRecommendations=self._parse_string_list(
+                payload.get("scanRecommendations")
+            ),
         )
 
     def _optional_string(self, payload: dict[str, Any], field: str) -> str | None:
@@ -483,6 +564,41 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
 
         return matches
 
+    def _parse_field_confidence(self, payload: dict[str, Any]) -> dict[str, int]:
+        raw_confidence = payload.get("fieldConfidence")
+        if not isinstance(raw_confidence, dict):
+            return {}
+
+        parsed: dict[str, int] = {}
+        for key, value in raw_confidence.items():
+            if not isinstance(key, str) or not key.strip():
+                continue
+            try:
+                parsed[key.strip()] = max(0, min(int(value), 100))
+            except (TypeError, ValueError):
+                raise OpenAIInvalidResponseError(
+                    "OpenAI fieldConfidence values must be integers from 0 to 100."
+                )
+        return parsed
+
+    def _confidence_level(self, value: Any, confidence: int) -> str:
+        if isinstance(value, str) and value in {"High", "Medium", "Low"}:
+            return value
+        if confidence >= 90:
+            return "High"
+        if confidence >= 70:
+            return "Medium"
+        return "Low"
+
+    def _parse_string_list(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise OpenAIInvalidResponseError(
+                "OpenAI list fields must be arrays of strings."
+            )
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
     def _media_type_for(self, image_path: Path) -> str:
         extension = image_path.suffix.lower()
         if extension in {".jpg", ".jpeg"}:
@@ -490,6 +606,19 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
         if extension == ".png":
             return "image/png"
         return "application/octet-stream"
+
+    def _prompt_from_payload(self, payload: dict[str, Any]) -> str:
+        try:
+            return payload["input"][0]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError):
+            return ""
+
+
+def _estimate_tokens(text: str) -> int:
+    normalized = text.strip()
+    if not normalized:
+        return 0
+    return max(1, len(normalized) // 4)
 
 
 # Product-facing provider alias used by the backend analyze endpoint roadmap.

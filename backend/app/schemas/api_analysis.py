@@ -82,6 +82,11 @@ class ApiAnalyzeResponse(BaseModel):
     comparableSales: list[ApiMarketCompResponse]
     imageUrl: str | None = None
     timestamp: str
+    fieldConfidence: dict[str, int] = Field(default_factory=dict)
+    confidenceLevel: str
+    lowConfidenceReasons: list[str] = Field(default_factory=list)
+    imageQualityIssues: list[str] = Field(default_factory=list)
+    scanRecommendations: list[str] = Field(default_factory=list)
 
 
 class ApiAnalyzeErrorResponse(BaseModel):
