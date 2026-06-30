@@ -9,15 +9,17 @@ safe default, local-first portfolio behavior is preserved, backend AI and eBay
 pricing are backend-only, and Android debug/release artifacts build
 successfully.
 
-Production readiness rating: **8 / 10 - internal beta ready, store-production
-blocked by manual real-device validation, real provider validation, and release
-signing finalization.**
+Production readiness rating: **7.5 / 10 - internal beta ready, store-production
+blocked by attached-device integration runner stability, manual real-device
+validation, real provider validation, and release signing finalization.**
 
 ## Automated Results
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| `dart format lib test` | Pass | 120 files checked; scanner timing file formatted. |
+| `scripts/run_master_qa.ps1 -SkipDeviceUi` | Pass | Master runner covers Flutter quality, backend quality, camera/gallery log capture, stress, and builds. |
+| `scripts/run_device_ui_tests.ps1 -DeviceId RZ8R213M8ZL` | Blocked | On Samsung SM E625F, Flutter built and installed the debug APK, then the host runner timed out waiting for test results. |
+| `dart format lib test integration_test` | Pass | 121 files checked. |
 | `flutter analyze` | Pass | No analyzer issues found. |
 | `flutter test` | Pass | 161 Flutter tests passing. |
 | `cd backend; py -m unittest discover tests` | Pass | 51 backend tests passing. |
@@ -25,6 +27,25 @@ signing finalization.**
 | `flutter build apk --debug` | Pass | Built `build/app/outputs/flutter-apk/app-debug.apk`. |
 | `flutter build apk --release` | Pass | Built `build/app/outputs/flutter-apk/app-release.apk` at 51.8 MB. |
 | `flutter build appbundle --release` | Pass | Built `build/app/outputs/bundle/release/app-release.aab` at 51.8 MB. |
+
+## Master QA Automation Suite
+
+Reports are generated under `build/test_reports/`.
+
+| Runner | Automation Level | Coverage |
+| --- | --- | --- |
+| `scripts/run_flutter_quality.ps1` | Fully automated | `dart format`, `flutter analyze`, `flutter test`. |
+| `scripts/run_backend_quality.ps1` | Fully automated | Backend unit tests, health endpoint, mock analyze endpoint, error responses, mocked OpenAI/eBay paths. |
+| `scripts/run_device_ui_tests.ps1` | Blocked on current attached device | Intended Android integration smoke for launch, Home, Scan fixture flow, Portfolio, Detail, Settings, usage limit. Current host/device runner times out after install. |
+| `scripts/run_camera_gallery_tests.ps1` | Semi-automated | ADB log capture for native camera/gallery picker testing. |
+| `scripts/run_persistence_tests.ps1` | Semi-automated | ADB force-stop by default; optional full device relaunch smoke with `-RunIntegrationAfterForceStop`. Real image relaunch validation remains manual. |
+| `scripts/run_stress_tests.ps1` | Semi-automated | Repeats Flutter quality and optionally device smoke to expose flakes. |
+| `scripts/run_android_builds.ps1` | Fully automated | Debug APK, release APK, release AAB. |
+
+Manual-only checks remain required for OEM camera/gallery picker permission
+dialogs, real camera/gallery image visual confirmation after force-stop,
+airplane-mode validation, production Supabase validation, real OpenAI/eBay
+provider validation, and store signing/release-console checks.
 
 ## Workflow Audit
 
@@ -237,6 +258,8 @@ No functional regressions were found by automated tests or build checks.
 
 ## Remaining Blockers
 
+- Fix or replace the attached-device Flutter integration runner path; current
+  Samsung SM E625F run times out after debug APK install.
 - Run final camera/gallery/save/restart/delete smoke test on a physical Android device.
 - Run real backend OpenAI validation with representative collectible images.
 - Run real eBay pricing validation with expected-price notes.

@@ -2,6 +2,59 @@
 
 A new Flutter project.
 
+## Master QA Automation
+
+CollectIQ AI includes a reusable local + attached Android device QA suite. The
+suite runs in mock/default mode and must not call paid OpenAI, eBay, or other
+external provider APIs.
+
+Run the full QA suite from the project root:
+
+```powershell
+scripts\run_master_qa.ps1 -DeviceId RZ8R213M8ZL
+```
+
+If the attached Android Flutter test runner is unavailable or timing out, run
+the stable local/build suite and keep native picker validation semi-automated:
+
+```powershell
+scripts\run_master_qa.ps1 -DeviceId RZ8R213M8ZL -SkipDeviceUi
+```
+
+Focused runners are also available:
+
+```powershell
+scripts\run_flutter_quality.ps1
+scripts\run_backend_quality.ps1
+scripts\run_device_ui_tests.ps1 -DeviceId RZ8R213M8ZL
+scripts\run_camera_gallery_tests.ps1 -DeviceId RZ8R213M8ZL
+scripts\run_persistence_tests.ps1 -DeviceId RZ8R213M8ZL
+scripts\run_stress_tests.ps1 -DeviceId RZ8R213M8ZL
+scripts\run_android_builds.ps1
+```
+
+All reports are written under:
+
+```text
+build/test_reports/
+```
+
+Coverage classification:
+
+- Fully automated: Flutter format/analyze/tests, backend tests,
+  Home/Scan/Portfolio/Detail/Settings widget flows, usage limit error, and
+  Android debug/release builds.
+- Attached-device automation: `run_device_ui_tests.ps1` runs the Flutter
+  integration smoke suite when the host/device runner is stable.
+- Semi-automated: native camera/gallery picker QA, ADB crash/log capture,
+  force-stop persistence smoke, and stress repetitions.
+- Manual-only: OEM permission dialog decisions, real camera/gallery image
+  visual confirmation, airplane-mode validation, real Supabase/provider
+  validation, and paid-provider validation.
+
+See `docs/REAL_DEVICE_TEST_AUTOMATION.md` and
+`docs/PRODUCTION_READINESS_AUDIT.md` for the full matrix and release checklist.
+
 ## Backend
 
 The local scanner backend is a FastAPI app in `backend/`.
