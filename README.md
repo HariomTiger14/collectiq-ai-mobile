@@ -560,17 +560,20 @@ Gemini keys, marketplace pricing keys, or upload keystore passwords to Flutter
 source. Mobile builds may receive only public Supabase anon configuration via
 `--dart-define`; privileged credentials must stay server-side.
 
-## Subscription and Usage Foundation
+## Subscription, Usage, and Google Play Billing
 
-Subscription support is foundation-only. There is no Stripe, Google Play Billing,
-Apple in-app purchase, or payment backend integration in this milestone.
+CollectIQ AI is still free/local-first by default. Google Play Billing is
+available as an Android MVP, but it is disabled unless explicitly configured for
+a build. There are no hardcoded billing secrets, and mock/local testing does not
+require a subscription.
 
-Current local plan behavior:
+Current plan behavior:
 
-- Free: active default plan.
-- Pro: placeholder, shown as coming soon.
-- Premium: placeholder, shown as coming soon.
-- Payment status: not configured.
+- Free: active default plan and development-safe scanner access.
+- Pro: Google Play product-backed entitlement when billing is enabled.
+- Premium: Google Play product-backed entitlement when billing is enabled.
+- Payment status: `Not configured` unless a billing-enabled build can reach
+  Google Play Billing.
 
 Usage tracking is local and development-safe by default. Successful scan analyses
 increment the local daily usage counter; failed analyses do not. The scanner
@@ -585,9 +588,54 @@ COLLECTIQ_DAILY_FREE_SCAN_LIMIT=25
 ```
 
 `COLLECTIQ_USAGE_UNLIMITED` defaults to `true` so normal local testing is not
-blocked. Future production monetisation can connect this layer to Google Play
-Billing, Stripe/customer portal logic, server-side entitlements, and real AI
-usage metering without changing the scan UI flow.
+blocked.
+
+### Google Play Billing MVP
+
+Billing is controlled by `--dart-define` values:
+
+```text
+COLLECTIQ_BILLING_ENABLED=false
+COLLECTIQ_PRO_PRODUCT_ID=collectiq_pro_monthly_test
+COLLECTIQ_PREMIUM_PRODUCT_ID=collectiq_premium_monthly_test
+```
+
+To test Google Play Billing with internal testing:
+
+1. Create subscription or managed product entries in Google Play Console.
+2. Use product ids that match the dart defines above, or pass your own ids:
+
+   ```powershell
+   flutter run `
+     --dart-define=COLLECTIQ_BILLING_ENABLED=true `
+     --dart-define=COLLECTIQ_PRO_PRODUCT_ID=your_pro_product_id `
+     --dart-define=COLLECTIQ_PREMIUM_PRODUCT_ID=your_premium_product_id
+   ```
+
+3. Upload a signed AAB to an internal testing track.
+4. Add tester accounts in Play Console.
+5. Install the app from the Play testing link, not from a sideloaded APK, when
+   validating real purchase flows.
+6. Use Google Play test cards/test purchase methods from a licensed tester
+   account.
+7. Open Settings -> Plan & Usage, load the available plans, purchase, cancel,
+   and restore.
+
+If billing is disabled, unavailable on the device, or products are not
+configured, Settings shows `Payments not configured` and the app continues on
+the Free/dev-safe entitlement.
+
+Release checklist before enabling paid products:
+
+- Product ids in Play Console match `COLLECTIQ_PRO_PRODUCT_ID` and
+  `COLLECTIQ_PREMIUM_PRODUCT_ID`.
+- Internal test purchases, pending purchases, cancelled purchases, failed
+  purchases, and restore purchases are verified.
+- Server-side receipt validation and durable account entitlements are planned
+  before relying on purchases across devices.
+- Free/local mode is still tested without billing defines.
+- No payment, Supabase, OpenAI, Gemini, eBay, or service-role secrets are stored
+  in Flutter source or committed files.
 
 ## Getting Started
 

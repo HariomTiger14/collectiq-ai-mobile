@@ -8,6 +8,7 @@ import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_c
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -192,23 +193,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _SettingsRow(
                         icon: Icons.payments_outlined,
                         title: 'Payment status',
-                        subtitle:
-                            'No Stripe or Google Play Billing integration yet.',
+                        subtitle: subscriptionState.isBillingAvailable
+                            ? 'Google Play Billing is available for this build.'
+                            : 'Payments are not configured for this build.',
                         trailing: subscriptionState.paymentStatusLabel,
                       ),
+                      if (subscriptionState.purchaseMessage != null)
+                        _SettingsRow(
+                          icon: Icons.receipt_long_outlined,
+                          title: 'Purchase status',
+                          subtitle: subscriptionState.purchaseMessage!,
+                          trailing:
+                              subscriptionState.entitlements.plan.displayName,
+                        ),
                       _SettingsRow(
                         icon: Icons.trending_up_outlined,
                         title: SubscriptionPlan.pro.displayName,
-                        subtitle:
-                            'Future paid plan for higher usage and cloud features.',
-                        trailing: SubscriptionPlan.pro.statusLabel,
+                        subtitle: _billingProductSubtitle(
+                          subscriptionState,
+                          SubscriptionPlan.pro,
+                        ),
+                        trailing:
+                            subscriptionState.entitlements.plan ==
+                                SubscriptionPlan.pro
+                            ? 'Active'
+                            : _billingProductTrailing(
+                                subscriptionState,
+                                SubscriptionPlan.pro,
+                              ),
                       ),
                       _SettingsRow(
                         icon: Icons.diamond_outlined,
                         title: SubscriptionPlan.premium.displayName,
-                        subtitle:
-                            'Future premium plan for advanced collector tools.',
-                        trailing: SubscriptionPlan.premium.statusLabel,
+                        subtitle: _billingProductSubtitle(
+                          subscriptionState,
+                          SubscriptionPlan.premium,
+                        ),
+                        trailing:
+                            subscriptionState.entitlements.plan ==
+                                SubscriptionPlan.premium
+                            ? 'Active'
+                            : _billingProductTrailing(
+                                subscriptionState,
+                                SubscriptionPlan.premium,
+                              ),
+                      ),
+                      _BillingActionsPanel(
+                        state: subscriptionState,
+                        onPurchasePro: () => ref
+                            .read(subscriptionControllerProvider.notifier)
+                            .purchasePlan(SubscriptionPlan.pro),
+                        onPurchasePremium: () => ref
+                            .read(subscriptionControllerProvider.notifier)
+                            .purchasePlan(SubscriptionPlan.premium),
+                        onRestore: () => ref
+                            .read(subscriptionControllerProvider.notifier)
+                            .restorePurchases(),
                       ),
                     ],
                   ),
@@ -661,6 +701,84 @@ class _AuthEmailPanel extends StatelessWidget {
   }
 }
 
+class _BillingActionsPanel extends StatelessWidget {
+  const _BillingActionsPanel({
+    required this.state,
+    required this.onPurchasePro,
+    required this.onPurchasePremium,
+    required this.onRestore,
+  });
+
+  final SubscriptionState state;
+  final VoidCallback onPurchasePro;
+  final VoidCallback onPurchasePremium;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final billingAvailable = state.isBillingAvailable;
+    final isLoading = state.isLoading;
+    final canBuyPro =
+        billingAvailable && _hasProduct(state, SubscriptionPlan.pro);
+    final canBuyPremium =
+        billingAvailable && _hasProduct(state, SubscriptionPlan.premium);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          billingAvailable
+              ? 'Upgrade with Google Play Billing.'
+              : 'Payments not configured. Free local mode remains active.',
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const ValueKey('settings-upgrade-pro-button'),
+            onPressed: isLoading || !canBuyPro ? null : onPurchasePro,
+            icon: const Icon(Icons.trending_up_outlined),
+            label: Text(
+              isLoading
+                  ? 'Working...'
+                  : _upgradeLabel(state, SubscriptionPlan.pro),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const ValueKey('settings-upgrade-premium-button'),
+            onPressed: isLoading || !canBuyPremium ? null : onPurchasePremium,
+            icon: const Icon(Icons.diamond_outlined),
+            label: Text(
+              isLoading
+                  ? 'Working...'
+                  : _upgradeLabel(state, SubscriptionPlan.premium),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('settings-restore-purchases-button'),
+            onPressed: isLoading || !billingAvailable ? null : onRestore,
+            icon: const Icon(Icons.restore_outlined),
+            label: const Text('Restore Purchases'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.title, required this.children});
 
@@ -797,6 +915,54 @@ String _providerOptionStatus({
   }
 
   return backendConfigured ? 'Backend set' : 'Coming soon';
+}
+
+String _billingProductSubtitle(SubscriptionState state, SubscriptionPlan plan) {
+  final product = _productForPlan(state, plan);
+  if (product != null) {
+    return '${product.title} - ${product.description}';
+  }
+
+  if (!state.isBillingAvailable) {
+    return 'Google Play Billing product placeholder. Configure Play Console to enable.';
+  }
+
+  return 'Product not found in Google Play. Check the configured product id.';
+}
+
+String _billingProductTrailing(SubscriptionState state, SubscriptionPlan plan) {
+  final product = _productForPlan(state, plan);
+  if (product != null) {
+    return product.price;
+  }
+
+  return state.isBillingAvailable ? 'Missing' : 'Unavailable';
+}
+
+String _upgradeLabel(SubscriptionState state, SubscriptionPlan plan) {
+  final product = _productForPlan(state, plan);
+  if (product == null) {
+    return 'Upgrade to ${plan.displayName}';
+  }
+
+  return 'Upgrade to ${plan.displayName} - ${product.price}';
+}
+
+bool _hasProduct(SubscriptionState state, SubscriptionPlan plan) {
+  return _productForPlan(state, plan) != null;
+}
+
+BillingProduct? _productForPlan(
+  SubscriptionState state,
+  SubscriptionPlan plan,
+) {
+  for (final product in state.products) {
+    if (product.plan == plan) {
+      return product;
+    }
+  }
+
+  return null;
 }
 
 Future<void> _manualSync(

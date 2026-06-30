@@ -337,7 +337,7 @@ void main() {
 
     expect(find.text('Current AI provider'), findsOneWidget);
     expect(find.text('OpenAI Vision'), findsWidgets);
-    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.text('Unavailable'), findsWidgets);
     expect(find.text('Coming soon'), findsWidgets);
     expect(
       find.text(

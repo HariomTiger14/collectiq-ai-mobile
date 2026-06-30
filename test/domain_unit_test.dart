@@ -60,6 +60,12 @@ import 'package:collectiq_ai/features/subscription/domain/entities/subscription_
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/usage_tracker.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/user_entitlements.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/billing_exception.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/purchase_result.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
+import 'package:collectiq_ai/features/subscription/domain/repositories/billing_repository.dart';
+import 'package:collectiq_ai/features/subscription/domain/repositories/entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
@@ -2246,6 +2252,185 @@ void main() {
       );
       expect(repository.count, 1);
     });
+
+    test('billing unavailable keeps payments unconfigured', () async {
+      final container = ProviderContainer(
+        overrides: [
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(
+            _MemoryEntitlementRepository(),
+          ),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(available: false),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(subscriptionControllerProvider.notifier).loadUsage();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.isBillingAvailable, isFalse);
+      expect(state.paymentStatusLabel, 'Not configured');
+      expect(state.entitlements.plan, SubscriptionPlan.free);
+    });
+
+    test('product load success exposes billing products', () async {
+      final container = ProviderContainer(
+        overrides: [
+          googlePlayBillingConfigProvider.overrideWithValue(
+            const GooglePlayBillingConfig(enabled: true),
+          ),
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(
+            _MemoryEntitlementRepository(),
+          ),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(
+              products: const [
+                BillingProduct(
+                  id: 'collectiq_pro_monthly_test',
+                  plan: SubscriptionPlan.pro,
+                  title: 'CollectIQ Pro',
+                  description: 'Higher scan limits',
+                  price: r'$4.99',
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(subscriptionControllerProvider.notifier).loadUsage();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.isBillingAvailable, isTrue);
+      expect(state.products.single.plan, SubscriptionPlan.pro);
+      expect(state.paymentStatusLabel, 'Configured');
+    });
+
+    test('product load failure reports friendly error', () async {
+      final container = ProviderContainer(
+        overrides: [
+          googlePlayBillingConfigProvider.overrideWithValue(
+            const GooglePlayBillingConfig(enabled: true),
+          ),
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(
+            _MemoryEntitlementRepository(),
+          ),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(
+              loadError: const BillingException('Products unavailable.'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(subscriptionControllerProvider.notifier).loadUsage();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.errorMessage, 'Products unavailable.');
+      expect(state.entitlements.plan, SubscriptionPlan.free);
+    });
+
+    test('purchase success updates entitlement', () async {
+      final entitlements = _MemoryEntitlementRepository();
+      final container = ProviderContainer(
+        overrides: [
+          googlePlayBillingConfigProvider.overrideWithValue(
+            const GooglePlayBillingConfig(enabled: true),
+          ),
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(entitlements),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(
+              purchaseResult: const PurchaseResult(
+                status: PurchaseResultStatus.success,
+                plan: SubscriptionPlan.pro,
+                message: 'Pro is active.',
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .purchasePlan(SubscriptionPlan.pro);
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.entitlements.plan, SubscriptionPlan.pro);
+      expect(state.purchaseMessage, 'Pro is active.');
+      expect(await entitlements.loadPlan(), SubscriptionPlan.pro);
+    });
+
+    test('restore purchase updates entitlement', () async {
+      final container = ProviderContainer(
+        overrides: [
+          googlePlayBillingConfigProvider.overrideWithValue(
+            const GooglePlayBillingConfig(enabled: true),
+          ),
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(
+            _MemoryEntitlementRepository(),
+          ),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(
+              restoreResult: const PurchaseResult(
+                status: PurchaseResultStatus.restored,
+                plan: SubscriptionPlan.premium,
+                message: 'Premium restored.',
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .restorePurchases();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.entitlements.plan, SubscriptionPlan.premium);
+      expect(state.usage.isUnlimited, isTrue);
+      expect(state.purchaseMessage, 'Premium restored.');
+    });
+
+    test('cancelled purchase does not upgrade entitlement', () async {
+      final container = ProviderContainer(
+        overrides: [
+          googlePlayBillingConfigProvider.overrideWithValue(
+            const GooglePlayBillingConfig(enabled: true),
+          ),
+          usageRepositoryProvider.overrideWithValue(_MemoryUsageRepository()),
+          entitlementRepositoryProvider.overrideWithValue(
+            _MemoryEntitlementRepository(),
+          ),
+          billingRepositoryProvider.overrideWithValue(
+            _FakeBillingRepository(
+              purchaseResult: const PurchaseResult(
+                status: PurchaseResultStatus.cancelled,
+                message: 'Purchase was cancelled.',
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .purchasePlan(SubscriptionPlan.pro);
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(state.entitlements.plan, SubscriptionPlan.free);
+      expect(state.purchaseMessage, 'Purchase was cancelled.');
+    });
   });
 
   group('MockCloudPortfolioRepository', () {
@@ -3565,6 +3750,66 @@ class _MemoryUsageRepository implements UsageRepository {
   @override
   Future<void> resetUsage() async {
     count = 0;
+  }
+}
+
+class _MemoryEntitlementRepository implements EntitlementRepository {
+  _MemoryEntitlementRepository();
+
+  SubscriptionPlan plan = SubscriptionPlan.free;
+
+  @override
+  Future<SubscriptionPlan> loadPlan() async {
+    return plan;
+  }
+
+  @override
+  Future<void> savePlan(SubscriptionPlan plan) async {
+    this.plan = plan;
+  }
+}
+
+class _FakeBillingRepository implements BillingRepository {
+  const _FakeBillingRepository({
+    this.available = true,
+    this.products = const [],
+    this.loadError,
+    this.purchaseResult = const PurchaseResult(
+      status: PurchaseResultStatus.failed,
+      message: 'Purchase failed.',
+    ),
+    this.restoreResult = const PurchaseResult(
+      status: PurchaseResultStatus.failed,
+      message: 'Restore failed.',
+    ),
+  });
+
+  final bool available;
+  final List<BillingProduct> products;
+  final Object? loadError;
+  final PurchaseResult purchaseResult;
+  final PurchaseResult restoreResult;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<List<BillingProduct>> loadProducts() async {
+    final error = loadError;
+    if (error != null) {
+      throw error;
+    }
+    return products;
+  }
+
+  @override
+  Future<PurchaseResult> purchase(SubscriptionPlan plan) async {
+    return purchaseResult;
+  }
+
+  @override
+  Future<PurchaseResult> restorePurchases() async {
+    return restoreResult;
   }
 }
 

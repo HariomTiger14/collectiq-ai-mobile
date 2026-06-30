@@ -23,4 +23,12 @@ enum SubscriptionPlan {
 
   /// Settings label for purchase state.
   String get statusLabel => isAvailable ? 'Active' : 'Coming soon';
+
+  /// Parses a stored plan name.
+  static SubscriptionPlan fromName(String? value) {
+    return SubscriptionPlan.values.firstWhere(
+      (plan) => plan.name == value,
+      orElse: () => SubscriptionPlan.free,
+    );
+  }
 }
