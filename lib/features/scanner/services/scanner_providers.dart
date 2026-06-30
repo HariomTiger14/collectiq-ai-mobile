@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_provider_factory.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_pricing_provider_factory.dart';
 import 'package:collectiq_ai/features/market/domain/repositories/market_provider.dart';
@@ -44,5 +45,6 @@ final scanResultEnrichmentServiceProvider =
     Provider<ScanResultEnrichmentService>((ref) {
       return ScanResultEnrichmentService(
         marketPricingProvider: ref.watch(marketPricingProviderProvider),
+        telemetryService: ref.watch(appTelemetryServiceProvider),
       );
     });

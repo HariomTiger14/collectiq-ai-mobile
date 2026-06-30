@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_usage_repository.dart';
@@ -182,6 +185,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
   late final BillingRepository _billingRepository;
   late final UsageLimitConfig _usageConfig;
   late final GooglePlayBillingConfig _billingConfig;
+  late final AppTelemetryService _telemetry;
 
   @override
   SubscriptionState build() {
@@ -190,6 +194,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     _billingRepository = ref.watch(billingRepositoryProvider);
     _usageConfig = ref.watch(usageLimitConfigProvider);
     _billingConfig = ref.watch(googlePlayBillingConfigProvider);
+    _telemetry = ref.watch(appTelemetryServiceProvider);
     final entitlements = ref.watch(userEntitlementsProvider);
     Future.microtask(() async {
       if (!ref.mounted) {
@@ -296,10 +301,19 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       clearErrorMessage: true,
       clearPurchaseMessage: true,
     );
+    _trackTelemetry(
+      TelemetryEventNames.subscriptionPurchaseStarted,
+      properties: {'plan': plan.name},
+    );
     try {
       final result = await _billingRepository.purchase(plan);
       await _applyPurchaseResult(result);
     } on BillingException catch (error) {
+      _recordTelemetryError(
+        error,
+        reason: 'billing_failure',
+        properties: {'plan': plan.name},
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: error.message,
@@ -307,6 +321,11 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       );
     } on Object catch (error) {
       debugPrint('[Subscription] purchase failed: $error');
+      _recordTelemetryError(
+        error,
+        reason: 'billing_failure',
+        properties: {'plan': plan.name},
+      );
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Purchase failed. Please try again.',
@@ -359,6 +378,10 @@ class SubscriptionController extends Notifier<SubscriptionState> {
         isLoading: false,
         purchaseMessage: result.message,
       );
+      _trackTelemetry(
+        TelemetryEventNames.subscriptionPurchaseSuccess,
+        properties: {'plan': plan.name, 'source': result.status.name},
+      );
       return;
     }
 
@@ -375,6 +398,27 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     final hour = resetAt.hour.toString().padLeft(2, '0');
     final minute = resetAt.minute.toString().padLeft(2, '0');
     return 'at $hour:$minute tomorrow';
+  }
+
+  void _trackTelemetry(
+    String eventName, {
+    Map<String, Object?> properties = const {},
+  }) {
+    unawaited(_telemetry.trackEvent(eventName, properties: properties));
+  }
+
+  void _recordTelemetryError(
+    Object error, {
+    String? reason,
+    Map<String, Object?> properties = const {},
+  }) {
+    unawaited(
+      _telemetry.recordNonFatalError(
+        error,
+        reason: reason,
+        properties: properties,
+      ),
+    );
   }
 }
 

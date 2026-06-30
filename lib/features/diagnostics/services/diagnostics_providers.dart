@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/entities/provider_diagnostics.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -62,5 +63,6 @@ final providerDiagnosticsProvider = Provider<ProviderDiagnostics>((ref) {
         aiConfig: ref.watch(aiAnalysisProviderConfigProvider),
         pricingProviderType: ref.watch(marketPricingProviderTypeProvider),
         lastScanPipelineStatus: ref.watch(scanPipelineStatusProvider),
+        telemetryStatus: ref.watch(telemetryStatusProvider),
       );
 });

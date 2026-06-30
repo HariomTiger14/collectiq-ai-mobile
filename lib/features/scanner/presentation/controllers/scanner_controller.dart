@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -134,6 +135,8 @@ class ScannerController extends Notifier<ScannerState> {
 
   /// Scan enrichment service dependency.
   late final ScanResultEnrichmentService _enrichmentService;
+
+  late final AppTelemetryService _telemetry;
   bool _isDisposed = false;
   bool _isPickerActive = false;
   bool _isRecoveringLostData = false;
@@ -149,6 +152,7 @@ class ScannerController extends Notifier<ScannerState> {
     _galleryService = ref.watch(galleryServiceProvider);
     _aiAnalysisProvider = ref.watch(aiAnalysisProviderProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
+    _telemetry = ref.watch(appTelemetryServiceProvider);
     ref.onDispose(() {
       _isDisposed = true;
     });
@@ -265,6 +269,10 @@ class ScannerController extends Notifier<ScannerState> {
   /// Opens the camera capture page and stores the captured image path.
   Future<void> startCameraScan(BuildContext context) async {
     _logFlow('camera button tapped');
+    _trackTelemetry(
+      TelemetryEventNames.scanStarted,
+      properties: const {'source': 'camera'},
+    );
     if (_isPickerActive) {
       debugPrint('[Scanner] camera picker request ignored; picker active');
       _logFlow('camera picker ignored active');
@@ -352,9 +360,18 @@ class ScannerController extends Notifier<ScannerState> {
         ),
         event: 'selected image state emitted',
       );
+      _trackTelemetry(
+        TelemetryEventNames.imageSelected,
+        properties: const {'source': 'camera'},
+      );
     } on ScannerException catch (error) {
       debugPrint('[Scanner] camera picker scanner error: ${error.code}');
       _logFlow('camera picker scanner error', error: error);
+      _recordTelemetryError(
+        error,
+        reason: 'scan_error',
+        properties: {'source': 'camera', 'code': error.code},
+      );
       _setState(
         state.copyWith(
           errorMessage: error.message,
@@ -373,6 +390,12 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint('[Scanner] camera picker failed: $error');
       debugPrint('$stackTrace');
       _logFlow('camera picker failed', error: error, stackTrace: stackTrace);
+      _recordTelemetryError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'scan_error',
+        properties: const {'source': 'camera'},
+      );
       _setState(
         state.copyWith(
           isPreparingImage: false,
@@ -409,6 +432,10 @@ class ScannerController extends Notifier<ScannerState> {
   /// Opens the gallery and stores a validated selected image.
   Future<void> pickImageFromGallery() async {
     _logFlow('gallery button tapped');
+    _trackTelemetry(
+      TelemetryEventNames.scanStarted,
+      properties: const {'source': 'gallery'},
+    );
     if (_isPickerActive) {
       debugPrint('[Scanner] gallery picker request ignored; picker active');
       _logFlow('gallery picker ignored active');
@@ -499,10 +526,19 @@ class ScannerController extends Notifier<ScannerState> {
         ),
         event: 'selected image state emitted',
       );
+      _trackTelemetry(
+        TelemetryEventNames.imageSelected,
+        properties: const {'source': 'gallery'},
+      );
       unawaited(_logPersistentGalleryDiagnostics(selectedImagePath));
     } on ScannerException catch (error) {
       debugPrint('[Scanner] gallery picker scanner error: ${error.code}');
       _logFlow('gallery picker scanner error', error: error);
+      _recordTelemetryError(
+        error,
+        reason: 'scan_error',
+        properties: {'source': 'gallery', 'code': error.code},
+      );
       _setState(
         state.copyWith(
           errorMessage: error.message,
@@ -520,6 +556,12 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint('[Scanner] gallery picker failed: $error');
       debugPrint('$stackTrace');
       _logFlow('gallery picker failed', error: error, stackTrace: stackTrace);
+      _recordTelemetryError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'scan_error',
+        properties: const {'source': 'gallery'},
+      );
       _setState(
         state.copyWith(
           isPreparingImage: false,
@@ -643,6 +685,10 @@ class ScannerController extends Notifier<ScannerState> {
     debugPrint('[Scanner] analyze start');
     final scanToResultStopwatch = Stopwatch()..start();
     _logFlow('analyze tapped');
+    _trackTelemetry(
+      TelemetryEventNames.analyzeStarted,
+      properties: {'source': _imageSourceFor(state.selectedImagePath ?? '')},
+    );
     final selectedImagePath = state.selectedImagePath;
     if (selectedImagePath == null) {
       return;
@@ -655,6 +701,11 @@ class ScannerController extends Notifier<ScannerState> {
           .ensureCanAnalyze();
     } on SubscriptionException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();
+      _trackTelemetry(
+        TelemetryEventNames.analyzeFailed,
+        properties: const {'reason': 'usage_limit'},
+      );
+      _recordTelemetryError(error, reason: 'scan_error');
       _setState(
         state.copyWith(
           errorMessage: error.message,
@@ -668,6 +719,10 @@ class ScannerController extends Notifier<ScannerState> {
 
     final validationError = await _validateSelectedImagePath(selectedImagePath);
     if (validationError != null) {
+      _trackTelemetry(
+        TelemetryEventNames.analyzeFailed,
+        properties: const {'reason': 'invalid_image'},
+      );
       _setState(
         state.copyWith(
           errorMessage: validationError,
@@ -728,12 +783,24 @@ class ScannerController extends Notifier<ScannerState> {
           .recordSuccessfulAnalysis();
       ref.read(scanPipelineStatusProvider.notifier).markCompleted();
       scanToResultStopwatch.stop();
+      _trackTelemetry(
+        TelemetryEventNames.analyzeSuccess,
+        properties: {
+          'source': _imageSourceFor(selectedImagePath),
+          'latency_ms': scanToResultStopwatch.elapsedMilliseconds,
+        },
+      );
       debugPrint(
         '[Scanner] scan-to-result latencyMs='
         '${scanToResultStopwatch.elapsedMilliseconds}',
       );
     } on AiAnalysisException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();
+      _trackTelemetry(
+        TelemetryEventNames.analyzeFailed,
+        properties: const {'reason': 'ai_provider'},
+      );
+      _recordTelemetryError(error, reason: 'scan_error');
       _setState(
         state.copyWith(
           errorMessage: error.message,
@@ -744,6 +811,18 @@ class ScannerController extends Notifier<ScannerState> {
       );
     } on NetworkException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();
+      _trackTelemetry(
+        TelemetryEventNames.analyzeFailed,
+        properties: {
+          'reason': 'backend_unavailable',
+          'status': error.statusCode,
+        },
+      );
+      _recordTelemetryError(
+        error,
+        reason: 'backend_unavailable',
+        properties: {'status': error.statusCode},
+      );
       _setState(
         state.copyWith(
           errorMessage: _messageForNetworkError(error),
@@ -756,6 +835,15 @@ class ScannerController extends Notifier<ScannerState> {
       ref.read(scanPipelineStatusProvider.notifier).markError();
       debugPrint('[Scanner] analysis failed: $error');
       debugPrint('$stackTrace');
+      _trackTelemetry(
+        TelemetryEventNames.analyzeFailed,
+        properties: const {'reason': 'unexpected'},
+      );
+      _recordTelemetryError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'scan_error',
+      );
       _setState(
         state.copyWith(
           errorMessage: 'Something went wrong. Please try again.',
@@ -847,6 +935,13 @@ class ScannerController extends Notifier<ScannerState> {
     );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
     _logFlow('portfolio updated', details: {'itemId': item.id});
+    _trackTelemetry(
+      TelemetryEventNames.saveToPortfolio,
+      properties: {
+        'category': item.category,
+        'source': _imageSourceFor(item.imagePath),
+      },
+    );
     await ref
         .read(imageSyncControllerProvider.notifier)
         .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
@@ -1022,6 +1117,29 @@ class ScannerController extends Notifier<ScannerState> {
     }
 
     return 'local';
+  }
+
+  void _trackTelemetry(
+    String eventName, {
+    Map<String, Object?> properties = const {},
+  }) {
+    unawaited(_telemetry.trackEvent(eventName, properties: properties));
+  }
+
+  void _recordTelemetryError(
+    Object error, {
+    StackTrace? stackTrace,
+    String? reason,
+    Map<String, Object?> properties = const {},
+  }) {
+    unawaited(
+      _telemetry.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: reason,
+        properties: properties,
+      ),
+    );
   }
 }
 

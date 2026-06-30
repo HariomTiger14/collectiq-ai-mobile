@@ -408,6 +408,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle: 'AI -> Pricing -> Result',
                         trailing: diagnostics.lastScanPipelineStatus,
                       ),
+                      _SettingsRow(
+                        icon: Icons.monitor_heart_outlined,
+                        title: 'Telemetry',
+                        subtitle:
+                            'Privacy-safe beta diagnostics. No images, paths, emails, API keys, or personal content.',
+                        trailing: diagnostics.telemetryStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.bug_report_outlined,
+                        title: 'Crash Reporting',
+                        subtitle:
+                            'Non-fatal errors are reported only when telemetry is configured.',
+                        trailing: diagnostics.crashReportingStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.analytics_outlined,
+                        title: 'Analytics',
+                        subtitle:
+                            'Basic app flow events only. Sensitive fields are redacted.',
+                        trailing: diagnostics.analyticsStatus,
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),

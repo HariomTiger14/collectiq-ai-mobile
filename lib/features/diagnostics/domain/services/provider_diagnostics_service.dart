@@ -2,6 +2,7 @@ import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validat
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/entities/provider_diagnostics.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_pricing_provider_factory.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 
 /// Builds developer-safe diagnostics from provider configuration.
 class ProviderDiagnosticsService {
@@ -13,6 +14,13 @@ class ProviderDiagnosticsService {
     required AiAnalysisProviderConfig aiConfig,
     required MarketPricingProviderType pricingProviderType,
     required String lastScanPipelineStatus,
+    TelemetryStatus telemetryStatus = const TelemetryStatus(
+      provider: 'Noop',
+      enabled: false,
+      crashReportingEnabled: false,
+      analyticsEnabled: false,
+      message: 'Telemetry disabled.',
+    ),
     bool isReleaseMode = false,
   }) {
     final endpointReadiness = const AiBackendEndpointReadinessChecker().check(
@@ -40,6 +48,10 @@ class ProviderDiagnosticsService {
       mockModeActive: mockModeActive ? 'Active' : 'Not configured',
       lastScanPipelineStatus: lastScanPipelineStatus,
       appMode: mockModeActive ? 'development/mock' : 'development',
+      telemetryStatus:
+          '${telemetryStatus.provider}: ${telemetryStatus.enabledLabel}',
+      crashReportingStatus: telemetryStatus.crashReportingLabel,
+      analyticsStatus: telemetryStatus.analyticsLabel,
     );
   }
 

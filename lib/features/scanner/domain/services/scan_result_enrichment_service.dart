@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_pricing_request.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
@@ -23,10 +24,15 @@ class ScanResultEnrichmentMetadata {
 /// Combines AI analysis output with market-pricing data before presentation.
 class ScanResultEnrichmentService {
   /// Creates a scan-result enrichment service.
-  const ScanResultEnrichmentService({required this.marketPricingProvider});
+  const ScanResultEnrichmentService({
+    required this.marketPricingProvider,
+    this.telemetryService = const NoopTelemetryService(),
+  });
 
   /// Future market-pricing provider dependency.
   final MarketPricingProvider marketPricingProvider;
+
+  final AppTelemetryService telemetryService;
 
   /// Returns an enriched scan result while preserving user-safe fallbacks.
   Future<AiAnalysisResult> enrich({
@@ -63,7 +69,13 @@ class ScanResultEnrichmentService {
           marketSummary: pricing.toMarketSummary(),
         ),
       );
-    } on Object {
+    } on Object catch (error, stackTrace) {
+      await telemetryService.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'pricing_provider_fallback',
+        properties: {'category': result.category},
+      );
       return AiAnalysisResult(
         recommendation: analysis.recommendation,
         scanResult: _copyResult(

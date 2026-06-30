@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_service.dart';
@@ -65,10 +66,12 @@ class SyncControllerState {
 /// Coordinates placeholder cloud sync state.
 class SyncController extends Notifier<SyncControllerState> {
   late final SyncService _syncService;
+  late final AppTelemetryService _telemetry;
 
   @override
   SyncControllerState build() {
     _syncService = ref.watch(syncServiceProvider);
+    _telemetry = ref.watch(appTelemetryServiceProvider);
     Future.microtask(loadStatus);
     return const SyncControllerState();
   }
@@ -97,11 +100,39 @@ class SyncController extends Notifier<SyncControllerState> {
   /// Placeholder upload action for future cloud backup.
   Future<void> uploadLocalItems(List<CollectibleItem> items) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    _trackTelemetry(
+      TelemetryEventNames.syncStarted,
+      properties: {
+        'operation': 'upload_local_items',
+        'item_count': items.length,
+      },
+    );
     try {
       final status = await _syncService.syncLocalItems(items);
+      _trackTelemetry(
+        TelemetryEventNames.syncSuccess,
+        properties: {
+          'operation': 'upload_local_items',
+          'state': status.state.name,
+          'pending_count': status.pendingItemCount,
+          'failed_count': status.failedItemCount,
+        },
+      );
       state = state.copyWith(status: status, isLoading: false);
     } on Object catch (error) {
       debugPrint('[Sync] upload local items failed: $error');
+      _trackTelemetry(
+        TelemetryEventNames.syncFailed,
+        properties: {
+          'operation': 'upload_local_items',
+          'item_count': items.length,
+        },
+      );
+      _recordTelemetryError(
+        error,
+        reason: 'cloud_sync_failure',
+        properties: {'operation': 'upload_local_items'},
+      );
       state = state.copyWith(
         status: SyncStatus(
           state: SyncState.failed,
@@ -118,13 +149,34 @@ class SyncController extends Notifier<SyncControllerState> {
 
   Future<List<CollectibleItem>> downloadCloudItems() async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    _trackTelemetry(
+      TelemetryEventNames.syncStarted,
+      properties: const {'operation': 'download_cloud_items'},
+    );
     try {
       final items = await _syncService.downloadCloudItems();
       final status = await _syncService.currentStatus();
+      _trackTelemetry(
+        TelemetryEventNames.syncSuccess,
+        properties: {
+          'operation': 'download_cloud_items',
+          'item_count': items.length,
+          'state': status.state.name,
+        },
+      );
       state = state.copyWith(status: status, isLoading: false);
       return items;
     } on Object catch (error) {
       debugPrint('[Sync] download cloud items failed: $error');
+      _trackTelemetry(
+        TelemetryEventNames.syncFailed,
+        properties: const {'operation': 'download_cloud_items'},
+      );
+      _recordTelemetryError(
+        error,
+        reason: 'cloud_sync_failure',
+        properties: const {'operation': 'download_cloud_items'},
+      );
       state = state.copyWith(
         status: SyncStatus(
           state: SyncState.failed,
@@ -141,6 +193,18 @@ class SyncController extends Notifier<SyncControllerState> {
 
   void markManualSyncFailed(Object error, {int pendingItemCount = 0}) {
     debugPrint('[Sync] manual sync failed: $error');
+    _trackTelemetry(
+      TelemetryEventNames.syncFailed,
+      properties: {
+        'operation': 'manual_sync',
+        'pending_count': pendingItemCount,
+      },
+    );
+    _recordTelemetryError(
+      error,
+      reason: 'cloud_sync_failure',
+      properties: const {'operation': 'manual_sync'},
+    );
     state = state.copyWith(
       status: SyncStatus(
         state: SyncState.failed,
@@ -151,6 +215,25 @@ class SyncController extends Notifier<SyncControllerState> {
       ),
       isLoading: false,
       errorMessage: error.toString(),
+    );
+  }
+
+  void _trackTelemetry(
+    String eventName, {
+    Map<String, Object?> properties = const {},
+  }) {
+    _telemetry.trackEvent(eventName, properties: properties);
+  }
+
+  void _recordTelemetryError(
+    Object error, {
+    String? reason,
+    Map<String, Object?> properties = const {},
+  }) {
+    _telemetry.recordNonFatalError(
+      error,
+      reason: reason,
+      properties: properties,
     );
   }
 }

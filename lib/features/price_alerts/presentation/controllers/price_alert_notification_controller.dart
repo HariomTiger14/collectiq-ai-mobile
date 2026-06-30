@@ -4,6 +4,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_n
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_notification_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_dispatcher.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_service.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final priceAlertNotificationRepositoryProvider =
@@ -21,6 +22,7 @@ final priceAlertNotificationDispatcherProvider =
       return PriceAlertNotificationDispatcher(
         ref.watch(priceAlertNotificationRepositoryProvider),
         ref.watch(priceAlertNotificationServiceProvider),
+        ref.watch(appTelemetryServiceProvider),
       );
     });
 

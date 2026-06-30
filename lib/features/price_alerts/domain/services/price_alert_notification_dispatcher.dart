@@ -2,13 +2,19 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.d
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_notification_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_service.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:flutter/foundation.dart';
 
 class PriceAlertNotificationDispatcher {
-  const PriceAlertNotificationDispatcher(this._repository, this._service);
+  const PriceAlertNotificationDispatcher(
+    this._repository,
+    this._service,
+    this._telemetry,
+  );
 
   final PriceAlertNotificationRepository _repository;
   final PriceAlertNotificationService _service;
+  final AppTelemetryService _telemetry;
 
   Future<PriceAlertNotificationResult> dispatchTriggeredAlerts(
     List<PriceAlertEvaluation> evaluations,
@@ -22,6 +28,10 @@ class PriceAlertNotificationDispatcher {
         message: 'No triggered price alerts.',
       );
     }
+    _trackTelemetry(
+      TelemetryEventNames.priceAlertTriggered,
+      properties: {'triggered_count': triggered.length},
+    );
 
     final preferences = await _repository.getPreferences();
     if (!preferences.enabled) {
@@ -106,6 +116,13 @@ class PriceAlertNotificationDispatcher {
       'delivered=${result.deliveredCount}',
     );
     return result;
+  }
+
+  void _trackTelemetry(
+    String eventName, {
+    Map<String, Object?> properties = const {},
+  }) {
+    _telemetry.trackEvent(eventName, properties: properties);
   }
 }
 

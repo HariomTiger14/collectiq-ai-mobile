@@ -1,5 +1,7 @@
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'dart:async';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_screen.dart';
@@ -41,6 +43,19 @@ class _AppShellState extends ConsumerState<AppShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        ref
+            .read(appTelemetryServiceProvider)
+            .trackEvent(
+              TelemetryEventNames.appOpen,
+              properties: const {'surface': 'app_shell'},
+            ),
+      );
+    });
   }
 
   @override

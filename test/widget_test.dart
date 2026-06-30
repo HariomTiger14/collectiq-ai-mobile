@@ -388,6 +388,9 @@ void main() {
     expect(find.text('AI Backend Client'), findsOneWidget);
     expect(find.text('Mock Mode Active'), findsOneWidget);
     expect(find.text('Last Scan Pipeline'), findsOneWidget);
+    expect(find.text('Telemetry'), findsOneWidget);
+    expect(find.text('Crash Reporting'), findsOneWidget);
+    expect(find.text('Analytics'), findsOneWidget);
     expect(find.text('Not configured'), findsWidgets);
 
     await tester.ensureVisible(find.text('Cloud Sync'));

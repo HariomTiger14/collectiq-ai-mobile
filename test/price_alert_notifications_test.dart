@@ -5,6 +5,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_n
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_service.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,7 +22,11 @@ void main() {
       final service = _FakeNotificationService(
         permissionStatus: PriceAlertNotificationPermissionStatus.granted,
       );
-      final dispatcher = PriceAlertNotificationDispatcher(repository, service);
+      final dispatcher = PriceAlertNotificationDispatcher(
+        repository,
+        service,
+        const NoopTelemetryService(),
+      );
 
       final result = await dispatcher.dispatchTriggeredAlerts([
         _triggeredEvaluation(),
@@ -40,7 +45,11 @@ void main() {
       final service = _FakeNotificationService(
         permissionStatus: PriceAlertNotificationPermissionStatus.denied,
       );
-      final dispatcher = PriceAlertNotificationDispatcher(repository, service);
+      final dispatcher = PriceAlertNotificationDispatcher(
+        repository,
+        service,
+        const NoopTelemetryService(),
+      );
 
       final result = await dispatcher.dispatchTriggeredAlerts([
         _triggeredEvaluation(),
@@ -59,7 +68,11 @@ void main() {
       final service = _FakeNotificationService(
         permissionStatus: PriceAlertNotificationPermissionStatus.granted,
       );
-      final dispatcher = PriceAlertNotificationDispatcher(repository, service);
+      final dispatcher = PriceAlertNotificationDispatcher(
+        repository,
+        service,
+        const NoopTelemetryService(),
+      );
       final evaluation = _triggeredEvaluation();
 
       final first = await dispatcher.dispatchTriggeredAlerts([evaluation]);

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
+import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +12,29 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
 void main() {
   _disableReleaseDebugLogs();
   _configureAndroidImagePicker();
-  runApp(const ProviderScope(child: CollectIqApp()));
+  final bootstrapTelemetry = createAppTelemetryService(
+    TelemetryConfig.fromEnvironment(),
+  );
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(
+      bootstrapTelemetry.recordNonFatalError(
+        details.exception,
+        stackTrace: details.stack,
+        reason: 'flutter_error',
+      ),
+    );
+  };
+  runZonedGuarded(
+    () => runApp(const ProviderScope(child: CollectIqApp())),
+    (error, stackTrace) => unawaited(
+      bootstrapTelemetry.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'uncaught_zone_error',
+      ),
+    ),
+  );
 }
 
 void _disableReleaseDebugLogs() {

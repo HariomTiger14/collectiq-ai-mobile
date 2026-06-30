@@ -14,6 +14,9 @@ class ProviderDiagnostics {
     required this.mockModeActive,
     required this.lastScanPipelineStatus,
     required this.appMode,
+    required this.telemetryStatus,
+    required this.crashReportingStatus,
+    required this.analyticsStatus,
   });
 
   /// Human-readable active AI provider name.
@@ -54,4 +57,13 @@ class ProviderDiagnostics {
 
   /// Current app mode label for developer diagnostics.
   final String appMode;
+
+  /// Safe telemetry provider/status label.
+  final String telemetryStatus;
+
+  /// Crash reporting enabled/disabled label.
+  final String crashReportingStatus;
+
+  /// Analytics enabled/disabled label.
+  final String analyticsStatus;
 }

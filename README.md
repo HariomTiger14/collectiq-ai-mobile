@@ -742,3 +742,54 @@ Future backend push work:
   enabled.
 - Keep push notification credentials server-side.
 - Continue using local alerts as the offline/local-first fallback.
+
+## Crash Reporting + Analytics MVP
+
+CollectIQ AI now has a privacy-safe telemetry abstraction for beta testing:
+
+- `AppTelemetryService`: shared app-facing interface.
+- `AnalyticsReporter`: records app flow events.
+- `CrashReporter`: records non-fatal errors.
+- `NoopTelemetryService`: default implementation. It performs no external
+  calls and keeps local/offline mode unchanged.
+- Firebase and Sentry are represented as config-driven placeholders until their
+  SDKs and project secrets are added intentionally.
+
+Telemetry is disabled by default. To test placeholder status labels locally:
+
+```powershell
+flutter run `
+  --dart-define=COLLECTIQ_TELEMETRY_ENABLED=true `
+  --dart-define=COLLECTIQ_TELEMETRY_PROVIDER=sentry `
+  --dart-define=COLLECTIQ_SENTRY_DSN=placeholder-local-only
+```
+
+Do not commit real DSNs, Firebase config files, analytics write keys, API keys,
+or crash reporting secrets.
+
+Privacy-safe event policy:
+
+- Allowed: coarse workflow events such as `app_open`, `scan_started`,
+  `image_selected`, `analyze_started`, `analyze_success`, `analyze_failed`,
+  `save_to_portfolio`, `price_alert_triggered`,
+  `subscription_purchase_started`, `subscription_purchase_success`,
+  `sync_started`, `sync_failed`, and `sync_success`.
+- Allowed properties: source labels, category labels, counts, status labels,
+  and latency values.
+- Never track: image paths, image bytes, filenames, emails, API keys, access
+  tokens, backend URLs, payment identifiers, prompts, notes, titles, or other
+  personal collectible content.
+- Sanitization removes sensitive keys and redacts values that look like paths,
+  URLs, emails, or long secrets.
+
+Settings -> Developer Diagnostics shows:
+
+- Telemetry provider/status.
+- Crash reporting enabled/disabled.
+- Analytics enabled/disabled.
+
+Future Firebase/Sentry setup:
+
+- Add the SDK only when a production project is ready.
+- Keep secrets in platform config or CI/CD secrets, not source code.
+- Preserve `NoopTelemetryService` as the offline/local fallback.
