@@ -1,7 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The INTERNET permission is required for development. Specifically,
+    <!-- The INTERNET permission is declared in the main manifest.
+
+         The Flutter tool also needs it in profile/dev workflows to communicate
+         with the running application for profiling and service extensions.
+         Keeping this comment here documents why profile builds are networked.
+
          the Flutter tool needs it to communicate with the running application
          to allow setting breakpoints, to provide hot reload, etc.
     -->
-    <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

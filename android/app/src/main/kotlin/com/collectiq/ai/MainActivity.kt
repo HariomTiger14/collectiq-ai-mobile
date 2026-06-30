@@ -1,4 +1,4 @@
-package com.example.collectiq_ai
+package com.collectiq.ai
 
 import io.flutter.embedding.android.FlutterActivity
 

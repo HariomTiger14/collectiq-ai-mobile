@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.collectiq_ai"
+    namespace = "com.collectiq.ai"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,21 +15,34 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.collectiq_ai"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.collectiq.ai"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("releaseUpload") {
+            val storeFilePath = System.getenv("COLLECTIQ_UPLOAD_KEYSTORE")
+            if (!storeFilePath.isNullOrBlank()) {
+                storeFile = file(storeFilePath)
+                storePassword = System.getenv("COLLECTIQ_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("COLLECTIQ_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("COLLECTIQ_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            val hasUploadKeystore =
+                !System.getenv("COLLECTIQ_UPLOAD_KEYSTORE").isNullOrBlank()
+            signingConfig = if (hasUploadKeystore) {
+                signingConfigs.getByName("releaseUpload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

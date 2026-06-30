@@ -339,3 +339,61 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Android Release Checklist
+
+Release readiness items now covered in the Android shell:
+
+- App label is `CollectIQ AI` through `android/app/src/main/res/values/strings.xml`.
+- A placeholder adaptive launcher icon is provided for Android 8+ while the
+  final brand icon is pending.
+- Splash background and splash mark use CollectIQ colors instead of the default
+  white Flutter launch screen.
+- Main manifest permissions are limited to `INTERNET` and `CAMERA`.
+- Android Photo Picker is used for gallery selection, so no broad media storage
+  permission is required for Android 13+ gallery uploads.
+- Cleartext HTTP traffic is enabled only in the debug manifest for local backend
+  testing.
+- Release builds suppress noisy `debugPrint` output with `kReleaseMode`.
+- Release signing can use environment variables without committing secrets:
+
+```powershell
+$env:COLLECTIQ_UPLOAD_KEYSTORE="C:\path\to\upload-keystore.jks"
+$env:COLLECTIQ_UPLOAD_STORE_PASSWORD="store-password"
+$env:COLLECTIQ_UPLOAD_KEY_ALIAS="upload"
+$env:COLLECTIQ_UPLOAD_KEY_PASSWORD="key-password"
+```
+
+If these values are absent, the local release APK build falls back to the debug
+signing key for verification only. Do not ship a Play Store release signed with
+the debug key.
+
+Before distributing a build, run:
+
+```powershell
+dart format lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+flutter build apk --release
+flutter build appbundle --release
+```
+
+`flutter build appbundle --release` requires a complete Android SDK command-line
+tools installation. If Flutter reports that it cannot check or strip native
+debug symbols, install Android SDK Command-line Tools in Android Studio and run:
+
+```powershell
+flutter doctor --android-licenses
+```
+
+Manual release checks:
+
+- Launch on a physical Android device.
+- Confirm camera capture, gallery selection, analyze, save, portfolio, and
+  detail navigation still work.
+- Confirm Android back navigation works on Android 13+.
+- Confirm Supabase/backend dart defines are supplied only for environments that
+  need them.
+- Replace the placeholder launcher icon with final store artwork before public
+  release.
