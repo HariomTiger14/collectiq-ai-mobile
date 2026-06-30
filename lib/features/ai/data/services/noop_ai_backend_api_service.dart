@@ -40,6 +40,10 @@ class NoopAiBackendApiService implements AiBackendApiService {
         throw AiBackendClientException.networkUnavailable();
       case AiBackendClientErrorType.timeout:
         throw AiBackendClientException.timeout();
+      case AiBackendClientErrorType.invalidEndpoint:
+        throw AiBackendClientException.invalidEndpoint(
+          'Backend AI endpoint is not valid for this build.',
+        );
       case AiBackendClientErrorType.invalidResponse:
         throw AiBackendClientException.invalidResponse();
       case AiBackendClientErrorType.invalidImagePayload:

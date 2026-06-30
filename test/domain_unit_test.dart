@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:collectiq_ai/features/ai/data/clients/http_ai_backend_client.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_ids.dart';
 import 'package:collectiq_ai/core/supabase/supabase_schema.dart';
@@ -17,10 +20,12 @@ import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portf
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
+import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_image_upload_payload.dart';
 import 'package:collectiq_ai/features/ai/data/providers/mock_ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/data/providers/open_ai_vision_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/data/services/dio_ai_backend_api_service.dart';
 import 'package:collectiq_ai/features/ai/data/services/noop_ai_backend_api_service.dart';
 import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
@@ -55,6 +60,7 @@ import 'package:collectiq_ai/features/subscription/presentation/controllers/subs
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -344,6 +350,10 @@ void main() {
       expect(diagnostics.aiProviderStatus, 'Mock');
       expect(diagnostics.pricingProvider, 'Mock Pricing');
       expect(diagnostics.pricingProviderStatus, 'Mock');
+      expect(diagnostics.backendEndpointConfigured, 'Not configured');
+      expect(diagnostics.backendEndpointValid, 'Invalid');
+      expect(diagnostics.backendEndpointReleaseSafe, 'No');
+      expect(diagnostics.httpBackendClientStatus, 'Disabled (mock)');
       expect(diagnostics.mockModeActive, 'Active');
       expect(diagnostics.appMode, 'development/mock');
     });
@@ -361,6 +371,75 @@ void main() {
       expect(diagnostics.aiProviderStatus, 'Coming soon');
       expect(diagnostics.backendEndpointConfigured, 'Not configured');
       expect(diagnostics.aiBackendClientStatus, 'Not configured');
+      expect(diagnostics.httpBackendClientStatus, 'Not configured');
+    });
+
+    test('valid backend endpoint reports ready diagnostics', () {
+      final diagnostics = const ProviderDiagnosticsService().build(
+        aiConfig: const AiAnalysisProviderConfig(
+          type: AiAnalysisProviderType.openAiVision,
+          backendAnalysisEndpointUrl: 'https://api.collectiq.test/ai/analyze',
+        ),
+        pricingProviderType: MarketPricingProviderType.mock,
+        lastScanPipelineStatus: 'Ready',
+        isReleaseMode: true,
+      );
+
+      expect(diagnostics.backendEndpointConfigured, 'Ready');
+      expect(diagnostics.backendEndpointValid, 'Valid');
+      expect(diagnostics.backendEndpointReleaseSafe, 'Yes');
+      expect(diagnostics.aiBackendClientStatus, 'Ready');
+      expect(diagnostics.httpBackendClientStatus, 'HTTP ready');
+    });
+  });
+
+  group('AiBackendEndpointReadiness', () {
+    test('missing endpoint reports not configured', () {
+      final readiness = const AiBackendEndpointReadinessChecker().check(
+        endpointUrl: '',
+      );
+
+      expect(readiness.isConfigured, isFalse);
+      expect(readiness.isValid, isFalse);
+      expect(readiness.configuredLabel, 'Not configured');
+    });
+
+    test('invalid URL reports invalid', () {
+      final readiness = const AiBackendEndpointReadinessChecker().check(
+        endpointUrl: 'not a url',
+      );
+
+      expect(readiness.isConfigured, isTrue);
+      expect(readiness.isValid, isFalse);
+      expect(readiness.validityLabel, 'Invalid');
+    });
+
+    test('valid HTTPS endpoint passes release safety', () {
+      final readiness = const AiBackendEndpointReadinessChecker().check(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        isReleaseMode: true,
+      );
+
+      expect(readiness.isConfigured, isTrue);
+      expect(readiness.isValid, isTrue);
+      expect(readiness.isReleaseSafe, isTrue);
+      expect(readiness.releaseSafeLabel, 'Yes');
+    });
+
+    test('HTTP endpoint is allowed only in debug local mode', () {
+      final debugReadiness = const AiBackendEndpointReadinessChecker().check(
+        endpointUrl: 'http://192.168.0.81:8000/ai/analyze',
+      );
+      final releaseReadiness = const AiBackendEndpointReadinessChecker().check(
+        endpointUrl: 'http://192.168.0.81:8000/ai/analyze',
+        isReleaseMode: true,
+      );
+
+      expect(debugReadiness.isValid, isTrue);
+      expect(debugReadiness.isReleaseSafe, isTrue);
+      expect(releaseReadiness.isValid, isTrue);
+      expect(releaseReadiness.isReleaseSafe, isFalse);
+      expect(releaseReadiness.releaseSafeLabel, 'No');
     });
   });
 
@@ -819,6 +898,38 @@ void main() {
       });
     });
 
+    test('valid request payload passes validation', () {
+      final request = AiBackendAnalysisRequest(
+        imagePath: '/local/path/card.jpg',
+        imageSource: 'gallery',
+        timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+      );
+
+      final result = const AiBackendContractValidator().validateRequest(
+        request,
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.statusLabel, 'Valid');
+    });
+
+    test('invalid request payload reports required field issues', () {
+      final request = AiBackendAnalysisRequest(
+        imagePath: '',
+        imageSource: '',
+        timestamp: DateTime.parse('1970-01-01T00:00:00Z'),
+      );
+
+      final result = const AiBackendContractValidator().validateRequest(
+        request,
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.issues, contains('imagePath is required.'));
+      expect(result.issues, contains('imageSource is required.'));
+      expect(result.statusLabel, 'Invalid');
+    });
+
     test('response parses backend analysis fields safely', () {
       final response = AiBackendAnalysisResponse.fromJson(
         _backendAnalysisJson(),
@@ -837,6 +948,27 @@ void main() {
       expect(response.alternatives, hasLength(1));
       expect(response.marketSummary, isNotNull);
       expect(response.comparableSales, hasLength(1));
+    });
+
+    test('valid response payload passes contract validation', () {
+      final result = const AiBackendContractValidator().validateResponsePayload(
+        _backendAnalysisJson(),
+      );
+
+      expect(result.isValid, isTrue);
+    });
+
+    test('response payload validation reports missing required fields', () {
+      final result = const AiBackendContractValidator().validateResponsePayload(
+        {'confidence': 'not-a-number'},
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.issues, contains('itemName is required.'));
+      expect(result.issues, contains('category is required.'));
+      expect(result.issues, contains('estimatedValue is required.'));
+      expect(result.issues, contains('condition is required.'));
+      expect(result.issues, contains('recommendation is required.'));
     });
 
     test('mapper converts backend response to scan result', () {
@@ -892,6 +1024,12 @@ void main() {
       expect(result.pricing.estimatedMarketValue, 0);
       expect(result.alternativeMatches.single.title, 'Unknown alternative');
       expect(result.alternativeMatches.single.confidence, 0.73);
+
+      final validation = const AiBackendContractValidator().validateResponse(
+        response,
+      );
+      expect(validation.isValid, isFalse);
+      expect(validation.issues, contains('itemName is missing or defaulted.'));
     });
 
     test('backend error parses safe defaults', () {
@@ -1163,6 +1301,172 @@ void main() {
       );
 
       expect(response.itemName, '1999 Pokemon Charizard Holo');
+    });
+  });
+
+  group('DioAiBackendApiService', () {
+    test('successful backend response maps through OpenAI provider', () async {
+      final adapter = _FakeDioAdapter(
+        responseData: {'result': _backendAnalysisJson()},
+      );
+      final service = DioAiBackendApiService(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+      final provider = OpenAiVisionAnalysisProvider(
+        backendClient: HttpAiBackendClient(
+          endpointUrl: 'https://api.collectiq.test/ai/analyze',
+          apiService: service,
+        ),
+      );
+
+      final result = await provider.analyze(
+        AiAnalysisRequest(
+          imagePath: _fixturePath('image.jpg'),
+          metadata: const {'imageSource': 'gallery'},
+        ),
+      );
+
+      expect(result.scanResult.title, '1999 Pokemon Charizard Holo');
+      expect(result.scanResult.category, 'Trading Card');
+      expect(result.scanResult.estimatedValue, 1850);
+      expect(result.scanResult.confidence, 0.94);
+      expect(adapter.calls, 1);
+      expect(adapter.lastPath, 'https://api.collectiq.test/ai/analyze');
+      expect(adapter.lastPayload?['request'], isA<Map>());
+      expect(adapter.lastPayload?['image'], isA<Map>());
+    });
+
+    test('timeout maps to friendly error', () async {
+      final service = DioAiBackendApiService(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        dio: Dio()
+          ..httpClientAdapter = _FakeDioAdapter(
+            dioExceptionType: DioExceptionType.receiveTimeout,
+          ),
+      );
+      final client = HttpAiBackendClient(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        apiService: service,
+      );
+
+      await expectLater(
+        client.analyze(_backendFileRequest()),
+        throwsA(
+          isA<AiBackendClientException>().having(
+            (error) => error.type,
+            'type',
+            AiBackendClientErrorType.timeout,
+          ),
+        ),
+      );
+    });
+
+    test('500 response maps to backend error', () async {
+      final service = DioAiBackendApiService(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        dio: Dio()
+          ..httpClientAdapter = _FakeDioAdapter(
+            statusCode: 500,
+            responseData: {
+              'error': {
+                'code': 'provider_down',
+                'message': 'Backend provider unavailable.',
+                'retryable': true,
+              },
+            },
+          ),
+      );
+      final client = HttpAiBackendClient(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        apiService: service,
+      );
+
+      await expectLater(
+        client.analyze(_backendFileRequest()),
+        throwsA(
+          isA<AiBackendClientException>()
+              .having(
+                (error) => error.type,
+                'type',
+                AiBackendClientErrorType.backendError,
+              )
+              .having((error) => error.statusCode, 'statusCode', 500)
+              .having(
+                (error) => error.message,
+                'message',
+                'Backend provider unavailable.',
+              ),
+        ),
+      );
+    });
+
+    test('malformed JSON is handled safely', () async {
+      final service = DioAiBackendApiService(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        dio: Dio()
+          ..httpClientAdapter = _FakeDioAdapter(rawResponseBody: 'not json'),
+      );
+      final client = HttpAiBackendClient(
+        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        apiService: service,
+      );
+
+      await expectLater(
+        client.analyze(_backendFileRequest()),
+        throwsA(
+          isA<AiBackendClientException>().having(
+            (error) => error.type,
+            'type',
+            AiBackendClientErrorType.malformedJson,
+          ),
+        ),
+      );
+    });
+
+    test('invalid endpoint blocks request before transport', () async {
+      final adapter = _FakeDioAdapter(
+        responseData: {'result': _backendAnalysisJson()},
+      );
+      final service = DioAiBackendApiService(
+        endpointUrl: 'not a url',
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+      final client = HttpAiBackendClient(
+        endpointUrl: 'not a url',
+        apiService: service,
+      );
+
+      await expectLater(
+        client.analyze(_backendFileRequest()),
+        throwsA(
+          isA<AiBackendClientException>().having(
+            (error) => error.type,
+            'type',
+            AiBackendClientErrorType.invalidEndpoint,
+          ),
+        ),
+      );
+      expect(adapter.calls, 0);
+    });
+
+    test('mock provider still makes no network call', () async {
+      final adapter = _FakeDioAdapter(
+        responseData: {'result': _backendAnalysisJson()},
+      );
+      final provider = MockAiAnalysisProvider(
+        recognitionRepository: _StaticRecognitionRepository(
+          _testRecognitionResult(),
+        ),
+        marketProvider: const MockMarketProvider(),
+      );
+
+      final result = await provider.analyze(
+        AiAnalysisRequest(imagePath: _fixturePath('image.jpg')),
+      );
+
+      expect(result.scanResult.title, '1999 Pokemon Charizard');
+      expect(adapter.calls, 0);
     });
   });
 
@@ -2158,6 +2462,14 @@ AiBackendAnalysisRequest _backendRequest() {
   );
 }
 
+AiBackendAnalysisRequest _backendFileRequest() {
+  return AiBackendAnalysisRequest(
+    imagePath: _fixturePath('image.jpg'),
+    imageSource: 'camera',
+    timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+  );
+}
+
 RecognitionResult _testRecognitionResult() {
   return RecognitionResult(
     success: true,
@@ -2244,6 +2556,58 @@ class _SuccessfulAiBackendClient implements AiBackendClient {
     lastRequest = request;
     return response;
   }
+}
+
+class _FakeDioAdapter implements HttpClientAdapter {
+  _FakeDioAdapter({
+    this.statusCode = 200,
+    this.responseData,
+    this.rawResponseBody,
+    this.dioExceptionType,
+  });
+
+  final int statusCode;
+  final Object? responseData;
+  final String? rawResponseBody;
+  final DioExceptionType? dioExceptionType;
+
+  int calls = 0;
+  String? lastPath;
+  Map<String, dynamic>? lastPayload;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    calls += 1;
+    lastPath = options.path;
+    final data = options.data;
+    if (data is Map<String, dynamic>) {
+      lastPayload = data;
+    }
+
+    final exceptionType = dioExceptionType;
+    if (exceptionType != null) {
+      throw DioException(
+        requestOptions: options,
+        type: exceptionType,
+        message: 'Simulated Dio failure',
+      );
+    }
+
+    return ResponseBody.fromString(
+      rawResponseBody ?? jsonEncode(responseData ?? _backendAnalysisJson()),
+      statusCode,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 class _StaticRecognitionRepository implements RecognitionRepository {

@@ -178,6 +178,72 @@ When a real client is added later, it should call only
 any transport/backend failure to `AiBackendClientException` so the scanner can
 continue showing friendly offline-safe errors.
 
+### Backend AI Integration Checklist
+
+Before enabling real backend analysis, verify:
+
+- `AI_BACKEND_ANALYSIS_ENDPOINT_URL` is configured.
+- The endpoint URL parses as valid `http` or `https`.
+- Release builds use HTTPS only.
+- Local HTTP endpoints such as `localhost`, `127.0.0.1`, `10.0.2.2`,
+  `192.168.x.x`, `10.x.x.x`, or `172.16-31.x.x` are used only for debug/local
+  testing.
+- Flutter sends no OpenAI, Gemini, pricing, marketplace, service-role, or other
+  privileged secrets.
+- `AiBackendAnalysisRequest` passes validation before transport.
+- Backend responses include required fields: item name, category, estimated
+  value, confidence, condition, and recommendation.
+- Optional fields use safe defaults so malformed or partial backend responses do
+  not crash scanner, portfolio, or detail UI.
+
+Contract validation helpers now cover:
+
+```text
+AiBackendContractValidator.validateRequest(...)
+AiBackendContractValidator.validateResponsePayload(...)
+AiBackendContractValidator.validateResponse(...)
+AiBackendEndpointReadinessChecker.check(...)
+```
+
+Settings -> Developer Diagnostics shows whether the endpoint is configured,
+valid, and release-safe. These checks do not call the network and do not enable
+paid AI usage.
+
+### Backend HTTP Client Disabled by Default
+
+The app now includes a Dio-backed `DioAiBackendApiService` plus
+`HttpAiBackendClient` for future server-side AI analysis. This path remains
+disabled while `AI_ANALYSIS_PROVIDER=mock`, so normal development, tests, and
+offline usage make no backend AI network calls.
+
+To exercise the future HTTP client against a trusted CollectIQ backend/proxy,
+run with:
+
+```bash
+flutter run \
+  --dart-define=AI_ANALYSIS_PROVIDER=openai_vision \
+  --dart-define=AI_BACKEND_ANALYSIS_ENDPOINT_URL=https://your-backend.example/scanner/analyze
+```
+
+For debug-only local backend testing, a local HTTP endpoint such as
+`http://10.0.2.2:8000/ai/analyze` or `http://192.168.x.x:8000/ai/analyze` is
+allowed. Release builds must use HTTPS. If the endpoint is missing, invalid, or
+not release-safe, the HTTP client blocks the request before transport and the
+scanner shows a friendly inline error.
+
+The HTTP service maps backend failures safely:
+
+- timeout -> retry-friendly timeout message
+- network unavailable -> offline/network message
+- non-200 response -> structured backend error
+- malformed JSON -> readable response error
+- invalid contract response -> invalid response error
+
+The request body contains the validated `AiBackendAnalysisRequest` plus
+`AiImageUploadPayload` metadata. It still targets only the CollectIQ backend; no
+OpenAI, Gemini, pricing, marketplace, service-role, or other privileged keys are
+stored in Flutter.
+
 ### Future Image Upload Payload
 
 Before a future backend request is sent, Flutter prepares validated image

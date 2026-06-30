@@ -236,6 +236,9 @@ void main() {
     expect(find.text('Pricing Provider'), findsOneWidget);
     expect(find.text('Mock Pricing'), findsOneWidget);
     expect(find.text('Backend Endpoint Configured'), findsOneWidget);
+    expect(find.text('Backend Endpoint Valid'), findsOneWidget);
+    expect(find.text('Release Safe Endpoint'), findsOneWidget);
+    expect(find.text('HTTP Backend Client'), findsOneWidget);
     expect(find.text('AI Backend Client'), findsOneWidget);
     expect(find.text('Mock Mode Active'), findsOneWidget);
     expect(find.text('Last Scan Pipeline'), findsOneWidget);

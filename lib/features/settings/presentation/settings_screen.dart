@@ -265,9 +265,22 @@ class SettingsScreen extends ConsumerWidget {
                       _SettingsRow(
                         icon: Icons.link_outlined,
                         title: 'Backend Endpoint Configured',
-                        subtitle:
-                            'Future backend AI endpoint used by paid providers.',
+                        subtitle: diagnostics.backendEndpointMessage,
                         trailing: diagnostics.backendEndpointConfigured,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.verified_outlined,
+                        title: 'Backend Endpoint Valid',
+                        subtitle:
+                            'URL validation only. No network request is made.',
+                        trailing: diagnostics.backendEndpointValid,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.security_outlined,
+                        title: 'Release Safe Endpoint',
+                        subtitle:
+                            'Release builds must use the CollectIQ AI backend over HTTPS.',
+                        trailing: diagnostics.backendEndpointReleaseSafe,
                       ),
                       _SettingsRow(
                         icon: Icons.cloud_sync_outlined,
@@ -275,6 +288,13 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle:
                             'No network calls run until the backend service is enabled.',
                         trailing: diagnostics.aiBackendClientStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.http_outlined,
+                        title: 'HTTP Backend Client',
+                        subtitle:
+                            'Dio transport is enabled only for a configured backend provider.',
+                        trailing: diagnostics.httpBackendClientStatus,
                       ),
                       _SettingsRow(
                         icon: Icons.developer_mode_outlined,

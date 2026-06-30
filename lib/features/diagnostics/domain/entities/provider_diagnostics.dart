@@ -6,7 +6,11 @@ class ProviderDiagnostics {
     required this.pricingProvider,
     required this.pricingProviderStatus,
     required this.backendEndpointConfigured,
+    required this.backendEndpointValid,
+    required this.backendEndpointReleaseSafe,
+    required this.backendEndpointMessage,
     required this.aiBackendClientStatus,
+    required this.httpBackendClientStatus,
     required this.mockModeActive,
     required this.lastScanPipelineStatus,
     required this.appMode,
@@ -27,8 +31,20 @@ class ProviderDiagnostics {
   /// Whether the future backend AI endpoint is configured.
   final String backendEndpointConfigured;
 
+  /// Whether the future backend AI endpoint URL is valid.
+  final String backendEndpointValid;
+
+  /// Whether the future backend AI endpoint is safe for release builds.
+  final String backendEndpointReleaseSafe;
+
+  /// Developer-safe backend endpoint message.
+  final String backendEndpointMessage;
+
   /// Safe status label for the backend AI client skeleton.
   final String aiBackendClientStatus;
+
+  /// Safe status label for the Dio-backed HTTP backend client.
+  final String httpBackendClientStatus;
 
   /// Whether local mock mode is currently active.
   final String mockModeActive;

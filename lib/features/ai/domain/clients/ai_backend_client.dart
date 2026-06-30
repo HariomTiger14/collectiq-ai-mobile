@@ -5,6 +5,7 @@ enum AiBackendClientErrorType {
   endpointMissing,
   networkUnavailable,
   timeout,
+  invalidEndpoint,
   invalidResponse,
   invalidImagePayload,
   backendError,
@@ -49,11 +50,24 @@ class AiBackendClientException implements Exception {
     );
   }
 
+  /// Backend endpoint is configured but cannot be used safely.
+  factory AiBackendClientException.invalidEndpoint(String message) {
+    return AiBackendClientException(
+      type: AiBackendClientErrorType.invalidEndpoint,
+      message: message,
+    );
+  }
+
   /// Backend returned a response the app cannot use.
-  factory AiBackendClientException.invalidResponse() {
-    return const AiBackendClientException(
+  factory AiBackendClientException.invalidResponse({
+    String message =
+        'AI analysis returned an invalid response. Please try again.',
+    Map<String, dynamic> details = const {},
+  }) {
+    return AiBackendClientException(
       type: AiBackendClientErrorType.invalidResponse,
-      message: 'AI analysis returned an invalid response. Please try again.',
+      message: message,
+      details: details,
     );
   }
 
