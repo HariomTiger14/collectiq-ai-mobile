@@ -71,6 +71,9 @@ TCGPLAYER_CLIENT_ID=
 TCGPLAYER_CLIENT_SECRET=
 TCGPLAYER_API_BASE=https://api.tcgplayer.com
 TCGPLAYER_TIMEOUT_SECONDS=10
+PRICECHARTING_API_KEY=
+PRICECHARTING_API_BASE=https://www.pricecharting.com
+PRICECHARTING_TIMEOUT_SECONDS=10
 PRICING_CACHE_TTL_SECONDS=900
 PRICING_PROVIDER_MIN_INTERVAL_MS=250
 ```
@@ -118,9 +121,10 @@ Pricing selection:
 - `PRICING_PROVIDER=mock`: default deterministic pricing and comparable sales.
 - `PRICING_PROVIDER=ebay`: backend-only eBay Browse API provider.
 - `PRICING_PROVIDER=tcgplayer`: backend-only TCGPlayer card pricing provider.
-- `PRICING_PROVIDER=pricecharting`: backend-only placeholder for guide pricing.
-- `PRICING_PROVIDER=aggregate`: blends available eBay and TCGPlayer provider
-  data, with mock fallback when live providers fail.
+- `PRICING_PROVIDER=pricecharting`: backend-only PriceCharting guide pricing
+  provider.
+- `PRICING_PROVIDER=aggregate`: blends available eBay, TCGPlayer, and
+  PriceCharting provider data, with mock fallback when live providers fail.
 
 The eBay provider requires `EBAY_ACCESS_TOKEN` in backend `.env`. If the token
 is missing, expired, rate-limited, or the provider fails, the aggregation service
@@ -129,7 +133,8 @@ response contract, and no third-party pricing API is called from the mobile app.
 The TCGPlayer provider requires `TCGPLAYER_CLIENT_ID` and
 `TCGPLAYER_CLIENT_SECRET` in backend `.env`. OAuth tokens are requested and
 refreshed server-side only. Flutter never receives TCGPlayer credentials or
-tokens. PriceCharting remains a safe backend placeholder for a later sprint.
+tokens. The PriceCharting provider requires `PRICECHARTING_API_KEY` in backend
+`.env` and normalizes guide prices into the existing Flutter pricing contract.
 
 When OpenAI is enabled, the backend sends the image to OpenAI's Responses API
 with a strict structured-output schema. The prompt asks for collectible
@@ -230,7 +235,8 @@ The pricing layer contains:
 - `EbayPricingProvider`: backend-only eBay Browse API integration.
 - `TCGPlayerPricingProvider`: backend-only TCGPlayer OAuth/search/pricing
   integration for trading-card market prices.
-- `PriceChartingPricingProvider`: placeholder for historical guide pricing.
+- `PriceChartingPricingProvider`: backend-only PriceCharting guide pricing
+  integration.
 - `PricingAggregationService`: normalizes comparable sales, removes obvious
   outliers, calculates estimated value/range/confidence/trend, and falls back
   safely when providers are unavailable.
@@ -376,6 +382,17 @@ For TCGPlayer specifically:
 - valid product/pricing responses are normalized into comparable sales and the
   existing Flutter market summary fields.
 
+For PriceCharting specifically:
+
+- `PRICECHARTING_API_KEY` missing or invalid config -> fallback to mock.
+- HTTP 401/403 -> authorization error -> fallback to mock.
+- HTTP 404 or empty product/price rows -> empty market data -> fallback.
+- HTTP 429 -> rate-limit error -> fallback to mock.
+- network timeout -> timeout error -> fallback to mock.
+- malformed pricing data -> fallback to mock.
+- valid guide-price responses are normalized into comparable sales and the
+  existing Flutter market summary fields.
+
 ### Pricing Diagnostics
 
 Debug logs include provider count, response time, fallback usage, cache status,
@@ -453,18 +470,39 @@ year, then requests product pricing rows and normalizes them into
 `PricingResult` and `MarketComparableSale`. Keep credentials in `backend/.env`
 only. Do not pass them to Flutter, `--dart-define`, app storage, or source code.
 
+### Enabling PriceCharting Pricing Locally
+
+Keep `PRICING_PROVIDER=mock` for normal development. To test PriceCharting from
+the backend only:
+
+```text
+PRICING_PROVIDER=pricecharting
+PRICECHARTING_API_KEY=your-server-side-pricecharting-key
+PRICECHARTING_API_BASE=https://www.pricecharting.com
+PRICECHARTING_TIMEOUT_SECONDS=10
+PRICING_CACHE_TTL_SECONDS=900
+PRICING_PROVIDER_MIN_INTERVAL_MS=250
+```
+
+The provider searches PriceCharting products using name, set, card number,
+brand, and year, then normalizes guide-price fields such as loose, complete,
+new, and graded prices into `PricingResult` and `MarketComparableSale`. Keep the
+API key in `backend/.env` only. Do not pass it to Flutter, `--dart-define`, app
+storage, or source code.
+
 ### Aggregate Pricing Mode
 
-`PRICING_PROVIDER=aggregate` calls the configured eBay and TCGPlayer providers,
-normalizes comparable sales, removes obvious outliers, and calculates market
-value/range/confidence/trend from the blended result. If every live provider is
-unavailable, timed out, rate-limited, or empty, the pipeline falls back to
-`MockPricingProvider` and returns diagnostics with `fallbackUsed=true`.
+`PRICING_PROVIDER=aggregate` calls the configured eBay, TCGPlayer, and
+PriceCharting providers, normalizes comparable sales, removes obvious outliers,
+and calculates market value/range/confidence/trend from the blended result. If
+every live provider is unavailable, timed out, rate-limited, or empty, the
+pipeline falls back to `MockPricingProvider` and returns diagnostics with
+`fallbackUsed=true`.
 
 ## Real AI + Live Pricing Validation Workflow
 
 Real provider validation is manual/local only. Automated tests mock provider
-responses and must not call OpenAI, eBay, or TCGPlayer.
+responses and must not call OpenAI, eBay, TCGPlayer, or PriceCharting.
 
 1. Start mock baseline mode:
 
@@ -490,6 +528,7 @@ $env:PRICING_PROVIDER="aggregate"
 $env:EBAY_ACCESS_TOKEN="your-server-side-ebay-token"
 $env:TCGPLAYER_CLIENT_ID="your-server-side-tcgplayer-client-id"
 $env:TCGPLAYER_CLIENT_SECRET="your-server-side-tcgplayer-client-secret"
+$env:PRICECHARTING_API_KEY="your-server-side-pricecharting-key"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -502,8 +541,9 @@ and alternatives. The `/api/analyze` response includes a backend-only
 `diagnostics` object for local validation. Flutter ignores unknown fields and
 the core response contract remains unchanged.
 
-Cost warning: OpenAI, eBay, and TCGPlayer provider calls may consume paid quota
-or rate-limited API access. Keep mock mode for normal development and CI.
+Cost warning: OpenAI, eBay, TCGPlayer, and PriceCharting provider calls may
+consume paid quota or rate-limited API access. Keep mock mode for normal
+development and CI.
 
 ## Public Dataset Validation Lab
 

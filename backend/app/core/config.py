@@ -39,6 +39,14 @@ class Settings:
     tcgplayer_timeout_seconds: float = float(
         os.getenv("TCGPLAYER_TIMEOUT_SECONDS", "10")
     )
+    pricecharting_api_key: str = os.getenv("PRICECHARTING_API_KEY", "")
+    pricecharting_api_base: str = os.getenv(
+        "PRICECHARTING_API_BASE",
+        "https://www.pricecharting.com",
+    )
+    pricecharting_timeout_seconds: float = float(
+        os.getenv("PRICECHARTING_TIMEOUT_SECONDS", "10")
+    )
     pricing_cache_ttl_seconds: int = int(os.getenv("PRICING_CACHE_TTL_SECONDS", "900"))
     pricing_provider_min_interval_ms: int = int(
         os.getenv("PRICING_PROVIDER_MIN_INTERVAL_MS", "250")

@@ -16,7 +16,3 @@ class _FuturePricingProvider(PricingProvider):
             "Keep PRICING_PROVIDER=mock until backend credentials and API mapping are ready."
         )
 
-
-class PriceChartingPricingProvider(_FuturePricingProvider):
-    provider_name = "pricecharting"
-    provider_label = "PriceCharting pricing"
