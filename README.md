@@ -268,6 +268,53 @@ CollectIQ AI is local-first by default. Supabase is optional infrastructure for
 future account and cloud sync features; do not put real Supabase secrets in
 source control.
 
+### Auth and cloud roadmap
+
+The mobile app now uses an auth abstraction rather than depending directly on
+Supabase from UI code:
+
+```text
+AuthRepository
+-> AuthController/AuthState
+-> Settings and future account screens
+```
+
+Current provider modes:
+
+- Local Anonymous: default device-only identity. The app is fully usable.
+- Supabase Anonymous: enabled only when Supabase dart defines are configured.
+- Email / Password: placeholder for future account screens.
+- Google Sign-In: placeholder; no OAuth client secrets are bundled.
+- Apple Sign-In: placeholder; no OAuth secrets are bundled.
+
+`AuthException` is the safe error type for auth-provider failures. Auth failures
+must never block local scan, analyze, save, portfolio, search, sort, detail, or
+delete flows.
+
+Cloud sync is also local-first:
+
+```text
+Save collectible locally
+-> Queue image/cloud work when configured
+-> Report sync state in Settings
+-> Never block local portfolio persistence
+```
+
+If cloud sync fails, the local portfolio remains the source of truth and Settings
+shows a recoverable sync status.
+
+Background image sync uses a persisted queue with these production states:
+
+- Pending: local image is waiting for upload.
+- Syncing: upload is currently running.
+- Synced: cloud image metadata was saved back to the local portfolio item.
+- Retryable: a temporary failure is waiting for backoff before another attempt.
+- Failed: retry attempts are exhausted or user attention is needed.
+
+Retries use exponential backoff. Local scan, analyze, save, portfolio, search,
+sort, detail, and delete flows must continue even when queue processing,
+Supabase Storage, or cloud record upload fails.
+
 ### Create a Supabase project
 
 1. Create a project at <https://supabase.com>.
@@ -311,20 +358,56 @@ flutter run `
   --dart-define=SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-Without these values, the app continues in guest/local-first mode and stores the
+Without these values, the app continues in Local Anonymous mode and stores the
 portfolio locally.
 
 ### Auth test plan
 
 Use `docs/supabase_auth_test_plan.md` to validate:
 
-- guest mode
+- local anonymous mode
 - anonymous sign-in
 - email/password sign-in
 - sign out
 
 Authentication is foundation-only right now. The app must not require login to
 scan, save, view, search, sort, or delete local portfolio items.
+
+### Secret handling
+
+Never commit Supabase service-role keys, OAuth client secrets, OpenAI keys,
+Gemini keys, marketplace pricing keys, or upload keystore passwords to Flutter
+source. Mobile builds may receive only public Supabase anon configuration via
+`--dart-define`; privileged credentials must stay server-side.
+
+## Subscription and Usage Foundation
+
+Subscription support is foundation-only. There is no Stripe, Google Play Billing,
+Apple in-app purchase, or payment backend integration in this milestone.
+
+Current local plan behavior:
+
+- Free: active default plan.
+- Pro: placeholder, shown as coming soon.
+- Premium: placeholder, shown as coming soon.
+- Payment status: not configured.
+
+Usage tracking is local and development-safe by default. Successful scan analyses
+increment the local daily usage counter; failed analyses do not. The scanner
+checks usage before analysis and shows a friendly inline error if a configured
+limit is reached.
+
+Development config:
+
+```text
+COLLECTIQ_USAGE_UNLIMITED=true
+COLLECTIQ_DAILY_FREE_SCAN_LIMIT=25
+```
+
+`COLLECTIQ_USAGE_UNLIMITED` defaults to `true` so normal local testing is not
+blocked. Future production monetisation can connect this layer to Google Play
+Billing, Stripe/customer portal logic, server-side entitlements, and real AI
+usage metering without changing the scan UI flow.
 
 ## Getting Started
 

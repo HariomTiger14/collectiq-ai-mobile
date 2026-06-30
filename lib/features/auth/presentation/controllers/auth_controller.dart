@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,7 @@ class AuthState {
   /// Creates auth state.
   const AuthState({this.user, this.isLoading = false, this.errorMessage});
 
-  /// Current signed-in user, null in local-first guest mode.
+  /// Current identity. Local-first mode uses a local anonymous user.
   final AppUser? user;
 
   /// Whether an auth action is running.
@@ -26,11 +27,23 @@ class AuthState {
   /// User-safe auth error.
   final String? errorMessage;
 
-  /// Whether a user is signed in.
-  bool get isSignedIn => user != null;
+  /// Whether a cloud-backed user is signed in.
+  bool get isSignedIn => user != null && user!.isCloudBacked;
+
+  /// Whether the app is running in local anonymous mode.
+  bool get isLocalMode => user == null || user!.isLocalOnly;
+
+  /// Current account mode label.
+  String get accountModeLabel {
+    if (user == null || user!.isLocalOnly) {
+      return AuthProviderType.localAnonymous.displayName;
+    }
+
+    return user!.provider.displayName;
+  }
 
   /// Label shown in Settings.
-  String get statusLabel => isSignedIn ? 'Signed in' : 'Guest mode';
+  String get statusLabel => isSignedIn ? 'Signed in' : 'Local mode';
 
   /// Creates a copy with updated fields.
   AuthState copyWith({
@@ -126,7 +139,12 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       await _repository.signOut();
-      state = state.copyWith(isLoading: false, clearUser: true);
+      final user = await _repository.currentUser();
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        clearUser: user == null,
+      );
     } on Object catch (error) {
       debugPrint('[Auth] sign out failed: $error');
       state = state.copyWith(
@@ -137,6 +155,10 @@ class AuthController extends Notifier<AuthState> {
   }
 
   String _messageForError(Object error) {
+    if (error is AuthException) {
+      return error.message;
+    }
+
     if (error is SupabaseAuthException) {
       return error.message;
     }

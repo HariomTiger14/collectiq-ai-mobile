@@ -46,7 +46,7 @@ class UploadWorker {
     final now = DateTime.now();
     await queueRepository.saveTask(
       task.copyWith(
-        status: ImageUploadTaskStatus.uploading,
+        status: ImageUploadTaskStatus.syncing,
         progress: 0.1,
         updatedAt: now,
         clearLastError: true,
@@ -68,7 +68,7 @@ class UploadWorker {
       }
 
       final uploadedTask = task.copyWith(
-        status: ImageUploadTaskStatus.uploaded,
+        status: ImageUploadTaskStatus.synced,
         storagePath: reference.path,
         publicUrl: reference.publicUrl,
         progress: 1,
@@ -118,7 +118,7 @@ class UploadWorker {
     await queueRepository.saveTask(
       task.copyWith(
         status: shouldRetry
-            ? ImageUploadTaskStatus.pending
+            ? ImageUploadTaskStatus.retryable
             : ImageUploadTaskStatus.failed,
         attemptCount: nextAttempt,
         lastError: message,

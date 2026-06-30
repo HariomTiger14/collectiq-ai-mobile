@@ -12,9 +12,21 @@ class SyncQueueSnapshot {
         .length;
   }
 
-  int get uploadingCount {
+  int get retryableCount {
     return tasks
-        .where((task) => task.status == ImageUploadTaskStatus.uploading)
+        .where((task) => task.status == ImageUploadTaskStatus.retryable)
+        .length;
+  }
+
+  int get readyToSyncCount => pendingCount + retryableCount;
+
+  int get uploadingCount {
+    return syncingCount;
+  }
+
+  int get syncingCount {
+    return tasks
+        .where((task) => task.status == ImageUploadTaskStatus.syncing)
         .length;
   }
 
@@ -25,8 +37,31 @@ class SyncQueueSnapshot {
   }
 
   int get uploadedCount {
+    return syncedCount;
+  }
+
+  int get syncedCount {
     return tasks
-        .where((task) => task.status == ImageUploadTaskStatus.uploaded)
+        .where((task) => task.status == ImageUploadTaskStatus.synced)
         .length;
+  }
+
+  String get stateLabel {
+    if (syncingCount > 0) {
+      return 'Syncing';
+    }
+    if (failedCount > 0) {
+      return 'Failed';
+    }
+    if (retryableCount > 0) {
+      return 'Retryable';
+    }
+    if (pendingCount > 0) {
+      return 'Pending';
+    }
+    if (syncedCount > 0) {
+      return 'Synced';
+    }
+    return 'Local only';
   }
 }

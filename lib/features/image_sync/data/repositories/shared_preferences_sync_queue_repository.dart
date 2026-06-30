@@ -10,6 +10,7 @@ class SharedPreferencesSyncQueueRepository implements SyncQueueRepository {
 
   static const _tasksKey = 'image_upload_tasks';
   static const _lastSyncKey = 'image_upload_last_sync_at';
+  static const _staleSyncingTimeout = Duration(minutes: 15);
 
   @override
   Future<ImageUploadTask> enqueueImageUpload({
@@ -22,7 +23,7 @@ class SharedPreferencesSyncQueueRepository implements SyncQueueRepository {
     }).firstOrNull;
 
     if (existingTask != null &&
-        existingTask.status != ImageUploadTaskStatus.uploaded) {
+        existingTask.status != ImageUploadTaskStatus.synced) {
       return existingTask;
     }
 
@@ -57,7 +58,31 @@ class SharedPreferencesSyncQueueRepository implements SyncQueueRepository {
   @override
   Future<List<ImageUploadTask>> getUploadableTasks() async {
     final tasks = await getTasks();
-    return tasks.where((task) => task.canUpload).toList(growable: false);
+    final now = DateTime.now();
+    var changed = false;
+    final normalizedTasks = tasks
+        .map((task) {
+          if (_isStaleSyncingTask(task, now)) {
+            changed = true;
+            return task.copyWith(
+              status: ImageUploadTaskStatus.retryable,
+              lastError: 'Upload was interrupted and will retry.',
+              nextRetryAt: now,
+              updatedAt: now,
+            );
+          }
+
+          return task;
+        })
+        .toList(growable: false);
+
+    if (changed) {
+      await _saveTasks(normalizedTasks);
+    }
+
+    return normalizedTasks
+        .where((task) => task.canUpload)
+        .toList(growable: false);
   }
 
   @override
@@ -94,5 +119,13 @@ class SharedPreferencesSyncQueueRepository implements SyncQueueRepository {
       tasks.map((task) => task.toJson()).toList(growable: false),
     );
     await preferences.setString(_tasksKey, encodedTasks);
+  }
+
+  bool _isStaleSyncingTask(ImageUploadTask task, DateTime now) {
+    if (task.status != ImageUploadTaskStatus.syncing) {
+      return false;
+    }
+
+    return now.difference(task.updatedAt) >= _staleSyncingTimeout;
   }
 }

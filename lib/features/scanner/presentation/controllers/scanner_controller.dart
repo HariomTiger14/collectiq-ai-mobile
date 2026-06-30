@@ -16,6 +16,8 @@ import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart'
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -646,6 +648,23 @@ class ScannerController extends Notifier<ScannerState> {
     }
     ref.read(scanPipelineStatusProvider.notifier).markReady();
 
+    try {
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanAnalyze();
+    } on SubscriptionException catch (error) {
+      ref.read(scanPipelineStatusProvider.notifier).markError();
+      _setState(
+        state.copyWith(
+          errorMessage: error.message,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+      );
+      return;
+    }
+
     final validationError = await _validateSelectedImagePath(selectedImagePath);
     if (validationError != null) {
       _setState(
@@ -692,6 +711,9 @@ class ScannerController extends Notifier<ScannerState> {
           isSavedToPortfolio: false,
         ),
       );
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .recordSuccessfulAnalysis();
       ref.read(scanPipelineStatusProvider.notifier).markCompleted();
     } on AiAnalysisException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();

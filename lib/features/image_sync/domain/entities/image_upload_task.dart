@@ -1,4 +1,32 @@
-enum ImageUploadTaskStatus { pending, uploading, uploaded, failed }
+enum ImageUploadTaskStatus {
+  pending,
+  syncing,
+  synced,
+  failed,
+  retryable;
+
+  static ImageUploadTaskStatus fromJsonName(Object? value) {
+    final name = value is String ? value : '';
+    return switch (name) {
+      'uploading' => ImageUploadTaskStatus.syncing,
+      'uploaded' => ImageUploadTaskStatus.synced,
+      _ => ImageUploadTaskStatus.values.firstWhere(
+        (status) => status.name == name,
+        orElse: () => ImageUploadTaskStatus.pending,
+      ),
+    };
+  }
+
+  String get label {
+    return switch (this) {
+      ImageUploadTaskStatus.pending => 'Pending',
+      ImageUploadTaskStatus.syncing => 'Syncing',
+      ImageUploadTaskStatus.synced => 'Synced',
+      ImageUploadTaskStatus.failed => 'Failed',
+      ImageUploadTaskStatus.retryable => 'Retryable',
+    };
+  }
+}
 
 class ImageUploadTask {
   const ImageUploadTask({
@@ -29,9 +57,12 @@ class ImageUploadTask {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  bool get isRetryable => status == ImageUploadTaskStatus.retryable;
+
   bool get canUpload {
-    if (status == ImageUploadTaskStatus.uploaded ||
-        status == ImageUploadTaskStatus.uploading) {
+    if (status == ImageUploadTaskStatus.synced ||
+        status == ImageUploadTaskStatus.syncing ||
+        status == ImageUploadTaskStatus.failed) {
       return false;
     }
 
@@ -72,10 +103,7 @@ class ImageUploadTask {
       id: json['id'] as String,
       collectibleId: json['collectibleId'] as String,
       localPath: json['localPath'] as String,
-      status: ImageUploadTaskStatus.values.firstWhere(
-        (status) => status.name == json['status'],
-        orElse: () => ImageUploadTaskStatus.pending,
-      ),
+      status: ImageUploadTaskStatus.fromJsonName(json['status']),
       storagePath: _optionalString(json['storagePath']),
       publicUrl: _optionalString(json['publicUrl']),
       attemptCount: (json['attemptCount'] as num?)?.toInt() ?? 0,

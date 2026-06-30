@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 
 /// Mock auth repository used until Firebase/Supabase is connected.
@@ -7,15 +8,17 @@ class MockAuthRepository implements AuthRepository {
   const MockAuthRepository();
 
   static const _mockUser = AppUser(
-    id: 'mock-user',
+    id: 'local-anonymous-user',
     displayName: 'Local Collector',
     email: null,
     isAnonymous: true,
+    isLocalOnly: true,
+    provider: AuthProviderType.localAnonymous,
   );
 
   @override
   Future<AppUser?> currentUser() async {
-    return null;
+    return _mockUser;
   }
 
   @override
@@ -33,7 +36,23 @@ class MockAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    return AppUser(id: 'mock-email-user', displayName: email, email: email);
+    throw const AuthException(
+      'Email/password sign-in is coming soon. Local mode remains available.',
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithGoogle() async {
+    throw const AuthException(
+      'Google sign-in is coming soon. Local mode remains available.',
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithApple() async {
+    throw const AuthException(
+      'Apple sign-in is coming soon. Local mode remains available.',
+    );
   }
 
   @override

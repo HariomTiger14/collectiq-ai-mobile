@@ -8,6 +8,8 @@ import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_c
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +26,7 @@ class SettingsScreen extends ConsumerWidget {
     final portfolioState = ref.watch(portfolioControllerProvider);
     final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
+    final subscriptionState = ref.watch(subscriptionControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -61,23 +64,53 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'Account',
                     children: [
                       _SettingsRow(
+                        icon: Icons.account_circle_outlined,
+                        title: 'Account mode',
+                        subtitle:
+                            authState.errorMessage ??
+                            'CollectIQ AI stays fully usable in local-first mode.',
+                        trailing: authState.accountModeLabel,
+                      ),
+                      _SettingsRow(
                         icon: Icons.person_outline,
                         title: 'Continue as Guest',
                         subtitle:
                             'Use camera, scans, and local portfolio without an account.',
-                        trailing: authState.isSignedIn ? 'Off' : 'Active',
+                        trailing: authState.isLocalMode ? 'Active' : 'Off',
                       ),
                       _SettingsRow(
                         icon: Icons.login_outlined,
-                        title: authState.isSignedIn ? 'Account' : 'Sign In',
+                        title: authState.isSignedIn
+                            ? 'Cloud account'
+                            : 'Sign In',
                         subtitle:
                             authState.errorMessage ??
                             (authState.isSignedIn
                                 ? authState.user!.displayName
-                                : 'Optional Supabase account sign in is prepared.'),
+                                : 'Cloud sign-in is optional and prepared for a future release.'),
                         trailing: authState.errorMessage != null
                             ? 'Needs attention'
                             : authState.statusLabel,
+                      ),
+                      const _SettingsRow(
+                        icon: Icons.email_outlined,
+                        title: 'Email / Password',
+                        subtitle: 'Account sign-in foundation is prepared.',
+                        trailing: 'Coming soon',
+                      ),
+                      const _SettingsRow(
+                        icon: Icons.g_mobiledata_outlined,
+                        title: 'Google Sign-In',
+                        subtitle:
+                            'OAuth provider placeholder. No Google keys are bundled.',
+                        trailing: 'Coming soon',
+                      ),
+                      const _SettingsRow(
+                        icon: Icons.apple,
+                        title: 'Apple Sign-In',
+                        subtitle:
+                            'OAuth provider placeholder. No Apple keys are bundled.',
+                        trailing: 'Coming soon',
                       ),
                     ],
                   ),
@@ -97,6 +130,57 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle:
                             'Price alerts and scan updates are placeholders.',
                         trailing: 'Off',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'Plan & Usage',
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.workspace_premium_outlined,
+                        title: 'Current plan',
+                        subtitle:
+                            'CollectIQ AI is local-first. Paid plans are placeholders.',
+                        trailing:
+                            subscriptionState.entitlements.plan.displayName,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.document_scanner_outlined,
+                        title: 'Scans used today',
+                        subtitle: subscriptionState.usage.isUnlimited
+                            ? 'Development-safe unlimited mode is active.'
+                            : 'Daily free scans reset automatically.',
+                        trailing: subscriptionState.usage.scansUsedToday
+                            .toString(),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.timelapse_outlined,
+                        title: 'Remaining scans',
+                        subtitle:
+                            'Configurable via COLLECTIQ_DAILY_FREE_SCAN_LIMIT.',
+                        trailing: subscriptionState.remainingLabel,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.payments_outlined,
+                        title: 'Payment status',
+                        subtitle:
+                            'No Stripe or Google Play Billing integration yet.',
+                        trailing: subscriptionState.paymentStatusLabel,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.trending_up_outlined,
+                        title: SubscriptionPlan.pro.displayName,
+                        subtitle:
+                            'Future paid plan for higher usage and cloud features.',
+                        trailing: SubscriptionPlan.pro.statusLabel,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.diamond_outlined,
+                        title: SubscriptionPlan.premium.displayName,
+                        subtitle:
+                            'Future premium plan for advanced collector tools.',
+                        trailing: SubscriptionPlan.premium.statusLabel,
                       ),
                     ],
                   ),
@@ -256,7 +340,15 @@ class SettingsScreen extends ConsumerWidget {
                         title: 'Pending uploads',
                         subtitle:
                             'Images keep using the local file until cloud upload completes.',
-                        trailing: imageSyncState.snapshot.pendingCount
+                        trailing: imageSyncState.snapshot.readyToSyncCount
+                            .toString(),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.replay_outlined,
+                        title: 'Retryable uploads',
+                        subtitle:
+                            'Temporary failures are queued with backoff and retried later.',
+                        trailing: imageSyncState.snapshot.retryableCount
                             .toString(),
                       ),
                       _SettingsRow(

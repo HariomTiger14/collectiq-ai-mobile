@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flutter/foundation.dart';
 
@@ -17,7 +18,7 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<AppUser?> currentUser() async {
     if (!supabaseService.isConfigured) {
       debugPrint('[Auth] Supabase not configured; current user is guest');
-      return null;
+      return fallbackRepository.currentUser();
     }
 
     debugPrint('[Auth] loading Supabase current user');
@@ -64,6 +65,20 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException(
+      'Google sign-in is coming soon. Local mode remains available.',
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException(
+      'Apple sign-in is coming soon. Local mode remains available.',
+    );
+  }
+
+  @override
   Future<void> signOut() async {
     if (!supabaseService.isConfigured) {
       return fallbackRepository.signOut();
@@ -83,6 +98,8 @@ class SupabaseAuthRepository implements AuthRepository {
       displayName: session.displayName,
       email: session.email,
       isAnonymous: session.isAnonymous,
+      isLocalOnly: false,
+      provider: AuthProviderType.supabaseAnonymous,
     );
   }
 }

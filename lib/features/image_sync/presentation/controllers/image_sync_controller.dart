@@ -41,6 +41,9 @@ class ImageSyncState {
     if (snapshot.failedCount > 0) {
       return 'Needs attention';
     }
+    if (snapshot.retryableCount > 0) {
+      return 'Retryable';
+    }
     if (snapshot.pendingCount > 0) {
       return 'Pending';
     }

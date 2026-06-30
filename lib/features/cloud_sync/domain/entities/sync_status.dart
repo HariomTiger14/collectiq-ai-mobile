@@ -29,6 +29,8 @@ class SyncStatus {
     this.authenticatedUserId,
     this.lastSyncedAt,
     this.pendingItemCount = 0,
+    this.failedItemCount = 0,
+    this.retryableItemCount = 0,
   });
 
   /// Current sync state.
@@ -48,6 +50,15 @@ class SyncStatus {
 
   /// Number of items waiting to sync.
   final int pendingItemCount;
+
+  /// Number of items that failed sync permanently or need attention.
+  final int failedItemCount;
+
+  /// Number of failed sync items that can retry later.
+  final int retryableItemCount;
+
+  /// Whether failed work can be retried without user action.
+  bool get hasRetryableWork => retryableItemCount > 0;
 
   /// Whether cloud sync is genuinely connected to an authenticated user.
   bool get isCloudConnected {
@@ -71,7 +82,7 @@ class SyncStatus {
       SyncState.synced => 'Synced',
       SyncState.pending => 'Pending',
       SyncState.syncing => 'Syncing',
-      SyncState.failed => 'Needs attention',
+      SyncState.failed => hasRetryableWork ? 'Retryable' : 'Needs attention',
       SyncState.conflict => 'Conflict',
     };
   }

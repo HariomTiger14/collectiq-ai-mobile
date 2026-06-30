@@ -7,12 +7,22 @@ import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/ai/services/ai_recognition_service.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
+import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
+import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
+import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -187,14 +197,29 @@ void main() {
     expect(find.text('Settings'), findsWidgets);
     expect(find.text('Manage account and cloud sync options.'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Account mode'), findsOneWidget);
+    expect(find.text('Local Anonymous'), findsOneWidget);
     expect(find.text('Continue as Guest'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Guest mode'), findsOneWidget);
+    expect(find.text('Local mode'), findsOneWidget);
+    expect(find.text('Email / Password'), findsOneWidget);
+    expect(find.text('Google Sign-In'), findsOneWidget);
+    expect(find.text('Apple Sign-In'), findsOneWidget);
     expect(
       find.text('Use camera, scans, and local portfolio without an account.'),
       findsOneWidget,
     );
     expect(find.text('App Preferences'), findsOneWidget);
+    expect(find.text('Plan & Usage'), findsOneWidget);
+    expect(find.text('Current plan'), findsOneWidget);
+    expect(find.text('Free'), findsOneWidget);
+    expect(find.text('Scans used today'), findsOneWidget);
+    expect(find.text('Remaining scans'), findsOneWidget);
+    expect(find.text('Unlimited'), findsOneWidget);
+    expect(find.text('Payment status'), findsOneWidget);
+    expect(find.text('Not configured'), findsWidgets);
+    expect(find.text('Pro'), findsOneWidget);
+    expect(find.text('Premium'), findsOneWidget);
     expect(find.text('AI & Scanning'), findsOneWidget);
     expect(find.text('Current AI provider'), findsOneWidget);
     expect(find.text('Mock AI'), findsWidgets);
@@ -221,6 +246,7 @@ void main() {
     expect(find.text('Cloud status'), findsOneWidget);
     expect(find.text('Anonymous User'), findsOneWidget);
     expect(find.text('Pending uploads'), findsOneWidget);
+    expect(find.text('Retryable uploads'), findsOneWidget);
     expect(find.text('Failed uploads'), findsOneWidget);
     expect(find.text('Last sync'), findsOneWidget);
     expect(find.text('Never'), findsOneWidget);
@@ -584,6 +610,92 @@ void main() {
     );
   });
 
+  testWidgets('usage increments after successful analysis', (
+    WidgetTester tester,
+  ) async {
+    final usageRepository = _MemoryUsageRepository();
+    await tester.pumpCollectIqApp(
+      usageRepository: usageRepository,
+      usageLimitConfig: const UsageLimitConfig(
+        developmentUnlimited: false,
+        dailyFreeScanLimit: 2,
+      ),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pumpAndSettle();
+
+    expect(usageRepository.count, 1);
+    expect(find.text('Analysis Complete'), findsOneWidget);
+  });
+
+  testWidgets('usage does not increment on failed analysis', (
+    WidgetTester tester,
+  ) async {
+    final usageRepository = _MemoryUsageRepository();
+    await tester.pumpCollectIqApp(
+      aiAnalysisProvider: const _FailingAiAnalysisProvider(),
+      usageRepository: usageRepository,
+      usageLimitConfig: const UsageLimitConfig(
+        developmentUnlimited: false,
+        dailyFreeScanLimit: 2,
+      ),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+
+    expect(usageRepository.count, 0);
+    expect(find.text('Provider failed safely.'), findsOneWidget);
+  });
+
+  testWidgets('limit reached shows friendly scan error', (
+    WidgetTester tester,
+  ) async {
+    final usageRepository = _MemoryUsageRepository(initialCount: 1);
+    await tester.pumpCollectIqApp(
+      usageRepository: usageRepository,
+      usageLimitConfig: const UsageLimitConfig(
+        developmentUnlimited: false,
+        dailyFreeScanLimit: 1,
+      ),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+
+    expect(usageRepository.count, 1);
+    expect(
+      find.textContaining('Daily free scan limit reached'),
+      findsOneWidget,
+    );
+    expect(find.text('AI Result'), findsNothing);
+  });
+
   testWidgets('AI provider failure shows scan error panel', (
     WidgetTester tester,
   ) async {
@@ -753,6 +865,40 @@ void main() {
     expect(find.text('1999 Pokémon Charizard'), findsOneWidget);
     expect(find.text('Total collection value'), findsOneWidget);
     expect(find.text('Items'), findsOneWidget);
+    expect(find.text('AUD 1,850'), findsWidgets);
+  });
+
+  testWidgets('local portfolio save works when auth and cloud fail', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(
+      authRepository: const _FailingAuthRepository(),
+      syncService: const _FailingSyncService(),
+    );
+
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.tap(find.text('Use Sample Scan'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.tap(find.text('Analyze with AI'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved to portfolio'), findsOneWidget);
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+
+    expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('AUD 1,850'), findsWidgets);
   });
 
@@ -1314,6 +1460,10 @@ extension on WidgetTester {
         const _FakeAIRecognitionService(),
     AiAnalysisProviderConfig? aiAnalysisProviderConfig,
     AiAnalysisProvider? aiAnalysisProvider,
+    AuthRepository? authRepository,
+    SyncService? syncService,
+    UsageLimitConfig? usageLimitConfig,
+    UsageRepository? usageRepository,
     CameraService? cameraService,
     GalleryService? galleryService,
   }) {
@@ -1327,6 +1477,14 @@ extension on WidgetTester {
             ),
           if (aiAnalysisProvider != null)
             aiAnalysisProviderProvider.overrideWithValue(aiAnalysisProvider),
+          if (authRepository != null)
+            authRepositoryProvider.overrideWithValue(authRepository),
+          if (syncService != null)
+            syncServiceProvider.overrideWithValue(syncService),
+          if (usageLimitConfig != null)
+            usageLimitConfigProvider.overrideWithValue(usageLimitConfig),
+          if (usageRepository != null)
+            usageRepositoryProvider.overrideWithValue(usageRepository),
           if (cameraService != null)
             cameraServiceProvider.overrideWithValue(cameraService),
           if (galleryService != null)
@@ -1395,6 +1553,94 @@ class _FailingAiAnalysisProvider implements AiAnalysisProvider {
   @override
   Future<AiAnalysisResult> analyze(AiAnalysisRequest request) {
     throw const AiAnalysisException('Provider failed safely.');
+  }
+}
+
+class _FailingAuthRepository implements AuthRepository {
+  const _FailingAuthRepository();
+
+  @override
+  Future<AppUser?> currentUser() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<AppUser> signIn() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<AppUser> signInAnonymously() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
+  Future<void> signOut() {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+}
+
+class _FailingSyncService implements SyncService {
+  const _FailingSyncService();
+
+  @override
+  Future<SyncStatus> currentStatus() {
+    throw StateError('cloud unavailable during local save test');
+  }
+
+  @override
+  Future<SyncStatus> markPending(List<CollectibleItem> localItems) {
+    throw StateError('cloud unavailable during local save test');
+  }
+
+  @override
+  Future<SyncStatus> syncLocalItems(List<CollectibleItem> localItems) {
+    throw StateError('cloud unavailable during local save test');
+  }
+
+  @override
+  Future<List<CollectibleItem>> downloadCloudItems() {
+    throw StateError('cloud unavailable during local save test');
+  }
+}
+
+class _MemoryUsageRepository implements UsageRepository {
+  _MemoryUsageRepository({int initialCount = 0}) : count = initialCount;
+
+  int count;
+
+  @override
+  Future<int> scansUsedToday() async {
+    return count;
+  }
+
+  @override
+  Future<int> incrementScansUsedToday() async {
+    count += 1;
+    return count;
+  }
+
+  @override
+  Future<void> resetUsage() async {
+    count = 0;
   }
 }
 

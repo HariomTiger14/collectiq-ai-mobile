@@ -5,6 +5,8 @@ import 'package:collectiq_ai/core/supabase/supabase_schema.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
@@ -28,6 +30,7 @@ import 'package:collectiq_ai/features/image_storage/domain/repositories/image_st
 import 'package:collectiq_ai/features/image_sync/data/repositories/shared_preferences_sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
 import 'package:collectiq_ai/features/image_storage/data/repositories/supabase_image_storage_repository.dart';
+import 'package:collectiq_ai/features/image_sync/domain/services/retry_policy.dart';
 import 'package:collectiq_ai/features/image_sync/domain/services/upload_worker.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_provider_factory.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_pricing_provider_factory.dart';
@@ -43,6 +46,12 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_tracker.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/user_entitlements.dart';
+import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -1331,12 +1340,17 @@ void main() {
   });
 
   group('MockAuthRepository', () {
-    test('defaults to no signed-in user for local-first mode', () async {
+    test('defaults to local anonymous user for local-first mode', () async {
       const repository = MockAuthRepository();
 
       final user = await repository.currentUser();
 
-      expect(user, isNull);
+      expect(user, isNotNull);
+      expect(user!.id, 'local-anonymous-user');
+      expect(user.displayName, 'Local Collector');
+      expect(user.isAnonymous, isTrue);
+      expect(user.isLocalOnly, isTrue);
+      expect(user.provider, AuthProviderType.localAnonymous);
     });
 
     test('signIn returns mock anonymous user placeholder', () async {
@@ -1344,9 +1358,29 @@ void main() {
 
       final user = await repository.signIn();
 
-      expect(user.id, 'mock-user');
+      expect(user.id, 'local-anonymous-user');
       expect(user.displayName, 'Local Collector');
       expect(user.isAnonymous, isTrue);
+    });
+
+    test('future sign-in providers return safe placeholder errors', () async {
+      const repository = MockAuthRepository();
+
+      await expectLater(
+        repository.signInWithEmailPassword(
+          email: 'harry@example.com',
+          password: 'password',
+        ),
+        throwsA(isA<AuthException>()),
+      );
+      await expectLater(
+        repository.signInWithGoogle(),
+        throwsA(isA<AuthException>()),
+      );
+      await expectLater(
+        repository.signInWithApple(),
+        throwsA(isA<AuthException>()),
+      );
     });
   });
 
@@ -1429,7 +1463,9 @@ void main() {
         );
         final repository = SupabaseAuthRepository(supabaseService: service);
 
-        expect(await repository.currentUser(), isNull);
+        final currentUser = await repository.currentUser();
+        expect(currentUser, isNotNull);
+        expect(currentUser!.isLocalOnly, isTrue);
         final user = await repository.signInAnonymously();
 
         expect(user.displayName, 'Local Collector');
@@ -1555,25 +1591,101 @@ void main() {
   });
 
   group('AuthController', () {
-    test('starts in guest mode and supports optional mock sign in', () async {
+    test('starts in local mode and keeps sign in optional', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       await Future<void>.delayed(Duration.zero);
       expect(container.read(authControllerProvider).isSignedIn, isFalse);
-      expect(container.read(authControllerProvider).statusLabel, 'Guest mode');
+      expect(container.read(authControllerProvider).isLocalMode, isTrue);
+      expect(container.read(authControllerProvider).statusLabel, 'Local mode');
+      expect(
+        container.read(authControllerProvider).accountModeLabel,
+        'Local Anonymous',
+      );
 
       await container.read(authControllerProvider.notifier).signIn();
 
       final signedInState = container.read(authControllerProvider);
-      expect(signedInState.isSignedIn, isTrue);
+      expect(signedInState.isSignedIn, isFalse);
+      expect(signedInState.isLocalMode, isTrue);
       expect(signedInState.user!.displayName, 'Local Collector');
-      expect(signedInState.statusLabel, 'Signed in');
+      expect(signedInState.statusLabel, 'Local mode');
 
       await container.read(authControllerProvider.notifier).signOut();
 
       expect(container.read(authControllerProvider).isSignedIn, isFalse);
-      expect(container.read(authControllerProvider).statusLabel, 'Guest mode');
+      expect(container.read(authControllerProvider).isLocalMode, isTrue);
+      expect(container.read(authControllerProvider).statusLabel, 'Local mode');
+    });
+  });
+
+  group('Subscription foundation', () {
+    test('default plan is free and development safe', () {
+      const config = UsageLimitConfig();
+      final usage = UsageTracker.fromLimit(
+        limit: config.usageLimit,
+        scansUsedToday: 999,
+      );
+
+      expect(UserEntitlements.developmentFree.plan, SubscriptionPlan.free);
+      expect(config.developmentUnlimited, isTrue);
+      expect(usage.canAnalyze, isTrue);
+      expect(usage.isUnlimited, isTrue);
+      expect(usage.remainingScans, config.dailyFreeScanLimit);
+    });
+
+    test('usage controller increments successful analyses', () async {
+      final repository = _MemoryUsageRepository();
+      final container = ProviderContainer(
+        overrides: [
+          usageRepositoryProvider.overrideWithValue(repository),
+          usageLimitConfigProvider.overrideWithValue(
+            const UsageLimitConfig(
+              developmentUnlimited: false,
+              dailyFreeScanLimit: 2,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(subscriptionControllerProvider.notifier).loadUsage();
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanAnalyze();
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .recordSuccessfulAnalysis();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(repository.count, 1);
+      expect(state.usage.scansUsedToday, 1);
+      expect(state.usage.remainingScans, 1);
+    });
+
+    test('usage controller blocks when limit is reached', () async {
+      final repository = _MemoryUsageRepository(initialCount: 1);
+      final container = ProviderContainer(
+        overrides: [
+          usageRepositoryProvider.overrideWithValue(repository),
+          usageLimitConfigProvider.overrideWithValue(
+            const UsageLimitConfig(
+              developmentUnlimited: false,
+              dailyFreeScanLimit: 1,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(subscriptionControllerProvider.notifier)
+            .ensureCanAnalyze(),
+        throwsA(isA<SubscriptionException>()),
+      );
+      expect(repository.count, 1);
     });
   });
 
@@ -1708,6 +1820,8 @@ void main() {
         final syncState = container.read(syncControllerProvider);
         expect(syncState.status.state, SyncState.failed);
         expect(syncState.status.pendingItemCount, 1);
+        expect(syncState.status.retryableItemCount, 1);
+        expect(syncState.status.statusLabel, 'Retryable');
         expect(syncState.errorMessage, contains('network unavailable'));
       },
     );
@@ -1808,15 +1922,95 @@ void main() {
       expect(items.single.imageStoragePath, 'remote/item-1.jpg');
       expect(items.single.cloudImageUrl, 'https://cdn.example.com/item-1.jpg');
     });
+
+    test('failed image sync is queued as retryable with backoff', () async {
+      const portfolioRepository = SharedPreferencesPortfolioRepository();
+      const queueRepository = SharedPreferencesSyncQueueRepository();
+      await portfolioRepository.addItem(
+        CollectibleItem(
+          id: 'item-1',
+          title: 'Camera Card',
+          category: 'Trading Card',
+          estimatedValue: 50,
+          confidence: 0.8,
+          condition: 'Good',
+          recommendation: 'Keep protected.',
+          imagePath: 'test/fixtures/persistent-camera-card.jpg',
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      );
+      await queueRepository.enqueueImageUpload(
+        collectibleId: 'item-1',
+        localPath: 'test/fixtures/persistent-camera-card.jpg',
+      );
+      final worker = UploadWorker(
+        queueRepository: queueRepository,
+        imageStorageRepository: const _FailingImageStorageRepository(),
+        portfolioRepository: portfolioRepository,
+      );
+
+      await worker.processQueue();
+
+      final snapshot = await queueRepository.snapshot();
+      expect(snapshot.retryableCount, 1);
+      expect(snapshot.failedCount, 0);
+      expect(snapshot.tasks.single.status, ImageUploadTaskStatus.retryable);
+      expect(snapshot.tasks.single.lastError, contains('storage unavailable'));
+      expect(snapshot.tasks.single.nextRetryAt, isNotNull);
+    });
+
+    test('retryable image sync uploads successfully on retry', () async {
+      const portfolioRepository = SharedPreferencesPortfolioRepository();
+      const queueRepository = SharedPreferencesSyncQueueRepository();
+      final imageStorageRepository = _FlakyImageStorageRepository();
+      await portfolioRepository.addItem(
+        CollectibleItem(
+          id: 'item-1',
+          title: 'Camera Card',
+          category: 'Trading Card',
+          estimatedValue: 50,
+          confidence: 0.8,
+          condition: 'Good',
+          recommendation: 'Keep protected.',
+          imagePath: 'test/fixtures/persistent-camera-card.jpg',
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      );
+      await queueRepository.enqueueImageUpload(
+        collectibleId: 'item-1',
+        localPath: 'test/fixtures/persistent-camera-card.jpg',
+      );
+      final worker = UploadWorker(
+        queueRepository: queueRepository,
+        imageStorageRepository: imageStorageRepository,
+        portfolioRepository: portfolioRepository,
+        retryPolicy: const RetryPolicy(baseDelay: Duration.zero),
+      );
+
+      await worker.processQueue();
+      var snapshot = await queueRepository.snapshot();
+      expect(snapshot.retryableCount, 1);
+
+      await worker.processQueue();
+
+      snapshot = await queueRepository.snapshot();
+      final items = await portfolioRepository.getItems();
+      expect(snapshot.syncedCount, 1);
+      expect(snapshot.retryableCount, 0);
+      expect(items.single.cloudImageUrl, 'https://cdn.example.com/item-1.jpg');
+    });
   });
 
   group('Local-first portfolio mode', () {
-    test('saves portfolio items while no auth user is signed in', () async {
+    test('saves portfolio items while no cloud user is signed in', () async {
       SharedPreferences.setMockInitialValues({});
       const authRepository = MockAuthRepository();
       final portfolioRepository = SharedPreferencesPortfolioRepository();
 
-      expect(await authRepository.currentUser(), isNull);
+      final user = await authRepository.currentUser();
+      expect(user, isNotNull);
+      expect(user!.isLocalOnly, isTrue);
+      expect(user.isCloudBacked, isFalse);
 
       await portfolioRepository.addItem(_testItem());
       final items = await portfolioRepository.getItems();
@@ -2092,6 +2286,81 @@ class _SuccessfulImageStorageRepository implements ImageStorageRepository {
   @override
   Future<String?> publicUrlFor(String storagePath) async {
     return 'https://cdn.example.com/item-1.jpg';
+  }
+}
+
+class _FailingImageStorageRepository implements ImageStorageRepository {
+  const _FailingImageStorageRepository();
+
+  @override
+  Future<ImageStorageReference> saveLocalImage(String localPath) async {
+    return ImageStorageReference(path: localPath, isRemote: false);
+  }
+
+  @override
+  Future<ImageStorageReference> uploadImage({
+    required String localPath,
+    required String collectibleId,
+  }) async {
+    throw StateError('storage unavailable');
+  }
+
+  @override
+  Future<String?> publicUrlFor(String storagePath) async {
+    return null;
+  }
+}
+
+class _FlakyImageStorageRepository implements ImageStorageRepository {
+  var _uploadAttempts = 0;
+
+  @override
+  Future<ImageStorageReference> saveLocalImage(String localPath) async {
+    return ImageStorageReference(path: localPath, isRemote: false);
+  }
+
+  @override
+  Future<ImageStorageReference> uploadImage({
+    required String localPath,
+    required String collectibleId,
+  }) async {
+    _uploadAttempts += 1;
+    if (_uploadAttempts == 1) {
+      throw StateError('storage unavailable');
+    }
+
+    return const ImageStorageReference(
+      path: 'remote/item-1.jpg',
+      isRemote: true,
+      publicUrl: 'https://cdn.example.com/item-1.jpg',
+    );
+  }
+
+  @override
+  Future<String?> publicUrlFor(String storagePath) async {
+    return 'https://cdn.example.com/item-1.jpg';
+  }
+}
+
+class _MemoryUsageRepository implements UsageRepository {
+  _MemoryUsageRepository({int initialCount = 0}) : count = initialCount;
+
+  int count;
+
+  @override
+  Future<int> scansUsedToday() async {
+    return count;
+  }
+
+  @override
+  Future<int> incrementScansUsedToday() async {
+    count += 1;
+    return count;
+  }
+
+  @override
+  Future<void> resetUsage() async {
+    count = 0;
   }
 }
 

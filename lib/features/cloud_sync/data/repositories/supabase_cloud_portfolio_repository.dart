@@ -90,6 +90,7 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
         message: 'Cloud sync failed. Changes remain saved locally.',
         isCloudBackupEnabled: true,
         pendingItemCount: items.length,
+        retryableItemCount: items.length,
       );
     }
   }
