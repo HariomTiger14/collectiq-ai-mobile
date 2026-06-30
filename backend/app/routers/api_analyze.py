@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.config import ALLOWED_CONTENT_TYPES, ALLOWED_EXTENSIONS, MAX_IMAGE_BYTES
 from app.schemas.api_analysis import (
     ApiAlternativeMatchResponse,
+    ApiAnalyzeDiagnosticsResponse,
     ApiAnalyzeRequest,
     ApiAnalyzeResponse,
     ApiMarketCompResponse,
@@ -166,23 +167,30 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     )
 
     total_processing_time_ms = int((time.perf_counter() - started_at) * 1000)
+    diagnostics = _diagnostics_response(
+        provider=provider,
+        recognition=recognition,
+        pricing=pricing,
+        confidence_level=_confidence_level(recognition.confidence),
+        total_processing_time_ms=total_processing_time_ms,
+    )
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Analyze completed provider=%s model=%s latencyMs=%s "
             "overallProcessingTimeMs=%s pricingProvider=%s pricingResponseTimeMs=%s "
             "pricingProviderCount=%s pricingFallbackUsed=%s pricingCacheStatus=%s "
             "pricingFreshness=%s pricingFallbackReason=%s",
-            getattr(provider, "provider_name", "unknown"),
-            getattr(provider, "_model", "mock"),
-            getattr(recognition, "processingTimeMs", total_processing_time_ms),
-            total_processing_time_ms,
-            pricing.providerDiagnostics.get("providers", pricing.pricingSource),
-            pricing.providerDiagnostics.get("responseTimeMs", "0"),
-            pricing.providerDiagnostics.get("providerCount", str(pricing.sourceCount)),
-            pricing.fallbackUsed,
-            pricing.cacheStatus,
-            pricing.pricingAge,
-            pricing.providerDiagnostics.get("fallbackReason", ""),
+            diagnostics.aiProvider,
+            diagnostics.aiModel,
+            diagnostics.aiLatencyMs,
+            diagnostics.totalLatencyMs,
+            diagnostics.pricingProvider,
+            diagnostics.pricingProviderLatencyMs,
+            diagnostics.pricingProviderCount,
+            diagnostics.pricingFallbackUsed,
+            diagnostics.pricingCacheStatus,
+            diagnostics.pricingFreshness,
+            diagnostics.pricingFallbackReason or "",
         )
 
     return ApiAnalyzeResponse(
@@ -217,7 +225,7 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
         imageUrl=None,
         timestamp=payload.request.timestamp,
         fieldConfidence=_field_confidence(recognition),
-        confidenceLevel=_confidence_level(recognition.confidence),
+        confidenceLevel=diagnostics.confidenceLevel,
         lowConfidenceReasons=(
             recognition.lowConfidenceReasons
             or _low_confidence_reasons(recognition.confidence, recognition.detectionQuality)
@@ -230,6 +238,7 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
             recognition.scanRecommendations
             or _scan_recommendations(recognition.confidence, recognition.detectionQuality)
         ),
+        diagnostics=diagnostics,
     )
 
 
@@ -452,3 +461,57 @@ def _market_sources(pricing) -> list[str]:
         if source.strip()
     ]
     return sources or [pricing.pricingSource]
+
+
+def _diagnostics_response(
+    *,
+    provider,
+    recognition,
+    pricing,
+    confidence_level: str,
+    total_processing_time_ms: int,
+) -> ApiAnalyzeDiagnosticsResponse:
+    return ApiAnalyzeDiagnosticsResponse(
+        aiProvider=getattr(
+            provider,
+            "provider_name",
+            getattr(recognition, "aiProvider", "unknown"),
+        ),
+        aiModel=getattr(provider, "_model", "mock"),
+        aiLatencyMs=_parse_int(
+            getattr(recognition, "processingTimeMs", total_processing_time_ms),
+            fallback=total_processing_time_ms,
+        ),
+        pricingProvider=pricing.providerDiagnostics.get(
+            "providers",
+            pricing.pricingSource,
+        )
+        or pricing.pricingSource,
+        pricingProviderLatencyMs=_parse_optional_int(
+            pricing.providerDiagnostics.get("providerResponseLatencyMs")
+        ),
+        pricingProviderCount=_parse_int(
+            pricing.providerDiagnostics.get("providerCount"),
+            fallback=pricing.sourceCount,
+        ),
+        pricingFallbackUsed=pricing.fallbackUsed,
+        pricingFallbackReason=pricing.providerDiagnostics.get("fallbackReason") or None,
+        pricingCacheStatus=pricing.cacheStatus,
+        pricingFreshness=pricing.pricingAge,
+        confidenceLevel=confidence_level,
+        totalLatencyMs=total_processing_time_ms,
+    )
+
+
+def _parse_optional_int(value) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(str(value).split(",")[0].strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_int(value, *, fallback: int) -> int:
+    parsed = _parse_optional_int(value)
+    return fallback if parsed is None else parsed

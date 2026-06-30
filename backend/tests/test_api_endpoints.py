@@ -107,6 +107,13 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIsInstance(payload["lowConfidenceReasons"], list)
         self.assertIsInstance(payload["imageQualityIssues"], list)
         self.assertIsInstance(payload["scanRecommendations"], list)
+        self.assertIn("diagnostics", payload)
+        diagnostics = payload["diagnostics"]
+        self.assertEqual(diagnostics["aiProvider"], "mock")
+        self.assertIn("pricingProvider", diagnostics)
+        self.assertIn("pricingFallbackUsed", diagnostics)
+        self.assertIn("totalLatencyMs", diagnostics)
+        self.assertIn(diagnostics["confidenceLevel"], ["High", "Medium", "Low"])
 
     def test_api_analyze_openai_without_key_returns_safe_error(self) -> None:
         with patch(
@@ -216,8 +223,12 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertGreaterEqual(len(manifest), 3)
         for entry in manifest:
             self.assertTrue(entry["imageFilename"])
+            self.assertTrue(entry["filename"])
             self.assertTrue(entry["expectedCategory"])
             self.assertTrue(entry["expectedItem"])
+            self.assertIsInstance(entry["expectedItemKeywords"], list)
+            self.assertTrue(entry["expectedBrandOrFranchise"])
+            self.assertIsInstance(entry["pricingExpected"], bool)
             confidence_range = entry["expectedConfidenceRange"]
             self.assertGreaterEqual(confidence_range["min"], 0)
             self.assertLessEqual(confidence_range["max"], 100)

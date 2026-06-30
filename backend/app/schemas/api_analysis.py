@@ -64,6 +64,21 @@ class ApiMarketSummaryResponse(BaseModel):
     comps: list[ApiMarketCompResponse] = Field(default_factory=list)
 
 
+class ApiAnalyzeDiagnosticsResponse(BaseModel):
+    aiProvider: str
+    aiModel: str
+    aiLatencyMs: int
+    pricingProvider: str
+    pricingProviderLatencyMs: int | None = None
+    pricingProviderCount: int
+    pricingFallbackUsed: bool
+    pricingFallbackReason: str | None = None
+    pricingCacheStatus: str
+    pricingFreshness: str
+    confidenceLevel: str
+    totalLatencyMs: int
+
+
 class ApiAnalyzeResponse(BaseModel):
     id: str
     itemName: str
@@ -87,6 +102,7 @@ class ApiAnalyzeResponse(BaseModel):
     lowConfidenceReasons: list[str] = Field(default_factory=list)
     imageQualityIssues: list[str] = Field(default_factory=list)
     scanRecommendations: list[str] = Field(default_factory=list)
+    diagnostics: ApiAnalyzeDiagnosticsResponse | None = None
 
 
 class ApiAnalyzeErrorResponse(BaseModel):

@@ -314,6 +314,48 @@ PRICING_PROVIDER_MIN_INTERVAL_MS=250
 The eBay token must stay in `backend/.env`. Do not pass it to Flutter,
 `--dart-define`, app storage, or source code.
 
+## Real AI + eBay Validation Workflow
+
+Real provider validation is manual/local only. Automated tests mock provider
+responses and must not call OpenAI or eBay.
+
+1. Start mock baseline mode:
+
+```powershell
+cd backend
+$env:AI_PROVIDER="mock"
+$env:PRICING_PROVIDER="mock"
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+2. Validate a local image against the backend contract:
+
+```powershell
+py scripts\validate_real_analysis.py C:\path\to\collectible.jpg --category "Pokemon Card"
+```
+
+3. Enable real provider mode only when you intend to spend API quota/cost:
+
+```powershell
+$env:AI_PROVIDER="openai"
+$env:OPENAI_API_KEY="sk-your-server-side-key"
+$env:PRICING_PROVIDER="ebay"
+$env:EBAY_ACCESS_TOKEN="your-server-side-ebay-token"
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+4. Run the same validation script and record results in
+   `docs/AI_PRICING_VALIDATION.md`.
+
+The validation script prints item name, category, confidence, estimated value,
+value range, pricing source, fallback status, latency, image quality warnings,
+and alternatives. The `/api/analyze` response includes a backend-only
+`diagnostics` object for local validation. Flutter ignores unknown fields and
+the core response contract remains unchanged.
+
+Cost warning: OpenAI and eBay provider calls may consume paid quota. Keep mock
+mode for normal development and CI.
+
 ### Adding Additional Pricing Providers
 
 1. Implement `PricingProvider.price(recognition)`.
