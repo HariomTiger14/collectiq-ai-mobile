@@ -56,6 +56,9 @@ import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
@@ -3555,6 +3558,172 @@ void main() {
       expect(snapshots, hasLength(3));
     });
   });
+
+  group('PriceAlertEvaluator', () {
+    const evaluator = PriceAlertEvaluator();
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('triggers when price rises above threshold', () {
+      final item = _analyticsItem(
+        id: 'charizard',
+        title: 'Charizard Holo',
+        category: 'Trading Card',
+        value: 1850,
+        confidence: 0.94,
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+      final alert = _priceAlert(
+        itemId: item.id,
+        itemTitle: item.title,
+        rule: const PriceAlertRule(
+          type: PriceAlertRuleType.priceRisesAboveAmount,
+          amount: 1800,
+        ),
+      );
+
+      final evaluation = evaluator.evaluateAlert(
+        alert: alert,
+        item: item,
+        now: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(evaluation.triggered, isTrue);
+      expect(evaluation.alert.status, PriceAlertStatus.triggered);
+      expect(evaluation.message, contains('rose above AUD 1,800'));
+    });
+
+    test('triggers when price drops below threshold', () {
+      final item = _analyticsItem(
+        id: 'coin',
+        title: 'Silver Eagle',
+        category: 'Coin',
+        value: 120,
+        confidence: 0.88,
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+      final alert = _priceAlert(
+        itemId: item.id,
+        itemTitle: item.title,
+        rule: const PriceAlertRule(
+          type: PriceAlertRuleType.priceDropsBelowAmount,
+          amount: 150,
+        ),
+      );
+
+      final evaluation = evaluator.evaluateAlert(
+        alert: alert,
+        item: item,
+        now: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(evaluation.triggered, isTrue);
+      expect(evaluation.message, contains('dropped below AUD 150'));
+    });
+
+    test('triggers percentage increase and decrease alerts', () {
+      final risingItem = _analyticsItem(
+        id: 'riser',
+        title: 'Rising Card',
+        category: 'Trading Card',
+        value: 125,
+        confidence: 0.9,
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+      final fallingItem = _analyticsItem(
+        id: 'faller',
+        title: 'Falling Comic',
+        category: 'Comic',
+        value: 80,
+        confidence: 0.9,
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+
+      final increase = evaluator.evaluateAlert(
+        alert: _priceAlert(
+          itemId: risingItem.id,
+          itemTitle: risingItem.title,
+          rule: const PriceAlertRule(
+            type: PriceAlertRuleType.percentageIncrease,
+            percentage: 0.1,
+            baselineValue: 100,
+          ),
+        ),
+        item: risingItem,
+      );
+      final decrease = evaluator.evaluateAlert(
+        alert: _priceAlert(
+          itemId: fallingItem.id,
+          itemTitle: fallingItem.title,
+          rule: const PriceAlertRule(
+            type: PriceAlertRuleType.percentageDecrease,
+            percentage: 0.1,
+            baselineValue: 100,
+          ),
+        ),
+        item: fallingItem,
+      );
+
+      expect(increase.triggered, isTrue);
+      expect(increase.message, contains('gained 25%'));
+      expect(decrease.triggered, isTrue);
+      expect(decrease.message, contains('lost 20%'));
+    });
+
+    test('triggers stale pricing reminder', () {
+      final item = _analyticsItem(
+        id: 'stale',
+        title: 'Stale Price Card',
+        category: 'Trading Card',
+        value: 500,
+        confidence: 0.9,
+        pricingLastUpdated: DateTime.parse('2026-05-01T00:00:00Z'),
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+      final alert = _priceAlert(
+        itemId: item.id,
+        itemTitle: item.title,
+        rule: const PriceAlertRule(
+          type: PriceAlertRuleType.stalePricingReminder,
+          staleAfterDays: 30,
+        ),
+      );
+
+      final evaluation = evaluator.evaluateAlert(
+        alert: alert,
+        item: item,
+        now: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(evaluation.triggered, isTrue);
+      expect(evaluation.message, contains('pricing is stale'));
+    });
+
+    test('persists alerts locally', () async {
+      const repository = SharedPreferencesPriceAlertRepository();
+      final first = _priceAlert(
+        id: 'alert-old',
+        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+      );
+      final latest = _priceAlert(
+        id: 'alert-new',
+        itemId: 'item-2',
+        createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+      );
+
+      await repository.saveAlert(first);
+      await repository.saveAlert(latest);
+
+      final alerts = await repository.getAlerts();
+      expect(alerts.map((alert) => alert.id), ['alert-new', 'alert-old']);
+      expect(await repository.getAlertsForItem('item-2'), hasLength(1));
+
+      await repository.deleteAlert('alert-new');
+      expect(await repository.getAlerts(), hasLength(1));
+    });
+  });
 }
 
 CollectibleItem _testItem() {
@@ -3683,6 +3852,28 @@ CollectibleItem _analyticsItem({
       'sources': ['Mock market'],
       'comps': const [],
     }),
+  );
+}
+
+PriceAlert _priceAlert({
+  String id = 'alert-1',
+  String itemId = 'item-1',
+  String itemTitle = '1999 Pokemon Charizard',
+  PriceAlertRule rule = const PriceAlertRule(
+    type: PriceAlertRuleType.priceRisesAboveAmount,
+    amount: 2000,
+  ),
+  DateTime? createdAt,
+}) {
+  final created = createdAt ?? DateTime.parse('2026-06-30T00:00:00Z');
+  return PriceAlert(
+    id: id,
+    itemId: itemId,
+    itemTitle: itemTitle,
+    rule: rule,
+    status: PriceAlertStatus.active,
+    createdAt: created,
+    updatedAt: created,
   );
 }
 

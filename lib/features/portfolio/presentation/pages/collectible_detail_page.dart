@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends StatelessWidget {
@@ -54,6 +57,8 @@ class CollectibleDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _DetailSections(item: item),
+                  const SizedBox(height: AppSpacing.xl),
+                  _PriceAlertSection(item: item),
                   const SizedBox(height: AppSpacing.xl),
                   _ActionButtons(onDelete: onDelete, itemId: item.id),
                 ],
@@ -698,6 +703,272 @@ class _PriceBars extends StatelessWidget {
   }
 }
 
+class _PriceAlertSection extends ConsumerWidget {
+  const _PriceAlertSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final alerts = ref.watch(itemPriceAlertsProvider(item.id));
+
+    return AppProfileSection(
+      title: 'Price Alerts',
+      children: [
+        Text(
+          'Track value changes locally. Push notifications are not enabled yet.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _CreateAlertButtons(item: item),
+        const SizedBox(height: AppSpacing.lg),
+        alerts.when(
+          data: (itemAlerts) => itemAlerts.isEmpty
+              ? const _NoAlertsMessage()
+              : Column(
+                  children: [
+                    for (final alert in itemAlerts) ...[
+                      _PriceAlertRow(alert: alert),
+                      if (alert != itemAlerts.last)
+                        const SizedBox(height: AppSpacing.md),
+                    ],
+                  ],
+                ),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => Text(
+            'Unable to load local alerts right now.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateAlertButtons extends ConsumerWidget {
+  const _CreateAlertButtons({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        _AlertActionButton(
+          label: 'Alert if value rises 10%',
+          icon: Icons.trending_up_outlined,
+          onPressed: () => _createAlert(
+            context,
+            ref,
+            item,
+            PriceAlertRuleType.percentageIncrease,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _AlertActionButton(
+          label: 'Alert if value drops 10%',
+          icon: Icons.trending_down_outlined,
+          onPressed: () => _createAlert(
+            context,
+            ref,
+            item,
+            PriceAlertRuleType.percentageDecrease,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _AlertActionButton(
+          label: 'Remind when pricing is stale',
+          icon: Icons.schedule_outlined,
+          onPressed: () => _createAlert(
+            context,
+            ref,
+            item,
+            PriceAlertRuleType.stalePricingReminder,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createAlert(
+    BuildContext context,
+    WidgetRef ref,
+    CollectibleItem item,
+    PriceAlertRuleType type,
+  ) async {
+    final repository = ref.read(priceAlertRepositoryProvider);
+    await repository.saveAlert(buildPriceAlert(item: item, type: type));
+    ref.invalidate(itemPriceAlertsProvider(item.id));
+    ref.invalidate(priceAlertSummaryProvider);
+    if (context.mounted) {
+      _showDetailSnackBar(context, 'Price alert created');
+    }
+  }
+}
+
+class _AlertActionButton extends StatelessWidget {
+  const _AlertActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
+    );
+  }
+}
+
+class _NoAlertsMessage extends StatelessWidget {
+  const _NoAlertsMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'No alerts for this collectible yet.',
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+class _PriceAlertRow extends ConsumerWidget {
+  const _PriceAlertRow({required this.alert});
+
+  final PriceAlert alert;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final triggered = alert.status == PriceAlertStatus.triggered;
+    final color = triggered ? AppColors.success : colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                triggered
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_none_outlined,
+                color: color,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _alertRuleLabel(alert.rule),
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      alert.message ?? alert.status.label,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                alert.status.label,
+                style: textTheme.labelLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              if (triggered) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _resetAlert(context, ref, alert),
+                    child: const Text('Reset'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _deleteAlert(context, ref, alert),
+                  child: const Text('Delete'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetAlert(
+    BuildContext context,
+    WidgetRef ref,
+    PriceAlert alert,
+  ) async {
+    final repository = ref.read(priceAlertRepositoryProvider);
+    await repository.saveAlert(
+      alert.copyWith(
+        status: PriceAlertStatus.active,
+        updatedAt: DateTime.now(),
+        clearMessage: true,
+        clearTriggeredAt: true,
+      ),
+    );
+    ref.invalidate(itemPriceAlertsProvider(alert.itemId));
+    ref.invalidate(priceAlertSummaryProvider);
+    if (context.mounted) {
+      _showDetailSnackBar(context, 'Price alert reset');
+    }
+  }
+
+  Future<void> _deleteAlert(
+    BuildContext context,
+    WidgetRef ref,
+    PriceAlert alert,
+  ) async {
+    final repository = ref.read(priceAlertRepositoryProvider);
+    await repository.deleteAlert(alert.id);
+    ref.invalidate(itemPriceAlertsProvider(alert.itemId));
+    ref.invalidate(priceAlertSummaryProvider);
+    if (context.mounted) {
+      _showDetailSnackBar(context, 'Price alert deleted');
+    }
+  }
+}
+
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.itemId, this.onDelete});
 
@@ -721,17 +992,6 @@ class _ActionButtons extends StatelessWidget {
             child: const Text('Re-analyze'),
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              _showDetailSnackBar(context, 'Price tracking coming next');
-            },
-            child: const Text('Track Price'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
@@ -799,6 +1059,25 @@ String _formatPricingDate(DateTime? date) {
   }
 
   return _formatDate(date);
+}
+
+String _alertRuleLabel(PriceAlertRule rule) {
+  switch (rule.type) {
+    case PriceAlertRuleType.priceRisesAboveAmount:
+      return 'Rises above ${_formatAud(rule.amount ?? 0)}';
+    case PriceAlertRuleType.priceDropsBelowAmount:
+      return 'Drops below ${_formatAud(rule.amount ?? 0)}';
+    case PriceAlertRuleType.percentageIncrease:
+      return 'Increases by ${_formatRulePercent(rule.percentage)}';
+    case PriceAlertRuleType.percentageDecrease:
+      return 'Decreases by ${_formatRulePercent(rule.percentage)}';
+    case PriceAlertRuleType.stalePricingReminder:
+      return 'Stale pricing reminder';
+  }
+}
+
+String _formatRulePercent(double? value) {
+  return '${((value ?? 0) * 100).toStringAsFixed(0)}%';
 }
 
 String _marketCurrency(MarketSummary summary) {

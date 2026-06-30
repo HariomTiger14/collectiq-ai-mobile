@@ -57,6 +57,25 @@ void main() {
     expect(find.text('Category Breakdown'), findsNothing);
   });
 
+  testWidgets('home shows local price alert summary', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"alert-card","title":"Alert Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Hold.","imagePath":"sample://card","createdAt":"2026-06-27T00:00:00.000"}]',
+      'price_alerts':
+          '[{"id":"alert-1","itemId":"alert-card","itemTitle":"Alert Charizard","rule":{"type":"priceRisesAboveAmount","amount":1800},"status":"active","createdAt":"2026-06-29T00:00:00.000","updatedAt":"2026-06-29T00:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Price Alerts'), findsOneWidget);
+    expect(find.text('Triggered Alerts'), findsOneWidget);
+    expect(find.textContaining('rose above AUD 1,800'), findsOneWidget);
+  });
+
   testWidgets('home dashboard analytics render from portfolio data', (
     WidgetTester tester,
   ) async {
@@ -1496,16 +1515,24 @@ void main() {
     await tester.pump();
     expect(find.text('Re-analysis coming next'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Track Price'));
+    await tester.ensureVisible(find.text('Price Alerts'));
     await tester.pump();
-    await tester.tap(find.text('Track Price'));
+    expect(find.text('Price Alerts'), findsOneWidget);
+    expect(find.text('No alerts for this collectible yet.'), findsOneWidget);
+    expect(find.text('Alert if value rises 10%'), findsOneWidget);
+    expect(find.text('Alert if value drops 10%'), findsOneWidget);
+    expect(find.text('Remind when pricing is stale'), findsOneWidget);
+
+    await tester.tap(find.text('Alert if value rises 10%'));
     await tester.pump();
-    expect(find.text('Price tracking coming next'), findsOneWidget);
+    expect(find.text('Price alert created'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Increases by 10%'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Sell Item'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sell Item'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Marketplace listing coming next'), findsOneWidget);
   });
 }

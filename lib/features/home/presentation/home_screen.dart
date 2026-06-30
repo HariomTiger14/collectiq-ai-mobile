@@ -8,6 +8,8 @@ import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_hi
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +29,7 @@ class HomeScreen extends ConsumerWidget {
     final performance = ref.watch(
       portfolioPerformanceProvider(portfolio.items),
     );
+    final alertSummary = ref.watch(priceAlertSummaryProvider(portfolio.items));
     final recentItems = orderedItems.take(3).toList();
     final insights = const CollectorDashboardAnalyticsService().build(
       orderedItems,
@@ -88,6 +91,8 @@ class HomeScreen extends ConsumerWidget {
                     _DashboardInsights(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
                     _PortfolioPerformanceSection(performance: performance),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _PriceAlertSummarySection(summary: alertSummary),
                     const SizedBox(height: AppSpacing.xxl),
                     _CategoryBreakdownSection(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
@@ -539,6 +544,108 @@ class _PerformanceRecommendation extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PriceAlertSummarySection extends StatelessWidget {
+  const _PriceAlertSummarySection({required this.summary});
+
+  final AsyncValue<PriceAlertSummary> summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 150),
+      child: AppInfoSection(
+        title: 'Price Alerts',
+        child: summary.when(
+          data: (data) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppResponsiveMetricGroup(
+                metrics: [
+                  AppMetricData(
+                    label: 'Active Alerts',
+                    value: data.activeCount.toString(),
+                    icon: Icons.notifications_active_outlined,
+                  ),
+                  AppMetricData(
+                    label: 'Triggered Alerts',
+                    value: data.triggeredCount.toString(),
+                    icon: Icons.price_change_outlined,
+                  ),
+                  AppMetricData(
+                    label: 'Tracked Items',
+                    value: data.totalCount.toString(),
+                    icon: Icons.bookmark_added_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _AlertSummaryMessage(summary: data),
+            ],
+          ),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => Text(
+            'Price alerts are stored locally and will retry on the next refresh.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AlertSummaryMessage extends StatelessWidget {
+  const _AlertSummaryMessage({required this.summary});
+
+  final PriceAlertSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final hasTriggered = summary.messages.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: hasTriggered
+            ? AppColors.success.withValues(alpha: 0.08)
+            : colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: hasTriggered
+              ? AppColors.success.withValues(alpha: 0.18)
+              : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasTriggered
+                ? Icons.notifications_active_outlined
+                : Icons.notifications_none_outlined,
+            color: hasTriggered ? AppColors.success : colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              hasTriggered
+                  ? summary.messages.first
+                  : 'Create alerts from a collectible detail page to track value changes.',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
