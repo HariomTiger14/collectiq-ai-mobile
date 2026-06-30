@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,6 +47,11 @@ final priceAlertSummaryProvider =
           await repository.saveAlert(evaluation.alert);
         }
       }
+      unawaited(
+        ref
+            .read(priceAlertNotificationDispatcherProvider)
+            .dispatchTriggeredAlerts(evaluations),
+      );
       return evaluator.summaryFromEvaluations(evaluations);
     });
 

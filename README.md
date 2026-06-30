@@ -660,7 +660,8 @@ Release readiness items now covered in the Android shell:
   final brand icon is pending.
 - Splash background and splash mark use CollectIQ colors instead of the default
   white Flutter launch screen.
-- Main manifest permissions are limited to `INTERNET` and `CAMERA`.
+- Main manifest permissions are limited to `INTERNET`, `CAMERA`, and
+  `POST_NOTIFICATIONS` for optional Android 13+ local price alerts.
 - Android Photo Picker is used for gallery selection, so no broad media storage
   permission is required for Android 13+ gallery uploads.
 - Cleartext HTTP traffic is enabled only in the debug manifest for local backend
@@ -708,3 +709,36 @@ Manual release checks:
   need them.
 - Replace the placeholder launcher icon with final store artwork before public
   release.
+
+## Local Price Alert Notifications
+
+Price alerts are evaluated locally from the saved portfolio and local market
+data. When an alert triggers, CollectIQ AI can show an Android local
+notification through the native `collectiq_ai/notifications` MethodChannel.
+No backend push notification service is required, and no pricing API is called
+from Flutter.
+
+Android setup:
+
+- `POST_NOTIFICATIONS` is declared for Android 13+.
+- The app creates a `collectiq_price_alerts` notification channel named
+  `Price Alerts`.
+- Settings shows notification permission status, enable/disable state, and last
+  local notification status.
+- If permission is denied, alerts still evaluate and save locally; notification
+  delivery is skipped with a clear Settings status.
+
+Duplicate protection:
+
+- Each delivered alert stores a local token based on alert id and triggered
+  timestamp.
+- The same already-triggered alert is not notified repeatedly.
+- If an alert is reset and triggers again later with a new timestamp, it can
+  notify again.
+
+Future backend push work:
+
+- Add server-side device tokens only after production auth/cloud sync is fully
+  enabled.
+- Keep push notification credentials server-side.
+- Continue using local alerts as the offline/local-first fallback.

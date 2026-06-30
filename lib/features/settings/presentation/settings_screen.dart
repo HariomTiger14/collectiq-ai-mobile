@@ -7,6 +7,8 @@ import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dar
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
@@ -50,6 +52,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
     final subscriptionState = ref.watch(subscriptionControllerProvider);
+    final notificationState = ref.watch(
+      priceAlertNotificationControllerProvider,
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -146,8 +151,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'App Preferences',
-                    children: const [
-                      _SettingsRow(
+                    children: [
+                      const _SettingsRow(
                         icon: Icons.palette_outlined,
                         title: 'Theme',
                         subtitle: 'System theme is used for now.',
@@ -155,10 +160,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       _SettingsRow(
                         icon: Icons.notifications_none_outlined,
-                        title: 'Notifications',
+                        title: 'Price alert notifications',
+                        subtitle: notificationState.settingsSubtitle,
+                        trailing: notificationState.settingsStatusLabel,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Notification permission',
                         subtitle:
-                            'Price alerts and scan updates are placeholders.',
-                        trailing: 'Off',
+                            'Android 13+ asks before local alerts can be shown.',
+                        trailing: notificationState.permissionStatus.label,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.history_outlined,
+                        title: 'Last notification',
+                        subtitle:
+                            notificationState.lastMessage ??
+                            'No price alert notifications sent yet.',
+                        trailing: notificationState.lastDeliveryStatus.label,
+                      ),
+                      _NotificationActionsPanel(
+                        state: notificationState,
+                        onToggleEnabled: (enabled) => ref
+                            .read(
+                              priceAlertNotificationControllerProvider.notifier,
+                            )
+                            .setEnabled(enabled),
+                        onRequestPermission: () => ref
+                            .read(
+                              priceAlertNotificationControllerProvider.notifier,
+                            )
+                            .requestPermission(),
                       ),
                     ],
                   ),
@@ -696,6 +728,81 @@ class _AuthEmailPanel extends StatelessWidget {
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _NotificationActionsPanel extends StatelessWidget {
+  const _NotificationActionsPanel({
+    required this.state,
+    required this.onToggleEnabled,
+    required this.onRequestPermission,
+  });
+
+  final PriceAlertNotificationState state;
+  final ValueChanged<bool> onToggleEnabled;
+  final VoidCallback onRequestPermission;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final canRequestPermission =
+        state.permissionStatus !=
+            PriceAlertNotificationPermissionStatus.granted &&
+        state.permissionStatus !=
+            PriceAlertNotificationPermissionStatus.notSupported;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          key: const ValueKey('settings-price-alert-notifications-switch'),
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enable price alert notifications',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Alerts stay local on this device. Backend push is not enabled yet.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Switch(
+              value: state.enabled,
+              onChanged: state.isLoading ? null : onToggleEnabled,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('settings-request-notification-permission'),
+            onPressed: state.isLoading || !canRequestPermission
+                ? null
+                : onRequestPermission,
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: Text(
+              state.isLoading
+                  ? 'Checking...'
+                  : 'Request Notification Permission',
+            ),
+          ),
+        ),
       ],
     );
   }
