@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +58,8 @@ class CollectibleDetailPage extends StatelessWidget {
                         ? 'Based on the saved AI estimate'
                         : 'Value range: ${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
                   ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _WishlistStatusSection(item: item),
                   const SizedBox(height: AppSpacing.xl),
                   _DetailSections(item: item),
                   const SizedBox(height: AppSpacing.xl),
@@ -130,6 +135,138 @@ class _ImagePreview extends StatelessWidget {
   Widget _placeholder(ColorScheme colorScheme) {
     return Center(
       child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
+    );
+  }
+}
+
+class _WishlistStatusSection extends ConsumerWidget {
+  const _WishlistStatusSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedStatus = ref.watch(wishlistStatusForItemProvider(item.id));
+
+    return AppProfileSection(
+      title: 'Wishlist Status',
+      children: [
+        Text(
+          'Track whether this collectible is owned, wanted, or still missing.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        selectedStatus.when(
+          data: (status) => _WishlistStatusSelector(
+            selectedStatus: status,
+            onChanged: (nextStatus) => _saveStatus(context, ref, nextStatus),
+          ),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => _WishlistStatusSelector(
+            selectedStatus: WishlistStatus.owned,
+            onChanged: (nextStatus) => _saveStatus(context, ref, nextStatus),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveStatus(
+    BuildContext context,
+    WidgetRef ref,
+    WishlistStatus status,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref
+        .read(wishlistRepositoryProvider)
+        .saveStatus(item: item, status: status);
+    ref.invalidate(wishlistEntriesProvider);
+    ref.invalidate(wishlistStatusForItemProvider(item.id));
+    messenger.showSnackBar(
+      SnackBar(content: Text('Wishlist status set to ${status.label}')),
+    );
+  }
+}
+
+class _WishlistStatusSelector extends StatelessWidget {
+  const _WishlistStatusSelector({
+    required this.selectedStatus,
+    required this.onChanged,
+  });
+
+  final WishlistStatus selectedStatus;
+  final ValueChanged<WishlistStatus> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final status in WishlistStatus.values) ...[
+          _WishlistStatusOption(
+            status: status,
+            selected: selectedStatus == status,
+            onTap: () => onChanged(status),
+          ),
+          if (status != WishlistStatus.values.last)
+            const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _WishlistStatusOption extends StatelessWidget {
+  const _WishlistStatusOption({
+    required this.status,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final WishlistStatus status;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = _wishlistStatusColor(context, status);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: selected ? null : onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: selected
+                ? color.withValues(alpha: 0.1)
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected ? color : colorScheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(_wishlistStatusIcon(status), color: color),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  status.label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (selected) Icon(Icons.check_circle, color: color),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1257,6 +1394,22 @@ void _showDetailSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+IconData _wishlistStatusIcon(WishlistStatus status) {
+  return switch (status) {
+    WishlistStatus.owned => Icons.check_circle_outline,
+    WishlistStatus.wanted => Icons.bookmark_add_outlined,
+    WishlistStatus.missing => Icons.playlist_add_check_outlined,
+  };
+}
+
+Color _wishlistStatusColor(BuildContext context, WishlistStatus status) {
+  return switch (status) {
+    WishlistStatus.owned => AppColors.success,
+    WishlistStatus.wanted => Theme.of(context).colorScheme.primary,
+    WishlistStatus.missing => const Color(0xFFD97706),
+  };
 }
 
 String _formatAud(double value) {

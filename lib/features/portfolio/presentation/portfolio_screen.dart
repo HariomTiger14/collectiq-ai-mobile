@@ -1,7 +1,9 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +53,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     final orderedItems = portfolioState.orderedItems;
     final visibleItems = _visibleItems(orderedItems);
+    final wishlistStatusByItemId = ref
+        .watch(wishlistEntriesProvider)
+        .maybeWhen<Map<String, WishlistStatus>>(
+          data: (entries) => {
+            for (final entry in entries) entry.itemId: entry.status,
+          },
+          orElse: () => const {},
+        );
     _logPortfolioOrder(visibleItems);
 
     return Scaffold(
@@ -138,6 +148,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         else
                           PortfolioItemsGrid(
                             items: visibleItems,
+                            wishlistStatusByItemId: wishlistStatusByItemId,
                             onRemoveItem: (id) => _confirmDelete(
                               context,
                               id,

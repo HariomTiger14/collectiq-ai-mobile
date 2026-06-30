@@ -170,6 +170,8 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
           '[{"id":"home-card","title":"Dashboard Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Grade it.","imagePath":"sample://card","createdAt":"2026-06-27T00:00:00.000","marketSummary":{"averagePrice":1810,"medianPrice":1850,"lowPrice":1443,"highPrice":2257,"salesCount":5,"trendLabel":"Rising","confidence":0.86,"lastUpdated":"2026-06-29T00:00:00Z","sources":["eBay Sold"],"comps":[]}},{"id":"home-coin","title":"Dashboard Silver Eagle","category":"Coin","estimatedValue":300,"confidence":0.70,"condition":"Mint","recommendation":"Store safely.","imagePath":"sample://coin","createdAt":"2026-06-26T00:00:00.000"},{"id":"home-comic","title":"Dashboard Spider-Man","category":"Comic","estimatedValue":600,"confidence":0.88,"condition":"Fine","recommendation":"Bag and board.","imagePath":"sample://comic","createdAt":"2026-06-10T00:00:00.000"}]',
+      'wishlist_status_entries':
+          '[{"itemId":"home-coin","title":"Dashboard Silver Eagle","category":"Coin","status":"wanted","updatedAt":"2026-06-30T00:00:00.000"},{"itemId":"missing-card","title":"Missing Blastoise","category":"Trading Card","status":"missing","updatedAt":"2026-06-29T00:00:00.000"}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -210,6 +212,18 @@ void main() {
       find.text('1 low-confidence items may need a closer look.'),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.text('Wishlist & Goals'));
+    await tester.pump();
+    expect(find.text('Wishlist & Goals'), findsOneWidget);
+    expect(find.text('Owned'), findsWidgets);
+    expect(find.text('Wanted'), findsWidgets);
+    expect(find.text('Missing'), findsWidgets);
+    expect(find.text('Complete Base Set'), findsOneWidget);
+    expect(find.text('Collect 100 Pokemon'), findsOneWidget);
+    expect(find.text('Own 50 graded cards'), findsOneWidget);
+    expect(find.text('Custom goal builder coming soon'), findsOneWidget);
+    expect(find.text('Goal recommendations'), findsOneWidget);
+    expect(find.text('Review missing collectibles'), findsOneWidget);
   });
 
   testWidgets('home dashboard updates after saving a scan', (
@@ -1469,6 +1483,8 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
           '[{"id":"detail-card","title":"Clickable Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","primaryMatch":"1999 Pokemon Charizard Holo","confidenceExplanation":"High confidence from character artwork.","detectionQuality":"Good","aiReasoning":"The image shows a Charizard-like Pokemon card.","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"},"marketSummary":{"averagePrice":1810,"medianPrice":1850,"lowPrice":1443,"highPrice":2257,"salesCount":5,"trendLabel":"Stable","confidence":0.86,"lastUpdated":"2026-06-29T00:00:00Z","sources":["eBay Sold","TCGplayer"],"comps":[{"source":"eBay Sold","title":"1999 Pokemon Charizard sold listing","soldPrice":1850,"currency":"AUD","soldDate":"2026-06-20T00:00:00Z","condition":"Near Mint"}]}}]',
+      'wishlist_status_entries':
+          '[{"itemId":"detail-card","title":"Clickable Charizard","category":"Trading Card","status":"wanted","updatedAt":"2026-06-30T00:00:00.000"}]',
     });
 
     await tester.pumpCollectIqApp();
@@ -1480,11 +1496,13 @@ void main() {
       find.byKey(const ValueKey('portfolio-item-detail-card')),
     );
     await tester.pump();
+    expect(find.text('Wanted'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('portfolio-item-detail-card')));
     await tester.pumpAndSettle();
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Estimated market value'), findsOneWidget);
+    expect(find.text('Wishlist Status'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
   });
@@ -1575,6 +1593,19 @@ void main() {
     expect(find.text('Mock market blend'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Wishlist Status'));
+    await tester.pump();
+    expect(find.text('Wishlist Status'), findsOneWidget);
+    await tester.tap(find.text('Wanted'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wishlist status set to Wanted'), findsOneWidget);
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getString('wishlist_status_entries'),
+      contains('"status":"wanted"'),
+    );
+    await tester.pump(const Duration(seconds: 4));
+
     await tester.ensureVisible(find.text('Price History'));
     await tester.pump();
     expect(find.text('Price History'), findsOneWidget);
@@ -1602,8 +1633,9 @@ void main() {
     await tester.ensureVisible(find.text('Re-analyze'));
     await tester.pump();
     await tester.tap(find.text('Re-analyze'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Re-analysis coming next'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
 
     await tester.ensureVisible(find.text('Price Alerts'));
     await tester.pump();
@@ -1614,7 +1646,7 @@ void main() {
     expect(find.text('Remind when pricing is stale'), findsOneWidget);
 
     await tester.tap(find.text('Alert if value rises 10%'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Price alert created'), findsOneWidget);
     await tester.pumpAndSettle();
     expect(find.text('Increases by 10%'), findsOneWidget);

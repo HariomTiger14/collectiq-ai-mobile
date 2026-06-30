@@ -74,6 +74,9 @@ import 'package:collectiq_ai/features/subscription/domain/repositories/billing_r
 import 'package:collectiq_ai/features/subscription/domain/repositories/entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/wishlist/data/repositories/shared_preferences_wishlist_repository.dart';
+import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
+import 'package:collectiq_ai/features/wishlist/domain/services/wishlist_service.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -3293,6 +3296,85 @@ void main() {
             .progress,
         closeTo(0.11, 0.01),
       );
+    });
+  });
+
+  group('WishlistService', () {
+    const service = WishlistService();
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('persists wishlist status updates locally', () async {
+      const repository = SharedPreferencesWishlistRepository();
+      final item = _testItemWith(id: 'wishlist-card');
+
+      await repository.saveStatus(item: item, status: WishlistStatus.wanted);
+
+      expect(
+        await repository.getStatusForItem('wishlist-card'),
+        WishlistStatus.wanted,
+      );
+      expect(await repository.getEntries(), hasLength(1));
+
+      await repository.saveStatus(item: item, status: WishlistStatus.missing);
+      final entries = await repository.getEntries();
+
+      expect(
+        await repository.getStatusForItem('wishlist-card'),
+        WishlistStatus.missing,
+      );
+      expect(entries, hasLength(1));
+      expect(entries.single.title, '1999 Pokemon Charizard');
+    });
+
+    test('builds wishlist summary from portfolio items and status entries', () {
+      final items = [
+        _testItemWith(id: 'owned-card'),
+        _testItemWith(id: 'wanted-card', title: 'Wanted Pikachu'),
+      ];
+      final summary = service.buildSummary(
+        items: items,
+        entries: [
+          WishlistStatusEntry(
+            itemId: 'wanted-card',
+            title: 'Wanted Pikachu',
+            category: 'Trading Card',
+            status: WishlistStatus.wanted,
+            updatedAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          ),
+          WishlistStatusEntry(
+            itemId: 'missing-card',
+            title: 'Missing Blastoise',
+            category: 'Trading Card',
+            status: WishlistStatus.missing,
+            updatedAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+        ],
+      );
+
+      expect(summary.countFor(WishlistStatus.owned), 1);
+      expect(summary.countFor(WishlistStatus.wanted), 1);
+      expect(summary.countFor(WishlistStatus.missing), 1);
+      expect(summary.recommendations, contains('Review missing collectibles'));
+      expect(
+        summary.recommendations,
+        contains('Add missing items to wishlist'),
+      );
+    });
+
+    test('collection goal progress exposes percentage completion', () {
+      const goal = CollectionGoal(
+        type: CollectionGoalType.collectPokemon,
+        title: 'Collect 100 Pokemon',
+        description: 'Build a dedicated Pokemon collection.',
+        current: 80,
+        target: 100,
+      );
+
+      expect(goal.progress, 0.8);
+      expect(goal.progressLabel, '80 / 100');
     });
   });
 

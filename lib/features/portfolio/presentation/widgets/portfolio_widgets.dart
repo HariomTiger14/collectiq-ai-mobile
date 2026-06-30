@@ -1,5 +1,7 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
+import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 
@@ -228,6 +230,7 @@ class PortfolioItemsGrid extends StatelessWidget {
     required this.items,
     required this.onRemoveItem,
     required this.onOpenItem,
+    this.wishlistStatusByItemId = const {},
     super.key,
   });
 
@@ -240,6 +243,8 @@ class PortfolioItemsGrid extends StatelessWidget {
   /// Called when a user opens an item.
   final ValueChanged<CollectibleItem> onOpenItem;
 
+  final Map<String, WishlistStatus> wishlistStatusByItemId;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -250,6 +255,7 @@ class PortfolioItemsGrid extends StatelessWidget {
             width: double.infinity,
             child: _PortfolioItemCard(
               item: item,
+              wishlistStatus: wishlistStatusByItemId[item.id],
               onTap: () => onOpenItem(item),
               onRemove: () => onRemoveItem(item.id),
             ),
@@ -264,11 +270,13 @@ class PortfolioItemsGrid extends StatelessWidget {
 class _PortfolioItemCard extends StatelessWidget {
   const _PortfolioItemCard({
     required this.item,
+    required this.wishlistStatus,
     required this.onTap,
     required this.onRemove,
   });
 
   final CollectibleItem item;
+  final WishlistStatus? wishlistStatus;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
@@ -299,7 +307,12 @@ class _PortfolioItemCard extends StatelessWidget {
                 size: 108,
               ),
               const SizedBox(width: AppSpacing.md),
-              Expanded(child: _PortfolioItemDetails(item: item)),
+              Expanded(
+                child: _PortfolioItemDetails(
+                  item: item,
+                  wishlistStatus: wishlistStatus,
+                ),
+              ),
               const SizedBox(width: AppSpacing.xs),
               Column(
                 children: [
@@ -416,9 +429,10 @@ class _PortfolioImagePlaceholder extends StatelessWidget {
 }
 
 class _PortfolioItemDetails extends StatelessWidget {
-  const _PortfolioItemDetails({required this.item});
+  const _PortfolioItemDetails({required this.item, this.wishlistStatus});
 
   final CollectibleItem item;
+  final WishlistStatus? wishlistStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -472,6 +486,12 @@ class _PortfolioItemDetails extends StatelessWidget {
               icon: Icons.trending_up_outlined,
               color: AppColors.secondaryAccent,
             ),
+            if (wishlistStatus != null)
+              _PortfolioBadge(
+                label: wishlistStatus!.label,
+                icon: _wishlistStatusIcon(wishlistStatus!),
+                color: _wishlistStatusColor(context, wishlistStatus!),
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -543,6 +563,22 @@ class _PortfolioBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+IconData _wishlistStatusIcon(WishlistStatus status) {
+  return switch (status) {
+    WishlistStatus.owned => Icons.check_circle_outline,
+    WishlistStatus.wanted => Icons.bookmark_add_outlined,
+    WishlistStatus.missing => Icons.playlist_add_check_outlined,
+  };
+}
+
+Color _wishlistStatusColor(BuildContext context, WishlistStatus status) {
+  return switch (status) {
+    WishlistStatus.owned => AppColors.success,
+    WishlistStatus.wanted => Theme.of(context).colorScheme.primary,
+    WishlistStatus.missing => const Color(0xFFD97706),
+  };
 }
 
 String _formatDate(DateTime date) {

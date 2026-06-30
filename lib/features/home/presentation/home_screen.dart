@@ -11,6 +11,8 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +33,7 @@ class HomeScreen extends ConsumerWidget {
       portfolioPerformanceProvider(portfolio.items),
     );
     final alertSummary = ref.watch(priceAlertSummaryProvider(portfolio.items));
+    final wishlistSummary = ref.watch(wishlistSummaryProvider(portfolio.items));
     final recentItems = orderedItems.take(3).toList();
     final insights = const CollectorDashboardAnalyticsService().build(
       orderedItems,
@@ -114,7 +117,10 @@ class HomeScreen extends ConsumerWidget {
                       intelligence: smartIntelligence,
                     ),
                     const SizedBox(height: AppSpacing.xxl),
-                    _WishlistGoalsSection(intelligence: smartIntelligence),
+                    _WishlistGoalsSection(
+                      intelligence: smartIntelligence,
+                      summary: wishlistSummary,
+                    ),
                     const SizedBox(height: AppSpacing.xxl),
                     _AchievementsSection(intelligence: smartIntelligence),
                     const SizedBox(height: AppSpacing.xxl),
@@ -1223,9 +1229,13 @@ class _AiCollectorRecommendationRow extends StatelessWidget {
 }
 
 class _WishlistGoalsSection extends StatelessWidget {
-  const _WishlistGoalsSection({required this.intelligence});
+  const _WishlistGoalsSection({
+    required this.intelligence,
+    required this.summary,
+  });
 
   final SmartCollectorIntelligence intelligence;
+  final AsyncValue<WishlistSummary> summary;
 
   @override
   Widget build(BuildContext context) {
@@ -1236,34 +1246,41 @@ class _WishlistGoalsSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppResponsiveMetricGroup(
-              metrics: [
-                AppMetricData(
-                  label: 'Owned',
-                  value:
-                      '${intelligence.wishlistStatusCounts[WishlistStatus.owned] ?? 0}',
-                  icon: Icons.check_circle_outline,
+            summary.when(
+              data: (data) => _WishlistSummaryMetrics(summary: data),
+              loading: () => _WishlistSummaryMetrics(
+                summary: WishlistSummary(
+                  counts: intelligence.wishlistStatusCounts,
+                  entries: const [],
+                  recommendations: const [],
                 ),
-                AppMetricData(
-                  label: 'Wanted',
-                  value:
-                      '${intelligence.wishlistStatusCounts[WishlistStatus.wanted] ?? 0}',
-                  icon: Icons.bookmark_add_outlined,
+              ),
+              error: (_, _) => _WishlistSummaryMetrics(
+                summary: WishlistSummary(
+                  counts: intelligence.wishlistStatusCounts,
+                  entries: const [],
+                  recommendations: const ['Wishlist status will retry soon.'],
                 ),
-                AppMetricData(
-                  label: 'Missing',
-                  value:
-                      '${intelligence.wishlistStatusCounts[WishlistStatus.missing] ?? 0}',
-                  icon: Icons.playlist_add_check_outlined,
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             for (final goal in intelligence.goals) ...[
-              _CollectionGoalRow(goal: goal),
+              _CollectionGoalCard(goal: goal),
               if (goal != intelligence.goals.last)
                 const SizedBox(height: AppSpacing.md),
             ],
+            const SizedBox(height: AppSpacing.md),
+            const _CustomGoalPlaceholder(),
+            const SizedBox(height: AppSpacing.lg),
+            _GoalRecommendations(
+              recommendations: summary.maybeWhen(
+                data: (data) => data.recommendations,
+                orElse: () => const [
+                  'Add missing items to wishlist',
+                  'Scan more Pokemon cards',
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1271,8 +1288,83 @@ class _WishlistGoalsSection extends StatelessWidget {
   }
 }
 
-class _CollectionGoalRow extends StatelessWidget {
-  const _CollectionGoalRow({required this.goal});
+class _WishlistSummaryMetrics extends StatelessWidget {
+  const _WishlistSummaryMetrics({required this.summary});
+
+  final WishlistSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppResponsiveMetricGroup(
+          metrics: [
+            AppMetricData(
+              label: 'Owned',
+              value: '${summary.countFor(WishlistStatus.owned)}',
+              icon: Icons.check_circle_outline,
+            ),
+            AppMetricData(
+              label: 'Wanted',
+              value: '${summary.countFor(WishlistStatus.wanted)}',
+              icon: Icons.bookmark_add_outlined,
+            ),
+            AppMetricData(
+              label: 'Missing',
+              value: '${summary.countFor(WishlistStatus.missing)}',
+              icon: Icons.playlist_add_check_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _WishlistStatusBar(summary: summary),
+      ],
+    );
+  }
+}
+
+class _WishlistStatusBar extends StatelessWidget {
+  const _WishlistStatusBar({required this.summary});
+
+  final WishlistSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = WishlistStatus.values.fold<int>(
+      0,
+      (sum, status) => sum + summary.countFor(status),
+    );
+    if (total == 0) {
+      return Text(
+        'Mark items as wanted, owned, or missing from the detail page.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Row(
+        children: [
+          for (final status in WishlistStatus.values)
+            if (summary.countFor(status) > 0)
+              Expanded(
+                flex: summary.countFor(status),
+                child: Container(
+                  height: 10,
+                  color: _wishlistStatusColor(context, status),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollectionGoalCard extends StatelessWidget {
+  const _CollectionGoalCard({required this.goal});
 
   final CollectionGoal goal;
 
@@ -1305,12 +1397,24 @@ class _CollectionGoalRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              Text(
-                goal.progressLabel,
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w900,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    goal.progressLabel,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    _goalStatus(goal),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1330,8 +1434,98 @@ class _CollectionGoalRow extends StatelessWidget {
               backgroundColor: colorScheme.surfaceContainerHighest,
             ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${(goal.progress * 100).toStringAsFixed(0)}% complete',
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _CustomGoalPlaceholder extends StatelessWidget {
+  const _CustomGoalPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.add_task_outlined, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              'Custom goal builder coming soon',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalRecommendations extends StatelessWidget {
+  const _GoalRecommendations({required this.recommendations});
+
+  final List<String> recommendations;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = recommendations.isEmpty
+        ? const ['Add missing items to wishlist']
+        : recommendations.take(4).toList(growable: false);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Goal recommendations',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final recommendation in items) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.lightbulb_outline,
+                size: 18,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  recommendation,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (recommendation != items.last)
+            const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
     );
   }
 }
@@ -2395,6 +2589,27 @@ IconData _achievementIcon(AchievementType type) {
     case AchievementType.completionist:
       return Icons.emoji_events_outlined;
   }
+}
+
+String _goalStatus(CollectionGoal goal) {
+  if (goal.progress >= 1) {
+    return 'Complete';
+  }
+  if (goal.progress >= 0.8) {
+    return 'Almost there';
+  }
+  if (goal.current == 0) {
+    return 'Not started';
+  }
+  return 'In progress';
+}
+
+Color _wishlistStatusColor(BuildContext context, WishlistStatus status) {
+  return switch (status) {
+    WishlistStatus.owned => AppColors.success,
+    WishlistStatus.wanted => Theme.of(context).colorScheme.primary,
+    WishlistStatus.missing => const Color(0xFFD97706),
+  };
 }
 
 String _formatAud(double value) {
