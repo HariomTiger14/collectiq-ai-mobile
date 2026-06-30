@@ -338,6 +338,7 @@ class _PortfolioControls extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final searchField = TextFormField(
+          key: const ValueKey('portfolio-search-field'),
           initialValue: searchQuery,
           onChanged: onSearchChanged,
           decoration: const InputDecoration(
@@ -399,6 +400,7 @@ class _PortfolioCategoryFilterChips extends StatelessWidget {
         children: [
           for (final filter in _PortfolioCategoryFilter.values) ...[
             ChoiceChip(
+              key: ValueKey('portfolio-filter-${filter.name}'),
               label: Text(filter.label),
               selected: selectedFilter == filter,
               onSelected: (_) => onChanged(filter),

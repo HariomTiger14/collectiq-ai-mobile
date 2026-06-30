@@ -83,40 +83,62 @@ class _AppShellState extends ConsumerState<AppShell>
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(appShellTabControllerProvider);
     final tabs = <Widget>[
-      HomeScreen(onScanPressed: _startNewScan),
-      ScannerScreen(
-        onViewPortfolio: () => _selectTab(
-          AppShellTabController.portfolioTab,
-          reason: 'scan-view-portfolio',
+      KeyedSubtree(
+        key: const ValueKey('screen-home'),
+        child: HomeScreen(onScanPressed: _startNewScan),
+      ),
+      KeyedSubtree(
+        key: const ValueKey('screen-scan'),
+        child: ScannerScreen(
+          onViewPortfolio: () => _selectTab(
+            AppShellTabController.portfolioTab,
+            reason: 'scan-view-portfolio',
+          ),
         ),
       ),
-      PortfolioScreen(onScanPressed: _startNewScan),
-      const SettingsScreen(),
+      KeyedSubtree(
+        key: const ValueKey('screen-portfolio'),
+        child: PortfolioScreen(onScanPressed: _startNewScan),
+      ),
+      const KeyedSubtree(
+        key: ValueKey('screen-settings'),
+        child: SettingsScreen(),
+      ),
     ];
 
     return Scaffold(
-      body: IndexedStack(index: selectedIndex, children: tabs),
+      key: const ValueKey('app-shell'),
+      body: IndexedStack(
+        key: const ValueKey('app-shell-indexed-stack'),
+        index: selectedIndex,
+        children: tabs,
+      ),
       bottomNavigationBar: NavigationBar(
+        key: const ValueKey('bottom-navigation'),
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) =>
             _selectTab(index, reason: 'bottom-navigation'),
         destinations: const [
           NavigationDestination(
+            key: ValueKey('nav-home'),
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
           NavigationDestination(
+            key: ValueKey('nav-scan'),
             icon: Icon(Icons.document_scanner_outlined),
             selectedIcon: Icon(Icons.document_scanner),
             label: 'Scan',
           ),
           NavigationDestination(
+            key: ValueKey('nav-portfolio'),
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Portfolio',
           ),
           NavigationDestination(
+            key: ValueKey('nav-settings'),
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',

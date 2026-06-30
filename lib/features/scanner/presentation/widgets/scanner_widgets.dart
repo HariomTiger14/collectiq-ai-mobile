@@ -238,6 +238,7 @@ class _ScanActions extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.xl),
         _GradientScanButton(
+          key: const ValueKey('scan-camera-button'),
           isLoading: isBusy,
           onPressed: isBusy
               ? null
@@ -254,6 +255,7 @@ class _ScanActions extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
+          key: const ValueKey('scan-gallery-button'),
           onPressed: isBusy
               ? null
               : () async {
@@ -271,6 +273,7 @@ class _ScanActions extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
+          key: const ValueKey('scan-sample-button'),
           onPressed: isBusy ? null : scannerController.useSampleScan,
           icon: const Icon(Icons.science_outlined),
           label: const Text('Use Sample Scan'),
@@ -281,7 +284,11 @@ class _ScanActions extends ConsumerWidget {
 }
 
 class _GradientScanButton extends StatelessWidget {
-  const _GradientScanButton({required this.isLoading, required this.onPressed});
+  const _GradientScanButton({
+    required this.isLoading,
+    required this.onPressed,
+    super.key,
+  });
 
   final bool isLoading;
   final VoidCallback? onPressed;
@@ -596,6 +603,7 @@ class ScanPreviewCard extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
+              key: const ValueKey('scan-analyze-button'),
               onPressed: isBusy
                   ? null
                   : () async {
