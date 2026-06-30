@@ -1,7 +1,11 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -23,18 +27,22 @@ class ScannerStep {
 
 class ScannerHistoryItem {
   const ScannerHistoryItem({
+    required this.id,
     required this.name,
     required this.estimatedValue,
     required this.date,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
+  final String id;
   final String name;
   final String estimatedValue;
   final String date;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 }
 
 class ScannerHeader extends StatelessWidget {
@@ -211,6 +219,7 @@ class _ScanActions extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final scannerState = ref.watch(scannerControllerProvider);
     final scannerController = ref.read(scannerControllerProvider.notifier);
+    final isBusy = scannerState.isLoading || scannerState.isPreparingImage;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,46 +238,40 @@ class _ScanActions extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.xl),
         _GradientScanButton(
-          isLoading: scannerState.isLoading,
-          onPressed: scannerState.isLoading
+          isLoading: isBusy,
+          onPressed: isBusy
               ? null
               : () async {
+                  logCollectIqScanFlow(
+                    'camera button tapped',
+                    selectedImagePath: scannerState.selectedImagePath,
+                    isLoading: scannerState.isLoading,
+                    isPreparingImage: scannerState.isPreparingImage,
+                    currentTabIndex: ref.read(appShellTabControllerProvider),
+                  );
                   await scannerController.startCameraScan(context);
-                  if (!context.mounted) {
-                    return;
-                  }
-                  final errorMessage = ref
-                      .read(scannerControllerProvider)
-                      .errorMessage;
-                  if (errorMessage != null) {
-                    _showScannerSnackBar(context, errorMessage);
-                  }
                 },
         ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
-          onPressed: scannerState.isLoading
+          onPressed: isBusy
               ? null
               : () async {
+                  logCollectIqScanFlow(
+                    'gallery button tapped',
+                    selectedImagePath: scannerState.selectedImagePath,
+                    isLoading: scannerState.isLoading,
+                    isPreparingImage: scannerState.isPreparingImage,
+                    currentTabIndex: ref.read(appShellTabControllerProvider),
+                  );
                   await scannerController.pickImageFromGallery();
-                  if (!context.mounted) {
-                    return;
-                  }
-                  final errorMessage = ref
-                      .read(scannerControllerProvider)
-                      .errorMessage;
-                  if (errorMessage != null) {
-                    _showScannerSnackBar(context, errorMessage);
-                  }
                 },
           icon: const Icon(Icons.photo_library_outlined),
           label: const Text('Choose from Gallery'),
         ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
-          onPressed: scannerState.isLoading
-              ? null
-              : scannerController.useSampleScan,
+          onPressed: isBusy ? null : scannerController.useSampleScan,
           icon: const Icon(Icons.science_outlined),
           label: const Text('Use Sample Scan'),
         ),
@@ -338,6 +341,127 @@ void _showScannerSnackBar(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
+/// Keeps the scan screen visually stable while Android returns a picker image.
+class ScanPreparingImageCard extends StatelessWidget {
+  /// Creates the preparing image card.
+  const ScanPreparingImageCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    logCollectIqScanFlow('preparing image shell visible');
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.28)),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Preparing image...',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Copying your photo into CollectIQ storage.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ScanErrorPanel extends StatelessWidget {
+  const ScanErrorPanel({required this.message, super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: colorScheme.error),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Scan interrupted',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  message,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Displays the selected scanner image and its current analysis readiness.
 class ScanPreviewCard extends ConsumerWidget {
   /// Creates a scan preview card.
@@ -364,92 +488,140 @@ class ScanPreviewCard extends ConsumerWidget {
     final isLoading = ref.watch(
       scannerControllerProvider.select((state) => state.isLoading),
     );
+    final isPreparingImage = ref.watch(
+      scannerControllerProvider.select((state) => state.isPreparingImage),
+    );
+    final isBusy = isLoading || isPreparingImage;
     final scannerController = ref.read(scannerControllerProvider.notifier);
+    logCollectIqScanFlow(
+      'analyze button visible',
+      selectedImagePath: imagePath,
+      isLoading: isLoading,
+      isPreparingImage: isPreparingImage,
+      currentTabIndex: ref.read(appShellTabControllerProvider),
+      details: {'enabled': !isBusy},
+    );
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+        border: Border.all(
+          color: isBusy
+              ? colorScheme.primary.withValues(alpha: 0.34)
+              : colorScheme.outlineVariant,
+        ),
+        boxShadow: isBusy
+            ? [...AppElevation.level1, ...AppElevation.accentGlow]
+            : AppElevation.level1,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            child: _ScanPreviewThumbnail(
-              imagePath: imagePath,
-              colorScheme: colorScheme,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppTwoLineTitle(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  status,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                child: Icon(
+                  Icons.check_circle_outline,
+                  color: colorScheme.primary,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: isLoading
-                        ? null
-                        : () async {
-                            await scannerController.analyzeWithAi();
-                            if (!context.mounted) {
-                              return;
-                            }
-                            final errorMessage = ref
-                                .read(scannerControllerProvider)
-                                .errorMessage;
-                            if (errorMessage != null) {
-                              _showScannerSnackBar(context, errorMessage);
-                            }
-                          },
-                    child: SizedBox(
-                      height: 20,
-                      child: Center(
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Analyze with AI'),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Image selected',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Review your photo, then analyze for identity, value, and condition.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: isLoading
-                      ? const Padding(
-                          key: ValueKey('processing-panel'),
-                          padding: EdgeInsets.only(top: AppSpacing.md),
-                          child: _ProcessingPanel(),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: _ScanPreviewThumbnail(
+                imagePath: imagePath,
+                colorScheme: colorScheme,
+                width: double.infinity,
+                height: 240,
+              ),
             ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppTwoLineTitle(
+            title,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            status,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: isBusy
+                  ? null
+                  : () async {
+                      await scannerController.analyzeWithAi();
+                    },
+              icon: isLoading
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome_outlined),
+              label: Text(isLoading ? 'Analyzing...' : 'Analyze with AI'),
+            ),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: isLoading
+                ? const Padding(
+                    key: ValueKey('processing-panel'),
+                    padding: EdgeInsets.only(top: AppSpacing.md),
+                    child: _ProcessingPanel(),
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -471,49 +643,187 @@ class _ProcessingPanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primary.withValues(alpha: 0.1),
+              colorScheme.secondary.withValues(alpha: 0.08),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Analyzing image',
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (var index = 0; index < _steps.length; index++) ...[
+              _ProcessingStep(
+                label: '${_steps[index]}...',
+                progress: (index + 1) / _steps.length,
+              ),
+              if (index != _steps.length - 1)
+                const SizedBox(height: AppSpacing.sm),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProcessingStep extends StatelessWidget {
+  const _ProcessingStep({required this.label, required this.progress});
+
+  final String label;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 680),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) {
+              return LinearProgressIndicator(
+                minHeight: 5,
+                value: value,
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.72),
+                color: colorScheme.primary,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FadeSlideIn extends StatelessWidget {
+  const _FadeSlideIn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 18 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+class _ResultSectionCard extends StatelessWidget {
+  const _ResultSectionCard({
+    required this.title,
+    required this.child,
+    this.icon,
+  });
+
+  final String title;
+  final Widget child;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
+              if (icon != null) ...[
+                Icon(icon, color: colorScheme.primary, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Expanded(
                 child: Text(
-                  'Analyzing image',
-                  style: textTheme.labelLarge?.copyWith(
+                  title,
+                  style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          for (final step in _steps)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Text(
-                '$step...',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+          const SizedBox(height: AppSpacing.md),
+          child,
         ],
       ),
     );
@@ -524,10 +834,14 @@ class _ScanPreviewThumbnail extends StatelessWidget {
   const _ScanPreviewThumbnail({
     required this.imagePath,
     required this.colorScheme,
+    required this.width,
+    required this.height,
   });
 
   final String imagePath;
   final ColorScheme colorScheme;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -535,6 +849,8 @@ class _ScanPreviewThumbnail extends StatelessWidget {
       key: ValueKey('scan-preview-image-$imagePath'),
       imagePath: imagePath,
       colorScheme: colorScheme,
+      width: width,
+      height: height,
     );
   }
 }
@@ -543,11 +859,15 @@ class _StableScanPreviewImage extends StatefulWidget {
   const _StableScanPreviewImage({
     required this.imagePath,
     required this.colorScheme,
+    required this.width,
+    required this.height,
     super.key,
   });
 
   final String imagePath;
   final ColorScheme colorScheme;
+  final double width;
+  final double height;
 
   @override
   State<_StableScanPreviewImage> createState() =>
@@ -567,8 +887,8 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
 
     if (imagePath.startsWith('sample://')) {
       return Container(
-        width: 88,
-        height: 88,
+        width: widget.width,
+        height: widget.height,
         color: colorScheme.primaryContainer,
         child: Icon(Icons.style_outlined, color: colorScheme.primary),
       );
@@ -577,11 +897,11 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return Image.network(
         imagePath,
-        width: 88,
-        height: 88,
-        fit: BoxFit.cover,
-        cacheWidth: 256,
-        cacheHeight: 256,
+        width: widget.width,
+        height: widget.height,
+        fit: BoxFit.contain,
+        cacheWidth: 900,
+        cacheHeight: 900,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
           return _fallbackThumbnail(colorScheme);
@@ -592,11 +912,11 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
     if (imagePath.startsWith('assets/')) {
       return Image.asset(
         imagePath,
-        width: 88,
-        height: 88,
-        fit: BoxFit.cover,
-        cacheWidth: 256,
-        cacheHeight: 256,
+        width: widget.width,
+        height: widget.height,
+        fit: BoxFit.contain,
+        cacheWidth: 900,
+        cacheHeight: 900,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
           return _fallbackThumbnail(colorScheme);
@@ -606,11 +926,11 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
 
     return Image.file(
       File(imagePath),
-      width: 88,
-      height: 88,
-      fit: BoxFit.cover,
-      cacheWidth: 256,
-      cacheHeight: 256,
+      width: widget.width,
+      height: widget.height,
+      fit: BoxFit.contain,
+      cacheWidth: 900,
+      cacheHeight: 900,
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
         return _fallbackThumbnail(colorScheme);
@@ -620,8 +940,8 @@ class _StableScanPreviewImageState extends State<_StableScanPreviewImage>
 
   Widget _fallbackThumbnail(ColorScheme colorScheme) {
     return Container(
-      width: 88,
-      height: 88,
+      width: widget.width,
+      height: widget.height,
       color: colorScheme.primaryContainer,
       child: Icon(Icons.image_outlined, color: colorScheme.primary),
     );
@@ -643,6 +963,7 @@ class AiResultCard extends ConsumerWidget {
     required this.detectionQuality,
     required this.aiReasoning,
     required this.pricing,
+    this.marketSummary,
     required this.recommendation,
     required this.isSaved,
     required this.onScanAnother,
@@ -700,6 +1021,8 @@ class AiResultCard extends ConsumerWidget {
   /// Market pricing supplied by the pricing provider.
   final PricingInfo pricing;
 
+  final MarketSummary? marketSummary;
+
   final bool isSaved;
   final VoidCallback? onViewPortfolio;
   final VoidCallback onScanAnother;
@@ -725,138 +1048,221 @@ class AiResultCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final scannerController = ref.read(scannerControllerProvider.notifier);
     final collectibleDetails = _metadataRows();
+    final trendLabel = marketSummary?.trendLabel ?? 'Stable';
+    final valueRange =
+        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}';
+    final keyAttributes = [
+      _MetadataDetail('Category', category),
+      _MetadataDetail('Condition', condition),
+      _MetadataDetail('Trend', trendLabel),
+      _MetadataDetail('Rarity', rarity),
+      _MetadataDetail('Year', year),
+      _MetadataDetail('Brand', brand),
+      _MetadataDetail('Set', setName),
+      _MetadataDetail('Character', playerOrCharacter),
+    ].where((detail) => detail.value.trim().isNotEmpty).take(6).toList();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'AI Result',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
+    return _FadeSlideIn(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: colorScheme.outlineVariant),
+          boxShadow: AppElevation.level2,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    boxShadow: AppElevation.accentGlow,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_outlined,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Analysis Result',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Primary match and market estimate',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppTwoLineTitle(
+              item,
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                height: 1.12,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              primaryMatch,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppPriceHero(
+              label: 'Estimated market value',
+              value: estimatedValue,
+              subtitle: 'Estimated value range: $valueRange',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _ResultBadgeWrap(
+              badges: [
+                _ResultBadgeData(
+                  icon: Icons.verified_outlined,
+                  label: '$confidence confidence',
+                  color: colorScheme.primary,
+                ),
+                _ResultBadgeData(
+                  icon: Icons.grade_outlined,
+                  label: condition,
+                  color: AppColors.success,
+                ),
+                _ResultBadgeData(
+                  icon: Icons.trending_up_outlined,
+                  label: 'Market trend: $trendLabel',
+                  color: AppColors.secondaryAccent,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (keyAttributes.isNotEmpty)
+              _ResultSectionCard(
+                title: 'Key Attributes',
+                icon: Icons.tune_outlined,
+                child: _KeyAttributesGrid(items: keyAttributes),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            _ResultSectionCard(
+              title: 'Market Pricing',
+              icon: Icons.paid_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AiResultRow(
+                    label: 'Market Value',
+                    value: _formatMoney(
+                      pricing.estimatedMarketValue,
+                      pricing.currency,
+                    ),
+                  ),
+                  _AiResultRow(label: 'Estimated Range', value: valueRange),
+                  _AiResultRow(
+                    label: 'Pricing Source',
+                    value: pricing.pricingSource,
+                  ),
+                  _AiResultRow(
+                    label: 'Pricing Confidence',
+                    value:
+                        '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+                  ),
+                  _AiResultRow(
+                    label: 'Last Updated',
+                    value: _formatPricingDate(pricing.lastUpdated),
+                  ),
+                ],
+              ),
+            ),
+            if (marketSummary != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ResultSectionCard(
+                title: 'Market Summary',
+                icon: Icons.query_stats_outlined,
+                child: _MarketSummarySection(summary: marketSummary!),
+              ),
+            ],
+            if (collectibleDetails.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ResultSectionCard(
+                title: 'Collectible Details',
+                icon: Icons.inventory_2_outlined,
+                child: _KeyAttributesGrid(items: collectibleDetails),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            _ResultSectionCard(
+              title: 'Why this match?',
+              icon: Icons.psychology_alt_outlined,
+              child: _AiReviewSection(
+                title: 'Confidence explanation',
+                body:
+                    '$confidenceExplanation\n\nDetection quality: $detectionQuality\n\n$aiReasoning',
+              ),
+            ),
+            if (alternativeMatches.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ResultSectionCard(
+                title: 'Alternative Matches',
+                icon: Icons.compare_arrows_outlined,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppTwoLineTitle(
-                      item,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      primaryMatch,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    for (final match in alternativeMatches.take(3))
+                      _AlternativeMatchTile(match: match),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              _ConfidenceBadge(label: confidence),
             ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _AiResultRow(label: 'Category', value: category),
-          _AiResultRow(label: 'Estimated Value', value: estimatedValue),
-          _AiResultRow(label: 'Condition', value: condition),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Market Value',
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _AiResultRow(
-            label: 'Market Value',
-            value: _formatMoney(pricing.estimatedMarketValue, pricing.currency),
-          ),
-          _AiResultRow(
-            label: 'Estimated Range',
-            value:
-                '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
-          ),
-          _AiResultRow(label: 'Pricing Source', value: pricing.pricingSource),
-          _AiResultRow(
-            label: 'Pricing Confidence',
-            value: '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
-          ),
-          _AiResultRow(
-            label: 'Last Updated',
-            value: _formatPricingDate(pricing.lastUpdated),
-          ),
-          if (collectibleDetails.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            Text(
-              'Collectible Details',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            _ResultSectionCard(
+              title: 'Recommendation',
+              icon: Icons.lightbulb_outline,
+              child: Text(recommendation, style: textTheme.bodyMedium),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isSaved
+                    ? null
+                    : () async {
+                        final didSave = await scannerController
+                            .saveScanResultToPortfolio();
+                        if (!context.mounted || !didSave) {
+                          return;
+                        }
+                        _showScannerSnackBar(context, 'Saved to portfolio');
+                      },
+                icon: Icon(
+                  isSaved
+                      ? Icons.check_circle_outline
+                      : Icons.bookmark_add_outlined,
+                ),
+                label: Text(isSaved ? 'Saved' : 'Save to Portfolio'),
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            for (final detail in collectibleDetails)
-              _AiResultRow(label: detail.label, value: detail.value),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          _AiReviewSection(
-            title: 'Why this match?',
-            body:
-                '$confidenceExplanation\n\nDetection quality: $detectionQuality\n\n$aiReasoning',
-          ),
-          if (alternativeMatches.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Alternative matches',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            for (final match in alternativeMatches.take(3))
-              _AlternativeMatchTile(match: match),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          _AiReviewSection(title: 'Recommendation', body: recommendation),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: isSaved
-                  ? null
-                  : () async {
-                      final didSave = await scannerController
-                          .saveScanResultToPortfolio();
-                      if (!context.mounted || !didSave) {
-                        return;
-                      }
-                      _showScannerSnackBar(context, 'Saved to portfolio');
-                    },
-              icon: Icon(
-                isSaved
-                    ? Icons.check_circle_outline
-                    : Icons.bookmark_add_outlined,
-              ),
-              label: Text(isSaved ? 'Saved' : 'Save to Portfolio'),
-            ),
-          ),
-          if (isSaved) ...[
-            const SizedBox(height: AppSpacing.md),
-            if (onViewPortfolio != null)
+            if (isSaved && onViewPortfolio != null) ...[
+              const SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -865,6 +1271,7 @@ class AiResultCard extends ConsumerWidget {
                   label: const Text('View in Portfolio'),
                 ),
               ),
+            ],
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
@@ -875,7 +1282,7 @@ class AiResultCard extends ConsumerWidget {
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -926,31 +1333,167 @@ class _MetadataDetail {
   final String value;
 }
 
-class _ConfidenceBadge extends StatelessWidget {
-  const _ConfidenceBadge({required this.label});
+class _ResultBadgeData {
+  const _ResultBadgeData({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
+  final IconData icon;
   final String label;
+  final Color color;
+}
+
+class _ResultBadgeWrap extends StatelessWidget {
+  const _ResultBadgeWrap({required this.badges});
+
+  final List<_ResultBadgeData> badges;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 520) {
+          return Column(
+            children: [
+              for (final badge in badges) ...[
+                _ResultBadge(badge: badge),
+                if (badge != badges.last) const SizedBox(height: AppSpacing.sm),
+              ],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            for (final badge in badges) ...[
+              Expanded(child: _ResultBadge(badge: badge)),
+              if (badge != badges.last) const SizedBox(width: AppSpacing.sm),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ResultBadge extends StatelessWidget {
+  const _ResultBadge({required this.badge});
+
+  final _ResultBadgeData badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+        color: badge.color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: badge.color.withValues(alpha: 0.2)),
       ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w800,
-        ),
+      child: Row(
+        children: [
+          Icon(badge.icon, color: badge.color, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              badge.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelLarge?.copyWith(
+                color: badge.color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KeyAttributesGrid extends StatelessWidget {
+  const _KeyAttributesGrid({required this.items});
+
+  final List<_MetadataDetail> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useTwoColumns = constraints.maxWidth >= 560;
+        if (!useTwoColumns) {
+          return Column(
+            children: [
+              for (final item in items) ...[
+                _AttributeTile(item: item),
+                if (item != items.last) const SizedBox(height: AppSpacing.sm),
+              ],
+            ],
+          );
+        }
+
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: (constraints.maxWidth - AppSpacing.sm) / 2,
+                child: _AttributeTile(item: item),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AttributeTile extends StatelessWidget {
+  const _AttributeTile({required this.item});
+
+  final _MetadataDetail item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            item.value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ],
       ),
     );
   }
@@ -979,6 +1522,122 @@ class _AiReviewSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(body, style: textTheme.bodyMedium),
       ],
+    );
+  }
+}
+
+class _MarketSummarySection extends StatelessWidget {
+  const _MarketSummarySection({required this.summary});
+
+  final MarketSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Market Summary',
+          style: textTheme.labelLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _AiResultRow(
+          label: 'Average Price',
+          value: _formatMoney(summary.averagePrice, _marketCurrency(summary)),
+        ),
+        _AiResultRow(
+          label: 'Median Price',
+          value: _formatMoney(summary.medianPrice, _marketCurrency(summary)),
+        ),
+        _AiResultRow(
+          label: 'Market Range',
+          value:
+              '${_formatMoney(summary.lowPrice, _marketCurrency(summary))} - ${_formatMoney(summary.highPrice, _marketCurrency(summary))}',
+        ),
+        _AiResultRow(
+          label: 'Sales Count',
+          value: '${summary.salesCount} comps',
+        ),
+        _AiResultRow(label: 'Trend', value: summary.trendLabel),
+        _AiResultRow(
+          label: 'Market Confidence',
+          value: '${(summary.confidence * 100).toStringAsFixed(0)}%',
+        ),
+        _AiResultRow(label: 'Sources', value: summary.sources.join(', ')),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Recent comparable sales',
+          style: textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final comp in summary.comps.take(3)) _MarketCompTile(comp: comp),
+      ],
+    );
+  }
+}
+
+class _MarketCompTile extends StatelessWidget {
+  const _MarketCompTile({required this.comp});
+
+  final MarketComp comp;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: AppTwoLineTitle(
+                    comp.title,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  _formatMoney(comp.soldPrice, comp.currency),
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${comp.source} / ${comp.condition} / ${_formatPricingDate(comp.soldDate)}',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1041,6 +1700,14 @@ class _AlternativeMatchTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _marketCurrency(MarketSummary summary) {
+  if (summary.comps.isEmpty) {
+    return 'AUD';
+  }
+
+  return summary.comps.first.currency;
 }
 
 class _AiResultRow extends StatelessWidget {
@@ -1227,49 +1894,69 @@ class _ScannerHistoryCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: colorScheme.outlineVariant),
-            ),
-            child: Icon(item.icon, color: colorScheme.primary),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+    return Material(
+      key: ValueKey('scan-recent-${item.id}'),
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: colorScheme.outlineVariant),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  item.date,
-                  style: textTheme.bodySmall?.copyWith(
+                child: Icon(item.icon, color: colorScheme.primary),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      item.date,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    item.estimatedValue,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Icon(
+                    Icons.chevron_right,
                     color: colorScheme.onSurfaceVariant,
+                    size: 18,
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Text(
-            item.estimatedValue,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
+        ),
       ),
     );
   }

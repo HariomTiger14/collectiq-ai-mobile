@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_ids.dart';
 import 'package:collectiq_ai/core/supabase/supabase_schema.dart';
@@ -15,14 +13,37 @@ import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.d
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
+import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
+import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
+import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
+import 'package:collectiq_ai/features/ai/data/models/ai_image_upload_payload.dart';
+import 'package:collectiq_ai/features/ai/data/providers/mock_ai_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/data/providers/open_ai_vision_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/data/services/noop_ai_backend_api_service.dart';
+import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
+import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/domain/repositories/recognition_repository.dart';
 import 'package:collectiq_ai/features/image_storage/domain/repositories/image_storage_repository.dart';
 import 'package:collectiq_ai/features/image_sync/data/repositories/shared_preferences_sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
 import 'package:collectiq_ai/features/image_storage/data/repositories/supabase_image_storage_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/services/upload_worker.dart';
+import 'package:collectiq_ai/features/market/data/providers/market_provider_factory.dart';
+import 'package:collectiq_ai/features/market/data/providers/market_pricing_provider_factory.dart';
+import 'package:collectiq_ai/features/market/data/providers/mock_market_provider.dart';
+import 'package:collectiq_ai/features/market/data/providers/mock_market_pricing_provider.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_pricing_request.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_pricing_result.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
+import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_provider.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
+import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,6 +68,7 @@ void main() {
       expect(json['imagePath'], 'sample://sports-card');
       expect(json['imageStoragePath'], isNull);
       expect(json['cloudImageUrl'], isNull);
+      expect(json['savedAt'], '2026-06-27T00:00:00.000');
       expect(json['createdAt'], '2026-06-27T00:00:00.000');
       expect(json['year'], '1999');
       expect(json['brand'], 'Pokemon');
@@ -59,6 +81,8 @@ void main() {
       expect(json['pricing']['lowEstimate'], 1443);
       expect(json['pricing']['highEstimate'], 2257);
       expect(json['pricing']['currency'], 'AUD');
+      expect(json['marketSummary']['salesCount'], 5);
+      expect(json['marketSummary']['comps'], hasLength(1));
     });
 
     test('fromJson restores all fields', () {
@@ -116,6 +140,278 @@ void main() {
       expect(item.notes, 'Verify holo surface.');
       expect(item.pricing?.estimatedMarketValue, 1850);
       expect(item.pricing?.pricingConfidence, 0.85);
+      expect(item.marketSummary, isNull);
+    });
+
+    test('fromJson prefers savedAt and safely falls back for old items', () {
+      final savedAtItem = CollectibleItem.fromJson({
+        'id': 'item-1',
+        'title': 'Saved Later',
+        'category': 'Trading Card',
+        'estimatedValue': 10,
+        'confidence': 0.8,
+        'condition': 'Good',
+        'recommendation': 'Hold.',
+        'imagePath': 'sample://card',
+        'savedAt': '2026-06-29T10:30:00.000',
+        'createdAt': '2026-06-01T00:00:00.000',
+      });
+      final missingTimestampItem = CollectibleItem.fromJson({
+        'id': 'item-2',
+        'title': 'Old Import',
+        'category': 'Coin',
+        'estimatedValue': 20,
+        'confidence': 0.7,
+        'condition': 'Good',
+        'recommendation': 'Store safely.',
+        'imagePath': 'sample://coin',
+      });
+
+      expect(savedAtItem.createdAt, DateTime.parse('2026-06-29T10:30:00.000'));
+      expect(
+        missingTimestampItem.createdAt,
+        DateTime.fromMillisecondsSinceEpoch(0),
+      );
+    });
+  });
+
+  group('MarketProvider', () {
+    test('mock provider generates realistic market comps', () async {
+      final summary = await const MockMarketProvider().summarizeMarket(
+        _testRecognitionResult(),
+      );
+
+      expect(summary.salesCount, 5);
+      expect(summary.averagePrice, greaterThan(0));
+      expect(summary.sources, contains('TCGplayer'));
+      expect(summary.comps, hasLength(5));
+      expect(summary.comps.first.title, contains('Charizard'));
+    });
+
+    test('factory defaults to mock and reserves future providers', () {
+      const factory = MarketProviderFactory();
+
+      expect(factory.create(), isA<MockMarketProvider>());
+      expect(
+        () => factory.create(provider: MarketProviderType.ebay),
+        throwsUnsupportedError,
+      );
+      expect(
+        () => factory.create(provider: MarketProviderType.tcgplayer),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('market summary parses nullable cloud JSON safely', () {
+      final summary = MarketSummary.fromJson({
+        'averagePrice': null,
+        'medianPrice': null,
+        'lowPrice': null,
+        'highPrice': null,
+        'salesCount': null,
+        'trendLabel': null,
+        'confidence': null,
+        'lastUpdated': null,
+        'sources': ['eBay Sold'],
+        'comps': [
+          {
+            'source': 'eBay Sold',
+            'title': 'Comparable',
+            'soldPrice': null,
+            'currency': null,
+            'soldDate': null,
+            'condition': null,
+          },
+        ],
+      });
+
+      expect(summary.averagePrice, 0);
+      expect(summary.salesCount, 0);
+      expect(summary.comps.single.soldPrice, 0);
+      expect(summary.comps.single.currency, 'AUD');
+    });
+  });
+
+  group('MarketPricingProvider', () {
+    test('mock pricing result returns expected fields', () async {
+      final result = await const MockMarketPricingProvider().price(
+        const MarketPricingRequest(
+          title: '1999 Pokemon Charizard',
+          category: 'Trading Card',
+          condition: 'Near Mint',
+          year: '1999',
+          brand: 'Pokemon',
+          setName: 'Base Set',
+          cardNumber: '4/102',
+          playerOrCharacter: 'Charizard',
+          asOfDate: null,
+        ),
+      );
+
+      expect(result.estimatedValue, greaterThan(0));
+      expect(result.lowEstimate, lessThanOrEqualTo(result.estimatedValue));
+      expect(result.highEstimate, greaterThanOrEqualTo(result.estimatedValue));
+      expect(result.currency, 'AUD');
+      expect(result.marketTrend, isNotEmpty);
+      expect(result.comparableSales, hasLength(5));
+      expect(result.confidence, greaterThan(0));
+      expect(result.sourceLabel, contains('Mock pricing blend'));
+      expect(result.toPricingInfo().pricingSource, result.sourceLabel);
+      expect(result.toMarketSummary().comps, hasLength(5));
+    });
+
+    test('factory defaults to mock pricing provider', () {
+      const factory = MarketPricingProviderFactory();
+
+      expect(factory.create(), isA<MockMarketPricingProvider>());
+    });
+
+    test('unsupported pricing provider returns friendly error', () async {
+      final provider = const MarketPricingProviderFactory().create(
+        provider: MarketPricingProviderType.ebayCompletedSales,
+      );
+
+      await expectLater(
+        provider.price(
+          const MarketPricingRequest(
+            title: '1999 Pokemon Charizard',
+            category: 'Trading Card',
+          ),
+        ),
+        throwsA(
+          isA<MarketPricingException>().having(
+            (error) => error.message,
+            'message',
+            contains('not enabled yet'),
+          ),
+        ),
+      );
+    });
+
+    test('partial pricing data uses safe defaults', () {
+      final result = MarketPricingResult.fromJson({
+        'estimatedValue': null,
+        'lowEstimate': null,
+        'highEstimate': null,
+        'currency': null,
+        'marketTrend': null,
+        'confidence': null,
+        'sourceLabel': null,
+        'lastUpdated': null,
+        'comparableSales': [
+          {
+            'source': null,
+            'title': null,
+            'soldPrice': null,
+            'currency': null,
+            'soldDate': null,
+            'condition': null,
+          },
+        ],
+      });
+
+      expect(result.estimatedValue, 0);
+      expect(result.lowEstimate, 0);
+      expect(result.highEstimate, 0);
+      expect(result.currency, 'AUD');
+      expect(result.marketTrend, 'Stable');
+      expect(result.confidence, 0);
+      expect(result.sourceLabel, 'Unknown');
+      expect(result.comparableSales.single.soldPrice, 0);
+      expect(result.toPricingInfo().estimatedMarketValue, 0);
+      expect(result.toMarketSummary().salesCount, 1);
+    });
+  });
+
+  group('ProviderDiagnosticsService', () {
+    test('diagnostics show mock AI and pricing active by default', () {
+      final diagnostics = const ProviderDiagnosticsService().build(
+        aiConfig: const AiAnalysisProviderConfig(),
+        pricingProviderType: MarketPricingProviderType.mock,
+        lastScanPipelineStatus: 'Ready',
+      );
+
+      expect(diagnostics.aiProvider, 'Mock AI');
+      expect(diagnostics.aiProviderStatus, 'Mock');
+      expect(diagnostics.pricingProvider, 'Mock Pricing');
+      expect(diagnostics.pricingProviderStatus, 'Mock');
+      expect(diagnostics.mockModeActive, 'Active');
+      expect(diagnostics.appMode, 'development/mock');
+    });
+
+    test('missing backend endpoint shows not configured', () {
+      final diagnostics = const ProviderDiagnosticsService().build(
+        aiConfig: const AiAnalysisProviderConfig(
+          type: AiAnalysisProviderType.openAiVision,
+        ),
+        pricingProviderType: MarketPricingProviderType.mock,
+        lastScanPipelineStatus: 'Ready',
+      );
+
+      expect(diagnostics.aiProvider, 'OpenAI Vision');
+      expect(diagnostics.aiProviderStatus, 'Coming soon');
+      expect(diagnostics.backendEndpointConfigured, 'Not configured');
+      expect(diagnostics.aiBackendClientStatus, 'Not configured');
+    });
+  });
+
+  group('ScanResultEnrichmentService', () {
+    test('combines AI result with pricing data', () async {
+      final service = ScanResultEnrichmentService(
+        marketPricingProvider: const MockMarketPricingProvider(),
+      );
+      final analysis = AiAnalysisResult(
+        recommendation: 'Provider recommendation.',
+        scanResult: _testScanResult(),
+      );
+
+      final enriched = await service.enrich(
+        analysis: analysis,
+        metadata: const ScanResultEnrichmentMetadata(
+          imagePath: 'sample://sports-card',
+          imageSource: 'sample',
+        ),
+      );
+
+      expect(enriched.recommendation, 'Provider recommendation.');
+      expect(enriched.scanResult.title, analysis.scanResult.title);
+      expect(
+        enriched.scanResult.pricing.pricingSource,
+        contains('Mock pricing blend'),
+      );
+      expect(enriched.scanResult.pricing.pricingConfidence, greaterThan(0));
+      expect(enriched.scanResult.marketSummary, isNotNull);
+      expect(enriched.scanResult.marketSummary?.comps, hasLength(5));
+    });
+
+    test('pricing failure still returns usable scan result', () async {
+      const service = ScanResultEnrichmentService(
+        marketPricingProvider: _FailingMarketPricingProvider(),
+      );
+      final analysis = AiAnalysisResult(
+        recommendation: 'Fallback recommendation.',
+        scanResult: _testScanResult(),
+      );
+
+      final enriched = await service.enrich(
+        analysis: analysis,
+        metadata: const ScanResultEnrichmentMetadata(
+          imagePath: 'sample://sports-card',
+          imageSource: 'sample',
+        ),
+      );
+
+      expect(enriched.scanResult.title, analysis.scanResult.title);
+      expect(
+        enriched.scanResult.estimatedValue,
+        analysis.scanResult.estimatedValue,
+      );
+      expect(
+        enriched.scanResult.pricing.pricingSource,
+        'Mock pricing unavailable',
+      );
+      expect(enriched.scanResult.pricing.pricingConfidence, 0);
+      expect(enriched.recommendation, 'Fallback recommendation.');
     });
   });
 
@@ -159,6 +455,216 @@ void main() {
       expect(items, hasLength(1));
       expect(items.single.id, 'persisted-1');
       expect(items.single.title, 'Persisted Charizard');
+    });
+
+    test('returns newest camera save first after persistence reload', () async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items':
+            '[{"id":"gallery-old","title":"Older Gallery Save","category":"Card","estimatedValue":100,"confidence":0.7,"condition":"Good","recommendation":"Hold.","imagePath":"sample://gallery","savedAt":"2026-06-29T08:00:00.000"},{"id":"camera-new","title":"Newer Camera Save","category":"Card","estimatedValue":200,"confidence":0.8,"condition":"Good","recommendation":"Hold.","imagePath":"sample://camera","savedAt":"2026-06-29T09:00:00.000"}]',
+      });
+      const repository = SharedPreferencesPortfolioRepository();
+
+      final items = await repository.getItems();
+
+      expect(items.map((item) => item.id), ['camera-new', 'gallery-old']);
+    });
+
+    test('returns newest gallery save first after persistence reload', () async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items':
+            '[{"id":"camera-old","title":"Older Camera Save","category":"Card","estimatedValue":100,"confidence":0.7,"condition":"Good","recommendation":"Hold.","imagePath":"sample://camera","savedAt":"2026-06-29T08:00:00.000"},{"id":"gallery-new","title":"Newer Gallery Save","category":"Card","estimatedValue":200,"confidence":0.8,"condition":"Good","recommendation":"Hold.","imagePath":"sample://gallery","savedAt":"2026-06-29T09:00:00.000"}]',
+      });
+      const repository = SharedPreferencesPortfolioRepository();
+
+      final items = await repository.getItems();
+
+      expect(items.map((item) => item.id), ['gallery-new', 'camera-old']);
+    });
+
+    test(
+      'addItem overrides stale mock timestamp with local save time',
+      () async {
+        const repository = SharedPreferencesPortfolioRepository();
+        final staleMockItem = _testItemWith(
+          id: 'stale-mock',
+          title: 'Stale Mock Result',
+          imagePath: 'sample://stale',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        );
+        final beforeSave = DateTime.now();
+
+        final savedItem = await repository.addItem(staleMockItem);
+        final items = await repository.getItems();
+
+        expect(items, hasLength(1));
+        expect(items.single.id, 'stale-mock');
+        expect(savedItem.id, 'stale-mock');
+        expect(savedItem.createdAt, items.single.createdAt);
+        expect(items.single.createdAt.isBefore(beforeSave), isFalse);
+      },
+    );
+
+    test(
+      'PortfolioController uses repository returned saved item timestamp',
+      () async {
+        final staleInput = _testItemWith(
+          id: 'scan-result',
+          title: 'Stale Controller Input',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        );
+        final returnedSavedItem = staleInput.copyWithSavedAt(
+          DateTime.parse('2026-06-29T12:00:00.000'),
+        );
+        final repository = _ReturningPortfolioRepository(returnedSavedItem);
+        final container = ProviderContainer(
+          overrides: [
+            portfolioRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await Future<void>.delayed(Duration.zero);
+        await container
+            .read(portfolioControllerProvider.notifier)
+            .saveItem(staleInput);
+
+        final orderedItems = container
+            .read(portfolioControllerProvider)
+            .orderedItems;
+        expect(orderedItems, hasLength(1));
+        expect(orderedItems.single.id, 'scan-result');
+        expect(
+          collectibleDisplayTimestamp(orderedItems.single),
+          DateTime.parse('2026-06-29T12:00:00.000'),
+        );
+        expect(
+          collectibleDisplayTimestamp(orderedItems.single),
+          isNot(staleInput.createdAt),
+        );
+      },
+    );
+
+    test('gallery then camera saves order by actual save timestamp', () async {
+      const repository = SharedPreferencesPortfolioRepository();
+
+      await repository.addItem(
+        _testItemWith(
+          id: 'gallery-first',
+          title: 'Gallery First',
+          imagePath: 'sample://gallery',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      await repository.addItem(
+        _testItemWith(
+          id: 'camera-second',
+          title: 'Camera Second',
+          imagePath: 'sample://camera',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        ),
+      );
+
+      final items = await repository.getItems();
+
+      expect(items.map((item) => item.id), ['camera-second', 'gallery-first']);
+    });
+
+    test('camera then gallery saves order by actual save timestamp', () async {
+      const repository = SharedPreferencesPortfolioRepository();
+
+      await repository.addItem(
+        _testItemWith(
+          id: 'camera-first',
+          title: 'Camera First',
+          imagePath: 'sample://camera',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      await repository.addItem(
+        _testItemWith(
+          id: 'gallery-second',
+          title: 'Gallery Second',
+          imagePath: 'sample://gallery',
+          createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+        ),
+      );
+
+      final items = await repository.getItems();
+
+      expect(items.map((item) => item.id), ['gallery-second', 'camera-first']);
+    });
+
+    test('persistence reload keeps local save order', () async {
+      const repository = SharedPreferencesPortfolioRepository();
+      await repository.addItem(_testItemWith(id: 'old-save'));
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      await repository.addItem(_testItemWith(id: 'new-save'));
+
+      const reloadedRepository = SharedPreferencesPortfolioRepository();
+      final items = await reloadedRepository.getItems();
+
+      expect(items.map((item) => item.id), ['new-save', 'old-save']);
+    });
+
+    test(
+      'new save is ordered first when existing timestamp is ahead of now',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'portfolio_items':
+              '[{"id":"future-existing","title":"Future Existing","category":"Card","estimatedValue":100,"confidence":0.7,"condition":"Good","recommendation":"Hold.","imagePath":"sample://old","savedAt":"2999-01-01T00:00:00.000Z"}]',
+        });
+        const repository = SharedPreferencesPortfolioRepository();
+
+        final savedItem = await repository.addItem(
+          _testItemWith(
+            id: 'new-local-save',
+            title: 'New Local Save',
+            imagePath: 'sample://new',
+            createdAt: DateTime.parse('2020-01-01T00:00:00.000'),
+          ),
+        );
+        final items = await repository.getItems();
+
+        expect(items.map((item) => item.id), [
+          'new-local-save',
+          'future-existing',
+        ]);
+        expect(
+          collectibleDisplayTimestamp(
+            savedItem,
+          ).isAfter(DateTime.parse('2999-01-01T00:00:00.000Z')),
+          isTrue,
+        );
+      },
+    );
+
+    test('equal timestamps use deterministic id fallback', () {
+      final timestamp = DateTime.parse('2026-06-29T10:00:00.000');
+      final items = collectiblesNewestFirst([
+        _testItemWith(id: 'item-a', createdAt: timestamp),
+        _testItemWith(id: 'item-c', createdAt: timestamp),
+        _testItemWith(id: 'item-b', createdAt: timestamp),
+      ]);
+
+      expect(items.map((item) => item.id), ['item-c', 'item-b', 'item-a']);
+    });
+
+    test('image sync update does not move old item above newer item', () async {
+      const repository = SharedPreferencesPortfolioRepository();
+      await repository.addItem(_testItemWith(id: 'old-image'));
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      await repository.addItem(_testItemWith(id: 'newer-item'));
+
+      await repository.updateItemImageSync(
+        itemId: 'old-image',
+        imageStoragePath: 'users/item/image.jpg',
+        cloudImageUrl: 'https://cdn.example.com/users/item/image.jpg',
+      );
+      final items = await repository.getItems();
+
+      expect(items.map((item) => item.id), ['newer-item', 'old-image']);
     });
   });
 
@@ -283,17 +789,525 @@ void main() {
     });
   });
 
+  group('AiBackendAnalysisContract', () {
+    test('request serializes future backend metadata safely', () {
+      final request = AiBackendAnalysisRequest(
+        imagePath: '/local/path/card.jpg',
+        imageSource: 'camera',
+        requestedCategory: 'Trading Card',
+        appVersion: '0.1.0',
+        deviceMetadata: const {'platform': 'android'},
+        timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+      );
+
+      expect(request.toJson(), {
+        'imagePath': '/local/path/card.jpg',
+        'imageSource': 'camera',
+        'requestedCategory': 'Trading Card',
+        'appVersion': '0.1.0',
+        'deviceMetadata': {'platform': 'android'},
+        'timestamp': '2026-06-30T09:00:00.000Z',
+      });
+    });
+
+    test('response parses backend analysis fields safely', () {
+      final response = AiBackendAnalysisResponse.fromJson(
+        _backendAnalysisJson(),
+      );
+
+      expect(response.itemName, '1999 Pokemon Charizard Holo');
+      expect(response.category, 'Trading Card');
+      expect(response.estimatedValue, 1850);
+      expect(response.lowEstimate, 1443);
+      expect(response.highEstimate, 2257);
+      expect(response.confidence, 0.94);
+      expect(response.condition, 'Near Mint');
+      expect(response.marketTrend, 'Rising');
+      expect(response.keyAttributes['setName'], 'Base Set');
+      expect(response.aiReview.primaryMatch, '1999 Pokemon Charizard Holo');
+      expect(response.alternatives, hasLength(1));
+      expect(response.marketSummary, isNotNull);
+      expect(response.comparableSales, hasLength(1));
+    });
+
+    test('mapper converts backend response to scan result', () {
+      final response = AiBackendAnalysisResponse.fromJson(
+        _backendAnalysisJson(),
+      );
+      final result = response.toScanResult(
+        thumbnail: '/local/path/card.jpg',
+        scanDate: DateTime.parse('2026-06-30T09:30:00Z'),
+      );
+
+      expect(result.id, 'backend-card-1');
+      expect(result.title, '1999 Pokemon Charizard Holo');
+      expect(result.category, 'Trading Card');
+      expect(result.estimatedValue, 1850);
+      expect(result.confidence, 0.94);
+      expect(result.condition, 'Near Mint');
+      expect(result.thumbnail, '/local/path/card.jpg');
+      expect(result.primaryMatch, '1999 Pokemon Charizard Holo');
+      expect(result.alternativeMatches.single.title, 'Charizard Promo');
+      expect(result.confidenceExplanation, contains('holographic'));
+      expect(result.detectionQuality, 'Good');
+      expect(result.aiReasoning, contains('Charizard'));
+      expect(result.pricing.lowEstimate, 1443);
+      expect(result.pricing.highEstimate, 2257);
+      expect(result.marketSummary?.trendLabel, 'Rising');
+      expect(result.marketSummary?.comps, hasLength(1));
+      expect(result.year, '1999');
+      expect(result.brand, 'Pokemon');
+      expect(result.setName, 'Base Set');
+      expect(result.cardNumber, '4/102');
+      expect(result.playerOrCharacter, 'Charizard');
+      expect(result.rarity, 'Holo Rare');
+    });
+
+    test('malformed response uses safe defaults', () {
+      final response = AiBackendAnalysisResponse.fromJson({
+        'confidence': 'not-a-number',
+        'valueRange': {'low': null},
+        'alternatives': [
+          {'confidence': 73},
+        ],
+      });
+      final result = response.toScanResult(thumbnail: 'sample://fallback');
+
+      expect(response.itemName, 'Unknown collectible');
+      expect(response.category, 'Collectible');
+      expect(response.estimatedValue, 0);
+      expect(response.confidence, 0);
+      expect(response.condition, 'Unknown');
+      expect(response.recommendation, 'Review the result before saving.');
+      expect(result.thumbnail, 'sample://fallback');
+      expect(result.pricing.estimatedMarketValue, 0);
+      expect(result.alternativeMatches.single.title, 'Unknown alternative');
+      expect(result.alternativeMatches.single.confidence, 0.73);
+    });
+
+    test('backend error parses safe defaults', () {
+      final error = AiBackendAnalysisError.fromJson({
+        'message': 'Backend unavailable.',
+        'retryable': true,
+        'details': {'status': 503},
+      });
+
+      expect(error.code, 'backend_ai_error');
+      expect(error.message, 'Backend unavailable.');
+      expect(error.retryable, isTrue);
+      expect(error.details['status'], 503);
+      expect(error.toJson()['retryable'], isTrue);
+    });
+  });
+
+  group('AiImageUploadPayload', () {
+    test('builds metadata from valid file', () async {
+      const preparer = AiImagePayloadPreparer();
+
+      final payload = await preparer.fromLocalFile(
+        localFilePath: 'test/fixtures/image.jpg',
+        imageSource: 'gallery',
+      );
+
+      expect(payload.fileName, 'image.jpg');
+      expect(payload.mimeType, 'image/jpeg');
+      expect(payload.sizeBytes, greaterThan(0));
+      expect(payload.imageSource, 'gallery');
+      expect(payload.localFilePath, 'test/fixtures/image.jpg');
+      expect(payload.base64Preview, isNull);
+      expect(payload.toMetadataJson()['mimeType'], 'image/jpeg');
+    });
+
+    test('missing file returns friendly validation error', () async {
+      const preparer = AiImagePayloadPreparer();
+
+      await expectLater(
+        preparer.fromLocalFile(
+          localFilePath: 'test/fixtures/missing-card.jpg',
+          imageSource: 'camera',
+        ),
+        throwsA(
+          isA<AiImagePayloadException>().having(
+            (error) => error.message,
+            'message',
+            contains('not found'),
+          ),
+        ),
+      );
+    });
+
+    test('unsupported extension returns friendly validation error', () async {
+      const preparer = AiImagePayloadPreparer();
+
+      await expectLater(
+        preparer.fromLocalFile(
+          localFilePath: 'test/fixtures/image.gif',
+          imageSource: 'gallery',
+        ),
+        throwsA(
+          isA<AiImagePayloadException>().having(
+            (error) => error.message,
+            'message',
+            contains('Unsupported image type'),
+          ),
+        ),
+      );
+    });
+
+    test('oversized image returns friendly validation error', () async {
+      const preparer = AiImagePayloadPreparer(maxFileSizeBytes: 4);
+
+      await expectLater(
+        preparer.fromLocalFile(
+          localFilePath: 'test/fixtures/image.jpg',
+          imageSource: 'gallery',
+        ),
+        throwsA(
+          isA<AiImagePayloadException>().having(
+            (error) => error.message,
+            'message',
+            contains('too large'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('AiBackendClient', () {
+    test('missing endpoint returns safe not-configured error', () async {
+      const client = NoopAiBackendClient(endpointUrl: '');
+
+      await expectLater(
+        client.analyze(_backendRequest()),
+        throwsA(
+          isA<AiBackendClientException>()
+              .having(
+                (error) => error.type,
+                'type',
+                AiBackendClientErrorType.endpointMissing,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('Backend AI endpoint not configured'),
+              ),
+        ),
+      );
+    });
+
+    test('timeout maps to friendly error', () async {
+      const client = NoopAiBackendClient(
+        endpointUrl: 'https://backend.example/analyze',
+        simulatedError: AiBackendClientErrorType.timeout,
+      );
+
+      await expectLater(
+        client.analyze(_backendRequest()),
+        throwsA(
+          isA<AiBackendClientException>()
+              .having(
+                (error) => error.type,
+                'type',
+                AiBackendClientErrorType.timeout,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('timed out'),
+              ),
+        ),
+      );
+    });
+
+    test('backend error maps to safe structured exception', () async {
+      const client = NoopAiBackendClient(
+        endpointUrl: 'https://backend.example/analyze',
+        simulatedError: AiBackendClientErrorType.backendError,
+        simulatedBackendError: AiBackendAnalysisError(
+          code: 'provider_unavailable',
+          message: 'AI provider is temporarily unavailable.',
+          retryable: true,
+          details: {'provider': 'openai'},
+        ),
+      );
+
+      await expectLater(
+        client.analyze(_backendRequest()),
+        throwsA(
+          isA<AiBackendClientException>()
+              .having(
+                (error) => error.type,
+                'type',
+                AiBackendClientErrorType.backendError,
+              )
+              .having((error) => error.statusCode, 'statusCode', 502)
+              .having(
+                (error) => error.message,
+                'message',
+                'AI provider is temporarily unavailable.',
+              ),
+        ),
+      );
+    });
+
+    test(
+      'malformed response maps to friendly error without crashing',
+      () async {
+        const client = NoopAiBackendClient(
+          endpointUrl: 'https://backend.example/analyze',
+          simulatedError: AiBackendClientErrorType.malformedJson,
+        );
+
+        await expectLater(
+          client.analyze(_backendRequest()),
+          throwsA(
+            isA<AiBackendClientException>()
+                .having(
+                  (error) => error.type,
+                  'type',
+                  AiBackendClientErrorType.malformedJson,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('could not be read'),
+                ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'API service skeleton returns injected response without network',
+      () async {
+        final service = NoopAiBackendApiService(
+          injectedResponse: AiBackendAnalysisResponse.fromJson(
+            _backendAnalysisJson(),
+          ),
+        );
+        const payload = AiImageUploadPayload(
+          fileName: 'image.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: 8,
+          imageSource: 'camera',
+          localFilePath: 'test/fixtures/image.jpg',
+        );
+
+        final response = await service.analyzeImage(
+          request: _backendRequest(),
+          imagePayload: payload,
+        );
+
+        expect(response.itemName, '1999 Pokemon Charizard Holo');
+        expect(response.category, 'Trading Card');
+      },
+    );
+
+    test(
+      'backend client maps image payload validation errors safely',
+      () async {
+        const client = NoopAiBackendClient(
+          endpointUrl: 'https://backend.example/analyze',
+        );
+
+        await expectLater(
+          client.analyze(
+            AiBackendAnalysisRequest(
+              imagePath: 'test/fixtures/missing-card.jpg',
+              imageSource: 'gallery',
+              timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+            ),
+          ),
+          throwsA(
+            isA<AiBackendClientException>()
+                .having(
+                  (error) => error.type,
+                  'type',
+                  AiBackendClientErrorType.invalidImagePayload,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('not found'),
+                ),
+          ),
+        );
+      },
+    );
+
+    test('backend client delegates valid payload to API service', () async {
+      final client = NoopAiBackendClient(
+        endpointUrl: 'https://backend.example/analyze',
+        apiService: NoopAiBackendApiService(
+          injectedResponse: AiBackendAnalysisResponse.fromJson(
+            _backendAnalysisJson(),
+          ),
+        ),
+      );
+
+      final response = await client.analyze(
+        AiBackendAnalysisRequest(
+          imagePath: 'test/fixtures/image.jpg',
+          imageSource: 'gallery',
+          timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+        ),
+      );
+
+      expect(response.itemName, '1999 Pokemon Charizard Holo');
+    });
+  });
+
+  group('AiAnalysisProvider', () {
+    test('config parses known providers and defaults to mock', () {
+      expect(
+        const AiAnalysisProviderConfig().type,
+        AiAnalysisProviderType.mock,
+      );
+      expect(
+        AiAnalysisProviderType.fromConfig('mock'),
+        AiAnalysisProviderType.mock,
+      );
+      expect(
+        AiAnalysisProviderType.fromConfig('openai_vision'),
+        AiAnalysisProviderType.openAiVision,
+      );
+      expect(
+        AiAnalysisProviderType.fromConfig('gemini'),
+        AiAnalysisProviderType.geminiVision,
+      );
+      expect(
+        AiAnalysisProviderType.fromConfig('unknown'),
+        AiAnalysisProviderType.mock,
+      );
+    });
+
+    test('config exposes provider labels and safe backend endpoint status', () {
+      const config = AiAnalysisProviderConfig(
+        type: AiAnalysisProviderType.openAiVision,
+        backendAnalysisEndpointUrl: 'https://api.collectiq.example/analyze',
+      );
+
+      expect(config.type.displayName, 'OpenAI Vision');
+      expect(config.type.configValue, 'openai_vision');
+      expect(config.hasBackendAnalysisEndpoint, isTrue);
+      expect(config.isSelectedProviderAvailable, isFalse);
+      expect(config.selectedProviderMessage, contains('backend endpoint'));
+      expect(AiAnalysisProviderType.mock.isAvailable, isTrue);
+      expect(AiAnalysisProviderType.geminiVision.statusLabel, 'Coming soon');
+    });
+
+    test('mock provider config requires no backend endpoint or API key', () {
+      const config = AiAnalysisProviderConfig();
+
+      expect(config.type, AiAnalysisProviderType.mock);
+      expect(config.hasBackendAnalysisEndpoint, isFalse);
+      expect(config.isSelectedProviderAvailable, isTrue);
+      expect(config.selectedProviderMessage, contains('Mock mode is active'));
+    });
+
+    test('OpenAI Vision skeleton returns safe backend error', () async {
+      const provider = OpenAiVisionAnalysisProvider(
+        backendClient: NoopAiBackendClient(endpointUrl: ''),
+      );
+
+      await expectLater(
+        provider.analyze(
+          const AiAnalysisRequest(imagePath: 'sample://sports-card'),
+        ),
+        throwsA(
+          isA<AiAnalysisException>().having(
+            (error) => error.message,
+            'message',
+            contains('Backend AI endpoint not configured'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'OpenAI Vision provider maps backend response to scan result',
+      () async {
+        final backendClient = _SuccessfulAiBackendClient(
+          AiBackendAnalysisResponse.fromJson(_backendAnalysisJson()),
+        );
+        final provider = OpenAiVisionAnalysisProvider(
+          backendClient: backendClient,
+        );
+
+        final result = await provider.analyze(
+          const AiAnalysisRequest(
+            imagePath: '/local/path/card.jpg',
+            metadata: {'imageSource': 'gallery'},
+          ),
+        );
+
+        expect(backendClient.calls, 1);
+        expect(backendClient.lastRequest?.imageSource, 'gallery');
+        expect(result.scanResult.title, '1999 Pokemon Charizard Holo');
+        expect(result.scanResult.thumbnail, '/local/path/card.jpg');
+        expect(result.scanResult.marketSummary?.trendLabel, 'Rising');
+        expect(result.recommendation, 'Consider grading before selling.');
+      },
+    );
+
+    test('mock provider returns scan analysis result', () async {
+      final provider = MockAiAnalysisProvider(
+        recognitionRepository: _StaticRecognitionRepository(
+          _testRecognitionResult(),
+        ),
+        marketProvider: const MockMarketProvider(),
+      );
+
+      final result = await provider.analyze(
+        const AiAnalysisRequest(imagePath: 'sample://sports-card'),
+      );
+
+      expect(result.scanResult.title, contains('Charizard'));
+      expect(result.scanResult.category, 'Trading Card');
+      expect(result.scanResult.thumbnail, 'sample://sports-card');
+      expect(result.scanResult.alternativeMatches, hasLength(3));
+      expect(result.scanResult.marketSummary, isNotNull);
+      expect(result.recommendation, 'Consider grading before selling.');
+    });
+
+    test(
+      'mock provider delegates real image analysis to recognition repository',
+      () async {
+        final repository = _StaticRecognitionRepository(
+          _testRecognitionResult(),
+        );
+        final provider = MockAiAnalysisProvider(
+          recognitionRepository: repository,
+          marketProvider: const MockMarketProvider(),
+        );
+
+        final result = await provider.analyze(
+          AiAnalysisRequest(
+            imagePath: _fixturePath('persistent-gallery-card.jpg'),
+          ),
+        );
+
+        expect(repository.calls, 1);
+        expect(result.scanResult.title, '1999 Pokemon Charizard');
+        expect(
+          result.scanResult.thumbnail,
+          _fixturePath('persistent-gallery-card.jpg'),
+        );
+      },
+    );
+  });
+
   group('GalleryService', () {
     test('validates supported image extensions case-insensitively', () async {
       final service = GalleryService();
 
       for (final name in [
-        'image.PNG',
-        'image.Png',
-        'image.jpg',
-        'image.JPEG',
+        'test/fixtures/image.PNG',
+        'test/fixtures/image.Png',
+        'test/fixtures/image.jpg',
+        'test/fixtures/image.JPEG',
       ]) {
-        final image = XFile.fromData(Uint8List.fromList([1, 2, 3]), path: name);
+        final image = XFile(name);
 
         await expectLater(service.validateImage(image), completion(isTrue));
       }
@@ -301,10 +1315,7 @@ void main() {
 
     test('rejects unsupported image extension with clear message', () async {
       final service = GalleryService();
-      final image = XFile.fromData(
-        Uint8List.fromList([1, 2, 3]),
-        path: 'image.gif',
-      );
+      final image = XFile('test/fixtures/image.gif');
 
       await expectLater(
         service.validateImage(image),
@@ -675,6 +1686,31 @@ void main() {
       expect(syncState.status.isCloudConnected, isTrue);
       expect(syncState.status.statusLabel, 'Synced');
     });
+
+    test(
+      'manual upload errors are caught and reported as sync state',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            syncServiceProvider.overrideWithValue(
+              const LocalFirstSyncService(
+                repository: _FailingCloudRepository(),
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(syncControllerProvider.notifier).uploadLocalItems([
+          _testItem(),
+        ]);
+
+        final syncState = container.read(syncControllerProvider);
+        expect(syncState.status.state, SyncState.failed);
+        expect(syncState.status.pendingItemCount, 1);
+        expect(syncState.errorMessage, contains('network unavailable'));
+      },
+    );
   });
 
   group('SyncService', () {
@@ -818,7 +1854,219 @@ CollectibleItem _testItem() {
       pricingConfidence: 0.85,
       lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
     ),
+    marketSummary: MarketSummary.fromJson({
+      'averagePrice': 1810,
+      'medianPrice': 1850,
+      'lowPrice': 1443,
+      'highPrice': 2257,
+      'salesCount': 5,
+      'trendLabel': 'Stable',
+      'confidence': 0.86,
+      'lastUpdated': '2026-06-29T00:00:00Z',
+      'sources': ['eBay Sold', 'TCGplayer'],
+      'comps': [
+        {
+          'source': 'eBay Sold',
+          'title': '1999 Pokemon Charizard sold listing',
+          'soldPrice': 1850,
+          'currency': 'AUD',
+          'soldDate': '2026-06-20T00:00:00Z',
+          'condition': 'Near Mint',
+        },
+      ],
+    }),
   );
+}
+
+CollectibleItem _testItemWith({
+  String id = 'item-1',
+  String title = '1999 Pokemon Charizard',
+  String imagePath = 'sample://sports-card',
+  DateTime? createdAt,
+}) {
+  return CollectibleItem(
+    id: id,
+    title: title,
+    category: 'Trading Card',
+    estimatedValue: 1850,
+    confidence: 0.94,
+    condition: 'Near Mint',
+    recommendation: 'Consider grading before selling.',
+    imagePath: imagePath,
+    createdAt: createdAt ?? DateTime.parse('2026-06-27T00:00:00.000'),
+  );
+}
+
+Map<String, dynamic> _backendAnalysisJson() {
+  return {
+    'id': 'backend-card-1',
+    'itemName': '1999 Pokemon Charizard Holo',
+    'type': 'Trading Card',
+    'estimatedValue': '1850',
+    'valueRange': {'low': 1443, 'high': 2257},
+    'confidence': 94,
+    'condition': 'Near Mint',
+    'marketTrend': 'Rising',
+    'keyAttributes': {
+      'year': '1999',
+      'brand': 'Pokemon',
+      'setName': 'Base Set',
+      'cardNumber': '4/102',
+      'playerOrCharacter': 'Charizard',
+      'rarity': 'Holo Rare',
+    },
+    'aiReview': {
+      'primaryMatch': '1999 Pokemon Charizard Holo',
+      'confidenceExplanation':
+          'High confidence from holographic cues and character artwork.',
+      'detectionQuality': 'Good',
+      'reasoning': 'The image contains a Charizard card layout.',
+    },
+    'alternatives': [
+      {
+        'title': 'Charizard Promo',
+        'category': 'Trading Card',
+        'confidence': 61,
+        'reason': 'Same character with similar collector cues.',
+      },
+    ],
+    'recommendation': 'Consider grading before selling.',
+    'marketSummary': {
+      'averagePrice': 1810,
+      'medianPrice': 1850,
+      'lowPrice': 1443,
+      'highPrice': 2257,
+      'salesCount': 1,
+      'trendLabel': 'Rising',
+      'confidence': 86,
+      'lastUpdated': '2026-06-29T00:00:00Z',
+      'sources': ['eBay Sold'],
+    },
+    'comparableSales': [
+      {
+        'source': 'eBay Sold',
+        'title': '1999 Pokemon Charizard sold listing',
+        'soldPrice': 1850,
+        'currency': 'AUD',
+        'soldDate': '2026-06-20T00:00:00Z',
+        'condition': 'Near Mint',
+      },
+    ],
+    'timestamp': '2026-06-30T09:00:00Z',
+  };
+}
+
+AiBackendAnalysisRequest _backendRequest() {
+  return AiBackendAnalysisRequest(
+    imagePath: '/local/path/card.jpg',
+    imageSource: 'camera',
+    timestamp: DateTime.parse('2026-06-30T09:00:00Z'),
+  );
+}
+
+RecognitionResult _testRecognitionResult() {
+  return RecognitionResult(
+    success: true,
+    filename: null,
+    imageUrl: 'sample://sports-card',
+    title: '1999 Pokemon Charizard',
+    category: 'Trading Card',
+    confidence: 0.94,
+    description: 'Sample scanner result.',
+    estimatedValue: 1850,
+    condition: 'Near Mint',
+    recommendation: 'Consider grading before selling.',
+    primaryMatch: '1999 Pokemon Charizard',
+    alternativeMatches: const [],
+    confidenceExplanation: 'Strong visual match.',
+    detectionQuality: 'Good',
+    aiReasoning: 'Visible card and character details match.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 1850,
+      lowEstimate: 1443,
+      highEstimate: 2257,
+      currency: 'AUD',
+      pricingSource: 'Mock market blend',
+      pricingConfidence: 0.85,
+      lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+    ),
+  );
+}
+
+ScanResult _testScanResult() {
+  final now = DateTime.parse('2026-06-30T09:00:00Z');
+  return ScanResult(
+    id: 'scan-test',
+    title: '1999 Pokemon Charizard',
+    category: 'Trading Card',
+    estimatedValue: 1850,
+    confidence: 0.94,
+    condition: 'Near Mint',
+    thumbnail: 'sample://sports-card',
+    scanDate: now,
+    primaryMatch: '1999 Pokemon Charizard',
+    alternativeMatches: const [],
+    confidenceExplanation: 'Strong visual match.',
+    detectionQuality: 'Good',
+    aiReasoning: 'Visible card and character details match.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 1850,
+      lowEstimate: 1443,
+      highEstimate: 2257,
+      currency: 'AUD',
+      pricingSource: 'Provider fixture',
+      pricingConfidence: 0.85,
+      lastUpdated: now,
+    ),
+    year: '1999',
+    brand: 'Pokemon',
+    setName: 'Base Set',
+    cardNumber: '4/102',
+    playerOrCharacter: 'Charizard',
+  );
+}
+
+class _FailingMarketPricingProvider implements MarketPricingProvider {
+  const _FailingMarketPricingProvider();
+
+  @override
+  Future<MarketPricingResult> price(MarketPricingRequest request) async {
+    throw const MarketPricingException('Pricing unavailable.');
+  }
+}
+
+class _SuccessfulAiBackendClient implements AiBackendClient {
+  _SuccessfulAiBackendClient(this.response);
+
+  final AiBackendAnalysisResponse response;
+  int calls = 0;
+  AiBackendAnalysisRequest? lastRequest;
+
+  @override
+  Future<AiBackendAnalysisResponse> analyze(
+    AiBackendAnalysisRequest request,
+  ) async {
+    calls += 1;
+    lastRequest = request;
+    return response;
+  }
+}
+
+class _StaticRecognitionRepository implements RecognitionRepository {
+  _StaticRecognitionRepository(this.result);
+
+  final RecognitionResult result;
+  int calls = 0;
+
+  @override
+  Future<RecognitionResult> recognizeCollectible(XFile image) async {
+    calls += 1;
+    return result;
+  }
+}
+
+String _fixturePath(String name) {
+  return File('test/fixtures/$name').absolute.path;
 }
 
 class _SuccessfulImageStorageRepository implements ImageStorageRepository {
@@ -847,6 +2095,41 @@ class _SuccessfulImageStorageRepository implements ImageStorageRepository {
   }
 }
 
+class _ReturningPortfolioRepository implements PortfolioRepository {
+  _ReturningPortfolioRepository(this.savedItem);
+
+  final CollectibleItem savedItem;
+  List<CollectibleItem> _items = const [];
+
+  @override
+  Future<CollectibleItem> addItem(CollectibleItem item) async {
+    _items = [savedItem];
+    return savedItem;
+  }
+
+  @override
+  Future<void> clearPortfolio() async {
+    _items = const [];
+  }
+
+  @override
+  Future<List<CollectibleItem>> getItems() async {
+    return _items;
+  }
+
+  @override
+  Future<void> removeItem(String id) async {
+    _items = _items.where((item) => item.id != id).toList();
+  }
+
+  @override
+  Future<void> updateItemImageSync({
+    required String itemId,
+    String? imageStoragePath,
+    String? cloudImageUrl,
+  }) async {}
+}
+
 class _StaticCloudPortfolioRepository implements CloudPortfolioRepository {
   const _StaticCloudPortfolioRepository({required this.status});
 
@@ -865,5 +2148,24 @@ class _StaticCloudPortfolioRepository implements CloudPortfolioRepository {
   @override
   Future<List<CollectibleItem>> downloadCloudItems() async {
     return const [];
+  }
+}
+
+class _FailingCloudRepository implements CloudPortfolioRepository {
+  const _FailingCloudRepository();
+
+  @override
+  Future<SyncStatus> getSyncStatus() async {
+    throw StateError('network unavailable');
+  }
+
+  @override
+  Future<SyncStatus> uploadLocalItems(List<CollectibleItem> items) async {
+    throw StateError('network unavailable');
+  }
+
+  @override
+  Future<List<CollectibleItem>> downloadCloudItems() async {
+    throw StateError('network unavailable');
   }
 }

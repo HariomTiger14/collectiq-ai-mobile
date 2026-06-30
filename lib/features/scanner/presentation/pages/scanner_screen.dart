@@ -1,6 +1,12 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
+import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,7 +19,8 @@ class ScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends ConsumerState<ScannerScreen> {
+class _ScannerScreenState extends ConsumerState<ScannerScreen>
+    with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   final _previewKey = GlobalKey();
   final _resultKey = GlobalKey();
@@ -56,47 +63,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     ),
   ];
 
-  static const _recentScans = [
-    ScannerHistoryItem(
-      name: '1986 Fleer Jordan Rookie',
-      estimatedValue: r'$12,300',
-      date: 'Today',
-      icon: Icons.sports_basketball_outlined,
-      color: AppColors.accent,
-    ),
-    ScannerHistoryItem(
-      name: 'Charizard Base Set Holo',
-      estimatedValue: r'$4,850',
-      date: 'Today',
-      icon: Icons.style_outlined,
-      color: AppColors.accent,
-    ),
-    ScannerHistoryItem(
-      name: 'Silver Eagle Proof Coin',
-      estimatedValue: r'$780',
-      date: 'Yesterday',
-      icon: Icons.monetization_on_outlined,
-      color: AppColors.accent,
-    ),
-    ScannerHistoryItem(
-      name: 'Omega Seamaster Vintage',
-      estimatedValue: r'$3,420',
-      date: 'Jun 25',
-      icon: Icons.watch_outlined,
-      color: AppColors.accent,
-    ),
-    ScannerHistoryItem(
-      name: 'Air Jordan 1 Chicago',
-      estimatedValue: r'$1,950',
-      date: 'Jun 24',
-      icon: Icons.directions_run_outlined,
-      color: AppColors.accent,
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scannerSubscription = ref.listenManual<ScannerState>(
       scannerControllerProvider,
       (previous, next) {
@@ -124,13 +94,47 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         }
       },
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(scannerControllerProvider.notifier)
+          .recoverLostPickerData(reason: 'scan-screen-startup');
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scannerSubscription.close();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[ScannerScreen] lifecycle $state');
+    final scannerController = ref.read(scannerControllerProvider.notifier);
+    final scannerState = ref.read(scannerControllerProvider);
+    logCollectIqScanFlow(
+      state == AppLifecycleState.resumed
+          ? 'app lifecycle resumed'
+          : state == AppLifecycleState.paused
+          ? 'app lifecycle paused'
+          : 'app lifecycle $state',
+      selectedImagePath: scannerState.selectedImagePath,
+      isLoading: scannerState.isLoading,
+      isPreparingImage: scannerState.isPreparingImage,
+      isPickerActive: scannerController.isPickerActiveForDebug,
+      isRecoveringLostData: scannerController.isRecoveringLostDataForDebug,
+      currentTabIndex: ref.read(appShellTabControllerProvider),
+    );
+    if (state != AppLifecycleState.resumed || !mounted) {
+      return;
+    }
+
+    scannerController.recoverLostPickerData(reason: 'app-resumed');
   }
 
   void _scrollTo(GlobalKey key) {
@@ -152,8 +156,39 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final scannerState = ref.watch(scannerControllerProvider);
+    final scannerController = ref.read(scannerControllerProvider.notifier);
+    final currentTabIndex = ref.watch(appShellTabControllerProvider);
+    final portfolioState = ref.watch(portfolioControllerProvider);
+    final orderedPortfolioItems = portfolioState.orderedItems;
+    _logScanRecentOrder(orderedPortfolioItems);
+    final recentScans = orderedPortfolioItems
+        .take(3)
+        .map(
+          (item) => _historyItemForCollectible(
+            item,
+            onTap: () => _openCollectibleDetail(context, item),
+          ),
+        )
+        .toList();
     final selectedImagePath = scannerState.selectedImagePath;
     final scanResult = scannerState.scanResult;
+    final showPickerShell =
+        selectedImagePath == null &&
+        (scannerState.isLoading || scannerState.isPreparingImage);
+    logCollectIqScanFlow(
+      'scan screen build',
+      selectedImagePath: selectedImagePath,
+      isLoading: scannerState.isLoading,
+      isPreparingImage: scannerState.isPreparingImage,
+      isPickerActive: scannerController.isPickerActiveForDebug,
+      isRecoveringLostData: scannerController.isRecoveringLostDataForDebug,
+      currentTabIndex: currentTabIndex,
+      details: {
+        'showPickerShell': showPickerShell,
+        'showPreview': selectedImagePath != null,
+        'showResult': scanResult != null,
+      },
+    );
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -181,6 +216,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       const ScannerHeader(),
                       const SizedBox(height: AppSpacing.xxl),
                       const ScanHeroCard(),
+                      if (showPickerShell) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        const ScanPreparingImageCard(
+                          key: ValueKey('scan-preparing-image-card'),
+                        ),
+                      ],
+                      if (scannerState.errorMessage != null) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        ScanErrorPanel(message: scannerState.errorMessage!),
+                      ],
                       if (selectedImagePath != null) ...[
                         const SizedBox(height: AppSpacing.xl),
                         ScanPreviewCard(
@@ -219,6 +264,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           detectionQuality: scanResult.detectionQuality,
                           aiReasoning: scanResult.aiReasoning,
                           pricing: scanResult.pricing,
+                          marketSummary: scanResult.marketSummary,
                           year: scanResult.year,
                           brand: scanResult.brand,
                           setName: scanResult.setName,
@@ -254,7 +300,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       const SizedBox(height: AppSpacing.xxl),
                       const ScannerSectionTitle(title: 'Recent Scans'),
                       const SizedBox(height: AppSpacing.md),
-                      const ScannerHistoryList(items: _recentScans),
+                      ScannerHistoryList(items: recentScans),
                       const SizedBox(height: AppSpacing.xxl),
                       const ScannerPremiumCard(),
                     ],
@@ -267,4 +313,103 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       ),
     );
   }
+}
+
+void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
+}
+
+void _logScanRecentOrder(List<CollectibleItem> items) {
+  debugPrint(
+    '[Scan] Recent Scans final source order: '
+    '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
+  );
+  for (final item in items.take(3)) {
+    debugPrint(
+      '[Scan] Recent Scans item '
+      'id=${item.id} '
+      'title="${item.title}" '
+      'imageSource=${_imageSourceFor(item.imagePath)} '
+      'createdAt=${item.createdAt.toIso8601String()} '
+      'savedAt=${item.createdAt.toIso8601String()} '
+      'updatedAt=not-tracked '
+      'displayTimestamp='
+      '${collectibleDisplayTimestamp(item).toIso8601String()}',
+    );
+  }
+}
+
+String _imageSourceFor(String imagePath) {
+  final normalizedPath = imagePath.trim();
+  if (normalizedPath.startsWith('sample://')) {
+    return 'sample';
+  }
+  if (normalizedPath.startsWith('http://') ||
+      normalizedPath.startsWith('https://')) {
+    return 'network';
+  }
+  if (normalizedPath.startsWith('assets/')) {
+    return 'asset';
+  }
+  if (normalizedPath.isEmpty) {
+    return 'missing';
+  }
+
+  return 'local';
+}
+
+ScannerHistoryItem _historyItemForCollectible(
+  CollectibleItem item, {
+  required VoidCallback onTap,
+}) {
+  return ScannerHistoryItem(
+    id: item.id,
+    name: item.title,
+    estimatedValue: _formatAud(item.estimatedValue),
+    date: _formatDate(item.createdAt),
+    icon: _iconForCategory(item.category),
+    color: AppColors.accent,
+    onTap: onTap,
+  );
+}
+
+IconData _iconForCategory(String category) {
+  final normalized = category.toLowerCase();
+  if (normalized.contains('coin')) {
+    return Icons.monetization_on_outlined;
+  }
+  if (normalized.contains('comic')) {
+    return Icons.menu_book_outlined;
+  }
+  if (normalized.contains('toy') || normalized.contains('figure')) {
+    return Icons.toys_outlined;
+  }
+  if (normalized.contains('sports')) {
+    return Icons.sports_basketball_outlined;
+  }
+  if (normalized.contains('watch')) {
+    return Icons.watch_outlined;
+  }
+  if (normalized.contains('sneaker')) {
+    return Icons.directions_run_outlined;
+  }
+
+  return Icons.style_outlined;
+}
+
+String _formatAud(double value) {
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return 'AUD $withCommas';
+}
+
+String _formatDate(DateTime value) {
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  return '$day/$month/${value.year}';
 }

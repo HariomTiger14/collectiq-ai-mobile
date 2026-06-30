@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +22,9 @@ class PortfolioState {
   /// Saved portfolio items.
   final List<CollectibleItem> items;
 
+  /// Canonical newest-first list for every display surface.
+  List<CollectibleItem> get orderedItems => collectiblesNewestFirst(items);
+
   /// Whether a portfolio operation is in progress.
   final bool isLoading;
 
@@ -31,7 +33,10 @@ class PortfolioState {
 
   /// Total estimated portfolio value.
   double get totalValue {
-    return items.fold<double>(0, (total, item) => total + item.estimatedValue);
+    return orderedItems.fold<double>(
+      0,
+      (total, item) => total + item.estimatedValue,
+    );
   }
 
   /// Total saved item count.
@@ -71,8 +76,9 @@ class PortfolioController extends Notifier<PortfolioState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final items = await _repository.getItems();
-      await _logLoadedImagePaths(items);
-      state = state.copyWith(items: items, isLoading: false);
+      final sortedItems = collectiblesNewestFirst(items);
+      _logFinalOrder('loadItems', sortedItems);
+      state = state.copyWith(items: sortedItems, isLoading: false);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -85,10 +91,28 @@ class PortfolioController extends Notifier<PortfolioState> {
   Future<void> saveItem(CollectibleItem item) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      await _repository.addItem(item);
-      final items = await _repository.getItems();
-      await _logLoadedImagePaths(items);
-      state = state.copyWith(items: items, isLoading: false);
+      final savedItem = await _repository.addItem(item);
+      debugPrint(
+        '[PortfolioController] saveItem returned saved item '
+        'id=${savedItem.id} '
+        'title="${savedItem.title}" '
+        'createdAt=${savedItem.createdAt.toIso8601String()} '
+        'savedAt=${savedItem.createdAt.toIso8601String()} '
+        'updatedAt=not-tracked '
+        'displayTimestamp='
+        '${collectibleDisplayTimestamp(savedItem).toIso8601String()}',
+      );
+      final immediateItems = collectiblesNewestFirst([
+        savedItem,
+        ...state.items.where((existingItem) => existingItem.id != savedItem.id),
+      ]);
+      _logFinalOrder('saveItem-immediate', immediateItems);
+      state = state.copyWith(items: immediateItems, isLoading: false);
+
+      final persistedItems = await _repository.getItems();
+      final sortedItems = collectiblesNewestFirst(persistedItems);
+      _logFinalOrder('saveItem-reload', sortedItems);
+      state = state.copyWith(items: sortedItems, isLoading: false);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -103,8 +127,9 @@ class PortfolioController extends Notifier<PortfolioState> {
     try {
       await _repository.removeItem(id);
       final items = await _repository.getItems();
-      await _logLoadedImagePaths(items);
-      state = state.copyWith(items: items, isLoading: false);
+      final sortedItems = collectiblesNewestFirst(items);
+      _logFinalOrder('removeItem', sortedItems);
+      state = state.copyWith(items: sortedItems, isLoading: false);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -127,27 +152,24 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
-  Future<void> _logLoadedImagePaths(List<CollectibleItem> items) async {
+  void _logFinalOrder(String source, List<CollectibleItem> items) {
+    debugPrint(
+      '[PortfolioController] $source final order: '
+      '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
+    );
     for (final item in items) {
-      debugPrint('[Portfolio] loaded item.imagePath: ${item.imagePath}');
       debugPrint(
-        '[Portfolio] loaded image file exists: '
-        '${await _localFileExists(item.imagePath)}',
+        '[PortfolioController] $source item '
+        'id=${item.id} '
+        'title="${item.title}" '
+        'imagePath=${item.imagePath} '
+        'createdAt=${item.createdAt.toIso8601String()} '
+        'savedAt=${item.createdAt.toIso8601String()} '
+        'updatedAt=not-tracked '
+        'displayTimestamp='
+        '${collectibleDisplayTimestamp(item).toIso8601String()}',
       );
     }
-  }
-
-  Future<bool> _localFileExists(String imagePath) async {
-    final normalizedPath = imagePath.trim();
-    if (normalizedPath.isEmpty ||
-        normalizedPath.startsWith('sample://') ||
-        normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://') ||
-        normalizedPath.startsWith('assets/')) {
-      return false;
-    }
-
-    return File(normalizedPath).exists();
   }
 }
 

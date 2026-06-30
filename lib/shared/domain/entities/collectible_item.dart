@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 class CollectibleAlternativeMatch {
@@ -48,6 +49,7 @@ class CollectibleItem {
     this.imageStoragePath,
     this.cloudImageUrl,
     this.pricing,
+    this.marketSummary,
     this.primaryMatch,
     this.alternativeMatches = const [],
     this.confidenceExplanation,
@@ -99,10 +101,12 @@ class CollectibleItem {
   /// Public cloud image URL after background upload completes.
   final String? cloudImageUrl;
 
-  /// Date and time the item was added.
+  /// Canonical date and time the item was saved into the local portfolio.
   final DateTime createdAt;
 
   final PricingInfo? pricing;
+
+  final MarketSummary? marketSummary;
 
   final String? primaryMatch;
   final List<CollectibleAlternativeMatch> alternativeMatches;
@@ -138,9 +142,14 @@ class CollectibleItem {
       imagePath: json['imagePath'] as String,
       imageStoragePath: _optionalString(json['imageStoragePath']),
       cloudImageUrl: _optionalString(json['cloudImageUrl']),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: _savedAtFromJson(json),
       pricing: json['pricing'] is Map<String, dynamic>
           ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+          : null,
+      marketSummary: json['marketSummary'] is Map<String, dynamic>
+          ? MarketSummary.fromJson(
+              json['marketSummary'] as Map<String, dynamic>,
+            )
           : null,
       primaryMatch: _optionalString(json['primaryMatch']),
       alternativeMatches:
@@ -181,8 +190,10 @@ class CollectibleItem {
       'imagePath': imagePath,
       'imageStoragePath': imageStoragePath,
       'cloudImageUrl': cloudImageUrl,
+      'savedAt': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'pricing': pricing?.toJson(),
+      'marketSummary': marketSummary?.toJson(),
       'primaryMatch': primaryMatch,
       'alternativeMatches': [
         for (final match in alternativeMatches) match.toJson(),
@@ -225,6 +236,45 @@ class CollectibleItem {
       cloudImageUrl: cloudImageUrl,
       createdAt: createdAt,
       pricing: pricing,
+      marketSummary: marketSummary,
+      primaryMatch: primaryMatch,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation: confidenceExplanation,
+      detectionQuality: detectionQuality,
+      aiReasoning: aiReasoning,
+      year: year,
+      brand: brand,
+      setName: setName,
+      series: series,
+      cardNumber: cardNumber,
+      playerOrCharacter: playerOrCharacter,
+      rarity: rarity,
+      estimatedGrade: estimatedGrade,
+      language: language,
+      edition: edition,
+      country: country,
+      mint: mint,
+      material: material,
+      notes: notes,
+    );
+  }
+
+  /// Creates a copy with a fresh local portfolio save timestamp.
+  CollectibleItem copyWithSavedAt(DateTime savedAt) {
+    return CollectibleItem(
+      id: id,
+      title: title,
+      category: category,
+      estimatedValue: estimatedValue,
+      confidence: confidence,
+      condition: condition,
+      recommendation: recommendation,
+      imagePath: imagePath,
+      imageStoragePath: imageStoragePath,
+      cloudImageUrl: cloudImageUrl,
+      createdAt: savedAt,
+      pricing: pricing,
+      marketSummary: marketSummary,
       primaryMatch: primaryMatch,
       alternativeMatches: alternativeMatches,
       confidenceExplanation: confidenceExplanation,
@@ -255,4 +305,24 @@ String? _optionalString(Object? value) {
 
   final normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
+}
+
+DateTime _savedAtFromJson(Map<String, dynamic> json) {
+  return _optionalDateTime(json['savedAt']) ??
+      _optionalDateTime(json['createdAt']) ??
+      _optionalDateTime(json['updatedAt']) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+DateTime? _optionalDateTime(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+
+  final normalized = value.trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+
+  return DateTime.tryParse(normalized);
 }

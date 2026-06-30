@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,19 @@ enum _PortfolioSortMode {
   confidence(label: 'Confidence high to low');
 
   const _PortfolioSortMode({required this.label});
+
+  final String label;
+}
+
+enum _PortfolioCategoryFilter {
+  all(label: 'All'),
+  cards(label: 'Cards'),
+  coins(label: 'Coins'),
+  comics(label: 'Comics'),
+  memorabilia(label: 'Memorabilia'),
+  other(label: 'Other');
+
+  const _PortfolioCategoryFilter({required this.label});
 
   final String label;
 }
@@ -28,13 +42,16 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   String _searchQuery = '';
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
+  _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final portfolioState = ref.watch(portfolioControllerProvider);
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
-    final visibleItems = _visibleItems(portfolioState.items);
+    final orderedItems = portfolioState.orderedItems;
+    final visibleItems = _visibleItems(orderedItems);
+    _logPortfolioOrder(visibleItems);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -75,9 +92,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       PortfolioSummaryCard(
                         totalValue: portfolioState.totalValue,
                         itemCount: portfolioState.itemCount,
-                        averageConfidence: _averageConfidence(
-                          portfolioState.items,
-                        ),
+                        averageConfidence: _averageConfidence(orderedItems),
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       if (portfolioState.isLoading &&
@@ -93,6 +108,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         _PortfolioControls(
                           searchQuery: _searchQuery,
                           sortMode: _sortMode,
+                          categoryFilter: _categoryFilter,
                           onSearchChanged: (value) {
                             setState(() {
                               _searchQuery = value;
@@ -103,10 +119,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               _sortMode = value;
                             });
                           },
+                          onCategoryFilterChanged: (value) {
+                            setState(() {
+                              _categoryFilter = value;
+                            });
+                          },
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         if (visibleItems.isEmpty)
-                          const PortfolioNoSearchResultsState()
+                          PortfolioNoSearchResultsState(
+                            onResetFilters: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _categoryFilter = _PortfolioCategoryFilter.all;
+                              });
+                            },
+                          )
                         else
                           PortfolioItemsGrid(
                             items: visibleItems,
@@ -150,16 +178,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
   List<CollectibleItem> _visibleItems(List<CollectibleItem> items) {
     final normalizedQuery = _searchQuery.trim().toLowerCase();
-    final filteredItems = normalizedQuery.isEmpty
+    final queryFilteredItems = normalizedQuery.isEmpty
         ? [...items]
         : items.where((item) {
             return item.title.toLowerCase().contains(normalizedQuery) ||
                 item.category.toLowerCase().contains(normalizedQuery);
           }).toList();
+    final filteredItems = queryFilteredItems
+        .where((item) => _matchesCategoryFilter(item, _categoryFilter))
+        .toList();
 
     filteredItems.sort((left, right) {
       return switch (_sortMode) {
-        _PortfolioSortMode.newest => right.createdAt.compareTo(left.createdAt),
+        _PortfolioSortMode.newest => compareCollectiblesNewestFirst(
+          left,
+          right,
+        ),
         _PortfolioSortMode.value => right.estimatedValue.compareTo(
           left.estimatedValue,
         ),
@@ -169,6 +203,33 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       };
     });
     return filteredItems;
+  }
+
+  bool _matchesCategoryFilter(
+    CollectibleItem item,
+    _PortfolioCategoryFilter filter,
+  ) {
+    final category = item.category.toLowerCase();
+    final title = item.title.toLowerCase();
+    final haystack = '$category $title';
+
+    return switch (filter) {
+      _PortfolioCategoryFilter.all => true,
+      _PortfolioCategoryFilter.cards =>
+        haystack.contains('card') || haystack.contains('tcg'),
+      _PortfolioCategoryFilter.coins => haystack.contains('coin'),
+      _PortfolioCategoryFilter.comics => haystack.contains('comic'),
+      _PortfolioCategoryFilter.memorabilia =>
+        haystack.contains('memorabilia') ||
+            haystack.contains('sports') ||
+            haystack.contains('autograph') ||
+            haystack.contains('jersey'),
+      _PortfolioCategoryFilter.other =>
+        !_matchesCategoryFilter(item, _PortfolioCategoryFilter.cards) &&
+            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.coins) &&
+            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.comics) &&
+            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.memorabilia),
+    };
   }
 
   double _averageConfidence(List<CollectibleItem> items) {
@@ -216,18 +277,61 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   }
 }
 
+void _logPortfolioOrder(List<CollectibleItem> items) {
+  debugPrint(
+    '[PortfolioScreen] final render order: '
+    '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
+  );
+  for (final item in items) {
+    debugPrint(
+      '[PortfolioScreen] render item '
+      'id=${item.id} '
+      'title="${item.title}" '
+      'imageSource=${_imageSourceFor(item.imagePath)} '
+      'createdAt=${item.createdAt.toIso8601String()} '
+      'savedAt=${item.createdAt.toIso8601String()} '
+      'updatedAt=not-tracked '
+      'displayTimestamp='
+      '${collectibleDisplayTimestamp(item).toIso8601String()}',
+    );
+  }
+}
+
+String _imageSourceFor(String imagePath) {
+  final normalizedPath = imagePath.trim();
+  if (normalizedPath.startsWith('sample://')) {
+    return 'sample';
+  }
+  if (normalizedPath.startsWith('http://') ||
+      normalizedPath.startsWith('https://')) {
+    return 'network';
+  }
+  if (normalizedPath.startsWith('assets/')) {
+    return 'asset';
+  }
+  if (normalizedPath.isEmpty) {
+    return 'missing';
+  }
+
+  return 'local';
+}
+
 class _PortfolioControls extends StatelessWidget {
   const _PortfolioControls({
     required this.searchQuery,
     required this.sortMode,
+    required this.categoryFilter,
     required this.onSearchChanged,
     required this.onSortChanged,
+    required this.onCategoryFilterChanged,
   });
 
   final String searchQuery;
   final _PortfolioSortMode sortMode;
+  final _PortfolioCategoryFilter categoryFilter;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<_PortfolioSortMode> onSortChanged;
+  final ValueChanged<_PortfolioCategoryFilter> onCategoryFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -246,24 +350,64 @@ class _PortfolioControls extends StatelessWidget {
           onSortChanged: onSortChanged,
         );
 
-        if (constraints.maxWidth >= 680) {
-          return Row(
-            children: [
-              Expanded(child: searchField),
-              const SizedBox(width: AppSpacing.lg),
-              SizedBox(width: 360, child: sortSelector),
-            ],
-          );
-        }
+        final searchAndSort = constraints.maxWidth >= 680
+            ? Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: AppSpacing.lg),
+                  SizedBox(width: 360, child: sortSelector),
+                ],
+              )
+            : Column(
+                children: [
+                  searchField,
+                  const SizedBox(height: AppSpacing.md),
+                  sortSelector,
+                ],
+              );
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            searchField,
+            searchAndSort,
             const SizedBox(height: AppSpacing.md),
-            sortSelector,
+            _PortfolioCategoryFilterChips(
+              selectedFilter: categoryFilter,
+              onChanged: onCategoryFilterChanged,
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _PortfolioCategoryFilterChips extends StatelessWidget {
+  const _PortfolioCategoryFilterChips({
+    required this.selectedFilter,
+    required this.onChanged,
+  });
+
+  final _PortfolioCategoryFilter selectedFilter;
+  final ValueChanged<_PortfolioCategoryFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final filter in _PortfolioCategoryFilter.values) ...[
+            ChoiceChip(
+              label: Text(filter.label),
+              selected: selectedFilter == filter,
+              onSelected: (_) => onChanged(filter),
+            ),
+            if (filter != _PortfolioCategoryFilter.values.last)
+              const SizedBox(width: AppSpacing.sm),
+          ],
+        ],
+      ),
     );
   }
 }

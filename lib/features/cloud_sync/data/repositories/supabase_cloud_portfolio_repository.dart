@@ -142,6 +142,7 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
         'notes': item.notes,
         'recommendation': item.recommendation,
         'cloudImageUrl': item.cloudImageUrl,
+        'marketSummary': item.marketSummary?.toJson(),
       },
       'ai_review': {
         'primaryMatch': item.primaryMatch,
@@ -169,7 +170,8 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
     final createdAt =
         parseNullableDateTime(row['saved_at']) ??
         parseNullableDateTime(row['created_at']) ??
-        DateTime.now();
+        parseNullableDateTime(row['updated_at']) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
 
     return CollectibleItem.fromJson({
       'id':
@@ -187,8 +189,12 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
       'imagePath': cloudImageUrl ?? parseString(row['image_path']),
       'imageStoragePath': storagePath,
       'cloudImageUrl': cloudImageUrl,
+      'savedAt': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'pricing': pricing.isEmpty ? null : pricing,
+      'marketSummary': parseJsonMap(metadata['marketSummary']).isEmpty
+          ? null
+          : parseJsonMap(metadata['marketSummary']),
       'primaryMatch': aiReview['primaryMatch'],
       'alternativeMatches': aiReview['alternativeMatches'],
       'confidenceExplanation': aiReview['confidenceExplanation'],

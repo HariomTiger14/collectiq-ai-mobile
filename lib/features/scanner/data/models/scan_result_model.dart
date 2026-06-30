@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
@@ -19,6 +20,7 @@ class ScanResultModel extends ScanResult {
     required super.detectionQuality,
     required super.aiReasoning,
     required super.pricing,
+    super.marketSummary,
     super.year,
     super.brand,
     super.setName,
@@ -73,6 +75,11 @@ class ScanResultModel extends ScanResult {
           : PricingInfo.fromLegacyEstimate(
               (json['estimatedValue'] as num).toDouble(),
             ),
+      marketSummary: json['marketSummary'] is Map<String, dynamic>
+          ? MarketSummary.fromJson(
+              json['marketSummary'] as Map<String, dynamic>,
+            )
+          : null,
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),
@@ -115,6 +122,7 @@ class ScanResultModel extends ScanResult {
       'detectionQuality': detectionQuality,
       'aiReasoning': aiReasoning,
       'pricing': pricing.toJson(),
+      'marketSummary': marketSummary?.toJson(),
       'year': year,
       'brand': brand,
       'setName': setName,

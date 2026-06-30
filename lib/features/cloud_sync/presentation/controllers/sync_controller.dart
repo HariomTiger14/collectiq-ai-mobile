@@ -135,6 +135,20 @@ class SyncController extends Notifier<SyncControllerState> {
       return const [];
     }
   }
+
+  void markManualSyncFailed(Object error, {int pendingItemCount = 0}) {
+    debugPrint('[Sync] manual sync failed: $error');
+    state = state.copyWith(
+      status: SyncStatus(
+        state: SyncState.failed,
+        message: 'Manual sync failed. Portfolio remains saved locally.',
+        isCloudBackupEnabled: true,
+        pendingItemCount: pendingItemCount,
+      ),
+      isLoading: false,
+      errorMessage: error.toString(),
+    );
+  }
 }
 
 /// Provides sync presentation state.

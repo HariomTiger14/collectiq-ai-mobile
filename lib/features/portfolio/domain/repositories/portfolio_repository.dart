@@ -2,8 +2,8 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 
 /// Contract for portfolio persistence.
 abstract interface class PortfolioRepository {
-  /// Adds [item] to the portfolio.
-  Future<void> addItem(CollectibleItem item);
+  /// Adds [item] to the portfolio and returns the final saved item.
+  Future<CollectibleItem> addItem(CollectibleItem item);
 
   /// Returns all saved portfolio items.
   Future<List<CollectibleItem>> getItems();

@@ -112,7 +112,9 @@ class ImageSyncController extends Notifier<ImageSyncState> {
       return;
     }
 
+    final startingSnapshot = await _queueRepository.snapshot();
     debugPrint('[ImageSync] processing upload queue');
+    debugPrint('[ImageSync] queue count: ${startingSnapshot.tasks.length}');
     state = state.copyWith(isUploading: true, clearErrorMessage: true);
     try {
       await _uploadWorker.processQueue();
@@ -120,7 +122,9 @@ class ImageSyncController extends Notifier<ImageSyncState> {
         snapshot: await _queueRepository.snapshot(),
         isUploading: false,
       );
-    } catch (_) {
+    } on Object catch (error, stackTrace) {
+      debugPrint('[ImageSync] process queue failed: $error');
+      debugPrint('$stackTrace');
       state = state.copyWith(
         snapshot: await _queueRepository.snapshot(),
         isUploading: false,

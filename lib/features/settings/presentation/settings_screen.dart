@@ -1,8 +1,11 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
+import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -19,6 +22,8 @@ class SettingsScreen extends ConsumerWidget {
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
     final portfolioState = ref.watch(portfolioControllerProvider);
+    final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
+    final diagnostics = ref.watch(providerDiagnosticsProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -98,13 +103,55 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'AI & Scanning',
-                    children: const [
+                    children: [
                       _SettingsRow(
                         icon: Icons.auto_awesome_outlined,
-                        title: 'AI model',
+                        title: 'Current AI provider',
+                        subtitle: aiProviderConfig.selectedProviderMessage,
+                        trailing: aiProviderConfig.type.displayName,
+                      ),
+                      if (aiProviderConfig.type == AiAnalysisProviderType.mock)
+                        const _SettingsRow(
+                          icon: Icons.info_outline,
+                          title: 'Mock mode active',
+                          subtitle:
+                              'Real AI providers are prepared but disabled until implemented.',
+                          trailing: 'Dev',
+                        ),
+                      _SettingsRow(
+                        icon: Icons.science_outlined,
+                        title: AiAnalysisProviderType.mock.displayName,
                         subtitle:
-                            'Uses the configured backend recognition provider.',
-                        trailing: 'Auto',
+                            'Local development recognizer. No external AI calls or API keys.',
+                        trailing: _providerOptionStatus(
+                          config: aiProviderConfig,
+                          type: AiAnalysisProviderType.mock,
+                          backendConfigured: true,
+                        ),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.visibility_outlined,
+                        title: AiAnalysisProviderType.openAiVision.displayName,
+                        subtitle:
+                            'Skeleton only. Real OpenAI calls must use the CollectIQ AI backend endpoint.',
+                        trailing: _providerOptionStatus(
+                          config: aiProviderConfig,
+                          type: AiAnalysisProviderType.openAiVision,
+                          backendConfigured:
+                              aiProviderConfig.hasBackendAnalysisEndpoint,
+                        ),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.auto_awesome_motion_outlined,
+                        title: AiAnalysisProviderType.geminiVision.displayName,
+                        subtitle:
+                            'Future backend-only provider. API keys must stay server-side.',
+                        trailing: _providerOptionStatus(
+                          config: aiProviderConfig,
+                          type: AiAnalysisProviderType.geminiVision,
+                          backendConfigured:
+                              aiProviderConfig.hasBackendAnalysisEndpoint,
+                        ),
                       ),
                       _SettingsRow(
                         icon: Icons.document_scanner_outlined,
@@ -112,6 +159,50 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle:
                             'Camera and gallery scans stay available locally.',
                         trailing: 'High',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'Developer Diagnostics',
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.auto_awesome_outlined,
+                        title: 'AI Provider',
+                        subtitle: diagnostics.aiProvider,
+                        trailing: diagnostics.aiProviderStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.price_check_outlined,
+                        title: 'Pricing Provider',
+                        subtitle: diagnostics.pricingProvider,
+                        trailing: diagnostics.pricingProviderStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.link_outlined,
+                        title: 'Backend Endpoint Configured',
+                        subtitle:
+                            'Future backend AI endpoint used by paid providers.',
+                        trailing: diagnostics.backendEndpointConfigured,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.cloud_sync_outlined,
+                        title: 'AI Backend Client',
+                        subtitle:
+                            'No network calls run until the backend service is enabled.',
+                        trailing: diagnostics.aiBackendClientStatus,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.developer_mode_outlined,
+                        title: 'Mock Mode Active',
+                        subtitle: diagnostics.appMode,
+                        trailing: diagnostics.mockModeActive,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.route_outlined,
+                        title: 'Last Scan Pipeline',
+                        subtitle: 'AI -> Pricing -> Result',
+                        trailing: diagnostics.lastScanPipelineStatus,
                       ),
                     ],
                   ),
@@ -188,12 +279,15 @@ class SettingsScreen extends ConsumerWidget {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: syncState.isLoading
+                          onPressed:
+                              syncState.isLoading || imageSyncState.isUploading
                               ? null
                               : () => _manualSync(ref, portfolioState.items),
                           icon: const Icon(Icons.sync_outlined),
                           label: Text(
-                            syncState.isLoading ? 'Syncing...' : 'Manual Sync',
+                            syncState.isLoading || imageSyncState.isUploading
+                                ? 'Syncing...'
+                                : 'Manual Sync',
                           ),
                         ),
                       ),
@@ -397,23 +491,61 @@ String _formatSyncDate(DateTime? value) {
   return '$day/$month/${value.year}';
 }
 
+String _providerOptionStatus({
+  required AiAnalysisProviderConfig config,
+  required AiAnalysisProviderType type,
+  required bool backendConfigured,
+}) {
+  if (config.type == type) {
+    return type.isAvailable ? 'Selected' : 'Unavailable';
+  }
+
+  if (type.isAvailable) {
+    return 'Available';
+  }
+
+  return backendConfigured ? 'Backend set' : 'Coming soon';
+}
+
 Future<void> _manualSync(
   WidgetRef ref,
   List<CollectibleItem> localItems,
 ) async {
-  await ref.read(imageSyncControllerProvider.notifier).processQueue();
-  await ref.read(syncControllerProvider.notifier).uploadLocalItems(localItems);
-  final downloadedItems = await ref
-      .read(syncControllerProvider.notifier)
-      .downloadCloudItems();
-  final localItemsById = {for (final item in localItems) item.id: item};
-  final portfolioController = ref.read(portfolioControllerProvider.notifier);
-  for (final item in downloadedItems) {
-    final localItem = localItemsById[item.id];
-    final resolvedItem = localItem == null
-        ? item
-        : SyncConflict(localItem: localItem, cloudItem: item).resolve();
-    await portfolioController.saveItem(resolvedItem);
+  debugPrint('[Sync] manual sync start');
+  debugPrint('[Sync] local item count: ${localItems.length}');
+  try {
+    await ref.read(imageSyncControllerProvider.notifier).processQueue();
+
+    final syncController = ref.read(syncControllerProvider.notifier);
+    for (final item in localItems) {
+      debugPrint('[Sync] database upsert start: ${item.id}');
+      await syncController.uploadLocalItems([item]);
+      debugPrint('[Sync] database upsert success: ${item.id}');
+    }
+
+    final downloadedItems = await syncController.downloadCloudItems();
+    debugPrint('[Sync] downloaded item count: ${downloadedItems.length}');
+    final localItemsById = {for (final item in localItems) item.id: item};
+    final portfolioController = ref.read(portfolioControllerProvider.notifier);
+    for (final item in downloadedItems) {
+      final localItem = localItemsById[item.id];
+      final resolvedItem = localItem == null
+          ? item
+          : SyncConflict(localItem: localItem, cloudItem: item).resolve();
+      if (localItem == null ||
+          resolvedItem.createdAt.isAfter(localItem.createdAt)) {
+        debugPrint('[Sync] merging cloud item: ${resolvedItem.id}');
+        await portfolioController.saveItem(resolvedItem);
+      }
+    }
+    await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
+    debugPrint('[Sync] manual sync complete');
+  } on Object catch (error, stackTrace) {
+    debugPrint('[Sync] manual sync caught exception: $error');
+    debugPrint('$stackTrace');
+    ref
+        .read(syncControllerProvider.notifier)
+        .markManualSyncFailed(error, pendingItemCount: localItems.length);
+    await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
   }
-  await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
 }

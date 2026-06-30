@@ -3,18 +3,20 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
-import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
-import 'package:collectiq_ai/features/ai/domain/repositories/recognition_repository.dart';
+import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
+import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
-import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,6 +26,7 @@ class ScannerState {
   const ScannerState({
     this.isCameraInitialized = false,
     this.isLoading = false,
+    this.isPreparingImage = false,
     this.selectedImage,
     this.selectedImagePath,
     this.selectedItemTitle,
@@ -39,6 +42,9 @@ class ScannerState {
 
   /// Whether the scanner workflow is currently loading.
   final bool isLoading;
+
+  /// Whether a returned picker image is being copied into app storage.
+  final bool isPreparingImage;
 
   /// Image selected from camera or gallery.
   final XFile? selectedImage;
@@ -68,6 +74,7 @@ class ScannerState {
   ScannerState copyWith({
     bool? isCameraInitialized,
     bool? isLoading,
+    bool? isPreparingImage,
     XFile? selectedImage,
     String? selectedImagePath,
     String? selectedItemTitle,
@@ -87,6 +94,7 @@ class ScannerState {
     return ScannerState(
       isCameraInitialized: isCameraInitialized ?? this.isCameraInitialized,
       isLoading: isLoading ?? this.isLoading,
+      isPreparingImage: isPreparingImage ?? this.isPreparingImage,
       selectedImage: clearSelectedImage
           ? null
           : selectedImage ?? this.selectedImage,
@@ -119,15 +127,71 @@ class ScannerController extends Notifier<ScannerState> {
   /// Gallery service dependency.
   late final GalleryService _galleryService;
 
-  /// AI recognition repository dependency.
-  late final RecognitionRepository _recognitionRepository;
+  /// AI analysis provider dependency.
+  late final AiAnalysisProvider _aiAnalysisProvider;
+
+  /// Scan enrichment service dependency.
+  late final ScanResultEnrichmentService _enrichmentService;
+  bool _isDisposed = false;
+  bool _isPickerActive = false;
+  bool _isRecoveringLostData = false;
+
+  bool get isPickerActiveForDebug => _isPickerActive;
+
+  bool get isRecoveringLostDataForDebug => _isRecoveringLostData;
 
   @override
   ScannerState build() {
+    _isDisposed = false;
     _cameraService = ref.watch(cameraServiceProvider);
     _galleryService = ref.watch(galleryServiceProvider);
-    _recognitionRepository = ref.watch(recognitionRepositoryProvider);
+    _aiAnalysisProvider = ref.watch(aiAnalysisProviderProvider);
+    _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
+    ref.onDispose(() {
+      _isDisposed = true;
+    });
+    logCollectIqScanFlow('scanner controller build');
     return const ScannerState();
+  }
+
+  void _setState(ScannerState nextState, {String event = 'state emitted'}) {
+    if (_isDisposed) {
+      return;
+    }
+
+    state = nextState;
+    _logFlow(event);
+  }
+
+  void _keepScanSelected(String reason) {
+    if (_isDisposed) {
+      return;
+    }
+
+    ref
+        .read(appShellTabControllerProvider.notifier)
+        .keepScanSelected(reason: reason);
+    _logFlow('scan tab preserved', details: {'reason': reason});
+  }
+
+  void _logFlow(
+    String event, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, Object?> details = const {},
+  }) {
+    logCollectIqScanFlow(
+      event,
+      selectedImagePath: state.selectedImagePath,
+      isLoading: state.isLoading,
+      isPreparingImage: state.isPreparingImage,
+      isPickerActive: _isPickerActive,
+      isRecoveringLostData: _isRecoveringLostData,
+      currentTabIndex: ref.read(appShellTabControllerProvider),
+      error: error,
+      stackTrace: stackTrace,
+      details: details,
+    );
   }
 
   /// Initializes camera state for the scanner screen.
@@ -154,35 +218,118 @@ class ScannerController extends Notifier<ScannerState> {
 
   /// Captures an image and stores it as the selected scanner image.
   Future<void> captureImage() async {
-    state = state.copyWith(isLoading: true, clearErrorMessage: true);
-    final image = await _cameraService.captureImage();
-    state = state.copyWith(
-      selectedImage: image,
-      selectedImagePath: image.path,
-      selectedItemTitle: 'Captured image',
-      selectedItemStatus: 'Ready for AI analysis',
-      isLoading: false,
-      clearScanResult: true,
-      clearAiRecommendation: true,
-      isSavedToPortfolio: false,
-    );
+    _setState(state.copyWith(isLoading: true, clearErrorMessage: true));
+    try {
+      final image = await _cameraService.captureImage();
+      if (image.path.trim().isEmpty) {
+        throw const ScannerException(
+          message: 'Captured image path is missing.',
+          code: 'scanner.camera.empty_path',
+        );
+      }
+      _setState(
+        state.copyWith(
+          selectedImage: image,
+          selectedImagePath: image.path,
+          selectedItemTitle: 'Captured image',
+          selectedItemStatus: 'Ready for AI analysis',
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+      );
+    } on ScannerException catch (error) {
+      debugPrint('[Scanner] camera capture scanner error: ${error.code}');
+      _setState(
+        state.copyWith(
+          errorMessage: error.message,
+          clearSelectedImage: true,
+          clearSelectedImagePath: true,
+          clearSelectedItemTitle: true,
+          clearSelectedItemStatus: true,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+      );
+    } on Object catch (error) {
+      debugPrint('[Scanner] camera capture failed: $error');
+      _setState(state.copyWith(errorMessage: 'Unable to capture image.'));
+    } finally {
+      _setState(state.copyWith(isLoading: false));
+    }
   }
 
   /// Opens the camera capture page and stores the captured image path.
   Future<void> startCameraScan(BuildContext context) async {
-    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    _logFlow('camera button tapped');
+    if (_isPickerActive) {
+      debugPrint('[Scanner] camera picker request ignored; picker active');
+      _logFlow('camera picker ignored active');
+      return;
+    }
+
+    debugPrint(
+      '[Scanner] camera picker opening from tab '
+      '${ref.read(appShellTabControllerProvider)}',
+    );
+    _keepScanSelected('camera-picker-open');
+    _isPickerActive = true;
+    _logFlow('picker active true', details: {'source': 'camera'});
+    _setState(
+      state.copyWith(isLoading: true, clearErrorMessage: true),
+      event: 'camera loading shell emitted',
+    );
     try {
       final capturedImage = await _cameraService.pickImageFromCamera();
+      if (_isDisposed) {
+        return;
+      }
+      debugPrint(
+        '[Scanner] camera picker returned on tab '
+        '${ref.read(appShellTabControllerProvider)}',
+      );
+      _logFlow(
+        'picker returned',
+        details: {'source': 'camera', 'path': capturedImage?.path},
+      );
+      _keepScanSelected('camera-picker-return');
       if (capturedImage == null || capturedImage.path.isEmpty) {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'Camera capture cancelled.',
+        _setState(
+          state.copyWith(
+            isPreparingImage: false,
+            errorMessage: 'Camera capture cancelled.',
+          ),
+          event: 'preparing image state false',
         );
         return;
       }
 
+      debugPrint('[Scanner] camera image copy started');
+      final copyStopwatch = Stopwatch()..start();
+      _setState(
+        state.copyWith(
+          isPreparingImage: true,
+          isLoading: false,
+          selectedItemTitle: 'Preparing image',
+          selectedItemStatus: 'Copying image into CollectIQ storage',
+          clearErrorMessage: true,
+        ),
+        event: 'image copy started',
+      );
       final image = await _cameraService.persistCapturedImage(capturedImage);
+      copyStopwatch.stop();
+      debugPrint('[Scanner] camera image copy completed: ${image.path}');
+      _logFlow(
+        'image copy completed',
+        details: {
+          'source': 'camera',
+          'path': image.path,
+          'elapsedMs': copyStopwatch.elapsedMilliseconds,
+        },
+      );
       final selectedImagePath = _displayPathFor(image);
+      await _ensureLocalImageExists(selectedImagePath, source: 'camera');
       debugPrint(
         '[Scanner] selectedImagePath after camera capture: '
         '$selectedImagePath',
@@ -190,32 +337,53 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint(
         '[Scanner] Supabase sync triggered after camera selection: false',
       );
-      state = state.copyWith(
-        selectedImage: image,
-        selectedImagePath: selectedImagePath,
-        selectedItemTitle: 'Captured image',
-        selectedItemStatus: 'Ready for AI analysis',
-        isLoading: false,
-        clearScanResult: true,
-        clearAiRecommendation: true,
-        isSavedToPortfolio: false,
+      _setState(
+        state.copyWith(
+          selectedImage: image,
+          selectedImagePath: selectedImagePath,
+          selectedItemTitle: 'Captured image',
+          selectedItemStatus: 'Ready for AI analysis',
+          isPreparingImage: false,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'selected image state emitted',
       );
     } on ScannerException catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.message,
-        clearSelectedImage: true,
-        clearSelectedImagePath: true,
-        clearSelectedItemTitle: true,
-        clearSelectedItemStatus: true,
-        clearScanResult: true,
-        clearAiRecommendation: true,
-        isSavedToPortfolio: false,
+      debugPrint('[Scanner] camera picker scanner error: ${error.code}');
+      _logFlow('camera picker scanner error', error: error);
+      _setState(
+        state.copyWith(
+          errorMessage: error.message,
+          isPreparingImage: false,
+          clearSelectedImage: true,
+          clearSelectedImagePath: true,
+          clearSelectedItemTitle: true,
+          clearSelectedItemStatus: true,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'preparing image state false',
       );
-    } on Exception {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Unable to open the camera.',
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] camera picker failed: $error');
+      debugPrint('$stackTrace');
+      _logFlow('camera picker failed', error: error, stackTrace: stackTrace);
+      _setState(
+        state.copyWith(
+          isPreparingImage: false,
+          errorMessage: 'Unable to open the camera.',
+        ),
+        event: 'preparing image state false',
+      );
+    } finally {
+      _isPickerActive = false;
+      _logFlow('picker active false', details: {'source': 'camera'});
+      _setState(
+        state.copyWith(isLoading: false),
+        event: 'camera loading shell cleared',
       );
     }
   }
@@ -223,6 +391,8 @@ class ScannerController extends Notifier<ScannerState> {
   /// Creates a sample selected scan for development and UI testing.
   void useSampleScan() {
     state = state.copyWith(
+      isLoading: false,
+      isPreparingImage: false,
       selectedImagePath: 'sample://sports-card',
       selectedItemTitle: 'Sample Sports Card',
       selectedItemStatus: 'Ready for AI analysis',
@@ -236,17 +406,77 @@ class ScannerController extends Notifier<ScannerState> {
 
   /// Opens the gallery and stores a validated selected image.
   Future<void> pickImageFromGallery() async {
-    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    _logFlow('gallery button tapped');
+    if (_isPickerActive) {
+      debugPrint('[Scanner] gallery picker request ignored; picker active');
+      _logFlow('gallery picker ignored active');
+      return;
+    }
+
+    debugPrint(
+      '[Scanner] gallery picker opening from tab '
+      '${ref.read(appShellTabControllerProvider)}',
+    );
+    _keepScanSelected('gallery-picker-open');
+    _isPickerActive = true;
+    _logFlow('picker active true', details: {'source': 'gallery'});
+    _setState(
+      state.copyWith(isLoading: true, clearErrorMessage: true),
+      event: 'gallery loading shell emitted',
+    );
     try {
       final image = await _galleryService.pickImage();
+      if (_isDisposed) {
+        return;
+      }
+      debugPrint(
+        '[Scanner] gallery picker returned on tab '
+        '${ref.read(appShellTabControllerProvider)}',
+      );
+      _logFlow(
+        'picker returned',
+        details: {'source': 'gallery', 'path': image?.path},
+      );
+      _keepScanSelected('gallery-picker-return');
       if (image == null) {
-        state = state.copyWith(isLoading: false);
+        _setState(
+          state.copyWith(
+            isPreparingImage: false,
+            errorMessage: 'Gallery selection cancelled.',
+          ),
+          event: 'preparing image state false',
+        );
         return;
       }
 
       await _galleryService.validateImage(image);
+      debugPrint('[Scanner] gallery image copy started');
+      final copyStopwatch = Stopwatch()..start();
+      _setState(
+        state.copyWith(
+          isPreparingImage: true,
+          isLoading: false,
+          selectedItemTitle: 'Preparing image',
+          selectedItemStatus: 'Copying image into CollectIQ storage',
+          clearErrorMessage: true,
+        ),
+        event: 'image copy started',
+      );
       final persistedImage = await _galleryService.persistSelectedImage(image);
+      copyStopwatch.stop();
+      debugPrint(
+        '[Scanner] gallery image copy completed: ${persistedImage.path}',
+      );
+      _logFlow(
+        'image copy completed',
+        details: {
+          'source': 'gallery',
+          'path': persistedImage.path,
+          'elapsedMs': copyStopwatch.elapsedMilliseconds,
+        },
+      );
       final selectedImagePath = _displayPathFor(persistedImage);
+      await _ensureLocalImageExists(selectedImagePath, source: 'gallery');
       debugPrint('[Scanner] gallery picker returned path: ${image.path}');
       debugPrint(
         '[Scanner] copied persistent gallery path: $selectedImagePath',
@@ -254,116 +484,249 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint(
         '[Scanner] Supabase sync triggered after gallery selection: false',
       );
-      state = state.copyWith(
-        selectedImage: persistedImage,
-        selectedImagePath: selectedImagePath,
-        selectedItemTitle: 'Gallery image',
-        selectedItemStatus: 'Ready for AI analysis',
-        isLoading: false,
-        clearScanResult: true,
-        clearAiRecommendation: true,
-        isSavedToPortfolio: false,
+      _setState(
+        state.copyWith(
+          selectedImage: persistedImage,
+          selectedImagePath: selectedImagePath,
+          selectedItemTitle: 'Gallery image',
+          selectedItemStatus: 'Ready for AI analysis',
+          isPreparingImage: false,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'selected image state emitted',
       );
       unawaited(_logPersistentGalleryDiagnostics(selectedImagePath));
     } on ScannerException catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.message,
-        clearSelectedImage: true,
-        clearSelectedImagePath: true,
-        clearSelectedItemTitle: true,
-        clearSelectedItemStatus: true,
-        clearScanResult: true,
-        clearAiRecommendation: true,
+      debugPrint('[Scanner] gallery picker scanner error: ${error.code}');
+      _logFlow('gallery picker scanner error', error: error);
+      _setState(
+        state.copyWith(
+          errorMessage: error.message,
+          isPreparingImage: false,
+          clearSelectedImage: true,
+          clearSelectedImagePath: true,
+          clearSelectedItemTitle: true,
+          clearSelectedItemStatus: true,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+        ),
+        event: 'preparing image state false',
       );
-    } on Exception {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Something went wrong. Please try again.',
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] gallery picker failed: $error');
+      debugPrint('$stackTrace');
+      _logFlow('gallery picker failed', error: error, stackTrace: stackTrace);
+      _setState(
+        state.copyWith(
+          isPreparingImage: false,
+          errorMessage: 'Something went wrong. Please try again.',
+        ),
+        event: 'preparing image state false',
       );
+    } finally {
+      _isPickerActive = false;
+      _logFlow('picker active false', details: {'source': 'gallery'});
+      _setState(
+        state.copyWith(isLoading: false),
+        event: 'gallery loading shell cleared',
+      );
+    }
+  }
+
+  /// Recovers an Android picker result if MainActivity was killed mid-capture.
+  Future<void> recoverLostPickerData({String reason = 'startup'}) async {
+    if (_isDisposed || _isPickerActive || _isRecoveringLostData) {
+      debugPrint(
+        '[Scanner] lost picker recovery skipped '
+        'reason=$reason disposed=$_isDisposed '
+        'pickerActive=$_isPickerActive recovering=$_isRecoveringLostData',
+      );
+      _logFlow(
+        'lost data recovery skipped',
+        details: {'reason': reason, 'disposed': _isDisposed},
+      );
+      return;
+    }
+
+    _isRecoveringLostData = true;
+    debugPrint('[Scanner] lost picker recovery start: $reason');
+    _logFlow('lost data recovery started', details: {'reason': reason});
+    try {
+      final recoveredImage = await _cameraService.retrieveLostImage();
+      if (_isDisposed || recoveredImage == null) {
+        _logFlow(
+          'lost data recovery completed',
+          details: {'reason': reason, 'recovered': false},
+        );
+        return;
+      }
+
+      debugPrint(
+        '[Scanner] lost picker image returned path: ${recoveredImage.path}',
+      );
+      _keepScanSelected('lost-picker-recovery');
+      await _galleryService.validateImage(recoveredImage);
+      final persistedImage = await _galleryService.persistSelectedImage(
+        recoveredImage,
+      );
+      final selectedImagePath = _displayPathFor(persistedImage);
+      await _ensureLocalImageExists(selectedImagePath, source: 'recovered');
+      debugPrint('[Scanner] lost picker persistent path: $selectedImagePath');
+      _setState(
+        state.copyWith(
+          isLoading: false,
+          isPreparingImage: false,
+          selectedImage: persistedImage,
+          selectedImagePath: selectedImagePath,
+          selectedItemTitle: 'Recovered image',
+          selectedItemStatus: 'Ready for AI analysis',
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          clearErrorMessage: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'selected image state emitted',
+      );
+      _logFlow(
+        'lost data recovery completed',
+        details: {'reason': reason, 'recovered': true},
+      );
+    } on ScannerException catch (error) {
+      debugPrint('[Scanner] lost picker scanner error: ${error.code}');
+      _logFlow('lost data recovery scanner error', error: error);
+      _setState(
+        state.copyWith(
+          isLoading: false,
+          isPreparingImage: false,
+          errorMessage: error.message,
+          clearSelectedImage: true,
+          clearSelectedImagePath: true,
+          clearSelectedItemTitle: true,
+          clearSelectedItemStatus: true,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'preparing image state false',
+      );
+    } on UnimplementedError {
+      debugPrint('[Scanner] lost picker recovery unsupported on platform');
+      _logFlow('lost data recovery completed', details: {'unsupported': true});
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] lost picker recovery failed: $error');
+      debugPrint('$stackTrace');
+      _logFlow(
+        'lost data recovery failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _setState(
+        state.copyWith(
+          isLoading: false,
+          isPreparingImage: false,
+          errorMessage: 'Unable to recover the selected image.',
+        ),
+        event: 'preparing image state false',
+      );
+    } finally {
+      _isRecoveringLostData = false;
+      _logFlow('lost data recovery completed', details: {'reason': reason});
     }
   }
 
   /// Runs AI analysis for the selected scan preview.
   Future<void> analyzeWithAi() async {
+    debugPrint('[Scanner] analyze start');
+    _logFlow('analyze tapped');
     final selectedImagePath = state.selectedImagePath;
     if (selectedImagePath == null) {
       return;
     }
+    ref.read(scanPipelineStatusProvider.notifier).markReady();
 
-    state = state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      isSavedToPortfolio: false,
+    final validationError = await _validateSelectedImagePath(selectedImagePath);
+    if (validationError != null) {
+      _setState(
+        state.copyWith(
+          errorMessage: validationError,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+      );
+      return;
+    }
+
+    _setState(
+      state.copyWith(
+        isLoading: true,
+        isPreparingImage: false,
+        clearErrorMessage: true,
+        isSavedToPortfolio: false,
+      ),
     );
     try {
-      final recognition = selectedImagePath.startsWith('sample://')
-          ? _sampleRecognitionResult()
-          : await _recognizeSelectedImage();
-      final thumbnail = _portfolioImagePathFor(
-        selectedImagePath: selectedImagePath,
-        recognitionImageUrl: recognition.imageUrl,
-      );
-      debugPrint('[Scanner] ScanResult.thumbnail: $thumbnail');
-      state = state.copyWith(
-        isLoading: false,
-        scanResult: ScanResult(
-          id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
-          title: recognition.title,
-          category: recognition.category,
-          estimatedValue: recognition.estimatedValue,
-          confidence: recognition.confidence,
-          condition: recognition.condition,
-          thumbnail: thumbnail,
-          scanDate: DateTime.now(),
-          primaryMatch: recognition.primaryMatch,
-          alternativeMatches: [
-            for (final match in recognition.alternativeMatches)
-              ScanAlternativeMatch(
-                title: match.title,
-                category: match.category,
-                confidence: match.confidence,
-                reason: match.reason,
-              ),
-          ],
-          confidenceExplanation: recognition.confidenceExplanation,
-          detectionQuality: recognition.detectionQuality,
-          aiReasoning: recognition.aiReasoning,
-          pricing: recognition.pricing,
-          year: recognition.year,
-          brand: recognition.brand,
-          setName: recognition.setName,
-          series: recognition.series,
-          cardNumber: recognition.cardNumber,
-          playerOrCharacter: recognition.playerOrCharacter,
-          rarity: recognition.rarity,
-          estimatedGrade: recognition.estimatedGrade,
-          language: recognition.language,
-          edition: recognition.edition,
-          country: recognition.country,
-          mint: recognition.mint,
-          material: recognition.material,
-          notes: recognition.notes,
+      final analysis = await _aiAnalysisProvider.analyze(
+        AiAnalysisRequest(
+          imagePath: selectedImagePath,
+          image: state.selectedImage,
+          metadata: {
+            'selectedItemTitle': state.selectedItemTitle,
+            'selectedItemStatus': state.selectedItemStatus,
+          },
         ),
-        aiRecommendation: recognition.recommendation,
-        isSavedToPortfolio: false,
+      );
+      final enrichedAnalysis = await _enrichmentService.enrich(
+        analysis: analysis,
+        metadata: ScanResultEnrichmentMetadata(
+          imagePath: selectedImagePath,
+          imageSource: _imageSourceFor(selectedImagePath),
+        ),
+      );
+      _setState(
+        state.copyWith(
+          scanResult: enrichedAnalysis.scanResult,
+          aiRecommendation: enrichedAnalysis.recommendation,
+          isSavedToPortfolio: false,
+        ),
+      );
+      ref.read(scanPipelineStatusProvider.notifier).markCompleted();
+    } on AiAnalysisException catch (error) {
+      ref.read(scanPipelineStatusProvider.notifier).markError();
+      _setState(
+        state.copyWith(
+          errorMessage: error.message,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
       );
     } on NetworkException catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: _messageForNetworkError(error),
-        clearScanResult: true,
-        clearAiRecommendation: true,
-        isSavedToPortfolio: false,
+      ref.read(scanPipelineStatusProvider.notifier).markError();
+      _setState(
+        state.copyWith(
+          errorMessage: _messageForNetworkError(error),
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
       );
-    } on Exception {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Something went wrong. Please try again.',
-        clearScanResult: true,
-        clearAiRecommendation: true,
-        isSavedToPortfolio: false,
+    } on Object catch (error, stackTrace) {
+      ref.read(scanPipelineStatusProvider.notifier).markError();
+      debugPrint('[Scanner] analysis failed: $error');
+      debugPrint('$stackTrace');
+      _setState(
+        state.copyWith(
+          errorMessage: 'Something went wrong. Please try again.',
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
       );
+    } finally {
+      _setState(state.copyWith(isLoading: false));
     }
   }
 
@@ -374,6 +737,8 @@ class ScannerController extends Notifier<ScannerState> {
       return false;
     }
 
+    debugPrint('[Scanner] Save to Portfolio tapped for result id=${result.id}');
+    _logFlow('save tapped', details: {'scanResultId': result.id});
     final item = CollectibleItem(
       id: result.id,
       title: result.title,
@@ -386,6 +751,7 @@ class ScannerController extends Notifier<ScannerState> {
       imagePath: result.thumbnail,
       createdAt: DateTime.now(),
       pricing: result.pricing,
+      marketSummary: result.marketSummary,
       primaryMatch: result.primaryMatch,
       alternativeMatches: [
         for (final match in result.alternativeMatches)
@@ -420,10 +786,21 @@ class ScannerController extends Notifier<ScannerState> {
       '${item.imagePath}',
     );
     debugPrint(
+      '[Scanner] CollectibleItem before save '
+      'id=${item.id} '
+      'title="${item.title}" '
+      'imageSource=${_imageSourceFor(item.imagePath)} '
+      'scanDate=${result.scanDate.toIso8601String()} '
+      'createdAt=${item.createdAt.toIso8601String()} '
+      'savedAt=${item.createdAt.toIso8601String()} '
+      'updatedAt=not-tracked',
+    );
+    debugPrint(
       '[Scanner] image file exists before save: '
       '${await _localFileExists(item.imagePath)}',
     );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+    _logFlow('portfolio updated', details: {'itemId': item.id});
     await ref
         .read(imageSyncControllerProvider.notifier)
         .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
@@ -435,6 +812,7 @@ class ScannerController extends Notifier<ScannerState> {
   void resetScan() {
     state = state.copyWith(
       isLoading: false,
+      isPreparingImage: false,
       clearSelectedImage: true,
       clearSelectedImagePath: true,
       clearSelectedItemTitle: true,
@@ -444,6 +822,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearErrorMessage: true,
       isSavedToPortfolio: false,
     );
+    ref.read(scanPipelineStatusProvider.notifier).markReady();
   }
 
   /// Clears completed saved work when the user leaves the scan tab.
@@ -475,15 +854,6 @@ class ScannerController extends Notifier<ScannerState> {
     return _cameraService.disposeCamera();
   }
 
-  Future<RecognitionResult> _recognizeSelectedImage() {
-    final image = state.selectedImage;
-    if (image == null) {
-      throw StateError('No image selected for analysis.');
-    }
-
-    return _recognitionRepository.recognizeCollectible(image);
-  }
-
   String _displayPathFor(XFile image) {
     if (image.path.isNotEmpty) {
       return image.path;
@@ -492,30 +862,37 @@ class ScannerController extends Notifier<ScannerState> {
     return image.name.isEmpty ? 'selected-image' : image.name;
   }
 
-  String _portfolioImagePathFor({
-    required String selectedImagePath,
-    required String? recognitionImageUrl,
-  }) {
-    if (_isUsableSelectedImagePath(selectedImagePath)) {
-      return selectedImagePath;
-    }
-
-    final normalizedRecognitionImageUrl = recognitionImageUrl?.trim();
-    if (normalizedRecognitionImageUrl != null &&
-        normalizedRecognitionImageUrl.isNotEmpty) {
-      return normalizedRecognitionImageUrl;
-    }
-
-    return selectedImagePath;
-  }
-
-  bool _isUsableSelectedImagePath(String imagePath) {
+  Future<String?> _validateSelectedImagePath(String imagePath) async {
     final normalizedPath = imagePath.trim();
     if (normalizedPath.isEmpty || normalizedPath == 'selected-image') {
-      return false;
+      return 'Selected image path is missing. Please choose another image.';
+    }
+    if (normalizedPath.startsWith('sample://')) {
+      return null;
+    }
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://') ||
+        normalizedPath.startsWith('assets/')) {
+      return null;
+    }
+    if (!await _safeLocalFileExists(normalizedPath)) {
+      return 'Selected image could not be found. Please choose another image.';
     }
 
-    return !normalizedPath.startsWith('sample://');
+    return null;
+  }
+
+  Future<void> _ensureLocalImageExists(
+    String imagePath, {
+    required String source,
+  }) async {
+    final error = await _validateSelectedImagePath(imagePath);
+    if (error != null) {
+      throw ScannerException(
+        message: error,
+        code: 'scanner.$source.missing_file',
+      );
+    }
   }
 
   Future<bool> _localFileExists(String imagePath) async {
@@ -528,7 +905,7 @@ class ScannerController extends Notifier<ScannerState> {
       return false;
     }
 
-    return File(normalizedPath).exists();
+    return File(normalizedPath).existsSync();
   }
 
   Future<bool> _safeLocalFileExists(String imagePath) async {
@@ -551,11 +928,11 @@ class ScannerController extends Notifier<ScannerState> {
     }
 
     final file = File(normalizedPath);
-    if (!await file.exists()) {
+    if (!file.existsSync()) {
       return 0;
     }
 
-    return file.length();
+    return file.lengthSync();
   }
 
   Future<int> _safeLocalFileSize(String imagePath) async {
@@ -582,67 +959,23 @@ class ScannerController extends Notifier<ScannerState> {
     };
   }
 
-  RecognitionResult _sampleRecognitionResult() {
-    return RecognitionResult(
-      success: true,
-      filename: null,
-      imageUrl: 'sample://sports-card',
-      title: '1999 Pokémon Charizard',
-      category: 'Trading Card',
-      confidence: 0.94,
-      description: 'Sample scanner result.',
-      estimatedValue: 1850,
-      condition: 'Near Mint',
-      recommendation: 'Consider grading before selling.',
-      primaryMatch: '1999 PokÃ©mon Charizard',
-      alternativeMatches: const [
-        RecognitionAlternativeMatch(
-          title: '2016 Pokemon Evolutions Charizard',
-          category: 'Trading Card',
-          confidence: 0.68,
-          reason: 'Similar artwork and card layout.',
-        ),
-        RecognitionAlternativeMatch(
-          title: 'Pokemon Charizard Promo',
-          category: 'Trading Card',
-          confidence: 0.61,
-          reason: 'Character match is plausible.',
-        ),
-        RecognitionAlternativeMatch(
-          title: 'Pokemon Expedition Charizard',
-          category: 'Trading Card',
-          confidence: 0.58,
-          reason: 'Shares fire-type character cues.',
-        ),
-      ],
-      confidenceExplanation:
-          'High confidence from the character artwork, card frame, and holographic cues.',
-      detectionQuality: 'Good - sample image is clear enough for review.',
-      aiReasoning:
-          'The sample shows a Charizard-like Pokemon card with collector-relevant holo and border details.',
-      pricing: PricingInfo(
-        estimatedMarketValue: 1850,
-        lowEstimate: 1443,
-        highEstimate: 2257,
-        currency: 'AUD',
-        pricingSource: 'Mock market blend: TCGplayer + eBay comps',
-        pricingConfidence: 0.85,
-        lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
-      ),
-      year: '1999',
-      brand: 'Pokemon',
-      setName: 'Base Set',
-      series: 'Pokemon TCG',
-      cardNumber: '4/102',
-      playerOrCharacter: 'Charizard',
-      rarity: 'Holo Rare',
-      estimatedGrade: 'PSA 8-9',
-      language: 'English',
-      edition: 'Unlimited',
-      country: 'United States',
-      material: 'Cardstock',
-      notes: 'Verify holo surface and card centering before grading.',
-    );
+  String _imageSourceFor(String imagePath) {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.startsWith('sample://')) {
+      return 'sample';
+    }
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return 'network';
+    }
+    if (normalizedPath.startsWith('assets/')) {
+      return 'asset';
+    }
+    if (normalizedPath.isEmpty) {
+      return 'missing';
+    }
+
+    return 'local';
   }
 }
 

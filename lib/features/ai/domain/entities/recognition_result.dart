@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Alternative collectible match returned by the AI review system.
@@ -55,6 +56,7 @@ class RecognitionResult {
     required this.detectionQuality,
     required this.aiReasoning,
     required this.pricing,
+    this.marketSummary,
     this.year,
     this.brand,
     this.setName,
@@ -119,6 +121,8 @@ class RecognitionResult {
   /// Pricing supplied by the configured pricing provider.
   final PricingInfo pricing;
 
+  final MarketSummary? marketSummary;
+
   final String? year;
   final String? brand;
   final String? setName;
@@ -170,6 +174,11 @@ class RecognitionResult {
       pricing: json['pricing'] is Map<String, dynamic>
           ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
           : PricingInfo.fromLegacyEstimate(estimatedValue),
+      marketSummary: json['marketSummary'] is Map<String, dynamic>
+          ? MarketSummary.fromJson(
+              json['marketSummary'] as Map<String, dynamic>,
+            )
+          : null,
       year: _optionalString(json['year']),
       brand: _optionalString(json['brand']),
       setName: _optionalString(json['setName']),

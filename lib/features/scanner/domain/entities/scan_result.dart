@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Alternative match displayed in the scan result review.
@@ -41,6 +42,7 @@ class ScanResult {
     required this.detectionQuality,
     required this.aiReasoning,
     required this.pricing,
+    this.marketSummary,
     this.year,
     this.brand,
     this.setName,
@@ -98,6 +100,8 @@ class ScanResult {
 
   /// Market pricing supplied by the pricing provider.
   final PricingInfo pricing;
+
+  final MarketSummary? marketSummary;
 
   final String? year;
   final String? brand;

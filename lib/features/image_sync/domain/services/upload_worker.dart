@@ -6,6 +6,7 @@ import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_ta
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/services/retry_policy.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:flutter/foundation.dart';
 
 class UploadWorker {
   const UploadWorker({
@@ -24,18 +25,24 @@ class UploadWorker {
 
   Future<void> processQueue() async {
     final tasks = await queueRepository.getUploadableTasks();
+    debugPrint('[ImageSync] queue count: ${tasks.length}');
     for (final task in tasks) {
       await _uploadTask(task);
     }
   }
 
   Future<void> _uploadTask(ImageUploadTask task) async {
+    debugPrint('[ImageSync] current task id: ${task.id}');
     if (!_isLocalImagePath(task.localPath) ||
         !await File(task.localPath).exists()) {
+      debugPrint('[ImageSync] upload skipped; file missing: ${task.localPath}');
       await _markFailed(task, 'Local image file is not available.');
       return;
     }
 
+    final imageFile = File(task.localPath);
+    final fileSize = await imageFile.length();
+    debugPrint('[ImageSync] current file size: $fileSize');
     final now = DateTime.now();
     await queueRepository.saveTask(
       task.copyWith(
@@ -48,12 +55,14 @@ class UploadWorker {
     );
 
     try {
+      debugPrint('[ImageSync] upload start: ${task.id}');
       final reference = await imageStorageRepository.uploadImage(
         localPath: task.localPath,
         collectibleId: task.collectibleId,
       );
 
       if (!reference.isRemote || reference.publicUrl == null) {
+        debugPrint('[ImageSync] upload produced local reference only');
         await _markFailed(task, 'Cloud image storage is not configured.');
         return;
       }
@@ -74,8 +83,11 @@ class UploadWorker {
         imageStoragePath: reference.path,
         cloudImageUrl: reference.publicUrl!,
       );
+      debugPrint('[ImageSync] upload success: ${task.id}');
       await _uploadUpdatedCollectible(task.collectibleId);
-    } on Exception catch (error) {
+    } on Object catch (error, stackTrace) {
+      debugPrint('[ImageSync] upload failure: $error');
+      debugPrint('$stackTrace');
       await _markFailed(task, error.toString());
     }
   }
@@ -94,7 +106,9 @@ class UploadWorker {
       return;
     }
 
+    debugPrint('[ImageSync] database upsert start: $collectibleId');
     await cloudRepository.uploadLocalItems(updatedItems);
+    debugPrint('[ImageSync] database upsert success: $collectibleId');
   }
 
   Future<void> _markFailed(ImageUploadTask task, String message) async {

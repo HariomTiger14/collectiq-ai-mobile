@@ -133,7 +133,9 @@ class PortfolioEmptyState extends StatelessWidget {
 /// Empty state shown when search filters hide all saved items.
 class PortfolioNoSearchResultsState extends StatelessWidget {
   /// Creates a no search results state.
-  const PortfolioNoSearchResultsState({super.key});
+  const PortfolioNoSearchResultsState({this.onResetFilters, super.key});
+
+  final VoidCallback? onResetFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +167,17 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
               color: colorScheme.onSurfaceVariant,
             ),
           ),
+          if (onResetFilters != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onResetFilters,
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Reset Search'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -262,6 +275,7 @@ class _PortfolioItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Material(
       color: Colors.transparent,
@@ -269,7 +283,7 @@ class _PortfolioItemCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -282,21 +296,36 @@ class _PortfolioItemCard extends StatelessWidget {
               _PortfolioItemImage(
                 key: ValueKey('portfolio-card-image-${item.id}'),
                 imagePath: item.imagePath,
-                size: 104,
+                size: 108,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(child: _PortfolioItemDetails(item: item)),
               const SizedBox(width: AppSpacing.xs),
-              IconButton.filledTonal(
-                onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline, size: 18),
-                tooltip: 'Remove item',
-                style: IconButton.styleFrom(
-                  foregroundColor: colorScheme.onSurfaceVariant,
-                  minimumSize: const Size(36, 36),
-                  fixedSize: const Size(36, 36),
-                  padding: EdgeInsets.zero,
-                ),
+              Column(
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: onRemove,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: 'Remove item',
+                    style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.onSurfaceVariant,
+                      minimumSize: const Size(36, 36),
+                      fixedSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  Text(
+                    'Open',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -395,6 +424,7 @@ class _PortfolioItemDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final trendLabel = item.marketSummary?.trendLabel ?? 'Stable';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,36 +442,105 @@ class _PortfolioItemDetails extends StatelessWidget {
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Saved ${_formatDate(item.createdAt)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           _formatAud(item.estimatedValue),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleMedium?.copyWith(
+          style: textTheme.titleLarge?.copyWith(
             color: colorScheme.primary,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          '${(item.confidence * 100).toStringAsFixed(0)}% confidence / ${item.condition}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.labelMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          children: [
+            _PortfolioBadge(
+              label: item.condition,
+              icon: Icons.grade_outlined,
+              color: AppColors.success,
+            ),
+            _PortfolioBadge(
+              label: '${(item.confidence * 100).toStringAsFixed(0)}%',
+              icon: Icons.verified_outlined,
+              color: colorScheme.primary,
+            ),
+            _PortfolioBadge(
+              label: trendLabel,
+              icon: Icons.trending_up_outlined,
+              color: AppColors.secondaryAccent,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Saved ${_formatDate(item.createdAt)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _PortfolioBadge extends StatelessWidget {
+  const _PortfolioBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -13,18 +14,54 @@ class GalleryService {
 
   static const _allowedExtensions = {'jpg', 'jpeg', 'png'};
   static const _maxImageBytes = 10 * 1024 * 1024;
+  static const _maxPickerDimension = 1280.0;
+  static const _pickerImageQuality = 82;
 
   final ImagePicker _imagePicker;
 
   /// Opens the gallery and returns the selected image file.
   Future<XFile?> pickImage() async {
-    final image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    debugPrint('[GalleryService] gallery picker launch requested');
+    _releaseImageCacheBeforeExternalPicker();
+    final image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: _maxPickerDimension,
+      maxHeight: _maxPickerDimension,
+      imageQuality: _pickerImageQuality,
+      requestFullMetadata: false,
+    );
     debugPrint('[GalleryService] picker returned: ${image?.path ?? 'null'}');
     return image;
   }
 
+  void _releaseImageCacheBeforeExternalPicker() {
+    final cache = PaintingBinding.instance.imageCache;
+    debugPrint(
+      '[GalleryService] clearing image cache before gallery picker: '
+      'current=${cache.currentSize} live=${cache.liveImageCount}',
+    );
+    cache.clear();
+    cache.clearLiveImages();
+  }
+
   /// Validates whether [image] can be used for scanner upload.
   Future<bool> validateImage(XFile image) async {
+    final originalPath = image.path.trim();
+    if (originalPath.isEmpty) {
+      throw const ScannerException(
+        message: 'Gallery image path is missing.',
+        code: 'scanner.gallery.empty_path',
+      );
+    }
+
+    final sourceFile = File(originalPath);
+    if (!sourceFile.existsSync()) {
+      throw const ScannerException(
+        message: 'Selected image could not be found.',
+        code: 'scanner.gallery.missing_file',
+      );
+    }
+
     final extension = _extensionFor(image);
     if (!_allowedExtensions.contains(extension)) {
       throw const ScannerException(
@@ -33,7 +70,7 @@ class GalleryService {
       );
     }
 
-    final length = await image.length();
+    final length = sourceFile.lengthSync();
     if (length > _maxImageBytes) {
       throw const ScannerException(
         message: 'Image is too large. Please choose an image under 10MB.',

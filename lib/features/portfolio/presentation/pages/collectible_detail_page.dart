@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
+import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 
@@ -48,7 +50,7 @@ class CollectibleDetailPage extends StatelessWidget {
                     value: _formatAud(item.estimatedValue),
                     subtitle: item.pricing == null
                         ? 'Based on the saved AI estimate'
-                        : 'Market range and source details below',
+                        : 'Value range: ${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _DetailSections(item: item),
@@ -97,7 +99,7 @@ class _ImagePreview extends StatelessWidget {
         normalizedPath.startsWith('https://')) {
       return Image.network(
         normalizedPath,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
@@ -106,7 +108,7 @@ class _ImagePreview extends StatelessWidget {
     if (normalizedPath.startsWith('assets/')) {
       return Image.asset(
         normalizedPath,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => _placeholder(colorScheme),
       );
@@ -114,7 +116,7 @@ class _ImagePreview extends StatelessWidget {
 
     return Image.file(
       File(normalizedPath),
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => _placeholder(colorScheme),
     );
@@ -180,6 +182,11 @@ class _DetailHeader extends StatelessWidget {
                 icon: Icons.auto_awesome_outlined,
               ),
               _StatusBadge(
+                label:
+                    'Market trend: ${item.marketSummary?.trendLabel ?? 'Stable'}',
+                icon: Icons.trending_up_outlined,
+              ),
+              _StatusBadge(
                 label: 'Saved ${_formatDate(item.createdAt)}',
                 icon: Icons.calendar_today_outlined,
               ),
@@ -239,9 +246,13 @@ class _DetailSections extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
+        if (item.marketSummary != null) ...[
+          _MarketIntelligenceSection(summary: item.marketSummary!),
+          const SizedBox(height: AppSpacing.xl),
+        ],
         if (collectibleDetails.isNotEmpty) ...[
           AppProfileSection(
-            title: 'Profile Details',
+            title: 'Key Attributes',
             children: [AppCompactMetadata(items: collectibleDetails)],
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -323,6 +334,83 @@ class _DetailSections extends StatelessWidget {
 
   AppMetadataItem _metadataItem(String label, String? value) {
     return AppMetadataItem(label: label, value: value ?? '');
+  }
+}
+
+class _MarketIntelligenceSection extends StatelessWidget {
+  const _MarketIntelligenceSection({required this.summary});
+
+  final MarketSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = _marketCurrency(summary);
+
+    return AppProfileSection(
+      title: 'Market Summary',
+      children: [
+        AppCompactMetadata(
+          items: [
+            AppMetadataItem(
+              label: 'Average Price',
+              value: _formatMoney(summary.averagePrice, currency),
+            ),
+            AppMetadataItem(
+              label: 'Median Price',
+              value: _formatMoney(summary.medianPrice, currency),
+            ),
+            AppMetadataItem(
+              label: 'Market Range',
+              value:
+                  '${_formatMoney(summary.lowPrice, currency)} - ${_formatMoney(summary.highPrice, currency)}',
+            ),
+            AppMetadataItem(
+              label: 'Sales Count',
+              value: '${summary.salesCount}',
+            ),
+            AppMetadataItem(label: 'Trend', value: summary.trendLabel),
+            AppMetadataItem(
+              label: 'Confidence',
+              value: '${(summary.confidence * 100).toStringAsFixed(0)}%',
+            ),
+            AppMetadataItem(
+              label: 'Sources',
+              value: summary.sources.join(', '),
+            ),
+            AppMetadataItem(
+              label: 'Last Updated',
+              value: _formatPricingDate(summary.lastUpdated),
+            ),
+          ],
+        ),
+        if (summary.comps.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Recent comparable sales',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final comp in summary.comps.take(5)) _MarketCompRow(comp: comp),
+        ],
+      ],
+    );
+  }
+}
+
+class _MarketCompRow extends StatelessWidget {
+  const _MarketCompRow({required this.comp});
+
+  final MarketComp comp;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppLabelValueRow(
+      label: comp.source,
+      value:
+          '${_formatMoney(comp.soldPrice, comp.currency)} / ${comp.condition} / ${_formatPricingDate(comp.soldDate)}',
+    );
   }
 }
 
@@ -711,4 +799,12 @@ String _formatPricingDate(DateTime? date) {
   }
 
   return _formatDate(date);
+}
+
+String _marketCurrency(MarketSummary summary) {
+  if (summary.comps.isEmpty) {
+    return 'AUD';
+  }
+
+  return summary.comps.first.currency;
 }
