@@ -1,6 +1,8 @@
 import unittest
 
 from app.services.ai.mock_recognition_service import MockRecognitionProvider
+from app.services.pricing.aggregation_service import PricingAggregationService
+from app.services.pricing.base_pricing_provider import PricingProviderUnavailableError
 from app.services.pricing.mock_pricing_provider import MockPricingProvider
 from app.services.pricing.provider_factory import get_pricing_provider
 
@@ -19,18 +21,25 @@ class MockPricingProviderTest(unittest.TestCase):
         self.assertGreaterEqual(pricing.pricingConfidence, 0)
         self.assertLessEqual(pricing.pricingConfidence, 100)
         self.assertTrue(pricing.lastUpdated.endswith("Z"))
+        self.assertTrue(pricing.comparableSales)
+        self.assertEqual(pricing.cacheStatus, "mock")
 
     def test_pricing_provider_factory_defaults_to_mock(self) -> None:
         provider = get_pricing_provider()
 
-        self.assertIsInstance(provider, MockPricingProvider)
+        self.assertIsInstance(provider, PricingAggregationService)
 
-    def test_pricing_provider_factory_reserves_future_provider_names(self) -> None:
-        with self.assertRaises(ValueError):
-            get_pricing_provider("ebay")
+    def test_pricing_provider_factory_supports_future_provider_names(self) -> None:
+        recognition = MockRecognitionProvider().recognize("uploads/card.png")
+
+        pricing = get_pricing_provider("ebay").price(recognition)
+
+        self.assertGreater(pricing.estimatedMarketValue, 0)
+        self.assertTrue(pricing.fallbackUsed)
+        self.assertEqual(pricing.cacheStatus, "fallback")
 
     def test_pricing_provider_factory_rejects_unknown_provider(self) -> None:
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PricingProviderUnavailableError):
             get_pricing_provider("unknown")
 
 

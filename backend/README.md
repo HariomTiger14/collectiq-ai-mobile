@@ -9,7 +9,7 @@ integrations.
 - `POST /scanner/analyze` for multipart scanner uploads
 - `POST /api/analyze` for the Flutter backend AI contract
 - Mock AI recognition
-- Mock pricing
+- Backend pricing provider pipeline with mock fallback
 
 The backend is the only place future OpenAI, Gemini, pricing, marketplace, or
 payment provider keys should live. Flutter must call this backend/proxy only.
@@ -103,6 +103,19 @@ Provider selection:
 - `AI_PROVIDER=openai`: OpenAI Vision provider path. Requires
   `OPENAI_API_KEY`; keep this key server-side in `backend/.env` only.
 
+Pricing selection:
+
+- `PRICING_PROVIDER=mock`: default deterministic pricing and comparable sales.
+- `PRICING_PROVIDER=ebay`: backend-only placeholder for completed sales.
+- `PRICING_PROVIDER=tcgplayer`: backend-only placeholder for card pricing.
+- `PRICING_PROVIDER=pricecharting`: backend-only placeholder for guide pricing.
+- `PRICING_PROVIDER=aggregate`: future multi-provider blend.
+
+Future pricing providers currently return typed unavailable errors that the
+aggregation service converts to mock fallback pricing. Flutter still receives
+the same response contract, and no third-party pricing API is called from the
+mobile app.
+
 When OpenAI is enabled, the backend sends the image to OpenAI's Responses API
 with a strict structured-output schema. The prompt asks for collectible
 identification, conservative AUD valuation, confidence explanation, detection
@@ -174,7 +187,8 @@ a high category match but lower confidence for year, number, edition, or grade.
 - AI estimates are not authentication, grading, or appraisal.
 - Small print may be unreadable from normal phone distance.
 - Reprints, variants, language differences, and editions can look very similar.
-- Market value remains mock pricing until real pricing providers are enabled.
+- Market value uses deterministic backend mock/fallback pricing until real
+  pricing provider credentials and API mappings are enabled.
 - Low-quality images should produce lower confidence and scan guidance rather
   than invented details.
 
@@ -187,6 +201,75 @@ a high category match but lower confidence for year, number, edition, or grade.
 - Do not log full prompts or image payloads in production.
 - Use `backend/tests/test_assets/manifest.json` as the golden dataset manifest.
   Current rows are placeholders until licensed or user-owned images are added.
+
+## Pricing Architecture
+
+Pricing is backend-only. Flutter sends images to the CollectIQ backend, the AI
+provider identifies the collectible, and the backend pricing pipeline enriches
+the result before returning the existing Flutter contract.
+
+The pricing layer contains:
+
+- `PricingProvider`: interface for provider implementations.
+- `MockPricingProvider`: deterministic default used in tests and local dev.
+- `EbayPricingProvider`: placeholder for completed/sold marketplace comps.
+- `TCGPlayerPricingProvider`: placeholder for trading-card price guides.
+- `PriceChartingPricingProvider`: placeholder for historical guide pricing.
+- `PricingAggregationService`: normalizes comparable sales, removes obvious
+  outliers, calculates estimated value/range/confidence/trend, and falls back
+  safely when providers are unavailable.
+
+Aggregation calculates:
+
+- `estimatedValue`
+- `lowEstimate`
+- `highEstimate`
+- `pricingConfidence`
+- `marketTrend`
+- `sourceCount`
+- `pricingAge`
+- recent comparable sales
+
+### Pricing Error Handling
+
+Provider failures should never crash analysis. The pipeline handles:
+
+- provider unavailable
+- timeout
+- empty market data
+- unsupported or incomplete provider data
+- future rate-limit errors
+
+If configured providers fail, the backend returns deterministic mock fallback
+pricing with diagnostics marking `fallbackUsed=true`.
+
+### Pricing Diagnostics
+
+Debug logs include provider count, response time, fallback usage, cache status,
+and pricing source count. Logs must not include provider API keys, payment
+tokens, or raw third-party credentials.
+
+### Future Cache Strategy
+
+Before enabling real providers, add a backend cache keyed by normalized
+collectible identity fields such as category, title, year, set, card number,
+grade/condition, language, and edition. Recommended first pass:
+
+- short TTL for marketplace sold comps;
+- longer TTL for guide prices;
+- stale-while-revalidate for repeated scans;
+- per-provider cache status in diagnostics.
+
+### Future Rate Limiting Strategy
+
+Real pricing providers should be protected by:
+
+- server-side API keys only;
+- per-provider timeout budgets;
+- request retries with backoff for retryable errors;
+- per-user/backend rate limits;
+- provider-specific quota monitoring;
+- graceful fallback to cached or mock pricing when limits are reached.
 
 ### Error Responses
 

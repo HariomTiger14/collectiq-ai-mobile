@@ -1,4 +1,5 @@
 import logging
+import statistics
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -21,6 +22,13 @@ from app.services.ai.openai_recognition_provider import (
     OpenAITimeoutError,
 )
 from app.services.ai.provider_factory import get_ai_recognition_provider
+from app.services.pricing.base_pricing_provider import (
+    EmptyMarketDataError,
+    PricingProviderError,
+    PricingProviderRateLimitError,
+    PricingProviderTimeoutError,
+    PricingProviderUnavailableError,
+)
 from app.services.pricing.provider_factory import get_pricing_provider
 
 
@@ -61,7 +69,7 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
             )
         else:
             recognition = provider.recognize(Path(payload.image.localFilePath))
-        pricing = get_pricing_provider("mock").price(recognition)
+        pricing = get_pricing_provider().price(recognition)
     except AIProviderNotConfiguredError as exc:
         raise _api_error(
             status.HTTP_501_NOT_IMPLEMENTED,
@@ -90,6 +98,41 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
             str(exc),
             retryable=True,
         ) from exc
+    except PricingProviderTimeoutError as exc:
+        raise _api_error(
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            "pricing_provider_timeout",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except PricingProviderRateLimitError as exc:
+        raise _api_error(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "pricing_provider_rate_limited",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except PricingProviderUnavailableError as exc:
+        raise _api_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "pricing_provider_unavailable",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except EmptyMarketDataError as exc:
+        raise _api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            "pricing_provider_empty_market_data",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except PricingProviderError as exc:
+        raise _api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            "pricing_provider_error",
+            str(exc),
+            retryable=True,
+        ) from exc
     except ValueError as exc:
         raise _api_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -107,24 +150,18 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
             retryable=True,
         ) from exc
 
-    comparable_sales = _mock_comparable_sales(
-        title=recognition.title,
-        condition=recognition.condition,
-        pricing_source=pricing.pricingSource,
-        value=pricing.estimatedMarketValue,
-        currency=pricing.currency,
-    )
+    comparable_sales = _comparable_sales_from_pricing(pricing)
 
     market_summary = ApiMarketSummaryResponse(
-        averagePrice=pricing.estimatedMarketValue,
-        medianPrice=pricing.estimatedMarketValue,
+        averagePrice=_average_price(comparable_sales, pricing.estimatedMarketValue),
+        medianPrice=_median_price(comparable_sales, pricing.estimatedMarketValue),
         lowPrice=pricing.lowEstimate,
         highPrice=pricing.highEstimate,
         salesCount=len(comparable_sales),
-        trendLabel=_trend_for(recognition.category),
+        trendLabel=pricing.marketTrend,
         confidence=pricing.pricingConfidence,
         lastUpdated=pricing.lastUpdated,
-        sources=[pricing.pricingSource],
+        sources=_market_sources(pricing),
         comps=comparable_sales,
     )
 
@@ -132,11 +169,17 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Analyze completed provider=%s model=%s latencyMs=%s "
-            "overallProcessingTimeMs=%s",
+            "overallProcessingTimeMs=%s pricingProvider=%s pricingResponseTimeMs=%s "
+            "pricingProviderCount=%s pricingFallbackUsed=%s pricingCacheStatus=%s",
             getattr(provider, "provider_name", "unknown"),
             getattr(provider, "_model", "mock"),
             getattr(recognition, "processingTimeMs", total_processing_time_ms),
             total_processing_time_ms,
+            pricing.pricingSource,
+            pricing.providerDiagnostics.get("responseTimeMs", "0"),
+            pricing.providerDiagnostics.get("providerCount", str(pricing.sourceCount)),
+            pricing.fallbackUsed,
+            pricing.cacheStatus,
         )
 
     return ApiAnalyzeResponse(
@@ -148,7 +191,7 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
         highEstimate=pricing.highEstimate,
         confidence=recognition.confidence,
         condition=recognition.condition,
-        marketTrend=market_summary.trendLabel,
+        marketTrend=pricing.marketTrend,
         keyAttributes=_key_attributes(recognition),
         aiReview=ApiReviewResponse(
             primaryMatch=recognition.primaryMatch,
@@ -353,33 +396,56 @@ def _clamp_confidence(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
-def _mock_comparable_sales(
-    *,
-    title: str,
-    condition: str,
-    pricing_source: str,
-    value: int,
-    currency: str,
-) -> list[ApiMarketCompResponse]:
+def _comparable_sales_from_pricing(pricing) -> list[ApiMarketCompResponse]:
+    if not pricing.comparableSales:
+        return [
+            ApiMarketCompResponse(
+                source=pricing.pricingSource,
+                title="Market pricing reference",
+                soldPrice=max(1, pricing.estimatedMarketValue),
+                currency=pricing.currency,
+                soldDate=pricing.lastUpdated,
+                condition="Unknown",
+                url=None,
+            )
+        ]
+
     return [
         ApiMarketCompResponse(
-            source=pricing_source,
-            title=f"{title} comparable sale",
-            soldPrice=max(1, value),
-            currency=currency,
-            soldDate="2026-06-30T00:00:00Z",
-            condition=condition,
-            url=None,
+            source=sale.source,
+            title=sale.title,
+            soldPrice=max(1, sale.soldPrice),
+            currency=sale.currency,
+            soldDate=sale.soldDate,
+            condition=sale.condition,
+            url=sale.url,
         )
+        for sale in pricing.comparableSales
     ]
 
 
-def _trend_for(category: str) -> str:
-    normalized = category.lower()
-    if "pokemon" in normalized or "sports" in normalized:
-        return "Rising"
-    if "coin" in normalized:
-        return "Stable"
-    if "comic" in normalized:
-        return "Watchlist"
-    return "Stable"
+def _average_price(
+    comparable_sales: list[ApiMarketCompResponse],
+    fallback: int,
+) -> int:
+    if not comparable_sales:
+        return fallback
+    return max(1, round(statistics.mean(sale.soldPrice for sale in comparable_sales)))
+
+
+def _median_price(
+    comparable_sales: list[ApiMarketCompResponse],
+    fallback: int,
+) -> int:
+    if not comparable_sales:
+        return fallback
+    return max(1, round(statistics.median(sale.soldPrice for sale in comparable_sales)))
+
+
+def _market_sources(pricing) -> list[str]:
+    sources = [
+        source.strip()
+        for source in pricing.pricingSource.split(",")
+        if source.strip()
+    ]
+    return sources or [pricing.pricingSource]
