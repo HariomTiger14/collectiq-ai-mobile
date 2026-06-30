@@ -1771,6 +1771,46 @@ void main() {
       expect(migration, contains('for delete'));
     });
 
+    test('production hardening migration adds sync and soft delete columns', () {
+      final migration = File(
+        'supabase/migrations/202606300001_production_cloud_sync_hardening.sql',
+      ).readAsStringSync();
+
+      expect(migration, contains('alter table public.collectibles'));
+      expect(migration, contains('deleted_at timestamptz'));
+      expect(migration, contains('last_synced_at timestamptz'));
+      expect(migration, contains("sync_status text not null default 'synced'"));
+      expect(migration, contains('cloud_version integer not null default 1'));
+      expect(migration, contains('collectibles_user_saved_idx'));
+      expect(migration, contains('collectibles_sync_status_check'));
+      expect(migration, contains("'retryable'"));
+      expect(migration, contains("'conflict'"));
+    });
+
+    test('production readiness files document policies and validation', () {
+      final checks = File(
+        'supabase/setup/production_readiness_checks.sql',
+      ).readAsStringSync();
+      final validator = File(
+        'scripts/validate_supabase_setup.py',
+      ).readAsStringSync();
+      final guide = File(
+        'docs/SUPABASE_PRODUCTION_SETUP.md',
+      ).readAsStringSync();
+
+      expect(checks, contains('table_exists'));
+      expect(checks, contains('rls_enabled'));
+      expect(checks, contains('storage_bucket_exists'));
+      expect(checks, contains('storage_policy_exists'));
+      expect(checks, contains('collectible-images'));
+      expect(validator, contains('EXPECTED_TABLES'));
+      expect(validator, contains('EXPECTED_STORAGE_POLICIES'));
+      expect(validator, contains('SUPABASE_DB_URL'));
+      expect(guide, contains('SUPABASE_ENABLED'));
+      expect(guide, contains('{userId}/{collectibleCloudId}/image.ext'));
+      expect(guide, contains('auth.uid() = user_id'));
+    });
+
     test(
       'auth repository falls back to guest mode when not configured',
       () async {

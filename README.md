@@ -410,6 +410,10 @@ CollectIQ AI is local-first by default. Supabase is optional infrastructure for
 future account and cloud sync features; do not put real Supabase secrets in
 source control.
 
+Production setup details live in `docs/SUPABASE_PRODUCTION_SETUP.md`, including
+the SQL run order, RLS summary, private storage bucket policies, and validation
+commands.
+
 ### Auth and cloud roadmap
 
 The mobile app now uses an auth abstraction rather than depending directly on
@@ -489,6 +493,8 @@ Run the SQL in:
 
 ```text
 supabase/migrations/202606290001_collectiq_cloud_schema.sql
+supabase/migrations/202606290002_collectible_images_storage_policies.sql
+supabase/migrations/202606300001_production_cloud_sync_hardening.sql
 ```
 
 You can paste it into the Supabase SQL Editor or run it with the Supabase CLI.
