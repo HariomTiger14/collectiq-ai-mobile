@@ -305,7 +305,7 @@ class _DetailSections extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.xl),
-        const _PriceHistorySection(),
+        _PriceHistorySection(item: item),
       ],
     );
   }
@@ -397,24 +397,121 @@ class _MarketIntelligenceSection extends StatelessWidget {
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
-          for (final comp in summary.comps.take(5)) _MarketCompRow(comp: comp),
+          _ComparableSalesVisualList(
+            comps: summary.comps.take(5).toList(growable: false),
+            currency: currency,
+          ),
         ],
       ],
     );
   }
 }
 
-class _MarketCompRow extends StatelessWidget {
-  const _MarketCompRow({required this.comp});
+class _ComparableSalesVisualList extends StatelessWidget {
+  const _ComparableSalesVisualList({
+    required this.comps,
+    required this.currency,
+  });
 
-  final MarketComp comp;
+  final List<MarketComp> comps;
+  final String currency;
 
   @override
   Widget build(BuildContext context) {
-    return AppLabelValueRow(
-      label: comp.source,
-      value:
-          '${_formatMoney(comp.soldPrice, comp.currency)} / ${comp.condition} / ${_formatPricingDate(comp.soldDate)}',
+    final highest = comps
+        .map((comp) => comp.soldPrice)
+        .fold<double>(0, (current, next) => current > next ? current : next);
+
+    return Column(
+      children: [
+        for (final comp in comps) ...[
+          _ComparableSaleVisualRow(
+            comp: comp,
+            highestPrice: highest,
+            displayCurrency: currency,
+          ),
+          if (comp != comps.last) const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _ComparableSaleVisualRow extends StatelessWidget {
+  const _ComparableSaleVisualRow({
+    required this.comp,
+    required this.highestPrice,
+    required this.displayCurrency,
+  });
+
+  final MarketComp comp;
+  final double highestPrice;
+  final String displayCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final widthFactor = highestPrice <= 0
+        ? 0.0
+        : (comp.soldPrice / highestPrice).clamp(0.08, 1.0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  comp.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                _formatMoney(comp.soldPrice, comp.currency),
+                style: textTheme.labelLarge?.copyWith(
+                  color: _valueGold,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: LinearProgressIndicator(
+              value: widthFactor,
+              minHeight: 8,
+              backgroundColor: colorScheme.outlineVariant,
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+              semanticsLabel:
+                  'Comparable sale ${_formatMoney(comp.soldPrice, displayCurrency)}',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${comp.source} / ${comp.condition} / ${_formatPricingDate(comp.soldDate)}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -551,30 +648,26 @@ class _AlternativeMatchRow extends StatelessWidget {
 }
 
 class _PriceHistorySection extends StatelessWidget {
-  const _PriceHistorySection();
+  const _PriceHistorySection({required this.item});
 
-  static const _prices = [
-    _PricePoint(month: 'Jan', value: 1200),
-    _PricePoint(month: 'Feb', value: 1350),
-    _PricePoint(month: 'Mar', value: 1480),
-    _PricePoint(month: 'Apr', value: 1620),
-    _PricePoint(month: 'May', value: 1760),
-    _PricePoint(month: 'Jun', value: 1850),
-  ];
+  final CollectibleItem item;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final currentValue = _prices.last.value;
-    final lowestValue = _prices
+    final prices = _pricesFor(item);
+    final currentValue = prices.last.value;
+    final lowestValue = prices
         .map((point) => point.value)
         .reduce((current, next) => current < next ? current : next);
-    final highestValue = _prices
+    final highestValue = prices
         .map((point) => point.value)
         .reduce((current, next) => current > next ? current : next);
-    final change = currentValue - _prices.first.value;
-    final changePercent = change / _prices.first.value * 100;
+    final change = currentValue - prices.first.value;
+    final changePercent = prices.first.value == 0
+        ? 0
+        : change / prices.first.value * 100;
 
     return Container(
       width: double.infinity,
@@ -592,7 +685,16 @@ class _PriceHistorySection extends StatelessWidget {
             'Price History',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Item value summary with accessible labels and local trend estimates.',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
+          _ItemValueSummaryVisual(item: item),
+          const SizedBox(height: AppSpacing.xl),
           AppResponsiveMetricGroup(
             metrics: [
               AppMetricData(
@@ -615,7 +717,7 @@ class _PriceHistorySection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
-          _PriceBars(points: _prices, highestValue: highestValue),
+          _PriceBars(points: prices, highestValue: highestValue),
           const SizedBox(height: AppSpacing.xl),
           Container(
             width: double.infinity,
@@ -646,6 +748,111 @@ class _PricePoint {
 
   final String month;
   final int value;
+}
+
+class _ItemValueSummaryVisual extends StatelessWidget {
+  const _ItemValueSummaryVisual({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final pricing = item.pricing;
+    final current = pricing?.estimatedMarketValue ?? item.estimatedValue;
+    final low = pricing?.lowEstimate ?? current * 0.82;
+    final high = pricing?.highEstimate ?? current * 1.18;
+    final span = high - low;
+    final position = span <= 0 ? 0.5 : ((current - low) / span).clamp(0.0, 1.0);
+
+    return Semantics(
+      label:
+          'Item value summary. Current value ${_formatMoney(current, pricing?.currency ?? 'AUD')}. Range ${_formatMoney(low, pricing?.currency ?? 'AUD')} to ${_formatMoney(high, pricing?.currency ?? 'AUD')}.',
+      container: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _valueGold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: const Icon(
+                    Icons.stacked_line_chart_outlined,
+                    color: _valueGold,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Item Value Summary',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _formatMoney(current, pricing?.currency ?? 'AUD'),
+                        style: textTheme.titleLarge?.copyWith(
+                          color: _valueGold,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: LinearProgressIndicator(
+                value: position,
+                minHeight: 10,
+                backgroundColor: colorScheme.outlineVariant,
+                valueColor: const AlwaysStoppedAnimation<Color>(_valueGold),
+                semanticsLabel: 'Current value position in estimated range',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Text(
+                  'Low ${_formatMoney(low, pricing?.currency ?? 'AUD')}',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'High ${_formatMoney(high, pricing?.currency ?? 'AUD')}',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PriceBars extends StatelessWidget {
@@ -701,6 +908,29 @@ class _PriceBars extends StatelessWidget {
       ),
     );
   }
+}
+
+List<_PricePoint> _pricesFor(CollectibleItem item) {
+  final current = (item.pricing?.estimatedMarketValue ?? item.estimatedValue)
+      .round()
+      .clamp(1, 1000000000)
+      .toInt();
+  final factors = [
+    1200 / 1850,
+    1350 / 1850,
+    1480 / 1850,
+    1620 / 1850,
+    1760 / 1850,
+    1.0,
+  ];
+  final values = factors
+      .map((factor) => (current * factor).round().clamp(1, 1000000000).toInt())
+      .toList(growable: false);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+  return [
+    for (var index = 0; index < months.length; index++)
+      _PricePoint(month: months[index], value: values[index]),
+  ];
 }
 
 class _PriceAlertSection extends ConsumerWidget {
@@ -1079,6 +1309,8 @@ String _alertRuleLabel(PriceAlertRule rule) {
 String _formatRulePercent(double? value) {
   return '${((value ?? 0) * 100).toStringAsFixed(0)}%';
 }
+
+const _valueGold = Color(0xFFD97706);
 
 String _marketCurrency(MarketSummary summary) {
   if (summary.comps.isEmpty) {

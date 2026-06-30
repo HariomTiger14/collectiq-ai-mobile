@@ -5,6 +5,7 @@ import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insig
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/portfolio_visual_analytics.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -91,6 +92,11 @@ class HomeScreen extends ConsumerWidget {
                     _DashboardInsights(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
                     _PortfolioPerformanceSection(performance: performance),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _PortfolioVisualAnalyticsSection(
+                      performance: performance,
+                      insights: insights,
+                    ),
                     const SizedBox(height: AppSpacing.xxl),
                     _PriceAlertSummarySection(summary: alertSummary),
                     const SizedBox(height: AppSpacing.xxl),
@@ -544,6 +550,88 @@ class _PerformanceRecommendation extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PortfolioVisualAnalyticsSection extends StatelessWidget {
+  const _PortfolioVisualAnalyticsSection({
+    required this.performance,
+    required this.insights,
+  });
+
+  final AsyncValue<PortfolioPerformance> performance;
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 145),
+      child: AppInfoSection(
+        title: 'Visual Analytics',
+        child: performance.when(
+          data: (data) => Column(
+            children: [
+              PortfolioValueTrendCard(snapshots: data.dailySnapshots),
+              const SizedBox(height: AppSpacing.md),
+              CollectionScoreTrendCard(snapshots: data.dailySnapshots),
+              const SizedBox(height: AppSpacing.md),
+              _MoverVisualGrid(performance: data),
+              const SizedBox(height: AppSpacing.md),
+              CategoryAllocationVisual(
+                distribution: insights.categoryDistribution,
+              ),
+            ],
+          ),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => const PortfolioValueTrendCard(snapshots: []),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoverVisualGrid extends StatelessWidget {
+  const _MoverVisualGrid({required this.performance});
+
+  final PortfolioPerformance performance;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useColumns = constraints.maxWidth >= 680;
+        final cards = [
+          PortfolioMoverVisualCard(
+            title: 'Top Gainer',
+            mover: performance.topGainer,
+            positive: true,
+          ),
+          PortfolioMoverVisualCard(
+            title: 'Top Loser',
+            mover: performance.topLoser,
+            positive: false,
+          ),
+        ];
+
+        if (!useColumns) {
+          return Column(
+            children: [
+              cards.first,
+              const SizedBox(height: AppSpacing.md),
+              cards.last,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: cards.first),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: cards.last),
+          ],
+        );
+      },
     );
   }
 }

@@ -15,6 +15,9 @@ import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dar
 import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
+import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/portfolio_visual_analytics.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -42,6 +45,91 @@ void main() {
     expect(find.text('Scan'), findsOneWidget);
     expect(find.text('Portfolio'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('portfolio value trend widget renders with snapshot data', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpVisualAnalytics(
+      PortfolioValueTrendCard(
+        snapshots: [
+          _visualSnapshot(value: 1000, day: 28),
+          _visualSnapshot(value: 1400, day: 30),
+        ],
+      ),
+    );
+
+    expect(find.text('Value History'), findsOneWidget);
+    expect(find.text('AUD 1,400'), findsOneWidget);
+    expect(find.textContaining('Change +AUD 400'), findsOneWidget);
+  });
+
+  testWidgets('portfolio value trend widget renders empty state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpVisualAnalytics(
+      const PortfolioValueTrendCard(snapshots: []),
+    );
+
+    expect(find.text('Value History'), findsOneWidget);
+    expect(find.text('No value history yet'), findsOneWidget);
+  });
+
+  testWidgets('category allocation visual renders category labels', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpVisualAnalytics(
+      const CategoryAllocationVisual(
+        distribution: {CollectorCategory.cards: 3, CollectorCategory.coins: 1},
+      ),
+    );
+
+    expect(find.text('Category Allocation'), findsOneWidget);
+    expect(find.text('Cards'), findsOneWidget);
+    expect(find.text('3 / 75%'), findsOneWidget);
+    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('1 / 25%'), findsOneWidget);
+  });
+
+  testWidgets('top gainer and loser visual cards render movement labels', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpVisualAnalytics(
+      Column(
+        children: const [
+          PortfolioMoverVisualCard(
+            title: 'Top Gainer',
+            mover: PortfolioValueMover(
+              itemId: 'gain',
+              title: 'Rising Charizard',
+              category: 'Trading Card',
+              previousValue: 1000,
+              currentValue: 1250,
+            ),
+            positive: true,
+          ),
+          SizedBox(height: 12),
+          PortfolioMoverVisualCard(
+            title: 'Top Loser',
+            mover: PortfolioValueMover(
+              itemId: 'loss',
+              title: 'Cooling Coin',
+              category: 'Coin',
+              previousValue: 500,
+              currentValue: 400,
+            ),
+            positive: false,
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('Top Gainer'), findsOneWidget);
+    expect(find.text('Rising Charizard'), findsOneWidget);
+    expect(find.text('+AUD 250'), findsOneWidget);
+    expect(find.text('Top Loser'), findsOneWidget);
+    expect(find.text('Cooling Coin'), findsOneWidget);
+    expect(find.text('-AUD 100'), findsOneWidget);
   });
 
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
@@ -90,7 +178,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Collection Value'), findsOneWidget);
-    expect(find.text('AUD 2,750'), findsOneWidget);
+    expect(find.text('AUD 2,750'), findsWidgets);
     expect(find.text('Dashboard Insights'), findsOneWidget);
     expect(find.text('Total Collectibles'), findsOneWidget);
     expect(find.text('Average Item Value'), findsOneWidget);
@@ -99,15 +187,17 @@ void main() {
     expect(find.text('Average Confidence'), findsOneWidget);
     expect(find.text('84%'), findsOneWidget);
     expect(find.text('Portfolio Performance'), findsOneWidget);
+    expect(find.text('Visual Analytics'), findsOneWidget);
+    expect(find.text('Value History'), findsOneWidget);
     expect(find.text("Today's Change"), findsOneWidget);
     expect(find.text('Weekly Change'), findsOneWidget);
     expect(find.text('Monthly Change'), findsOneWidget);
-    expect(find.text('Top Gainer'), findsOneWidget);
-    expect(find.text('Top Loser'), findsOneWidget);
+    expect(find.text('Top Gainer'), findsWidgets);
+    expect(find.text('Top Loser'), findsWidgets);
     expect(find.text('Category Breakdown'), findsOneWidget);
-    expect(find.text('Cards'), findsOneWidget);
-    expect(find.text('Coins'), findsOneWidget);
-    expect(find.text('Comics'), findsOneWidget);
+    expect(find.text('Cards'), findsWidgets);
+    expect(find.text('Coins'), findsWidgets);
+    expect(find.text('Comics'), findsWidgets);
     expect(find.text('Memorabilia'), findsOneWidget);
     expect(find.text('Other'), findsOneWidget);
     expect(find.text('Portfolio Highlights'), findsOneWidget);
@@ -1578,6 +1668,19 @@ extension on WidgetTester {
     );
   }
 
+  Future<void> pumpVisualAnalytics(Widget child) {
+    return pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> pumpUntilFound(
     Finder finder, {
     Duration timeout = const Duration(seconds: 3),
@@ -1591,6 +1694,28 @@ extension on WidgetTester {
     }
     throw TestFailure('Timed out waiting for $finder');
   }
+}
+
+PortfolioSnapshot _visualSnapshot({required double value, required int day}) {
+  final date = DateTime.utc(2026, 6, day);
+  return PortfolioSnapshot(
+    id: 'daily:$day',
+    period: TrendSnapshotPeriod.daily,
+    periodStart: date,
+    capturedAt: date,
+    totalPortfolioValue: value,
+    totalItems: 2,
+    averageValue: value / 2,
+    categoryTotals: {
+      for (final category in CollectorCategory.values) category: 0.0,
+      CollectorCategory.cards: value * 0.75,
+      CollectorCategory.coins: value * 0.25,
+    },
+    collectionScore: (value / 2).round().clamp(0, 1000).toInt(),
+    itemValues: const {'card': 1000, 'coin': 400},
+    itemTitles: const {'card': 'Charizard', 'coin': 'Silver Eagle'},
+    itemCategories: const {'card': 'Trading Card', 'coin': 'Coin'},
+  );
 }
 
 class _CustomAiAnalysisProvider implements AiAnalysisProvider {
