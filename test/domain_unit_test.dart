@@ -20,7 +20,9 @@ import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portf
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
@@ -2518,6 +2520,230 @@ void main() {
       expect(updated.categoryDistribution[CollectorCategory.coins], 1);
     });
   });
+
+  group('SmartCollectorInsightsService', () {
+    const dashboardService = CollectorDashboardAnalyticsService();
+    const smartService = SmartCollectorInsightsService();
+
+    test('calculates a 0 to 1000 collection score with factor breakdowns', () {
+      final analytics = dashboardService.build([
+        _analyticsItem(
+          id: 'rare-card',
+          title: 'Charizard Holo',
+          category: 'Trading Card',
+          value: 1850,
+          confidence: 0.94,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          rarity: 'Rare Holo',
+        ),
+        _analyticsItem(
+          id: 'coin',
+          title: 'Silver Eagle',
+          category: 'Coin',
+          value: 300,
+          confidence: 0.88,
+          createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+          brand: 'US Mint',
+          setName: 'Bullion',
+        ),
+      ]);
+
+      final intelligence = smartService.build(analytics);
+
+      expect(intelligence.collectionScore.score, inInclusiveRange(0, 1000));
+      expect(intelligence.collectionScore.label, isNotEmpty);
+      expect(
+        intelligence.collectionScore.factorScores.keys,
+        containsAll(CollectionScoreFactor.values),
+      );
+      expect(
+        intelligence.collectionScore.factorScores[CollectionScoreFactor.rarity],
+        greaterThan(0),
+      );
+      expect(
+        intelligence.collectionScore.factorScores[CollectionScoreFactor
+            .diversity],
+        greaterThan(0),
+      );
+    });
+
+    test(
+      'generates smart insights for duplicates, rescans and category mix',
+      () {
+        final analytics = dashboardService.build([
+          _analyticsItem(
+            id: 'duplicate-a',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1850,
+            confidence: 0.94,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+            rarity: 'Rare Holo',
+          ),
+          _analyticsItem(
+            id: 'duplicate-b',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1700,
+            confidence: 0.62,
+            createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+            detectionQuality: 'Blurry image with glare.',
+            includeMetadata: false,
+          ),
+          _analyticsItem(
+            id: 'coin',
+            title: 'Silver Eagle',
+            category: 'Coin',
+            value: 300,
+            confidence: 0.88,
+            createdAt: DateTime.parse('2026-06-27T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'comic',
+            title: 'Amazing Spider-Man',
+            category: 'Comic',
+            value: 650,
+            confidence: 0.86,
+            createdAt: DateTime.parse('2026-06-26T00:00:00Z'),
+            trendLabel: 'Rising',
+          ),
+        ]);
+
+        final intelligence = smartService.build(analytics);
+        final insightTitles = intelligence.insights.map(
+          (insight) => insight.title,
+        );
+
+        expect(insightTitles, contains('Duplicate collectibles'));
+        expect(insightTitles, contains('Three collectibles need rescanning'));
+        expect(insightTitles, contains('Highest value category'));
+        expect(insightTitles, contains('Coins are underrepresented'));
+        expect(insightTitles, contains('Comic watchlist signal'));
+        expect(
+          intelligence.insights.map((insight) => insight.message).join(' '),
+          contains('Your highest value category is Cards.'),
+        );
+      },
+    );
+
+    test('generates AI collector recommendations from collection signals', () {
+      final analytics = dashboardService.build([
+        _analyticsItem(
+          id: 'rare-card',
+          title: 'Charizard Holo',
+          category: 'Trading Card',
+          value: 1850,
+          confidence: 0.63,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          pricingLastUpdated: DateTime.parse('2026-04-01T00:00:00Z'),
+          detectionQuality: 'Dark and blurry image.',
+          rarity: 'Rare Holo',
+        ),
+        _analyticsItem(
+          id: 'comic',
+          title: 'Amazing Spider-Man',
+          category: 'Comic',
+          value: 650,
+          confidence: 0.86,
+          createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+          trendLabel: 'Rising',
+        ),
+      ]);
+
+      final intelligence = smartService.build(analytics);
+      final recommendationTypes = intelligence.recommendations.map(
+        (recommendation) => recommendation.type,
+      );
+
+      expect(
+        recommendationTypes,
+        containsAll([
+          AiCollectorRecommendationType.scanBetterPhotos,
+          AiCollectorRecommendationType.upgradeGrading,
+          AiCollectorRecommendationType.sellNow,
+          AiCollectorRecommendationType.hold,
+          AiCollectorRecommendationType.watchPrice,
+          AiCollectorRecommendationType.addMissingCards,
+        ]),
+      );
+    });
+
+    test('builds wishlist foundation and collection goals', () {
+      final analytics = dashboardService.build([
+        _analyticsItem(
+          id: 'base-set-card',
+          title: 'Base Set Pikachu',
+          category: 'Trading Card',
+          value: 80,
+          confidence: 0.90,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          setName: 'Base Set',
+        ),
+      ]);
+
+      final intelligence = smartService.build(analytics);
+
+      expect(intelligence.wishlistStatusCounts[WishlistStatus.owned], 1);
+      expect(intelligence.wishlistStatusCounts[WishlistStatus.wanted], 1);
+      expect(intelligence.wishlistStatusCounts[WishlistStatus.missing], 99);
+      expect(intelligence.goals.map((goal) => goal.title), [
+        'Complete Base Set',
+        'Collect 100 Pokemon',
+        'Own 50 graded cards',
+      ]);
+      expect(intelligence.goals.first.progressLabel, '1 / 102');
+    });
+
+    test('unlocks achievements from collector milestones', () {
+      final coinItems = [
+        for (var index = 0; index < 10; index++)
+          _analyticsItem(
+            id: 'coin-$index',
+            title: 'Silver Eagle $index',
+            category: 'Coin',
+            value: 50,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+            brand: 'US Mint',
+            setName: 'Bullion',
+          ),
+      ];
+      final analytics = dashboardService.build([
+        _analyticsItem(
+          id: 'rare-card',
+          title: 'Charizard Holo',
+          category: 'Trading Card',
+          value: 1850,
+          confidence: 0.94,
+          createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          rarity: 'Rare Holo',
+        ),
+        ...coinItems,
+      ]);
+
+      final intelligence = smartService.build(analytics);
+      final unlocked = intelligence.unlockedAchievements.map(
+        (achievement) => achievement.type,
+      );
+
+      expect(
+        unlocked,
+        containsAll([
+          AchievementType.firstScan,
+          AchievementType.rareCollector,
+          AchievementType.coinExpert,
+        ]),
+      );
+      expect(
+        intelligence.achievements
+            .firstWhere(
+              (achievement) => achievement.type == AchievementType.hundredScans,
+            )
+            .progress,
+        closeTo(0.11, 0.01),
+      );
+    });
+  });
 }
 
 CollectibleItem _testItem() {
@@ -2599,6 +2825,11 @@ CollectibleItem _analyticsItem({
   required DateTime createdAt,
   DateTime? pricingLastUpdated,
   String? detectionQuality,
+  String? rarity,
+  String? trendLabel,
+  String? estimatedGrade,
+  String? brand,
+  String? setName,
   bool includeMetadata = true,
 }) {
   return CollectibleItem(
@@ -2612,11 +2843,12 @@ CollectibleItem _analyticsItem({
     imagePath: 'sample://$id',
     createdAt: createdAt,
     year: includeMetadata ? '1999' : null,
-    brand: includeMetadata ? 'Pokemon' : null,
-    setName: includeMetadata ? 'Base Set' : null,
+    brand: includeMetadata ? (brand ?? 'Pokemon') : null,
+    setName: includeMetadata ? (setName ?? 'Base Set') : null,
     cardNumber: includeMetadata ? '4/102' : null,
     playerOrCharacter: includeMetadata ? title : null,
-    rarity: includeMetadata ? 'Rare' : null,
+    rarity: includeMetadata ? (rarity ?? 'Rare') : null,
+    estimatedGrade: estimatedGrade,
     notes: includeMetadata ? 'Collector-ready record.' : null,
     detectionQuality: detectionQuality,
     pricing: PricingInfo(
@@ -2634,7 +2866,7 @@ CollectibleItem _analyticsItem({
       'lowPrice': value * 0.8,
       'highPrice': value * 1.2,
       'salesCount': 3,
-      'trendLabel': 'Stable',
+      'trendLabel': trendLabel ?? 'Stable',
       'confidence': confidence,
       'lastUpdated': (pricingLastUpdated ?? createdAt).toIso8601String(),
       'sources': ['Mock market'],

@@ -1,6 +1,8 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -23,6 +25,9 @@ class HomeScreen extends ConsumerWidget {
     final recentItems = orderedItems.take(3).toList();
     final insights = const CollectorDashboardAnalyticsService().build(
       orderedItems,
+    );
+    final smartIntelligence = const SmartCollectorInsightsService().build(
+      insights,
     );
     _logHomeOrder(recentItems);
 
@@ -80,6 +85,20 @@ class HomeScreen extends ConsumerWidget {
                     _CategoryBreakdownSection(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
                     _CollectionHealthSection(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _CollectionScoreSection(intelligence: smartIntelligence),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _SmartCollectorInsightsSection(
+                      intelligence: smartIntelligence,
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _AiCollectorRecommendationsSection(
+                      intelligence: smartIntelligence,
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _WishlistGoalsSection(intelligence: smartIntelligence),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _AchievementsSection(intelligence: smartIntelligence),
                     const SizedBox(height: AppSpacing.xxl),
                     _PortfolioAnalyticsSection(
                       insights: insights,
@@ -520,6 +539,495 @@ class _CollectionHealthSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CollectionScoreSection extends StatelessWidget {
+  const _CollectionScoreSection({required this.intelligence});
+
+  final SmartCollectorIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = intelligence.collectionScore;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 195),
+      child: AppInfoSection(
+        title: 'Collection Score',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 86,
+                    height: 86,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: AppElevation.accentGlow,
+                    ),
+                    child: Text(
+                      '${score.score}',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${score.label} collector profile',
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Scored from rarity, completeness, confidence, value, diversity, duplicates, image quality, and pricing freshness.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            for (final factor in CollectionScoreFactor.values) ...[
+              _CollectionScoreFactorRow(
+                label: factor.label,
+                value: score.factorScores[factor] ?? 0,
+              ),
+              if (factor != CollectionScoreFactor.values.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionScoreFactorRow extends StatelessWidget {
+  const _CollectionScoreFactorRow({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final fraction = (value / 100).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Text(
+              '$value',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Container(
+            height: 8,
+            width: double.infinity,
+            color: colorScheme.surfaceContainerHighest,
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: fraction,
+              child: Container(color: colorScheme.primary),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmartCollectorInsightsSection extends StatelessWidget {
+  const _SmartCollectorInsightsSection({required this.intelligence});
+
+  final SmartCollectorIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleInsights = intelligence.insights.take(5).toList();
+
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 205),
+      child: AppInfoSection(
+        title: 'Smart Collector Insights',
+        child: Column(
+          children: [
+            for (final insight in visibleInsights) ...[
+              _SmartCollectorInsightCard(insight: insight),
+              if (insight != visibleInsights.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmartCollectorInsightCard extends StatelessWidget {
+  const _SmartCollectorInsightCard({required this.insight});
+
+  final SmartCollectorInsight insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _smartInsightColor(
+      insight.type,
+      Theme.of(context).colorScheme,
+    );
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(_smartInsightIcon(insight.type), color: color),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  insight.title,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(insight.message, style: textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiCollectorRecommendationsSection extends StatelessWidget {
+  const _AiCollectorRecommendationsSection({required this.intelligence});
+
+  final SmartCollectorIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    final recommendations = intelligence.recommendations.take(5).toList();
+
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 215),
+      child: AppInfoSection(
+        title: 'AI Collector Recommendations',
+        child: Column(
+          children: [
+            for (final recommendation in recommendations) ...[
+              _AiCollectorRecommendationRow(recommendation: recommendation),
+              if (recommendation != recommendations.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AiCollectorRecommendationRow extends StatelessWidget {
+  const _AiCollectorRecommendationRow({required this.recommendation});
+
+  final AiCollectorRecommendation recommendation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Icon(
+            _aiRecommendationIcon(recommendation.type),
+            color: colorScheme.primary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                recommendation.title,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                recommendation.message,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WishlistGoalsSection extends StatelessWidget {
+  const _WishlistGoalsSection({required this.intelligence});
+
+  final SmartCollectorIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 225),
+      child: AppInfoSection(
+        title: 'Wishlist & Goals',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppResponsiveMetricGroup(
+              metrics: [
+                AppMetricData(
+                  label: 'Owned',
+                  value:
+                      '${intelligence.wishlistStatusCounts[WishlistStatus.owned] ?? 0}',
+                  icon: Icons.check_circle_outline,
+                ),
+                AppMetricData(
+                  label: 'Wanted',
+                  value:
+                      '${intelligence.wishlistStatusCounts[WishlistStatus.wanted] ?? 0}',
+                  icon: Icons.bookmark_add_outlined,
+                ),
+                AppMetricData(
+                  label: 'Missing',
+                  value:
+                      '${intelligence.wishlistStatusCounts[WishlistStatus.missing] ?? 0}',
+                  icon: Icons.playlist_add_check_outlined,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            for (final goal in intelligence.goals) ...[
+              _CollectionGoalRow(goal: goal),
+              if (goal != intelligence.goals.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionGoalRow extends StatelessWidget {
+  const _CollectionGoalRow({required this.goal});
+
+  final CollectionGoal goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  goal.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                goal.progressLabel,
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            goal.description,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: LinearProgressIndicator(
+              minHeight: 8,
+              value: goal.progress,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AchievementsSection extends StatelessWidget {
+  const _AchievementsSection({required this.intelligence});
+
+  final SmartCollectorIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 235),
+      child: AppInfoSection(
+        title: 'Achievements',
+        child: Column(
+          children: [
+            for (final achievement in intelligence.achievements) ...[
+              _AchievementRow(achievement: achievement),
+              if (achievement != intelligence.achievements.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementRow extends StatelessWidget {
+  const _AchievementRow({required this.achievement});
+
+  final CollectorAchievement achievement;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final color = achievement.isUnlocked
+        ? AppColors.success
+        : colorScheme.outline;
+
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Icon(_achievementIcon(achievement.type), color: color),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                achievement.title,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                achievement.description,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              LinearProgressIndicator(
+                minHeight: 4,
+                value: achievement.progress.clamp(0.0, 1.0),
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                color: color,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1439,6 +1947,67 @@ IconData _recommendationIcon(CollectionRecommendationType type) {
       return Icons.fact_check_outlined;
     case CollectionRecommendationType.addMoreCollectibles:
       return Icons.add_circle_outline;
+  }
+}
+
+Color _smartInsightColor(
+  SmartCollectorInsightType type,
+  ColorScheme colorScheme,
+) {
+  switch (type) {
+    case SmartCollectorInsightType.opportunity:
+      return colorScheme.primary;
+    case SmartCollectorInsightType.warning:
+      return const Color(0xFFD97706);
+    case SmartCollectorInsightType.highlight:
+      return AppColors.success;
+    case SmartCollectorInsightType.trend:
+      return AppColors.secondaryAccent;
+  }
+}
+
+IconData _smartInsightIcon(SmartCollectorInsightType type) {
+  switch (type) {
+    case SmartCollectorInsightType.opportunity:
+      return Icons.auto_awesome_outlined;
+    case SmartCollectorInsightType.warning:
+      return Icons.warning_amber_outlined;
+    case SmartCollectorInsightType.highlight:
+      return Icons.workspace_premium_outlined;
+    case SmartCollectorInsightType.trend:
+      return Icons.trending_up_outlined;
+  }
+}
+
+IconData _aiRecommendationIcon(AiCollectorRecommendationType type) {
+  switch (type) {
+    case AiCollectorRecommendationType.scanBetterPhotos:
+      return Icons.photo_camera_outlined;
+    case AiCollectorRecommendationType.upgradeGrading:
+      return Icons.workspace_premium_outlined;
+    case AiCollectorRecommendationType.sellNow:
+      return Icons.sell_outlined;
+    case AiCollectorRecommendationType.hold:
+      return Icons.lock_clock_outlined;
+    case AiCollectorRecommendationType.watchPrice:
+      return Icons.query_stats_outlined;
+    case AiCollectorRecommendationType.addMissingCards:
+      return Icons.playlist_add_outlined;
+  }
+}
+
+IconData _achievementIcon(AchievementType type) {
+  switch (type) {
+    case AchievementType.firstScan:
+      return Icons.looks_one_outlined;
+    case AchievementType.hundredScans:
+      return Icons.collections_bookmark_outlined;
+    case AchievementType.rareCollector:
+      return Icons.diamond_outlined;
+    case AchievementType.coinExpert:
+      return Icons.paid_outlined;
+    case AchievementType.completionist:
+      return Icons.emoji_events_outlined;
   }
 }
 
