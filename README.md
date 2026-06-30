@@ -25,6 +25,25 @@ onboarding_completed_v1
 Settings includes a **Reset Onboarding** action for QA, demos, and beta tester
 handoffs.
 
+## Closed Beta Preparation
+
+Closed beta readiness is tracked in:
+
+- `docs/CLOSED_BETA_READINESS.md`
+- `docs/TESTER_FEEDBACK_TEMPLATE.md`
+- `docs/KNOWN_LIMITATIONS.md`
+
+Generate a physical-device smoke checklist for each release candidate with:
+
+```powershell
+scripts\run_beta_smoke_checklist.ps1
+```
+
+The beta pack covers Play Store internal testing, tester feedback capture,
+known limitations, local-first/offline expectations, optional Supabase/backend
+configuration, billing test setup, and final manual smoke checks. Do not commit
+secrets or expose provider API keys in Flutter builds.
+
 ## Master QA Automation
 
 CollectIQ AI includes a reusable local + attached Android device QA suite. The
