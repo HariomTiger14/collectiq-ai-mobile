@@ -50,7 +50,7 @@ OpenAI vision recognition, set:
 
 ```text
 AI_PROVIDER=openai
-OPENAI_API_KEY=sk-your-key
+OPENAI_API_KEY=<server-side-openai-key>
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TIMEOUT_SECONDS=30
 ```

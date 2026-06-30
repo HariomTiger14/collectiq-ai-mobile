@@ -153,7 +153,7 @@ and tests.
 
 ```text
 AI_PROVIDER=openai
-OPENAI_API_KEY=sk-your-server-side-key
+OPENAI_API_KEY=<server-side-openai-key>
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TIMEOUT_SECONDS=30
 ```
@@ -338,7 +338,7 @@ py scripts\validate_real_analysis.py C:\path\to\collectible.jpg --category "Poke
 
 ```powershell
 $env:AI_PROVIDER="openai"
-$env:OPENAI_API_KEY="sk-your-server-side-key"
+$env:OPENAI_API_KEY="<server-side-openai-key>"
 $env:PRICING_PROVIDER="ebay"
 $env:EBAY_ACCESS_TOKEN="your-server-side-ebay-token"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

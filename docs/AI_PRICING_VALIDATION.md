@@ -38,7 +38,7 @@ Real provider calls are opt-in and backend-only. Do not pass secrets to Flutter.
 cd backend
 .\.venv\Scripts\Activate.ps1
 $env:AI_PROVIDER="openai"
-$env:OPENAI_API_KEY="sk-your-server-side-key"
+$env:OPENAI_API_KEY="<server-side-openai-key>"
 $env:OPENAI_MODEL="gpt-4.1-mini"
 $env:PRICING_PROVIDER="ebay"
 $env:EBAY_ACCESS_TOKEN="your-server-side-ebay-access-token"

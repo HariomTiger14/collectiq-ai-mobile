@@ -641,6 +641,7 @@ class ScannerController extends Notifier<ScannerState> {
   /// Runs AI analysis for the selected scan preview.
   Future<void> analyzeWithAi() async {
     debugPrint('[Scanner] analyze start');
+    final scanToResultStopwatch = Stopwatch()..start();
     _logFlow('analyze tapped');
     final selectedImagePath = state.selectedImagePath;
     if (selectedImagePath == null) {
@@ -687,6 +688,7 @@ class ScannerController extends Notifier<ScannerState> {
       ),
     );
     try {
+      final aiStopwatch = Stopwatch()..start();
       final analysis = await _aiAnalysisProvider.analyze(
         AiAnalysisRequest(
           imagePath: selectedImagePath,
@@ -697,12 +699,22 @@ class ScannerController extends Notifier<ScannerState> {
           },
         ),
       );
+      aiStopwatch.stop();
+      debugPrint(
+        '[Scanner] AI analysis latencyMs=${aiStopwatch.elapsedMilliseconds}',
+      );
+      final enrichmentStopwatch = Stopwatch()..start();
       final enrichedAnalysis = await _enrichmentService.enrich(
         analysis: analysis,
         metadata: ScanResultEnrichmentMetadata(
           imagePath: selectedImagePath,
           imageSource: _imageSourceFor(selectedImagePath),
         ),
+      );
+      enrichmentStopwatch.stop();
+      debugPrint(
+        '[Scanner] pricing enrichment latencyMs='
+        '${enrichmentStopwatch.elapsedMilliseconds}',
       );
       _setState(
         state.copyWith(
@@ -715,6 +727,11 @@ class ScannerController extends Notifier<ScannerState> {
           .read(subscriptionControllerProvider.notifier)
           .recordSuccessfulAnalysis();
       ref.read(scanPipelineStatusProvider.notifier).markCompleted();
+      scanToResultStopwatch.stop();
+      debugPrint(
+        '[Scanner] scan-to-result latencyMs='
+        '${scanToResultStopwatch.elapsedMilliseconds}',
+      );
     } on AiAnalysisException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();
       _setState(
@@ -748,6 +765,13 @@ class ScannerController extends Notifier<ScannerState> {
         ),
       );
     } finally {
+      if (scanToResultStopwatch.isRunning) {
+        scanToResultStopwatch.stop();
+        debugPrint(
+          '[Scanner] scan-to-result ended latencyMs='
+          '${scanToResultStopwatch.elapsedMilliseconds}',
+        );
+      }
       _setState(state.copyWith(isLoading: false));
     }
   }
