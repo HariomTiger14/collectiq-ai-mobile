@@ -35,7 +35,11 @@ class PricingAggregationServiceTest(unittest.TestCase):
         self.assertEqual(pricing.highEstimate, 140)
         self.assertEqual(pricing.sourceCount, 1)
         self.assertFalse(pricing.fallbackUsed)
-        self.assertGreaterEqual(pricing.pricingConfidence, 80)
+        self.assertGreaterEqual(pricing.pricingConfidence, 70)
+        self.assertEqual(pricing.providerDiagnostics["medianPrice"], "120")
+        self.assertEqual(pricing.providerDiagnostics["outliersRemoved"], "0")
+        self.assertEqual(pricing.providerDiagnostics["comparableCount"], "3")
+        self.assertIn("agreement at", pricing.providerDiagnostics["priceExplanation"])
 
     def test_aggregator_removes_obvious_outliers(self) -> None:
         provider = _StaticPricingProvider(
@@ -53,6 +57,7 @@ class PricingAggregationServiceTest(unittest.TestCase):
 
         self.assertLess(pricing.highEstimate, 10000)
         self.assertEqual(pricing.estimatedMarketValue, 110)
+        self.assertEqual(pricing.providerDiagnostics["outliersRemoved"], "1")
 
     def test_aggregator_uses_mock_fallback_on_provider_error(self) -> None:
         provider = _FailingPricingProvider(

@@ -12,6 +12,7 @@ from app.services.pricing.base_pricing_provider import (
     utc_timestamp,
 )
 from app.services.pricing.mock_pricing_provider import MockPricingProvider
+from app.services.pricing.pricing_intelligence_engine import PricingConfidenceEngine
 
 
 logger = logging.getLogger("collectiq.pricing")
@@ -25,9 +26,11 @@ class PricingAggregationService:
         providers: list[PricingProvider],
         *,
         fallback_provider: PricingProvider | None = None,
+        confidence_engine: PricingConfidenceEngine | None = None,
     ) -> None:
         self._providers = providers
         self._fallback_provider = fallback_provider or MockPricingProvider()
+        self._confidence_engine = confidence_engine or PricingConfidenceEngine()
 
     def price(self, recognition: RecognitionResult) -> PricingResult:
         started_at = time.perf_counter()
@@ -97,11 +100,21 @@ class PricingAggregationService:
             for result in provider_results
             for sale in result.comparableSales
         )
-        comps = self._remove_outliers(comps)
+        provider_count = self._provider_count(provider_results, comps)
+        intelligence = self._confidence_engine.analyze(
+            recognition=recognition,
+            comparable_sales=comps,
+            provider_count=provider_count,
+            fallback_used=fallback_used,
+        )
+        comps = intelligence.comparable_sales
 
         if comps:
             prices = [sale.soldPrice for sale in comps]
-            estimated_value = max(1, round(statistics.median(prices)))
+            estimated_value = intelligence.median_price or max(
+                1,
+                round(statistics.median(prices)),
+            )
             low_estimate = max(1, min(prices))
             high_estimate = max(low_estimate, max(prices))
         else:
@@ -110,7 +123,7 @@ class PricingAggregationService:
             low_estimate = provider_results[0].lowEstimate
             high_estimate = provider_results[0].highEstimate
 
-        confidence = self._confidence(
+        confidence = intelligence.confidence.confidence or self._confidence(
             recognition=recognition,
             provider_results=provider_results,
             comparable_sales=comps,
@@ -128,7 +141,10 @@ class PricingAggregationService:
                 if result.pricingSource
             }
         )
-        trend = self._trend(provider_results, recognition.category)
+        trend = intelligence.market_trend or self._trend(
+            provider_results,
+            recognition.category,
+        )
         cache_status = self._cache_status(provider_results, fallback_used)
         fallback_reason = " | ".join(provider_errors) if fallback_used else ""
         provider_diagnostics = self._provider_diagnostics(provider_results)
@@ -160,7 +176,42 @@ class PricingAggregationService:
                 ),
                 "pricingFreshness": self._pricing_age(provider_results),
                 "errors": " | ".join(provider_errors),
+                "providerAgreement": str(
+                    intelligence.confidence.provider_agreement_percent
+                ),
+                "priceVariance": str(intelligence.variance_percent),
+                "medianPrice": str(intelligence.median_price),
+                "trimmedMean": str(intelligence.trimmed_mean),
+                "outliersRemoved": str(len(intelligence.removed_outliers)),
+                "comparableCount": str(len(comps)),
+                "confidenceCalculation": intelligence.confidence.reason,
+                "priceExplanation": intelligence.price_explanation,
+                "comparableQuality": self._quality_summary(
+                    intelligence.comparable_quality,
+                ),
             },
+        )
+
+    def _provider_count(
+        self,
+        provider_results: list[PricingResult],
+        comparable_sales: list[MarketComparableSale],
+    ) -> int:
+        sources = {
+            sale.source.strip()
+            for sale in comparable_sales
+            if sale.source and sale.source.strip()
+        }
+        return len(sources) or len(provider_results) or 1
+
+    def _quality_summary(self, quality_scores) -> str:
+        if not quality_scores:
+            return ""
+        counts: dict[str, int] = {}
+        for score in quality_scores:
+            counts[score.label] = counts.get(score.label, 0) + 1
+        return ", ".join(
+            f"{label}:{counts[label]}" for label in sorted(counts)
         )
 
     def _normalize_sales(self, sales) -> list[MarketComparableSale]:

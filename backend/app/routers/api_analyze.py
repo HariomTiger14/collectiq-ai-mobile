@@ -498,6 +498,28 @@ def _diagnostics_response(
         pricingFallbackReason=pricing.providerDiagnostics.get("fallbackReason") or None,
         pricingCacheStatus=pricing.cacheStatus,
         pricingFreshness=pricing.pricingAge,
+        pricingProviderAgreement=_parse_optional_int(
+            pricing.providerDiagnostics.get("providerAgreement")
+        ),
+        pricingVariancePercent=_parse_optional_int(
+            pricing.providerDiagnostics.get("priceVariance")
+        ),
+        pricingMedianValue=_parse_optional_int(
+            pricing.providerDiagnostics.get("medianPrice")
+        ),
+        pricingOutliersRemoved=_parse_optional_int(
+            pricing.providerDiagnostics.get("outliersRemoved")
+        ),
+        pricingComparableCount=_parse_optional_int(
+            pricing.providerDiagnostics.get("comparableCount")
+        ),
+        pricingConfidenceCalculation=pricing.providerDiagnostics.get(
+            "confidenceCalculation"
+        )
+        or None,
+        pricingExplanation=pricing.providerDiagnostics.get("priceExplanation") or None,
+        pricingComparableQuality=pricing.providerDiagnostics.get("comparableQuality")
+        or None,
         confidenceLevel=confidence_level,
         totalLatencyMs=total_processing_time_ms,
     )

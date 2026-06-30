@@ -75,6 +75,14 @@ class ApiAnalyzeDiagnosticsResponse(BaseModel):
     pricingFallbackReason: str | None = None
     pricingCacheStatus: str
     pricingFreshness: str
+    pricingProviderAgreement: int | None = None
+    pricingVariancePercent: int | None = None
+    pricingMedianValue: int | None = None
+    pricingOutliersRemoved: int | None = None
+    pricingComparableCount: int | None = None
+    pricingConfidenceCalculation: str | None = None
+    pricingExplanation: str | None = None
+    pricingComparableQuality: str | None = None
     confidenceLevel: str
     totalLatencyMs: int
 

@@ -234,6 +234,8 @@ The pricing layer contains:
 - `PricingAggregationService`: normalizes comparable sales, removes obvious
   outliers, calculates estimated value/range/confidence/trend, and falls back
   safely when providers are unavailable.
+- `PricingConfidenceEngine`: turns raw comps into explainable confidence,
+  outlier filtering, trend labels, comparable quality, and price explanations.
 
 Aggregation calculates:
 
@@ -245,6 +247,101 @@ Aggregation calculates:
 - `sourceCount`
 - `pricingAge`
 - recent comparable sales
+
+### Pricing Methodology
+
+CollectIQ uses robust, explainable pricing rather than trusting a single raw
+listing. The aggregation service first normalizes provider comps into
+`MarketComparableSale`, then the pricing intelligence engine evaluates:
+
+- provider count and provider agreement;
+- number of comparable sales;
+- price variance;
+- market freshness/listing age;
+- comparable quality;
+- outliers removed from the estimate.
+
+The displayed estimated value is the median of cleaned comparable sales. Median
+is preferred over raw average because it is harder for one unusually high or low
+listing to distort the valuation. Diagnostics also include a trimmed mean for
+debugging and future charting.
+
+### Confidence Calculation
+
+Pricing confidence is scored from 0-100 using:
+
+- provider count: multiple independent sources improve confidence;
+- comparable count: more usable comps improve confidence;
+- provider agreement: provider median prices close together improve confidence;
+- variance: wide price spread lowers confidence;
+- market freshness: recent comps score higher than stale comps;
+- comparable quality: stronger title, set, card number, condition, and grading
+  matches improve confidence;
+- fallback penalty: mock fallback caps confidence lower than live provider data.
+
+The backend diagnostics include the confidence reason, for example:
+
+```text
+12 comparable sales, 2 providers, 9% price variance, 94% provider agreement,
+fresh market data
+```
+
+### Outlier Handling
+
+Outlier detection removes broken and suspicious comps before estimating value:
+
+- zero or negative prices;
+- missing title/source rows;
+- extremely low prices compared with median;
+- extremely high prices compared with median;
+- IQR-based extremes when enough comps are available.
+
+The service keeps diagnostics for `outliersRemoved`, `medianPrice`,
+`trimmedMean`, `priceVariance`, and `comparableCount`.
+
+### Trend Classification
+
+Comparable sales are sorted by sold date and compared across older vs recent
+sales. The backend returns:
+
+- `Strong Uptrend`
+- `Moderate Uptrend`
+- `Stable`
+- `Moderate Downtrend`
+- `Strong Downtrend`
+
+### Comparable Quality
+
+Each comparable is scored as:
+
+- `Excellent`
+- `Good`
+- `Fair`
+- `Poor`
+
+Quality factors include title-token match, card number, set, condition, and
+grading keywords such as PSA/BGS/CGC. Aggregated quality counts are included in
+diagnostics.
+
+### Explain Price
+
+The pricing engine produces a plain-English explanation in diagnostics:
+
+```text
+Estimated value is based on 12 comparable sales, 2 providers, fresh market
+data, 88% confidence, and eBay + TCGPlayer agreement at 94%.
+```
+
+This explanation is backend-generated and does not require any Flutter contract
+changes.
+
+### Provider Weighting
+
+The current MVP treats cleaned comparable sales equally after provider-specific
+normalization. Provider agreement and comparable quality influence confidence,
+not the median value directly. Future providers can add weighting once real
+validation data proves a provider should carry more or less influence for a
+category.
 
 ### Pricing Error Handling
 
@@ -282,9 +379,10 @@ For TCGPlayer specifically:
 ### Pricing Diagnostics
 
 Debug logs include provider count, response time, fallback usage, cache status,
-pricing source count, provider name, pricing freshness, and fallback reason.
-Logs must not include provider API keys, payment tokens, or raw third-party
-credentials.
+pricing source count, provider name, pricing freshness, fallback reason,
+provider agreement, variance, median value, outliers removed, comparable count,
+confidence calculation, comparable quality, and price explanation. Logs must not
+include provider API keys, payment tokens, or raw third-party credentials.
 
 ### Future Cache Strategy
 
