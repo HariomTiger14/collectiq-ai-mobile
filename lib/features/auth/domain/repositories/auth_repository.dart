@@ -20,6 +20,12 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  /// Creates an email/password account when supported by the auth provider.
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  });
+
   /// Signs in with Google when supported by the auth provider.
   Future<AppUser> signInWithGoogle();
 

@@ -10,6 +10,7 @@ import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repositor
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
@@ -1682,6 +1683,13 @@ void main() {
         throwsA(isA<AuthException>()),
       );
       await expectLater(
+        repository.signUpWithEmailPassword(
+          email: 'harry@example.com',
+          password: 'password',
+        ),
+        throwsA(isA<AuthException>()),
+      );
+      await expectLater(
         repository.signInWithGoogle(),
         throwsA(isA<AuthException>()),
       );
@@ -1780,6 +1788,96 @@ void main() {
         expect(user.isAnonymous, isTrue);
       },
     );
+
+    test('email sign-in success maps Supabase session to app user', () async {
+      final gateway = _FakeSupabaseAuthGateway(
+        passwordSession: const SupabaseAuthSession(
+          userId: 'user-email',
+          email: 'harry@example.com',
+          accessToken: 'access-token',
+          displayName: 'harry@example.com',
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        ),
+      );
+      final repository = SupabaseAuthRepository(supabaseService: gateway);
+
+      final user = await repository.signInWithEmailPassword(
+        email: 'harry@example.com',
+        password: 'password123',
+      );
+
+      expect(user.id, 'user-email');
+      expect(user.email, 'harry@example.com');
+      expect(user.provider, AuthProviderType.emailPassword);
+      expect(user.isCloudBacked, isTrue);
+      expect(gateway.signInCalls, 1);
+    });
+
+    test('email sign-up success maps Supabase session to app user', () async {
+      final gateway = _FakeSupabaseAuthGateway(
+        signUpSession: const SupabaseAuthSession(
+          userId: 'new-user',
+          email: 'new@example.com',
+          accessToken: 'new-token',
+          displayName: 'new@example.com',
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        ),
+      );
+      final repository = SupabaseAuthRepository(supabaseService: gateway);
+
+      final user = await repository.signUpWithEmailPassword(
+        email: 'new@example.com',
+        password: 'password123',
+      );
+
+      expect(user.id, 'new-user');
+      expect(user.email, 'new@example.com');
+      expect(user.provider, AuthProviderType.emailPassword);
+      expect(gateway.signUpCalls, 1);
+    });
+
+    test('email sign-in failure surfaces auth exception', () async {
+      final repository = SupabaseAuthRepository(
+        supabaseService: _FakeSupabaseAuthGateway(
+          signInError: const SupabaseAuthException('Invalid login credentials'),
+        ),
+      );
+
+      await expectLater(
+        repository.signInWithEmailPassword(
+          email: 'harry@example.com',
+          password: 'bad-password',
+        ),
+        throwsA(
+          isA<SupabaseAuthException>().having(
+            (error) => error.message,
+            'message',
+            'Invalid login credentials',
+          ),
+        ),
+      );
+    });
+
+    test('sign-out clears Supabase session', () async {
+      final gateway = _FakeSupabaseAuthGateway(
+        currentSessionValue: const SupabaseAuthSession(
+          userId: 'user-email',
+          email: 'harry@example.com',
+          accessToken: 'access-token',
+          displayName: 'Harry',
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        ),
+      );
+      final repository = SupabaseAuthRepository(supabaseService: gateway);
+
+      await repository.signOut();
+
+      expect(gateway.signOutCalls, 1);
+      expect(gateway.lastSignOutToken, 'access-token');
+    });
 
     test('auth session cache is scoped to the Supabase project URL', () async {
       SharedPreferences.setMockInitialValues({
@@ -1925,6 +2023,119 @@ void main() {
       expect(container.read(authControllerProvider).isSignedIn, isFalse);
       expect(container.read(authControllerProvider).isLocalMode, isTrue);
       expect(container.read(authControllerProvider).statusLabel, 'Local mode');
+    });
+
+    test('email sign-in success updates auth state', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              emailUser: const AppUser(
+                id: 'email-user',
+                displayName: 'harry@example.com',
+                email: 'harry@example.com',
+                provider: AuthProviderType.emailPassword,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isTrue);
+      expect(state.user!.email, 'harry@example.com');
+      expect(state.accountModeLabel, 'Email / Password');
+      expect(state.errorMessage, isNull);
+    });
+
+    test('email sign-up success updates auth state', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              signUpUser: const AppUser(
+                id: 'new-email-user',
+                displayName: 'new@example.com',
+                email: 'new@example.com',
+                provider: AuthProviderType.emailPassword,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'new@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isTrue);
+      expect(state.user!.email, 'new@example.com');
+      expect(state.accountModeLabel, 'Email / Password');
+    });
+
+    test('email sign-in failure leaves local mode with error', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              signInError: const AuthException('Invalid email or password.'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'bad-password',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.errorMessage, 'Invalid email or password.');
+    });
+
+    test('sign-out returns Settings state to local mode', () async {
+      final repository = _ScriptedAuthRepository(
+        emailUser: const AppUser(
+          id: 'email-user',
+          displayName: 'harry@example.com',
+          email: 'harry@example.com',
+          provider: AuthProviderType.emailPassword,
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+      await container.read(authControllerProvider.notifier).signOut();
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.isLocalMode, isTrue);
+      expect(repository.signOutCalls, 1);
     });
   });
 
@@ -3280,5 +3491,165 @@ class _FailingCloudRepository implements CloudPortfolioRepository {
   @override
   Future<List<CollectibleItem>> downloadCloudItems() async {
     throw StateError('network unavailable');
+  }
+}
+
+class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
+  _FakeSupabaseAuthGateway({
+    this.currentSessionValue,
+    this.passwordSession,
+    this.signUpSession,
+    this.signInError,
+  });
+
+  final SupabaseAuthSession? currentSessionValue;
+  final SupabaseAuthSession? passwordSession;
+  final SupabaseAuthSession? signUpSession;
+  final Object? signInError;
+  var signInCalls = 0;
+  var signUpCalls = 0;
+  var signOutCalls = 0;
+  String? lastSignOutToken;
+
+  @override
+  bool get isConfigured => true;
+
+  @override
+  Future<SupabaseAuthSession?> currentSession() async => currentSessionValue;
+
+  @override
+  Future<SupabaseAuthSession> ensureAnonymousSession() async {
+    return currentSessionValue ??
+        const SupabaseAuthSession(
+          userId: 'anonymous-user',
+          email: null,
+          accessToken: 'anonymous-token',
+          displayName: 'Anonymous Collector',
+          isAnonymous: true,
+          projectUrl: 'https://example.supabase.co',
+        );
+  }
+
+  @override
+  Future<SupabaseAuthSession> signInAnonymously() async {
+    return ensureAnonymousSession();
+  }
+
+  @override
+  Future<SupabaseAuthSession> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    signInCalls += 1;
+    final error = signInError;
+    if (error != null) {
+      throw error;
+    }
+    return passwordSession ??
+        SupabaseAuthSession(
+          userId: 'email-user',
+          email: email,
+          accessToken: 'email-token',
+          displayName: email,
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        );
+  }
+
+  @override
+  Future<SupabaseAuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    signUpCalls += 1;
+    return signUpSession ??
+        SupabaseAuthSession(
+          userId: 'new-email-user',
+          email: email,
+          accessToken: 'new-email-token',
+          displayName: email,
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        );
+  }
+
+  @override
+  Future<void> signOut(String accessToken) async {
+    signOutCalls += 1;
+    lastSignOutToken = accessToken;
+  }
+}
+
+class _ScriptedAuthRepository implements AuthRepository {
+  _ScriptedAuthRepository({this.emailUser, this.signUpUser, this.signInError});
+
+  final AppUser? emailUser;
+  final AppUser? signUpUser;
+  final Object? signInError;
+  var signOutCalls = 0;
+
+  static const _localUser = AppUser(
+    id: 'local-anonymous-user',
+    displayName: 'Local Collector',
+    email: null,
+    isAnonymous: true,
+    isLocalOnly: true,
+    provider: AuthProviderType.localAnonymous,
+  );
+
+  @override
+  Future<AppUser?> currentUser() async => _localUser;
+
+  @override
+  Future<AppUser> signIn() async => _localUser;
+
+  @override
+  Future<AppUser> signInAnonymously() async => _localUser;
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    final error = signInError;
+    if (error != null) {
+      throw error;
+    }
+    return emailUser ??
+        AppUser(
+          id: 'email-user',
+          displayName: email,
+          email: email,
+          provider: AuthProviderType.emailPassword,
+        );
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return signUpUser ??
+        AppUser(
+          id: 'new-email-user',
+          displayName: email,
+          email: email,
+          provider: AuthProviderType.emailPassword,
+        );
+  }
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is coming soon.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is coming soon.');
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOutCalls += 1;
   }
 }

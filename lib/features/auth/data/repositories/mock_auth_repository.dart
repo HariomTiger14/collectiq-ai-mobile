@@ -37,7 +37,17 @@ class MockAuthRepository implements AuthRepository {
     required String password,
   }) async {
     throw const AuthException(
-      'Email/password sign-in is coming soon. Local mode remains available.',
+      'Email/password sign-in requires Supabase configuration. Local mode remains available.',
+    );
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    throw const AuthException(
+      'Email/password sign-up requires Supabase configuration. Local mode remains available.',
     );
   }
 

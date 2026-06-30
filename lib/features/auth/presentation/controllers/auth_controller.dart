@@ -134,17 +134,33 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Creates an email/password Supabase account when configured.
+  Future<void> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      final user = await _repository.signUpWithEmailPassword(
+        email: email,
+        password: password,
+      );
+      state = state.copyWith(user: user, isLoading: false);
+    } on Object catch (error) {
+      debugPrint('[Auth] email sign-up failed: $error');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: _messageForError(error),
+      );
+    }
+  }
+
   /// Signs out and returns to guest mode.
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       await _repository.signOut();
-      final user = await _repository.currentUser();
-      state = state.copyWith(
-        user: user,
-        isLoading: false,
-        clearUser: user == null,
-      );
+      state = state.copyWith(isLoading: false, clearUser: true);
     } on Object catch (error) {
       debugPrint('[Auth] sign out failed: $error');
       state = state.copyWith(

@@ -11,7 +11,7 @@ class SupabaseAuthRepository implements AuthRepository {
     this.fallbackRepository = const MockAuthRepository(),
   });
 
-  final SupabaseService supabaseService;
+  final SupabaseAuthGateway supabaseService;
   final AuthRepository fallbackRepository;
 
   @override
@@ -65,6 +65,25 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    if (!supabaseService.isConfigured) {
+      return fallbackRepository.signUpWithEmailPassword(
+        email: email,
+        password: password,
+      );
+    }
+
+    final session = await supabaseService.signUpWithPassword(
+      email: email,
+      password: password,
+    );
+    return _userFromSession(session);
+  }
+
+  @override
   Future<AppUser> signInWithGoogle() {
     throw const AuthException(
       'Google sign-in is coming soon. Local mode remains available.',
@@ -99,7 +118,9 @@ class SupabaseAuthRepository implements AuthRepository {
       email: session.email,
       isAnonymous: session.isAnonymous,
       isLocalOnly: false,
-      provider: AuthProviderType.supabaseAnonymous,
+      provider: session.isAnonymous
+          ? AuthProviderType.supabaseAnonymous
+          : AuthProviderType.emailPassword,
     );
   }
 }

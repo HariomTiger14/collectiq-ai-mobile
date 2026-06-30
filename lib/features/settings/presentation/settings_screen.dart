@@ -15,11 +15,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Settings screen for account and sync placeholders.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
@@ -92,11 +107,17 @@ class SettingsScreen extends ConsumerWidget {
                             ? 'Needs attention'
                             : authState.statusLabel,
                       ),
-                      const _SettingsRow(
-                        icon: Icons.email_outlined,
-                        title: 'Email / Password',
-                        subtitle: 'Account sign-in foundation is prepared.',
-                        trailing: 'Coming soon',
+                      _AuthEmailPanel(
+                        emailController: _emailController,
+                        passwordController: _passwordController,
+                        authState: authState,
+                        onSignIn: () => _submitEmailAuth(signUp: false),
+                        onSignUp: () => _submitEmailAuth(signUp: true),
+                        onSignOut: authState.isSignedIn
+                            ? () => ref
+                                  .read(authControllerProvider.notifier)
+                                  .signOut()
+                            : null,
                       ),
                       const _SettingsRow(
                         icon: Icons.g_mobiledata_outlined,
@@ -477,6 +498,160 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _submitEmailAuth({required bool signUp}) async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (signUp) {
+      await ref
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(email: email, password: password);
+      return;
+    }
+
+    await ref
+        .read(authControllerProvider.notifier)
+        .signInWithEmailPassword(email: email, password: password);
+  }
+}
+
+class _AuthEmailPanel extends StatelessWidget {
+  const _AuthEmailPanel({
+    required this.emailController,
+    required this.passwordController,
+    required this.authState,
+    required this.onSignIn,
+    required this.onSignUp,
+    required this.onSignOut,
+  });
+
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final AuthState authState;
+  final VoidCallback onSignIn;
+  final VoidCallback onSignUp;
+  final VoidCallback? onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isLoading = authState.isLoading;
+    final signedInEmail = authState.user?.email;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.56),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(Icons.email_outlined, color: colorScheme.primary),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Email / Password',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    authState.isSignedIn
+                        ? signedInEmail ?? authState.user!.displayName
+                        : 'Optional Supabase account. Local mode remains available.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Text(
+              authState.isSignedIn ? 'Signed in' : 'Ready',
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          key: const ValueKey('settings-auth-email-field'),
+          controller: emailController,
+          enabled: !isLoading,
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            hintText: 'collector@example.com',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextField(
+          key: const ValueKey('settings-auth-password-field'),
+          controller: passwordController,
+          enabled: !isLoading,
+          obscureText: true,
+          autofillHints: const [AutofillHints.password],
+          decoration: const InputDecoration(
+            labelText: 'Password',
+            hintText: 'Minimum 6 characters',
+          ),
+        ),
+        if (authState.errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            authState.errorMessage!,
+            style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const ValueKey('settings-auth-sign-in-button'),
+            onPressed: isLoading ? null : onSignIn,
+            icon: const Icon(Icons.login_outlined),
+            label: Text(isLoading ? 'Working...' : 'Sign In'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('settings-auth-sign-up-button'),
+            onPressed: isLoading ? null : onSignUp,
+            icon: const Icon(Icons.person_add_alt_outlined),
+            label: const Text('Sign Up'),
+          ),
+        ),
+        if (authState.isSignedIn) ...[
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const ValueKey('settings-auth-sign-out-button'),
+              onPressed: isLoading ? null : onSignOut,
+              icon: const Icon(Icons.logout_outlined),
+              label: const Text('Sign Out'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

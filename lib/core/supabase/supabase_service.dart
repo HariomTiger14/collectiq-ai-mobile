@@ -8,7 +8,29 @@ final supabaseServiceProvider = Provider<SupabaseService>((ref) {
   return SupabaseService.instance(config: ref.watch(supabaseConfigProvider));
 });
 
-class SupabaseService {
+abstract interface class SupabaseAuthGateway {
+  bool get isConfigured;
+
+  Future<SupabaseAuthSession?> currentSession();
+
+  Future<SupabaseAuthSession> ensureAnonymousSession();
+
+  Future<SupabaseAuthSession> signInAnonymously();
+
+  Future<SupabaseAuthSession> signInWithPassword({
+    required String email,
+    required String password,
+  });
+
+  Future<SupabaseAuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+  });
+
+  Future<void> signOut(String accessToken);
+}
+
+class SupabaseService implements SupabaseAuthGateway {
   SupabaseService._(this.config)
     : _dio = Dio(
         BaseOptions(
@@ -47,8 +69,10 @@ class SupabaseService {
     return _instance!;
   }
 
+  @override
   bool get isConfigured => config.isConfigured;
 
+  @override
   Future<SupabaseAuthSession?> currentSession() async {
     if (!isConfigured) {
       debugPrint('[Supabase] current session skipped: not configured');
@@ -86,6 +110,7 @@ class SupabaseService {
     return session;
   }
 
+  @override
   Future<SupabaseAuthSession> ensureAnonymousSession() async {
     final session = await currentSession();
     if (session != null && session.accessToken.isNotEmpty) {
@@ -104,6 +129,7 @@ class SupabaseService {
     return signInAnonymously();
   }
 
+  @override
   Future<SupabaseAuthSession> signInAnonymously() async {
     _ensureConfigured();
     debugPrint('[Supabase] anonymous sign-in starting');
@@ -138,6 +164,7 @@ class SupabaseService {
     }
   }
 
+  @override
   Future<SupabaseAuthSession> signInWithPassword({
     required String email,
     required String password,
@@ -152,7 +179,7 @@ class SupabaseService {
       );
     } on DioException catch (error) {
       logDioException(error, payload: const {'email': '', 'password': ''});
-      rethrow;
+      throw SupabaseAuthException(_authFailureMessage(error));
     }
 
     final session = SupabaseAuthSession.fromJson(
@@ -164,6 +191,37 @@ class SupabaseService {
     return session;
   }
 
+  @override
+  Future<SupabaseAuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    _ensureConfigured();
+    late final Response<Map<String, dynamic>> response;
+    try {
+      response = await _dio.post<Map<String, dynamic>>(
+        '/auth/v1/signup',
+        data: {
+          'email': email,
+          'password': password,
+          'data': {'display_name': email},
+        },
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: const {'email': '', 'password': ''});
+      throw SupabaseAuthException(_authFailureMessage(error));
+    }
+
+    final session = SupabaseAuthSession.fromJson(
+      response.data ?? {},
+      projectUrl: config.url,
+    );
+    _ensureValidSession(session);
+    await _saveSession(session);
+    return session;
+  }
+
+  @override
   Future<void> signOut(String accessToken) async {
     _ensureConfigured();
     try {

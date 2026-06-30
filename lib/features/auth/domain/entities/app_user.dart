@@ -67,10 +67,9 @@ enum AuthProviderType {
   bool get isAvailable {
     return switch (this) {
       AuthProviderType.localAnonymous ||
-      AuthProviderType.supabaseAnonymous => true,
-      AuthProviderType.emailPassword ||
-      AuthProviderType.google ||
-      AuthProviderType.apple => false,
+      AuthProviderType.supabaseAnonymous ||
+      AuthProviderType.emailPassword => true,
+      AuthProviderType.google || AuthProviderType.apple => false,
     };
   }
 

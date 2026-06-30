@@ -200,7 +200,23 @@ void main() {
     expect(find.text('Account mode'), findsOneWidget);
     expect(find.text('Local Anonymous'), findsOneWidget);
     expect(find.text('Continue as Guest'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.text('Sign In'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('settings-auth-email-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-auth-password-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-auth-sign-in-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-auth-sign-up-button')),
+      findsOneWidget,
+    );
     expect(find.text('Local mode'), findsOneWidget);
     expect(find.text('Email / Password'), findsOneWidget);
     expect(find.text('Google Sign-In'), findsOneWidget);
@@ -275,6 +291,36 @@ void main() {
     await tester.pump();
     expect(find.text('About'), findsOneWidget);
     expect(find.text('App version'), findsOneWidget);
+  });
+
+  testWidgets('settings signs in with mocked email auth repository', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(authRepository: _InteractiveAuthRepository());
+
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-auth-email-field')),
+      'harry@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-auth-password-field')),
+      'password123',
+    );
+    final signInButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('settings-auth-sign-in-button')),
+    );
+    signInButton.onPressed!();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('harry@example.com'), findsWidgets);
+    expect(find.text('Signed in'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('settings-auth-sign-out-button')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('settings displays unavailable configured AI provider', (
@@ -1586,6 +1632,14 @@ class _FailingAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) {
+    throw const AuthException('Auth unavailable during local save test.');
+  }
+
+  @override
   Future<AppUser> signInWithGoogle() {
     throw const AuthException('Auth unavailable during local save test.');
   }
@@ -1598,6 +1652,78 @@ class _FailingAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() {
     throw const AuthException('Auth unavailable during local save test.');
+  }
+}
+
+class _InteractiveAuthRepository implements AuthRepository {
+  AppUser? _user;
+
+  @override
+  Future<AppUser?> currentUser() async {
+    return _user ??
+        const AppUser(
+          id: 'local-anonymous-user',
+          displayName: 'Local Collector',
+          email: null,
+          isAnonymous: true,
+          isLocalOnly: true,
+          provider: AuthProviderType.localAnonymous,
+        );
+  }
+
+  @override
+  Future<AppUser> signIn() async {
+    return signInAnonymously();
+  }
+
+  @override
+  Future<AppUser> signInAnonymously() async {
+    _user = const AppUser(
+      id: 'local-anonymous-user',
+      displayName: 'Local Collector',
+      email: null,
+      isAnonymous: true,
+      isLocalOnly: true,
+      provider: AuthProviderType.localAnonymous,
+    );
+    return _user!;
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    _user = AppUser(
+      id: 'email-user',
+      displayName: email,
+      email: email,
+      provider: AuthProviderType.emailPassword,
+    );
+    return _user!;
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return signInWithEmailPassword(email: email, password: password);
+  }
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is coming soon.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is coming soon.');
+  }
+
+  @override
+  Future<void> signOut() async {
+    _user = null;
   }
 }
 
