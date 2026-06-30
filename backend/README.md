@@ -356,6 +356,47 @@ the core response contract remains unchanged.
 Cost warning: OpenAI and eBay provider calls may consume paid quota. Keep mock
 mode for normal development and CI.
 
+## Public Dataset Validation Lab
+
+The validation lab supports user-owned images and public/open dataset exports
+without scraping marketplace or search-engine images. It accepts local image
+folders, locally downloaded Kaggle folders, locally downloaded Hugging Face
+exports, and CSV/JSON ground-truth manifests.
+
+Safe placeholder run:
+
+```powershell
+scripts\run_validation_lab.ps1 -DryRun
+```
+
+Prepare a local dataset manifest:
+
+```powershell
+scripts\run_validation_lab.ps1 `
+  -UserImageFolder C:\path\to\owned-or-open-images `
+  -ManifestPath validation\manifests\my_manifest.json `
+  -PrepareOnly
+```
+
+Run against the local backend:
+
+```powershell
+scripts\run_validation_lab.ps1 `
+  -ManifestPath validation\manifests\my_manifest.json `
+  -ImageDir validation\images `
+  -Endpoint http://127.0.0.1:8000/api/analyze
+```
+
+Reports are written to:
+
+```text
+validation/reports/latest_validation_report.md
+validation/reports/latest_validation_results.csv
+```
+
+See `docs/VALIDATION_LAB.md` for dataset safety rules, manifest fields, metrics,
+and manual real-provider validation guidance.
+
 ### Adding Additional Pricing Providers
 
 1. Implement `PricingProvider.price(recognition)`.

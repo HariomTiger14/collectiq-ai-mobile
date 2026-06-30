@@ -1,0 +1,41 @@
+[
+  {
+    "filename": "pokemon_card_placeholder.jpg",
+    "expected_name": "1999 Pokemon Charizard Holo",
+    "expected_category": "Pokemon Card",
+    "expected_brand": "Pokemon",
+    "expected_set": "Base Set",
+    "expected_year": "1999",
+    "expected_price_min": 1000,
+    "expected_price_max": 3000,
+    "source": "placeholder",
+    "license": "not-an-image",
+    "notes": "Replace with a licensed, public-domain, open-dataset, or user-owned image before real validation."
+  },
+  {
+    "filename": "sports_card_placeholder.jpg",
+    "expected_name": "1986 Fleer Michael Jordan Rookie",
+    "expected_category": "Sports Card",
+    "expected_brand": "Fleer",
+    "expected_set": "Fleer Basketball",
+    "expected_year": "1986",
+    "expected_price_min": 5000,
+    "expected_price_max": 25000,
+    "source": "placeholder",
+    "license": "not-an-image",
+    "notes": "Placeholder row for future licensed dataset validation."
+  },
+  {
+    "filename": "coin_placeholder.jpg",
+    "expected_name": "1921 Morgan Silver Dollar",
+    "expected_category": "Coin",
+    "expected_brand": "United States Mint",
+    "expected_set": "Morgan Dollar",
+    "expected_year": "1921",
+    "expected_price_min": 25,
+    "expected_price_max": 150,
+    "source": "placeholder",
+    "license": "not-an-image",
+    "notes": "Placeholder row for future licensed dataset validation."
+  }
+]

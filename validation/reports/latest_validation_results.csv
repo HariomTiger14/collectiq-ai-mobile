@@ -1,0 +1,4 @@
+filename,status,expected_name,actual_name,expected_category,actual_category,expected_brand,actual_brand,expected_set,actual_set,expected_year,actual_year,expected_price_min,expected_price_max,actual_estimated_value,confidence,latency_ms,fallback_reason,category_match,name_keyword_match,set_match,year_match,price_in_range,error
+pokemon_card_placeholder.jpg,missing_image,1999 Pokemon Charizard Holo,,Pokemon Card,,Pokemon,,Base Set,,1999,,1000.0,3000.0,,,,,False,False,,,,Image file is missing from validation/images.
+sports_card_placeholder.jpg,missing_image,1986 Fleer Michael Jordan Rookie,,Sports Card,,Fleer,,Fleer Basketball,,1986,,5000.0,25000.0,,,,,False,False,,,,Image file is missing from validation/images.
+coin_placeholder.jpg,missing_image,1921 Morgan Silver Dollar,,Coin,,United States Mint,,Morgan Dollar,,1921,,25.0,150.0,,,,,False,False,,,,Image file is missing from validation/images.
