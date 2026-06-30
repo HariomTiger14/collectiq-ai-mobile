@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import UPLOAD_DIR
-from app.routers import health, portfolio, scanner
+from app.routers import api_analyze, health, portfolio, scanner
 
 
 app = FastAPI(
@@ -25,6 +25,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.include_router(health.router)
+app.include_router(api_analyze.router)
 app.include_router(scanner.router)
 app.include_router(portfolio.router)
 
