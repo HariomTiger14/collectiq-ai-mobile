@@ -363,6 +363,19 @@ without scraping marketplace or search-engine images. It accepts local image
 folders, locally downloaded Kaggle folders, locally downloaded Hugging Face
 exports, and CSV/JSON ground-truth manifests.
 
+Dataset images are intentionally ignored by git:
+
+```text
+validation/images/**
+validation/datasets/
+validation/downloads/
+validation/exports/
+validation/raw/
+validation/tmp/
+```
+
+Only scripts, docs, manifests, and placeholders should be committed.
+
 Safe placeholder run:
 
 ```powershell
@@ -376,6 +389,17 @@ scripts\run_validation_lab.ps1 `
   -UserImageFolder C:\path\to\owned-or-open-images `
   -ManifestPath validation\manifests\my_manifest.json `
   -PrepareOnly
+```
+
+Import CSV/JSON metadata into the canonical manifest shape:
+
+```powershell
+scripts\import_validation_dataset.ps1 `
+  -ImageFolder C:\path\to\owned-or-open-images `
+  -Metadata C:\path\to\metadata.csv `
+  -SourceName "User-owned validation set" `
+  -License "user-owned" `
+  -OutputManifest validation\manifests\generated_manifest.json
 ```
 
 Run against the local backend:
@@ -394,8 +418,9 @@ validation/reports/latest_validation_report.md
 validation/reports/latest_validation_results.csv
 ```
 
-See `docs/VALIDATION_LAB.md` for dataset safety rules, manifest fields, metrics,
-and manual real-provider validation guidance.
+See `docs/PUBLIC_DATASET_SOURCES.md` for safe source examples and
+`docs/VALIDATION_LAB.md` for dataset safety rules, manifest fields, metrics, and
+manual real-provider validation guidance.
 
 ### Adding Additional Pricing Providers
 

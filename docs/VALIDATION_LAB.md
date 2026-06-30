@@ -47,6 +47,36 @@ The preparer supports local paths only:
 - CSV/JSON manifest with expected labels.
 
 No credentials are stored by the repo or scripts.
+See `docs/PUBLIC_DATASET_SOURCES.md` for a catalog of safe source types,
+license notes, and expected metadata fields.
+
+## Import a Dataset
+
+Use the importer when you have a local folder plus optional CSV/JSON metadata.
+Images are ignored by git and should remain local.
+
+```powershell
+scripts\import_validation_dataset.ps1 `
+  -ImageFolder C:\datasets\collectiq_safe_images `
+  -Metadata C:\datasets\collectiq_safe_images\metadata.csv `
+  -SourceName "User-owned validation set" `
+  -License "user-owned" `
+  -OutputManifest validation\manifests\generated_manifest.json
+```
+
+To copy local images into the validation workspace without committing them:
+
+```powershell
+scripts\import_validation_dataset.ps1 `
+  -ImageFolder C:\datasets\collectiq_safe_images `
+  -Metadata C:\datasets\collectiq_safe_images\metadata.json `
+  -CopyImagesTo validation\images
+```
+
+The importer maps common columns such as `filename`, `image`, `title`,
+`category`, `brand`, `set`, `series`, `year`, and `date` into the CollectIQ
+manifest fields. Missing images are kept in the manifest with a note so you can
+fix local paths. Unsupported image extensions are skipped.
 
 ## Prepare a Dataset
 

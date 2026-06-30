@@ -1,0 +1,35 @@
+[
+  {
+    "filename": "pokemon_card_placeholder.jpg",
+    "expected_name": "1999 Pokemon Charizard Holo",
+    "expected_category": "Pokemon Card",
+    "expected_brand": "Pokemon",
+    "expected_set": "Base Set",
+    "expected_year": "1999",
+    "source": "CollectIQ placeholder manifest",
+    "license": "not-an-image",
+    "notes": "Replace with a licensed, public-domain, open-dataset, or user-owned image before real validation. Image file missing from local dataset folder."
+  },
+  {
+    "filename": "sports_card_placeholder.jpg",
+    "expected_name": "1986 Fleer Michael Jordan Rookie",
+    "expected_category": "Sports Card",
+    "expected_brand": "Fleer",
+    "expected_set": "Fleer Basketball",
+    "expected_year": "1986",
+    "source": "CollectIQ placeholder manifest",
+    "license": "not-an-image",
+    "notes": "Placeholder row for future licensed dataset validation. Image file missing from local dataset folder."
+  },
+  {
+    "filename": "coin_placeholder.jpg",
+    "expected_name": "1921 Morgan Silver Dollar",
+    "expected_category": "Coin",
+    "expected_brand": "United States Mint",
+    "expected_set": "Morgan Dollar",
+    "expected_year": "1921",
+    "source": "CollectIQ placeholder manifest",
+    "license": "not-an-image",
+    "notes": "Placeholder row for future licensed dataset validation. Image file missing from local dataset folder."
+  }
+]

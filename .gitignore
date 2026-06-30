@@ -41,6 +41,20 @@ migrate_working_dir/
 .venv/
 .env
 
+# Validation lab local datasets. Keep scripts/manifests/docs in git, but never
+# commit imported image files or large dataset exports.
+/validation/images/**
+!/validation/images/
+!/validation/images/.gitkeep
+/validation/reports/*
+!/validation/reports/
+!/validation/reports/.gitkeep
+/validation/datasets/
+/validation/downloads/
+/validation/exports/
+/validation/raw/
+/validation/tmp/
+
 # Symbolication related
 app.*.symbols
 
