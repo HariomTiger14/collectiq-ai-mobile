@@ -1,4 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -19,7 +21,9 @@ class HomeScreen extends ConsumerWidget {
     final portfolio = ref.watch(portfolioControllerProvider);
     final orderedItems = portfolio.orderedItems;
     final recentItems = orderedItems.take(3).toList();
-    final insights = _HomeInsights.fromItems(orderedItems);
+    final insights = const CollectorDashboardAnalyticsService().build(
+      orderedItems,
+    );
     _logHomeOrder(recentItems);
 
     return Scaffold(
@@ -74,6 +78,20 @@ class HomeScreen extends ConsumerWidget {
                     _DashboardInsights(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
                     _CategoryBreakdownSection(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _CollectionHealthSection(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _PortfolioAnalyticsSection(
+                      insights: insights,
+                      onOpenItem: (item) =>
+                          _openCollectibleDetail(context, item),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _InsightsSection(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _RecommendationsSection(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _TrendFoundationSection(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
                     _PortfolioHighlights(
                       insights: insights,
@@ -151,7 +169,7 @@ String _imageSourceFor(String imagePath) {
 class _CollectionHero extends StatelessWidget {
   const _CollectionHero({required this.insights});
 
-  final _HomeInsights insights;
+  final CollectorDashboardAnalytics insights;
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +296,7 @@ class _PrimaryScanButton extends StatelessWidget {
 class _DashboardInsights extends StatelessWidget {
   const _DashboardInsights({required this.insights});
 
-  final _HomeInsights insights;
+  final CollectorDashboardAnalytics insights;
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +336,7 @@ class _DashboardInsights extends StatelessWidget {
 class _CategoryBreakdownSection extends StatelessWidget {
   const _CategoryBreakdownSection({required this.insights});
 
-  final _HomeInsights insights;
+  final CollectorDashboardAnalytics insights;
 
   @override
   Widget build(BuildContext context) {
@@ -328,13 +346,13 @@ class _CategoryBreakdownSection extends StatelessWidget {
         title: 'Category Breakdown',
         child: Column(
           children: [
-            for (final category in _DashboardCategory.values) ...[
+            for (final category in CollectorCategory.values) ...[
               _CategoryBreakdownBar(
                 label: category.label,
-                count: insights.categoryCounts[category] ?? 0,
+                count: insights.categoryDistribution[category] ?? 0,
                 total: insights.itemCount,
               ),
-              if (category != _DashboardCategory.values.last)
+              if (category != CollectorCategory.values.last)
                 const SizedBox(height: AppSpacing.md),
             ],
           ],
@@ -412,13 +430,484 @@ class _CategoryBreakdownBar extends StatelessWidget {
   }
 }
 
+class _CollectionHealthSection extends StatelessWidget {
+  const _CollectionHealthSection({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    final health = insights.collectionHealth;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 180),
+      child: AppInfoSection(
+        title: 'Collection Health',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    '${health.score}',
+                    style: textTheme.headlineSmall?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        health.label,
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Based on confidence, metadata, pricing freshness, duplicates, and image quality.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppResponsiveMetricGroup(
+              metrics: [
+                AppMetricData(
+                  label: 'Confidence',
+                  value: '${health.confidenceScore}',
+                  icon: Icons.verified_outlined,
+                ),
+                AppMetricData(
+                  label: 'Data Quality',
+                  value: '${health.metadataScore}',
+                  icon: Icons.fact_check_outlined,
+                ),
+                AppMetricData(
+                  label: 'Pricing Freshness',
+                  value: '${health.pricingFreshnessScore}',
+                  icon: Icons.schedule_outlined,
+                ),
+                AppMetricData(
+                  label: 'Duplicates',
+                  value: '${health.duplicateScore}',
+                  icon: Icons.control_point_duplicate_outlined,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioAnalyticsSection extends StatelessWidget {
+  const _PortfolioAnalyticsSection({
+    required this.insights,
+    required this.onOpenItem,
+  });
+
+  final CollectorDashboardAnalytics insights;
+  final ValueChanged<CollectibleItem> onOpenItem;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 210),
+      child: AppInfoSection(
+        title: 'Portfolio Analytics',
+        child: Column(
+          children: [
+            _AnalyticsMiniList(
+              title: 'Top 5 Highest Value',
+              items: insights.topHighestValue,
+              valueFor: (item) => _formatAud(item.estimatedValue),
+              onOpenItem: onOpenItem,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _AnalyticsMiniList(
+              title: 'Top 5 Lowest Confidence',
+              items: insights.topLowestConfidence,
+              valueFor: (item) => _formatPercent(item.confidence),
+              onOpenItem: onOpenItem,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _AnalyticsMiniList(
+              title: 'Newest Additions',
+              items: insights.newestAdditions,
+              valueFor: (item) => _formatDate(item.createdAt),
+              onOpenItem: onOpenItem,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _LargestCategoryTile(insights: insights),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyticsMiniList extends StatelessWidget {
+  const _AnalyticsMiniList({
+    required this.title,
+    required this.items,
+    required this.valueFor,
+    required this.onOpenItem,
+  });
+
+  final String title;
+  final List<CollectibleItem> items;
+  final String Function(CollectibleItem item) valueFor;
+  final ValueChanged<CollectibleItem> onOpenItem;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        for (final item in items) ...[
+          _CompactAnalyticsRow(
+            item: item,
+            value: valueFor(item),
+            onTap: () => onOpenItem(item),
+          ),
+          if (item != items.last) const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _CompactAnalyticsRow extends StatelessWidget {
+  const _CompactAnalyticsRow({
+    required this.item,
+    required this.value,
+    required this.onTap,
+  });
+
+  final CollectibleItem item;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              PortfolioThumbnail(imagePath: item.imagePath, size: 44),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      item.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                value,
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LargestCategoryTile extends StatelessWidget {
+  const _LargestCategoryTile({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    final category = insights.largestCategory;
+    final count = category == null
+        ? 0
+        : insights.categoryDistribution[category] ?? 0;
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.category_outlined, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              'Largest Category',
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            category == null ? 'None' : '${category.label} ($count)',
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightsSection extends StatelessWidget {
+  const _InsightsSection({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 230),
+      child: AppInfoSection(
+        title: 'Collector Insights',
+        child: Column(
+          children: [
+            for (final insight in insights.insights.take(5)) ...[
+              _InsightCard(insight: insight),
+              if (insight != insights.insights.take(5).last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({required this.insight});
+
+  final CollectionInsight insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _insightColor(insight.type, Theme.of(context).colorScheme);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(_insightIcon(insight.type), color: color),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  insight.title,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(insight.message, style: textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecommendationsSection extends StatelessWidget {
+  const _RecommendationsSection({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 250),
+      child: AppInfoSection(
+        title: 'Recommendations',
+        child: Column(
+          children: [
+            for (final recommendation in insights.recommendations) ...[
+              _RecommendationRow(recommendation: recommendation),
+              if (recommendation != insights.recommendations.last)
+                const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendationRow extends StatelessWidget {
+  const _RecommendationRow({required this.recommendation});
+
+  final CollectionRecommendation recommendation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colorScheme.secondary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Icon(
+            _recommendationIcon(recommendation.type),
+            color: colorScheme.secondary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                recommendation.title,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                recommendation.message,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendFoundationSection extends StatelessWidget {
+  const _TrendFoundationSection({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 270),
+      child: AppInfoSection(
+        title: 'Portfolio Trends',
+        child: AppResponsiveMetricGroup(
+          metrics: [
+            AppMetricData(
+              label: 'Daily Snapshots',
+              value: insights.dailySnapshots.length.toString(),
+              icon: Icons.today_outlined,
+            ),
+            AppMetricData(
+              label: 'Weekly Snapshots',
+              value: insights.weeklySnapshots.length.toString(),
+              icon: Icons.date_range_outlined,
+            ),
+            AppMetricData(
+              label: 'Monthly Snapshots',
+              value: insights.monthlySnapshots.length.toString(),
+              icon: Icons.calendar_month_outlined,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PortfolioHighlights extends StatelessWidget {
   const _PortfolioHighlights({
     required this.insights,
     required this.onOpenItem,
   });
 
-  final _HomeInsights insights;
+  final CollectorDashboardAnalytics insights;
   final ValueChanged<CollectibleItem> onOpenItem;
 
   @override
@@ -912,6 +1401,47 @@ class _FadeSlideIn extends StatelessWidget {
   }
 }
 
+Color _insightColor(CollectionInsightType type, ColorScheme colorScheme) {
+  switch (type) {
+    case CollectionInsightType.positive:
+      return AppColors.success;
+    case CollectionInsightType.warning:
+      return const Color(0xFFD97706);
+    case CollectionInsightType.review:
+      return AppColors.accent;
+    case CollectionInsightType.highlight:
+      return colorScheme.primary;
+  }
+}
+
+IconData _insightIcon(CollectionInsightType type) {
+  switch (type) {
+    case CollectionInsightType.positive:
+      return Icons.trending_up_outlined;
+    case CollectionInsightType.warning:
+      return Icons.warning_amber_outlined;
+    case CollectionInsightType.review:
+      return Icons.rate_review_outlined;
+    case CollectionInsightType.highlight:
+      return Icons.workspace_premium_outlined;
+  }
+}
+
+IconData _recommendationIcon(CollectionRecommendationType type) {
+  switch (type) {
+    case CollectionRecommendationType.scanAgain:
+      return Icons.document_scanner_outlined;
+    case CollectionRecommendationType.improvePhoto:
+      return Icons.photo_camera_outlined;
+    case CollectionRecommendationType.upgradePlan:
+      return Icons.workspace_premium_outlined;
+    case CollectionRecommendationType.reviewLowConfidence:
+      return Icons.fact_check_outlined;
+    case CollectionRecommendationType.addMoreCollectibles:
+      return Icons.add_circle_outline;
+  }
+}
+
 String _formatAud(double value) {
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
@@ -929,135 +1459,4 @@ String _formatDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
   return '$day/$month/${date.year}';
-}
-
-enum _DashboardCategory {
-  cards(label: 'Cards'),
-  coins(label: 'Coins'),
-  comics(label: 'Comics'),
-  memorabilia(label: 'Memorabilia'),
-  other(label: 'Other');
-
-  const _DashboardCategory({required this.label});
-
-  final String label;
-}
-
-class _HomeInsights {
-  const _HomeInsights({
-    required this.items,
-    required this.totalValue,
-    required this.itemCount,
-    required this.averageItemValue,
-    required this.averageConfidence,
-    required this.recentlyAddedCount,
-    required this.categoryCounts,
-    required this.lowConfidenceItems,
-    this.highestValueItem,
-    this.mostRecentItem,
-    this.strongestConfidenceItem,
-  });
-
-  final List<CollectibleItem> items;
-  final double totalValue;
-  final int itemCount;
-  final double averageItemValue;
-  final double averageConfidence;
-  final int recentlyAddedCount;
-  final Map<_DashboardCategory, int> categoryCounts;
-  final List<CollectibleItem> lowConfidenceItems;
-  final CollectibleItem? highestValueItem;
-  final CollectibleItem? mostRecentItem;
-  final CollectibleItem? strongestConfidenceItem;
-
-  factory _HomeInsights.fromItems(List<CollectibleItem> orderedItems) {
-    final items = List<CollectibleItem>.unmodifiable(orderedItems);
-    final itemCount = items.length;
-    final totalValue = items.fold<double>(
-      0,
-      (sum, item) => sum + item.estimatedValue,
-    );
-    final totalConfidence = items.fold<double>(
-      0,
-      (sum, item) => sum + item.confidence,
-    );
-    final categoryCounts = {
-      for (final category in _DashboardCategory.values) category: 0,
-    };
-    for (final item in items) {
-      final category = _categoryFor(item.category);
-      categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
-    }
-
-    final highestValueItem = _maxBy(items, (item) => item.estimatedValue);
-    final strongestConfidenceItem = _maxBy(items, (item) => item.confidence);
-    final mostRecentItem = items.isEmpty ? null : items.first;
-    final newestTimestamp = items
-        .map(collectibleDisplayTimestamp)
-        .fold<DateTime?>(
-          null,
-          (latest, timestamp) =>
-              latest == null || timestamp.isAfter(latest) ? timestamp : latest,
-        );
-    final recentCutoff = newestTimestamp?.subtract(const Duration(days: 7));
-    final recentlyAddedCount = recentCutoff == null
-        ? 0
-        : items
-              .where(
-                (item) =>
-                    !collectibleDisplayTimestamp(item).isBefore(recentCutoff),
-              )
-              .length;
-
-    return _HomeInsights(
-      items: items,
-      totalValue: totalValue,
-      itemCount: itemCount,
-      averageItemValue: itemCount == 0 ? 0 : totalValue / itemCount,
-      averageConfidence: itemCount == 0 ? 0 : totalConfidence / itemCount,
-      recentlyAddedCount: recentlyAddedCount,
-      categoryCounts: categoryCounts,
-      highestValueItem: highestValueItem,
-      mostRecentItem: mostRecentItem,
-      strongestConfidenceItem: strongestConfidenceItem,
-      lowConfidenceItems: items
-          .where((item) => item.confidence < 0.75)
-          .toList(growable: false),
-    );
-  }
-}
-
-CollectibleItem? _maxBy(
-  List<CollectibleItem> items,
-  double Function(CollectibleItem item) valueFor,
-) {
-  CollectibleItem? best;
-  for (final item in items) {
-    if (best == null || valueFor(item) > valueFor(best)) {
-      best = item;
-    }
-  }
-
-  return best;
-}
-
-_DashboardCategory _categoryFor(String category) {
-  final value = category.toLowerCase();
-  if (value.contains('card') || value.contains('tcg')) {
-    return _DashboardCategory.cards;
-  }
-  if (value.contains('coin')) {
-    return _DashboardCategory.coins;
-  }
-  if (value.contains('comic')) {
-    return _DashboardCategory.comics;
-  }
-  if (value.contains('memorabilia') ||
-      value.contains('sports') ||
-      value.contains('autograph') ||
-      value.contains('jersey')) {
-    return _DashboardCategory.memorabilia;
-  }
-
-  return _DashboardCategory.other;
 }

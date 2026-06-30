@@ -19,6 +19,8 @@ import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dar
 import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
+import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
@@ -2323,6 +2325,199 @@ void main() {
       expect(items.single.title, contains('Charizard'));
     });
   });
+
+  group('CollectorDashboardAnalyticsService', () {
+    const service = CollectorDashboardAnalyticsService();
+
+    test('calculates portfolio intelligence metrics', () {
+      final items = [
+        _analyticsItem(
+          id: 'new-card',
+          title: 'Charizard Holo',
+          category: 'Trading Card',
+          value: 1850,
+          confidence: 0.94,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+        _analyticsItem(
+          id: 'coin',
+          title: 'Silver Eagle',
+          category: 'Coin',
+          value: 300,
+          confidence: 0.80,
+          createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+        ),
+        _analyticsItem(
+          id: 'comic',
+          title: 'Amazing Spider-Man',
+          category: 'Comic',
+          value: 650,
+          confidence: 0.72,
+          createdAt: DateTime.parse('2026-06-25T00:00:00Z'),
+        ),
+      ];
+
+      final analytics = service.build(items);
+
+      expect(analytics.totalValue, 2800);
+      expect(analytics.itemCount, 3);
+      expect(analytics.averageItemValue, closeTo(933.33, 0.01));
+      expect(analytics.averageConfidence, closeTo(0.82, 0.01));
+      expect(analytics.highestValueItem?.id, 'new-card');
+      expect(analytics.lowestValueItem?.id, 'coin');
+      expect(analytics.mostRecentItem?.id, 'new-card');
+      expect(analytics.strongestConfidenceItem?.id, 'new-card');
+      expect(analytics.categoryDistribution[CollectorCategory.cards], 1);
+      expect(analytics.categoryDistribution[CollectorCategory.coins], 1);
+      expect(analytics.categoryDistribution[CollectorCategory.comics], 1);
+      expect(analytics.topHighestValue.map((item) => item.id), [
+        'new-card',
+        'comic',
+        'coin',
+      ]);
+      expect(analytics.topLowestConfidence.first.id, 'comic');
+      expect(analytics.newestAdditions.map((item) => item.id), [
+        'new-card',
+        'coin',
+        'comic',
+      ]);
+    });
+
+    test(
+      'scores collection health from confidence, metadata, pricing, duplicates and quality',
+      () {
+        final analytics = service.build([
+          _analyticsItem(
+            id: 'healthy',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1850,
+            confidence: 0.94,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'duplicate',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1700,
+            confidence: 0.62,
+            createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+            pricingLastUpdated: DateTime.parse('2026-04-01T00:00:00Z'),
+            detectionQuality: 'Dark image with glare and cropped edges.',
+            includeMetadata: false,
+          ),
+        ]);
+
+        expect(analytics.collectionHealth.score, inInclusiveRange(0, 100));
+        expect(analytics.collectionHealth.duplicateCount, 1);
+        expect(analytics.collectionHealth.missingDataCount, 1);
+        expect(analytics.collectionHealth.stalePricingCount, 1);
+        expect(analytics.collectionHealth.lowQualityCount, 1);
+        expect(analytics.collectionHealth.label, isNotEmpty);
+      },
+    );
+
+    test('generates insights and recommendations for review actions', () {
+      final analytics = service.build([
+        _analyticsItem(
+          id: 'low-confidence',
+          title: 'Blurry Mewtwo',
+          category: 'Trading Card',
+          value: 250,
+          confidence: 0.61,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          detectionQuality: 'Blurry image with low resolution.',
+          includeMetadata: false,
+        ),
+      ]);
+
+      expect(
+        analytics.insights.map((insight) => insight.title),
+        containsAll([
+          'Low confidence scans',
+          'Cards needing review',
+          'Highest value item',
+          'Most scanned category',
+        ]),
+      );
+      expect(
+        analytics.recommendations.map((recommendation) => recommendation.type),
+        containsAll([
+          CollectionRecommendationType.reviewLowConfidence,
+          CollectionRecommendationType.scanAgain,
+          CollectionRecommendationType.improvePhoto,
+          CollectionRecommendationType.addMoreCollectibles,
+        ]),
+      );
+    });
+
+    test('builds daily, weekly and monthly trend snapshots', () {
+      final analytics = service.build([
+        _analyticsItem(
+          id: 'june-card',
+          title: 'June Card',
+          category: 'Trading Card',
+          value: 100,
+          confidence: 0.9,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+        _analyticsItem(
+          id: 'july-coin',
+          title: 'July Coin',
+          category: 'Coin',
+          value: 200,
+          confidence: 0.8,
+          createdAt: DateTime.parse('2026-07-03T00:00:00Z'),
+        ),
+      ]);
+
+      expect(analytics.dailySnapshots, hasLength(2));
+      expect(analytics.weeklySnapshots, hasLength(1));
+      expect(analytics.weeklySnapshots.single.totalValue, 300);
+      expect(analytics.monthlySnapshots, hasLength(2));
+      expect(analytics.monthlySnapshots.map((snapshot) => snapshot.itemCount), [
+        1,
+        1,
+      ]);
+    });
+
+    test('dashboard analytics update when portfolio data changes', () {
+      final initial = service.build([
+        _analyticsItem(
+          id: 'first',
+          title: 'First Card',
+          category: 'Trading Card',
+          value: 100,
+          confidence: 0.9,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      ]);
+      final updated = service.build([
+        _analyticsItem(
+          id: 'newer',
+          title: 'Newer Coin',
+          category: 'Coin',
+          value: 500,
+          confidence: 0.95,
+          createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+        ),
+        _analyticsItem(
+          id: 'first',
+          title: 'First Card',
+          category: 'Trading Card',
+          value: 100,
+          confidence: 0.9,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      ]);
+
+      expect(initial.totalValue, 100);
+      expect(updated.totalValue, 600);
+      expect(updated.itemCount, 2);
+      expect(updated.mostRecentItem?.id, 'newer');
+      expect(updated.categoryDistribution[CollectorCategory.coins], 1);
+    });
+  });
 }
 
 CollectibleItem _testItem() {
@@ -2392,6 +2587,59 @@ CollectibleItem _testItemWith({
     recommendation: 'Consider grading before selling.',
     imagePath: imagePath,
     createdAt: createdAt ?? DateTime.parse('2026-06-27T00:00:00.000'),
+  );
+}
+
+CollectibleItem _analyticsItem({
+  required String id,
+  required String title,
+  required String category,
+  required double value,
+  required double confidence,
+  required DateTime createdAt,
+  DateTime? pricingLastUpdated,
+  String? detectionQuality,
+  bool includeMetadata = true,
+}) {
+  return CollectibleItem(
+    id: id,
+    title: title,
+    category: category,
+    estimatedValue: value,
+    confidence: confidence,
+    condition: 'Near Mint',
+    recommendation: 'Review before selling.',
+    imagePath: 'sample://$id',
+    createdAt: createdAt,
+    year: includeMetadata ? '1999' : null,
+    brand: includeMetadata ? 'Pokemon' : null,
+    setName: includeMetadata ? 'Base Set' : null,
+    cardNumber: includeMetadata ? '4/102' : null,
+    playerOrCharacter: includeMetadata ? title : null,
+    rarity: includeMetadata ? 'Rare' : null,
+    notes: includeMetadata ? 'Collector-ready record.' : null,
+    detectionQuality: detectionQuality,
+    pricing: PricingInfo(
+      estimatedMarketValue: value,
+      lowEstimate: value * 0.8,
+      highEstimate: value * 1.2,
+      currency: 'AUD',
+      pricingSource: 'Mock market blend',
+      pricingConfidence: 0.85,
+      lastUpdated: pricingLastUpdated ?? createdAt,
+    ),
+    marketSummary: MarketSummary.fromJson({
+      'averagePrice': value,
+      'medianPrice': value,
+      'lowPrice': value * 0.8,
+      'highPrice': value * 1.2,
+      'salesCount': 3,
+      'trendLabel': 'Stable',
+      'confidence': confidence,
+      'lastUpdated': (pricingLastUpdated ?? createdAt).toIso8601String(),
+      'sources': ['Mock market'],
+      'comps': const [],
+    }),
   );
 }
 
