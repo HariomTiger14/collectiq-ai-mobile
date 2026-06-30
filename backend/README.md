@@ -67,6 +67,10 @@ EBAY_ACCESS_TOKEN=
 EBAY_BROWSE_API_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
 EBAY_MARKETPLACE_ID=EBAY_AU
 EBAY_TIMEOUT_SECONDS=10
+TCGPLAYER_CLIENT_ID=
+TCGPLAYER_CLIENT_SECRET=
+TCGPLAYER_API_BASE=https://api.tcgplayer.com
+TCGPLAYER_TIMEOUT_SECONDS=10
 PRICING_CACHE_TTL_SECONDS=900
 PRICING_PROVIDER_MIN_INTERVAL_MS=250
 ```
@@ -113,15 +117,19 @@ Pricing selection:
 
 - `PRICING_PROVIDER=mock`: default deterministic pricing and comparable sales.
 - `PRICING_PROVIDER=ebay`: backend-only eBay Browse API provider.
-- `PRICING_PROVIDER=tcgplayer`: backend-only placeholder for card pricing.
+- `PRICING_PROVIDER=tcgplayer`: backend-only TCGPlayer card pricing provider.
 - `PRICING_PROVIDER=pricecharting`: backend-only placeholder for guide pricing.
-- `PRICING_PROVIDER=aggregate`: future multi-provider blend.
+- `PRICING_PROVIDER=aggregate`: blends available eBay and TCGPlayer provider
+  data, with mock fallback when live providers fail.
 
 The eBay provider requires `EBAY_ACCESS_TOKEN` in backend `.env`. If the token
 is missing, expired, rate-limited, or the provider fails, the aggregation service
 falls back to deterministic mock pricing. Flutter still receives the same
 response contract, and no third-party pricing API is called from the mobile app.
-TCGPlayer and PriceCharting remain safe backend placeholders for later sprints.
+The TCGPlayer provider requires `TCGPLAYER_CLIENT_ID` and
+`TCGPLAYER_CLIENT_SECRET` in backend `.env`. OAuth tokens are requested and
+refreshed server-side only. Flutter never receives TCGPlayer credentials or
+tokens. PriceCharting remains a safe backend placeholder for a later sprint.
 
 When OpenAI is enabled, the backend sends the image to OpenAI's Responses API
 with a strict structured-output schema. The prompt asks for collectible
@@ -220,7 +228,8 @@ The pricing layer contains:
 - `PricingProvider`: interface for provider implementations.
 - `MockPricingProvider`: deterministic default used in tests and local dev.
 - `EbayPricingProvider`: backend-only eBay Browse API integration.
-- `TCGPlayerPricingProvider`: placeholder for trading-card price guides.
+- `TCGPlayerPricingProvider`: backend-only TCGPlayer OAuth/search/pricing
+  integration for trading-card market prices.
 - `PriceChartingPricingProvider`: placeholder for historical guide pricing.
 - `PricingAggregationService`: normalizes comparable sales, removes obvious
   outliers, calculates estimated value/range/confidence/trend, and falls back
@@ -257,6 +266,17 @@ For eBay specifically:
 - network timeout -> timeout error -> fallback to mock.
 - empty or malformed pricing data -> fallback to mock.
 - valid responses are normalized into comparable sales and aggregated into the
+  existing Flutter market summary fields.
+
+For TCGPlayer specifically:
+
+- `TCGPLAYER_CLIENT_ID`/`TCGPLAYER_CLIENT_SECRET` missing -> fallback to mock.
+- OAuth token request and refresh happen server-side only.
+- HTTP 401 during search/pricing -> token refresh and one retry.
+- HTTP 404 or empty product/pricing rows -> empty market data -> fallback.
+- HTTP 429 -> rate-limit error -> fallback to mock.
+- network timeout -> timeout error -> fallback to mock.
+- valid product/pricing responses are normalized into comparable sales and the
   existing Flutter market summary fields.
 
 ### Pricing Diagnostics
@@ -314,10 +334,39 @@ PRICING_PROVIDER_MIN_INTERVAL_MS=250
 The eBay token must stay in `backend/.env`. Do not pass it to Flutter,
 `--dart-define`, app storage, or source code.
 
-## Real AI + eBay Validation Workflow
+### Enabling TCGPlayer Pricing Locally
+
+Keep `PRICING_PROVIDER=mock` for normal development. To test TCGPlayer from the
+backend only:
+
+```text
+PRICING_PROVIDER=tcgplayer
+TCGPLAYER_CLIENT_ID=your-server-side-client-id
+TCGPLAYER_CLIENT_SECRET=your-server-side-client-secret
+TCGPLAYER_API_BASE=https://api.tcgplayer.com
+TCGPLAYER_TIMEOUT_SECONDS=10
+PRICING_CACHE_TTL_SECONDS=900
+PRICING_PROVIDER_MIN_INTERVAL_MS=250
+```
+
+The provider requests an OAuth access token with the client-credentials flow,
+searches matching products using name, set, card number, rarity, brand, and
+year, then requests product pricing rows and normalizes them into
+`PricingResult` and `MarketComparableSale`. Keep credentials in `backend/.env`
+only. Do not pass them to Flutter, `--dart-define`, app storage, or source code.
+
+### Aggregate Pricing Mode
+
+`PRICING_PROVIDER=aggregate` calls the configured eBay and TCGPlayer providers,
+normalizes comparable sales, removes obvious outliers, and calculates market
+value/range/confidence/trend from the blended result. If every live provider is
+unavailable, timed out, rate-limited, or empty, the pipeline falls back to
+`MockPricingProvider` and returns diagnostics with `fallbackUsed=true`.
+
+## Real AI + Live Pricing Validation Workflow
 
 Real provider validation is manual/local only. Automated tests mock provider
-responses and must not call OpenAI or eBay.
+responses and must not call OpenAI, eBay, or TCGPlayer.
 
 1. Start mock baseline mode:
 
@@ -339,8 +388,10 @@ py scripts\validate_real_analysis.py C:\path\to\collectible.jpg --category "Poke
 ```powershell
 $env:AI_PROVIDER="openai"
 $env:OPENAI_API_KEY="<server-side-openai-key>"
-$env:PRICING_PROVIDER="ebay"
+$env:PRICING_PROVIDER="aggregate"
 $env:EBAY_ACCESS_TOKEN="your-server-side-ebay-token"
+$env:TCGPLAYER_CLIENT_ID="your-server-side-tcgplayer-client-id"
+$env:TCGPLAYER_CLIENT_SECRET="your-server-side-tcgplayer-client-secret"
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -353,8 +404,8 @@ and alternatives. The `/api/analyze` response includes a backend-only
 `diagnostics` object for local validation. Flutter ignores unknown fields and
 the core response contract remains unchanged.
 
-Cost warning: OpenAI and eBay provider calls may consume paid quota. Keep mock
-mode for normal development and CI.
+Cost warning: OpenAI, eBay, and TCGPlayer provider calls may consume paid quota
+or rate-limited API access. Keep mock mode for normal development and CI.
 
 ## Public Dataset Validation Lab
 

@@ -17,11 +17,6 @@ class _FuturePricingProvider(PricingProvider):
         )
 
 
-class TCGPlayerPricingProvider(_FuturePricingProvider):
-    provider_name = "tcgplayer"
-    provider_label = "TCGplayer card pricing"
-
-
 class PriceChartingPricingProvider(_FuturePricingProvider):
     provider_name = "pricecharting"
     provider_label = "PriceCharting pricing"

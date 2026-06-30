@@ -7,9 +7,9 @@ from app.services.pricing.aggregation_service import PricingAggregationService
 from app.services.pricing.ebay_pricing_provider import EbayPricingProvider
 from app.services.pricing.external_pricing_providers import (
     PriceChartingPricingProvider,
-    TCGPlayerPricingProvider,
 )
 from app.services.pricing.mock_pricing_provider import MockPricingProvider
+from app.services.pricing.tcgplayer_pricing_provider import TCGPlayerPricingProvider
 
 
 _mock_provider = MockPricingProvider()
@@ -21,7 +21,14 @@ _ebay_provider = EbayPricingProvider(
     cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
     min_interval_ms=settings.pricing_provider_min_interval_ms,
 )
-_tcgplayer_provider = TCGPlayerPricingProvider()
+_tcgplayer_provider = TCGPlayerPricingProvider(
+    client_id=settings.tcgplayer_client_id,
+    client_secret=settings.tcgplayer_client_secret,
+    api_base=settings.tcgplayer_api_base,
+    timeout_seconds=settings.tcgplayer_timeout_seconds,
+    cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
+    min_interval_ms=settings.pricing_provider_min_interval_ms,
+)
 _pricecharting_provider = PriceChartingPricingProvider()
 
 
@@ -42,7 +49,7 @@ def get_pricing_provider(provider_name: str | None = None) -> PricingProvider:
 
     if selected_provider == "aggregate":
         return PricingAggregationService(
-            [_ebay_provider, _tcgplayer_provider, _pricecharting_provider],
+            [_ebay_provider, _tcgplayer_provider],
             fallback_provider=_mock_provider,
         )
 

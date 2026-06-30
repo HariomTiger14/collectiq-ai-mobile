@@ -30,6 +30,15 @@ class Settings:
     )
     ebay_marketplace_id: str = os.getenv("EBAY_MARKETPLACE_ID", "EBAY_AU")
     ebay_timeout_seconds: float = float(os.getenv("EBAY_TIMEOUT_SECONDS", "10"))
+    tcgplayer_client_id: str = os.getenv("TCGPLAYER_CLIENT_ID", "")
+    tcgplayer_client_secret: str = os.getenv("TCGPLAYER_CLIENT_SECRET", "")
+    tcgplayer_api_base: str = os.getenv(
+        "TCGPLAYER_API_BASE",
+        "https://api.tcgplayer.com",
+    )
+    tcgplayer_timeout_seconds: float = float(
+        os.getenv("TCGPLAYER_TIMEOUT_SECONDS", "10")
+    )
     pricing_cache_ttl_seconds: int = int(os.getenv("PRICING_CACHE_TTL_SECONDS", "900"))
     pricing_provider_min_interval_ms: int = int(
         os.getenv("PRICING_PROVIDER_MIN_INTERVAL_MS", "250")
