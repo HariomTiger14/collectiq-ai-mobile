@@ -1,8 +1,10 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -22,6 +24,9 @@ class HomeScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final portfolio = ref.watch(portfolioControllerProvider);
     final orderedItems = portfolio.orderedItems;
+    final performance = ref.watch(
+      portfolioPerformanceProvider(portfolio.items),
+    );
     final recentItems = orderedItems.take(3).toList();
     final insights = const CollectorDashboardAnalyticsService().build(
       orderedItems,
@@ -81,6 +86,8 @@ class HomeScreen extends ConsumerWidget {
                   ] else ...[
                     const SizedBox(height: AppSpacing.xxl),
                     _DashboardInsights(insights: insights),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _PortfolioPerformanceSection(performance: performance),
                     const SizedBox(height: AppSpacing.xxl),
                     _CategoryBreakdownSection(insights: insights),
                     const SizedBox(height: AppSpacing.xxl),
@@ -348,6 +355,190 @@ class _DashboardInsights extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PortfolioPerformanceSection extends StatelessWidget {
+  const _PortfolioPerformanceSection({required this.performance});
+
+  final AsyncValue<PortfolioPerformance> performance;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FadeSlideIn(
+      delay: const Duration(milliseconds: 140),
+      child: AppInfoSection(
+        title: 'Portfolio Performance',
+        child: performance.when(
+          data: (data) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppResponsiveMetricGroup(
+                metrics: [
+                  AppMetricData(
+                    label: "Today's Change",
+                    value: _formatChange(data.todayChange),
+                    icon: Icons.today_outlined,
+                  ),
+                  AppMetricData(
+                    label: 'Weekly Change',
+                    value: _formatChange(data.weeklyChange),
+                    icon: Icons.date_range_outlined,
+                  ),
+                  AppMetricData(
+                    label: 'Monthly Change',
+                    value: _formatChange(data.monthlyChange),
+                    icon: Icons.calendar_month_outlined,
+                  ),
+                  AppMetricData(
+                    label: 'Overall Gain/Loss',
+                    value: _formatChange(data.overallChange),
+                    icon: Icons.query_stats_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _MoverSummary(performance: data),
+              const SizedBox(height: AppSpacing.lg),
+              for (final recommendation in data.recommendations) ...[
+                _PerformanceRecommendation(message: recommendation),
+                if (recommendation != data.recommendations.last)
+                  const SizedBox(height: AppSpacing.sm),
+              ],
+            ],
+          ),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => Text(
+            'Portfolio performance history will update after the next portfolio refresh.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoverSummary extends StatelessWidget {
+  const _MoverSummary({required this.performance});
+
+  final PortfolioPerformance performance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _MoverRow(
+          label: 'Top Gainer',
+          mover: performance.topGainer,
+          positive: true,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _MoverRow(
+          label: 'Top Loser',
+          mover: performance.topLoser,
+          positive: false,
+        ),
+      ],
+    );
+  }
+}
+
+class _MoverRow extends StatelessWidget {
+  const _MoverRow({
+    required this.label,
+    required this.mover,
+    required this.positive,
+  });
+
+  final String label;
+  final PortfolioValueMover? mover;
+  final bool positive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final color = positive ? AppColors.success : const Color(0xFFD97706);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            positive
+                ? Icons.trending_up_outlined
+                : Icons.trending_down_outlined,
+            color: color,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  mover?.title ?? 'No movement yet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Text(
+            mover == null ? 'AUD 0' : _formatSignedAud(mover!.absoluteChange),
+            style: textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PerformanceRecommendation extends StatelessWidget {
+  const _PerformanceRecommendation({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.insights_outlined, size: 18, color: colorScheme.primary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2018,6 +2209,19 @@ String _formatAud(double value) {
     (match) => ',',
   );
   return 'AUD $withCommas';
+}
+
+String _formatSignedAud(double value) {
+  final prefix = value > 0
+      ? '+'
+      : value < 0
+      ? '-'
+      : '';
+  return '$prefix${_formatAud(value.abs())}';
+}
+
+String _formatChange(PortfolioValueChange change) {
+  return '${_formatSignedAud(change.absoluteChange)} (${_formatPercent(change.percentageChange.abs())})';
 }
 
 String _formatPercent(double value) {

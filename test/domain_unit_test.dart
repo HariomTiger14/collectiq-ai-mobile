@@ -22,8 +22,11 @@ import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_c
 import 'package:collectiq_ai/features/diagnostics/domain/services/provider_diagnostics_service.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
+import 'package:collectiq_ai/features/home/data/repositories/shared_preferences_portfolio_history_repository.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/home/domain/services/portfolio_history_service.dart';
 import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
@@ -3287,6 +3290,269 @@ void main() {
             .progress,
         closeTo(0.11, 0.01),
       );
+    });
+  });
+
+  group('PortfolioHistoryService', () {
+    const service = PortfolioHistoryService();
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('creates daily weekly and monthly portfolio snapshots', () {
+      final items = [
+        _analyticsItem(
+          id: 'card',
+          title: 'Charizard Holo',
+          category: 'Trading Card',
+          value: 1800,
+          confidence: 0.94,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+        _analyticsItem(
+          id: 'coin',
+          title: 'Silver Eagle',
+          category: 'Coin',
+          value: 200,
+          confidence: 0.86,
+          createdAt: DateTime.parse('2026-06-28T00:00:00Z'),
+        ),
+      ];
+
+      final snapshots = service.createCurrentSnapshots(
+        items,
+        capturedAt: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(snapshots, hasLength(3));
+      expect(
+        snapshots.map((snapshot) => snapshot.period),
+        containsAll(TrendSnapshotPeriod.values),
+      );
+      expect(snapshots.first.totalPortfolioValue, 2000);
+      expect(snapshots.first.totalItems, 2);
+      expect(snapshots.first.averageValue, 1000);
+      expect(snapshots.first.categoryTotals[CollectorCategory.cards], 1800);
+      expect(snapshots.first.categoryTotals[CollectorCategory.coins], 200);
+      expect(snapshots.first.collectionScore, inInclusiveRange(0, 1000));
+      expect(snapshots.first.itemValues['card'], 1800);
+    });
+
+    test('persists and upserts history snapshots', () async {
+      const repository = SharedPreferencesPortfolioHistoryRepository();
+      final first = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1000,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.daily,
+        capturedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+      );
+      final updated = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1200,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.daily,
+        capturedAt: DateTime.parse('2026-06-30T18:00:00Z'),
+      );
+
+      await repository.upsertSnapshot(first);
+      await repository.upsertSnapshot(updated);
+      final snapshots = await repository.getSnapshots(
+        TrendSnapshotPeriod.daily,
+      );
+
+      expect(snapshots, hasLength(1));
+      expect(snapshots.single.totalPortfolioValue, 1200);
+      expect(snapshots.single.capturedAt.hour, 18);
+    });
+
+    test('calculates value changes against historical snapshots', () {
+      final yesterday = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1000,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.daily,
+        capturedAt: DateTime.parse('2026-06-29T12:00:00Z'),
+      );
+      final lastWeek = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 800,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-20T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.weekly,
+        capturedAt: DateTime.parse('2026-06-22T12:00:00Z'),
+      );
+
+      final performance = service.buildPerformance(
+        currentItems: [
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 1200,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          ),
+        ],
+        history: [yesterday, lastWeek],
+        capturedAt: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(performance.todayChange.absoluteChange, 200);
+      expect(performance.todayChange.percentageChange, closeTo(0.2, 0.001));
+      expect(performance.weeklyChange.absoluteChange, 400);
+      expect(performance.overallChange.currentValue, 1200);
+    });
+
+    test('calculates top gainers and top losers', () {
+      final previous = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'gainer',
+            title: 'Rising Card',
+            category: 'Trading Card',
+            value: 100,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'loser',
+            title: 'Falling Coin',
+            category: 'Coin',
+            value: 300,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.daily,
+        capturedAt: DateTime.parse('2026-06-29T12:00:00Z'),
+      );
+
+      final performance = service.buildPerformance(
+        currentItems: [
+          _analyticsItem(
+            id: 'gainer',
+            title: 'Rising Card',
+            category: 'Trading Card',
+            value: 250,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'loser',
+            title: 'Falling Coin',
+            category: 'Coin',
+            value: 180,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          ),
+        ],
+        history: [previous],
+        capturedAt: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(performance.topGainer?.itemId, 'gainer');
+      expect(performance.topGainer?.absoluteChange, 150);
+      expect(performance.topLoser?.itemId, 'loser');
+      expect(performance.topLoser?.absoluteChange, -120);
+      expect(performance.recentlyAppreciated.single.itemId, 'gainer');
+      expect(performance.recentlyDropped.single.itemId, 'loser');
+    });
+
+    test('generates trend recommendations', () {
+      final previous = service.createSnapshot(
+        [
+          _analyticsItem(
+            id: 'card',
+            title: 'Watch Card',
+            category: 'Trading Card',
+            value: 1000,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-22T00:00:00Z'),
+          ),
+        ],
+        period: TrendSnapshotPeriod.weekly,
+        capturedAt: DateTime.parse('2026-06-22T12:00:00Z'),
+      );
+
+      final performance = service.buildPerformance(
+        currentItems: [
+          _analyticsItem(
+            id: 'card',
+            title: 'Watch Card',
+            category: 'Trading Card',
+            value: 1080,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+          ),
+        ],
+        history: [previous],
+        capturedAt: DateTime.parse('2026-06-30T12:00:00Z'),
+      );
+
+      expect(
+        performance.recommendations,
+        contains('Collection gained 8% this week.'),
+      );
+      expect(
+        performance.recommendations.any(
+          (recommendation) => recommendation.contains('Cards outperform'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('provider records history from supplied portfolio items', () async {
+      final items = [
+        _analyticsItem(
+          id: 'history-card',
+          title: 'History Charizard',
+          category: 'Trading Card',
+          value: 1200,
+          confidence: 0.9,
+          createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
+        ),
+      ];
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final performance = await container.read(
+        portfolioPerformanceProvider(items).future,
+      );
+      const repository = SharedPreferencesPortfolioHistoryRepository();
+      final snapshots = await repository.getAllSnapshots();
+
+      expect(performance.dailySnapshots, isNotEmpty);
+      expect(performance.dailySnapshots.last.totalPortfolioValue, 1200);
+      expect(snapshots, hasLength(3));
     });
   });
 }

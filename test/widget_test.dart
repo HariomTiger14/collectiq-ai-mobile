@@ -68,6 +68,7 @@ void main() {
     await tester.pumpCollectIqApp();
     await tester.pump();
     await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Collection Value'), findsOneWidget);
     expect(find.text('AUD 2,750'), findsOneWidget);
@@ -78,6 +79,12 @@ void main() {
     expect(find.text('Recently Added'), findsOneWidget);
     expect(find.text('Average Confidence'), findsOneWidget);
     expect(find.text('84%'), findsOneWidget);
+    expect(find.text('Portfolio Performance'), findsOneWidget);
+    expect(find.text("Today's Change"), findsOneWidget);
+    expect(find.text('Weekly Change'), findsOneWidget);
+    expect(find.text('Monthly Change'), findsOneWidget);
+    expect(find.text('Top Gainer'), findsOneWidget);
+    expect(find.text('Top Loser'), findsOneWidget);
     expect(find.text('Category Breakdown'), findsOneWidget);
     expect(find.text('Cards'), findsOneWidget);
     expect(find.text('Coins'), findsOneWidget);
