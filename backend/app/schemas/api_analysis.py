@@ -18,6 +18,7 @@ class ApiImagePayload(BaseModel):
     sizeBytes: int
     imageSource: str
     localFilePath: str
+    base64Image: str | None = None
     base64Preview: str | None = None
 
 

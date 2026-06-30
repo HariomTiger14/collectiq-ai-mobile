@@ -327,6 +327,17 @@ class MockRecognitionProvider(AIRecognitionProvider):
 
         return MOCK_COLLECTIBLES[selected_index]
 
+    def recognize_api_payload(
+        self,
+        *,
+        request_metadata: dict,
+        image_payload: dict,
+    ) -> RecognitionResult:
+        return self.recognize(Path(image_payload.get("localFilePath") or "uploads/mock.jpg"))
+
 
 # Backwards-compatible alias for existing tests/imports.
 MockRecognitionService = MockRecognitionProvider
+
+# Product-facing provider alias used by the real AI integration roadmap.
+MockAiProvider = MockRecognitionProvider

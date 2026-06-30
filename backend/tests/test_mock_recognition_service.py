@@ -1,12 +1,17 @@
 import unittest
 from pathlib import Path
 
+from app.services.ai.base_recognition_service import AIRecognitionProvider, AiProvider
 from app.services.ai.mock_recognition_service import (
     MOCK_COLLECTIBLES,
+    MockAiProvider,
     MockRecognitionProvider,
     MockRecognitionService,
 )
-from app.services.ai.openai_recognition_provider import OpenAIRecognitionProvider
+from app.services.ai.openai_recognition_provider import (
+    OpenAIRecognitionProvider,
+    OpenAiVisionProvider,
+)
 from app.services.ai.provider_factory import get_ai_recognition_provider
 
 
@@ -73,6 +78,11 @@ class MockRecognitionProviderTest(unittest.TestCase):
 
     def test_backwards_compatible_mock_service_alias(self) -> None:
         self.assertIs(MockRecognitionService, MockRecognitionProvider)
+
+    def test_product_provider_aliases(self) -> None:
+        self.assertIs(AiProvider, AIRecognitionProvider)
+        self.assertIs(MockAiProvider, MockRecognitionProvider)
+        self.assertIs(OpenAiVisionProvider, OpenAIRecognitionProvider)
 
 
 class ProviderFactoryTest(unittest.TestCase):

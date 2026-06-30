@@ -53,3 +53,6 @@ class AIRecognitionProvider(Protocol):
 # Backwards-compatible alias for older imports while the backend moves to the
 # provider naming used by the real AI foundation.
 AIRecognitionService = AIRecognitionProvider
+
+# Product-facing provider alias used by the backend analyze endpoint roadmap.
+AiProvider = AIRecognitionProvider

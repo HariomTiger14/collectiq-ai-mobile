@@ -12,6 +12,12 @@ from app.schemas.api_analysis import (
     ApiMarketSummaryResponse,
     ApiReviewResponse,
 )
+from app.services.ai.openai_recognition_provider import (
+    AIProviderNotConfiguredError,
+    OpenAIInvalidResponseError,
+    OpenAIProviderError,
+    OpenAITimeoutError,
+)
 from app.services.ai.provider_factory import get_ai_recognition_provider
 from app.services.pricing.provider_factory import get_pricing_provider
 
@@ -43,10 +49,50 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     _validate_contract(payload)
 
     try:
-        recognition = get_ai_recognition_provider("mock").recognize(
-            Path(payload.image.localFilePath)
-        )
+        provider = get_ai_recognition_provider()
+        if hasattr(provider, "recognize_api_payload"):
+            recognition = provider.recognize_api_payload(
+                request_metadata=_model_to_dict(payload.request),
+                image_payload=_model_to_dict(payload.image),
+            )
+        else:
+            recognition = provider.recognize(Path(payload.image.localFilePath))
         pricing = get_pricing_provider("mock").price(recognition)
+    except AIProviderNotConfiguredError as exc:
+        raise _api_error(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "ai_provider_not_configured",
+            str(exc),
+            retryable=False,
+        ) from exc
+    except OpenAITimeoutError as exc:
+        raise _api_error(
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            "ai_provider_timeout",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except OpenAIInvalidResponseError as exc:
+        raise _api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            "ai_provider_invalid_response",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except OpenAIProviderError as exc:
+        raise _api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            "ai_provider_error",
+            str(exc),
+            retryable=True,
+        ) from exc
+    except ValueError as exc:
+        raise _api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "unsupported_ai_provider",
+            str(exc),
+            retryable=False,
+        ) from exc
     except HTTPException:
         raise
     except Exception as exc:
@@ -152,6 +198,12 @@ def _validate_contract(payload: ApiAnalyzeRequest) -> None:
             retryable=False,
             details={"requestedCategory": request.requestedCategory},
         )
+
+
+def _model_to_dict(model) -> dict:
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
 
 
 def _api_error(

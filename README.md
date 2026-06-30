@@ -11,7 +11,7 @@ Install and run it from the project root:
 ```powershell
 cd backend
 py -m pip install -r requirements.txt
-py -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Swagger is available at:
@@ -29,6 +29,13 @@ multipart field: image
 
 Uploaded images are saved to `uploads/`, and the endpoint returns the same
 scanner analysis response shape for both mock and OpenAI providers.
+
+The Flutter backend AI contract endpoint is:
+
+```text
+POST http://127.0.0.1:8000/api/analyze
+JSON body: { "request": { ... }, "image": { ... } }
+```
 
 ### AI Provider
 
@@ -123,7 +130,7 @@ Flutter provider selection is limited to safe client-side routing:
 
 ```text
 AI_ANALYSIS_PROVIDER=mock
-AI_BACKEND_ANALYSIS_ENDPOINT_URL=https://your-backend.example/scanner/analyze
+AI_BACKEND_ANALYSIS_ENDPOINT_URL=https://your-backend.example/api/analyze
 ```
 
 `AI_ANALYSIS_PROVIDER=mock` remains the default. Future OpenAI or Gemini mobile
@@ -216,20 +223,36 @@ The app now includes a Dio-backed `DioAiBackendApiService` plus
 disabled while `AI_ANALYSIS_PROVIDER=mock`, so normal development, tests, and
 offline usage make no backend AI network calls.
 
-To exercise the future HTTP client against a trusted CollectIQ backend/proxy,
-run with:
+To exercise the HTTP client against the local FastAPI backend, start the backend:
 
-```bash
-flutter run \
-  --dart-define=AI_ANALYSIS_PROVIDER=openai_vision \
-  --dart-define=AI_BACKEND_ANALYSIS_ENDPOINT_URL=https://your-backend.example/scanner/analyze
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-For debug-only local backend testing, a local HTTP endpoint such as
-`http://10.0.2.2:8000/ai/analyze` or `http://192.168.x.x:8000/ai/analyze` is
-allowed. Release builds must use HTTPS. If the endpoint is missing, invalid, or
-not release-safe, the HTTP client blocks the request before transport and the
-scanner shows a friendly inline error.
+Then run Flutter on an Android emulator with:
+
+```powershell
+flutter run `
+  --dart-define=AI_ANALYSIS_PROVIDER=openai_vision `
+  --dart-define=AI_BACKEND_ANALYSIS_ENDPOINT_URL=http://10.0.2.2:8000/api/analyze
+```
+
+For a physical Android device on the same Wi-Fi network, use your laptop LAN IP:
+
+```powershell
+flutter run `
+  --dart-define=AI_ANALYSIS_PROVIDER=openai_vision `
+  --dart-define=AI_BACKEND_ANALYSIS_ENDPOINT_URL=http://192.168.x.x:8000/api/analyze
+```
+
+For debug-only local backend testing, local HTTP endpoints such as
+`http://10.0.2.2:8000/api/analyze` or
+`http://192.168.x.x:8000/api/analyze` are allowed. Release builds must use
+HTTPS. If the endpoint is missing, invalid, or not release-safe, the HTTP client
+blocks the request before transport and the scanner shows a friendly inline
+error.
 
 The HTTP service maps backend failures safely:
 

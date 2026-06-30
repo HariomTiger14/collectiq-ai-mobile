@@ -59,6 +59,31 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
 
         started_at = time.perf_counter()
         payload = self._build_payload(image_path)
+        return self._recognize_with_payload(payload, started_at)
+
+    def recognize_api_payload(
+        self,
+        *,
+        request_metadata: dict,
+        image_payload: dict,
+    ) -> RecognitionResult:
+        if not self._api_key.strip():
+            raise AIProviderNotConfiguredError(
+                "OPENAI_API_KEY is required when AI_PROVIDER=openai."
+            )
+
+        started_at = time.perf_counter()
+        payload = self._build_payload_from_api_payload(
+            request_metadata=request_metadata,
+            image_payload=image_payload,
+        )
+        return self._recognize_with_payload(payload, started_at)
+
+    def _recognize_with_payload(
+        self,
+        payload: dict[str, Any],
+        started_at: float,
+    ) -> RecognitionResult:
 
         try:
             response = self._client.post(
@@ -97,7 +122,42 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
     def _build_payload(self, image_path: Path) -> dict[str, Any]:
         encoded_image = base64.b64encode(image_path.read_bytes()).decode("ascii")
         media_type = self._media_type_for(image_path)
+        return self._build_payload_for_data_url(
+            image_data_url=f"data:{media_type};base64,{encoded_image}",
+            prompt_context={
+                "imageSource": "uploaded file",
+                "fileName": image_path.name,
+                "mimeType": media_type,
+            },
+        )
 
+    def _build_payload_from_api_payload(
+        self,
+        *,
+        request_metadata: dict,
+        image_payload: dict,
+    ) -> dict[str, Any]:
+        image_data_url = self._image_data_url_from_api_payload(image_payload)
+        prompt_context = {
+            "imageSource": request_metadata.get("imageSource")
+            or image_payload.get("imageSource")
+            or "unknown",
+            "requestedCategory": request_metadata.get("requestedCategory") or "none",
+            "fileName": image_payload.get("fileName") or "unknown",
+            "mimeType": image_payload.get("mimeType") or "application/octet-stream",
+            "appVersion": request_metadata.get("appVersion") or "unknown",
+        }
+        return self._build_payload_for_data_url(
+            image_data_url=image_data_url,
+            prompt_context=prompt_context,
+        )
+
+    def _build_payload_for_data_url(
+        self,
+        *,
+        image_data_url: str,
+        prompt_context: dict[str, Any],
+    ) -> dict[str, Any]:
         return {
             "model": self._model,
             "input": [
@@ -106,19 +166,11 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                     "content": [
                         {
                             "type": "input_text",
-                            "text": (
-                                "Identify this collectible and estimate its "
-                                "collector profile. Return conservative, "
-                                "realistic values in Australian dollars. "
-                                "Include reasoning, detection quality, and "
-                                "exactly three plausible alternative matches. "
-                                "Also extract collectible profile metadata "
-                                "when visible; use null for unknown metadata."
-                            ),
+                            "text": self._prompt_text(prompt_context),
                         },
                         {
                             "type": "input_image",
-                            "image_url": f"data:{media_type};base64,{encoded_image}",
+                            "image_url": image_data_url,
                         },
                     ],
                 }
@@ -227,6 +279,48 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
                 }
             },
         }
+
+    def _prompt_text(self, context: dict[str, Any]) -> str:
+        return (
+            "You are CollectIQ AI, a careful collectible identification and "
+            "valuation assistant. Analyze the provided image for a real "
+            "collector. Launch categories are Pokemon/TCG cards, sports cards, "
+            "coins, comics, memorabilia, toys/figures, and other collectibles. "
+            "Use conservative Australian-dollar estimates. Prefer uncertainty "
+            "over overclaiming. Return strict JSON that matches the provided "
+            "schema only. Include exactly three plausible alternative matches. "
+            "Explain confidence, image detection quality, and reasoning. Extract "
+            "rich metadata when visible; use null when unknown. Context: "
+            f"imageSource={context.get('imageSource')}; "
+            f"requestedCategory={context.get('requestedCategory')}; "
+            f"fileName={context.get('fileName')}; "
+            f"mimeType={context.get('mimeType')}; "
+            f"appVersion={context.get('appVersion')}."
+        )
+
+    def _image_data_url_from_api_payload(self, image_payload: dict) -> str:
+        mime_type = str(image_payload.get("mimeType") or "application/octet-stream")
+        local_path = Path(str(image_payload.get("localFilePath") or ""))
+        if str(local_path).strip() and local_path.exists():
+            encoded_image = base64.b64encode(local_path.read_bytes()).decode("ascii")
+            return f"data:{mime_type};base64,{encoded_image}"
+
+        encoded_image = image_payload.get("base64Image") or image_payload.get(
+            "base64Preview"
+        )
+        if isinstance(encoded_image, str) and encoded_image.strip():
+            try:
+                base64.b64decode(encoded_image, validate=True)
+            except ValueError as exc:
+                raise OpenAIProviderError(
+                    "Image payload base64 data was invalid."
+                ) from exc
+            return f"data:{mime_type};base64,{encoded_image.strip()}"
+
+        raise OpenAIProviderError(
+            "OpenAI analysis requires backend-readable image bytes. "
+            "Provide a stored file path or base64Image in the backend payload."
+        )
 
     def _extract_structured_output(self, response_body: dict[str, Any]) -> dict[str, Any]:
         output_text = response_body.get("output_text")
@@ -396,3 +490,7 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
         if extension == ".png":
             return "image/png"
         return "application/octet-stream"
+
+
+# Product-facing provider alias used by the backend analyze endpoint roadmap.
+OpenAiVisionProvider = OpenAIRecognitionProvider

@@ -378,7 +378,7 @@ void main() {
       final diagnostics = const ProviderDiagnosticsService().build(
         aiConfig: const AiAnalysisProviderConfig(
           type: AiAnalysisProviderType.openAiVision,
-          backendAnalysisEndpointUrl: 'https://api.collectiq.test/ai/analyze',
+          backendAnalysisEndpointUrl: 'https://api.collectiq.test/api/analyze',
         ),
         pricingProviderType: MarketPricingProviderType.mock,
         lastScanPipelineStatus: 'Ready',
@@ -416,7 +416,7 @@ void main() {
 
     test('valid HTTPS endpoint passes release safety', () {
       final readiness = const AiBackendEndpointReadinessChecker().check(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         isReleaseMode: true,
       );
 
@@ -428,10 +428,10 @@ void main() {
 
     test('HTTP endpoint is allowed only in debug local mode', () {
       final debugReadiness = const AiBackendEndpointReadinessChecker().check(
-        endpointUrl: 'http://192.168.0.81:8000/ai/analyze',
+        endpointUrl: 'http://192.168.0.81:8000/api/analyze',
       );
       final releaseReadiness = const AiBackendEndpointReadinessChecker().check(
-        endpointUrl: 'http://192.168.0.81:8000/ai/analyze',
+        endpointUrl: 'http://192.168.0.81:8000/api/analyze',
         isReleaseMode: true,
       );
 
@@ -1310,12 +1310,12 @@ void main() {
         responseData: {'result': _backendAnalysisJson()},
       );
       final service = DioAiBackendApiService(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         dio: Dio()..httpClientAdapter = adapter,
       );
       final provider = OpenAiVisionAnalysisProvider(
         backendClient: HttpAiBackendClient(
-          endpointUrl: 'https://api.collectiq.test/ai/analyze',
+          endpointUrl: 'https://api.collectiq.test/api/analyze',
           apiService: service,
         ),
       );
@@ -1332,21 +1332,21 @@ void main() {
       expect(result.scanResult.estimatedValue, 1850);
       expect(result.scanResult.confidence, 0.94);
       expect(adapter.calls, 1);
-      expect(adapter.lastPath, 'https://api.collectiq.test/ai/analyze');
+      expect(adapter.lastPath, 'https://api.collectiq.test/api/analyze');
       expect(adapter.lastPayload?['request'], isA<Map>());
       expect(adapter.lastPayload?['image'], isA<Map>());
     });
 
     test('timeout maps to friendly error', () async {
       final service = DioAiBackendApiService(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         dio: Dio()
           ..httpClientAdapter = _FakeDioAdapter(
             dioExceptionType: DioExceptionType.receiveTimeout,
           ),
       );
       final client = HttpAiBackendClient(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         apiService: service,
       );
 
@@ -1364,7 +1364,7 @@ void main() {
 
     test('500 response maps to backend error', () async {
       final service = DioAiBackendApiService(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         dio: Dio()
           ..httpClientAdapter = _FakeDioAdapter(
             statusCode: 500,
@@ -1378,7 +1378,7 @@ void main() {
           ),
       );
       final client = HttpAiBackendClient(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         apiService: service,
       );
 
@@ -1403,12 +1403,12 @@ void main() {
 
     test('malformed JSON is handled safely', () async {
       final service = DioAiBackendApiService(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         dio: Dio()
           ..httpClientAdapter = _FakeDioAdapter(rawResponseBody: 'not json'),
       );
       final client = HttpAiBackendClient(
-        endpointUrl: 'https://api.collectiq.test/ai/analyze',
+        endpointUrl: 'https://api.collectiq.test/api/analyze',
         apiService: service,
       );
 
