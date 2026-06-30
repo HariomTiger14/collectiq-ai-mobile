@@ -170,16 +170,19 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
         logger.debug(
             "Analyze completed provider=%s model=%s latencyMs=%s "
             "overallProcessingTimeMs=%s pricingProvider=%s pricingResponseTimeMs=%s "
-            "pricingProviderCount=%s pricingFallbackUsed=%s pricingCacheStatus=%s",
+            "pricingProviderCount=%s pricingFallbackUsed=%s pricingCacheStatus=%s "
+            "pricingFreshness=%s pricingFallbackReason=%s",
             getattr(provider, "provider_name", "unknown"),
             getattr(provider, "_model", "mock"),
             getattr(recognition, "processingTimeMs", total_processing_time_ms),
             total_processing_time_ms,
-            pricing.pricingSource,
+            pricing.providerDiagnostics.get("providers", pricing.pricingSource),
             pricing.providerDiagnostics.get("responseTimeMs", "0"),
             pricing.providerDiagnostics.get("providerCount", str(pricing.sourceCount)),
             pricing.fallbackUsed,
             pricing.cacheStatus,
+            pricing.pricingAge,
+            pricing.providerDiagnostics.get("fallbackReason", ""),
         )
 
     return ApiAnalyzeResponse(

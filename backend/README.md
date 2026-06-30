@@ -63,6 +63,12 @@ PRICING_PROVIDER=mock
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TIMEOUT_SECONDS=30
+EBAY_ACCESS_TOKEN=
+EBAY_BROWSE_API_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
+EBAY_MARKETPLACE_ID=EBAY_AU
+EBAY_TIMEOUT_SECONDS=10
+PRICING_CACHE_TTL_SECONDS=900
+PRICING_PROVIDER_MIN_INTERVAL_MS=250
 ```
 
 For v1.0 preparation, keep `AI_PROVIDER=mock` until the production backend AI
@@ -106,15 +112,16 @@ Provider selection:
 Pricing selection:
 
 - `PRICING_PROVIDER=mock`: default deterministic pricing and comparable sales.
-- `PRICING_PROVIDER=ebay`: backend-only placeholder for completed sales.
+- `PRICING_PROVIDER=ebay`: backend-only eBay Browse API provider.
 - `PRICING_PROVIDER=tcgplayer`: backend-only placeholder for card pricing.
 - `PRICING_PROVIDER=pricecharting`: backend-only placeholder for guide pricing.
 - `PRICING_PROVIDER=aggregate`: future multi-provider blend.
 
-Future pricing providers currently return typed unavailable errors that the
-aggregation service converts to mock fallback pricing. Flutter still receives
-the same response contract, and no third-party pricing API is called from the
-mobile app.
+The eBay provider requires `EBAY_ACCESS_TOKEN` in backend `.env`. If the token
+is missing, expired, rate-limited, or the provider fails, the aggregation service
+falls back to deterministic mock pricing. Flutter still receives the same
+response contract, and no third-party pricing API is called from the mobile app.
+TCGPlayer and PriceCharting remain safe backend placeholders for later sprints.
 
 When OpenAI is enabled, the backend sends the image to OpenAI's Responses API
 with a strict structured-output schema. The prompt asks for collectible
@@ -212,7 +219,7 @@ The pricing layer contains:
 
 - `PricingProvider`: interface for provider implementations.
 - `MockPricingProvider`: deterministic default used in tests and local dev.
-- `EbayPricingProvider`: placeholder for completed/sold marketplace comps.
+- `EbayPricingProvider`: backend-only eBay Browse API integration.
 - `TCGPlayerPricingProvider`: placeholder for trading-card price guides.
 - `PriceChartingPricingProvider`: placeholder for historical guide pricing.
 - `PricingAggregationService`: normalizes comparable sales, removes obvious
@@ -243,22 +250,39 @@ Provider failures should never crash analysis. The pipeline handles:
 If configured providers fail, the backend returns deterministic mock fallback
 pricing with diagnostics marking `fallbackUsed=true`.
 
+For eBay specifically:
+
+- `EBAY_ACCESS_TOKEN` missing or invalid config -> fallback to mock.
+- HTTP 429 -> rate-limit error -> fallback to mock.
+- network timeout -> timeout error -> fallback to mock.
+- empty or malformed pricing data -> fallback to mock.
+- valid responses are normalized into comparable sales and aggregated into the
+  existing Flutter market summary fields.
+
 ### Pricing Diagnostics
 
 Debug logs include provider count, response time, fallback usage, cache status,
-and pricing source count. Logs must not include provider API keys, payment
-tokens, or raw third-party credentials.
+pricing source count, provider name, pricing freshness, and fallback reason.
+Logs must not include provider API keys, payment tokens, or raw third-party
+credentials.
 
 ### Future Cache Strategy
 
-Before enabling real providers, add a backend cache keyed by normalized
-collectible identity fields such as category, title, year, set, card number,
-grade/condition, language, and edition. Recommended first pass:
+The first pass uses an in-memory cache keyed by normalized collectible identity
+fields such as category, title, year, set, card number, grade/condition,
+language, and edition. Configure with:
+
+```text
+PRICING_CACHE_TTL_SECONDS=900
+```
+
+Recommended production evolution:
 
 - short TTL for marketplace sold comps;
 - longer TTL for guide prices;
 - stale-while-revalidate for repeated scans;
 - per-provider cache status in diagnostics.
+- shared Redis/database cache if running multiple backend instances.
 
 ### Future Rate Limiting Strategy
 
@@ -266,10 +290,40 @@ Real pricing providers should be protected by:
 
 - server-side API keys only;
 - per-provider timeout budgets;
+- local provider throttling via `PRICING_PROVIDER_MIN_INTERVAL_MS`;
 - request retries with backoff for retryable errors;
 - per-user/backend rate limits;
 - provider-specific quota monitoring;
 - graceful fallback to cached or mock pricing when limits are reached.
+
+### Enabling eBay Pricing Locally
+
+Keep `PRICING_PROVIDER=mock` for normal development. To test eBay from the
+backend only:
+
+```text
+PRICING_PROVIDER=ebay
+EBAY_ACCESS_TOKEN=your-server-side-oauth-access-token
+EBAY_BROWSE_API_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
+EBAY_MARKETPLACE_ID=EBAY_AU
+EBAY_TIMEOUT_SECONDS=10
+PRICING_CACHE_TTL_SECONDS=900
+PRICING_PROVIDER_MIN_INTERVAL_MS=250
+```
+
+The eBay token must stay in `backend/.env`. Do not pass it to Flutter,
+`--dart-define`, app storage, or source code.
+
+### Adding Additional Pricing Providers
+
+1. Implement `PricingProvider.price(recognition)`.
+2. Read credentials from backend environment only.
+3. Normalize provider responses into `PricingResult` and
+   `MarketComparableSale`.
+4. Raise typed pricing errors for timeout, rate limit, unavailable provider, or
+   empty market data.
+5. Register the provider in `provider_factory.py`.
+6. Add mocked backend tests. Do not call real provider APIs in automated tests.
 
 ### Error Responses
 

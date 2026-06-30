@@ -17,11 +17,6 @@ class _FuturePricingProvider(PricingProvider):
         )
 
 
-class EbayPricingProvider(_FuturePricingProvider):
-    provider_name = "ebay"
-    provider_label = "eBay completed sales pricing"
-
-
 class TCGPlayerPricingProvider(_FuturePricingProvider):
     provider_name = "tcgplayer"
     provider_label = "TCGplayer card pricing"

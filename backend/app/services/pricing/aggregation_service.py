@@ -129,6 +129,9 @@ class PricingAggregationService:
             }
         )
         trend = self._trend(provider_results, recognition.category)
+        cache_status = self._cache_status(provider_results, fallback_used)
+        fallback_reason = " | ".join(provider_errors) if fallback_used else ""
+        provider_diagnostics = self._provider_diagnostics(provider_results)
 
         return PricingResult(
             estimatedMarketValue=estimated_value,
@@ -143,12 +146,19 @@ class PricingAggregationService:
             pricingAge=self._pricing_age(provider_results),
             comparableSales=comps,
             fallbackUsed=fallback_used,
-            cacheStatus="fallback" if fallback_used else "miss",
+            cacheStatus=cache_status,
             providerDiagnostics={
                 "providerCount": str(len(self._providers)),
+                "providers": provider_diagnostics.get("providers", ""),
                 "fallbackUsed": str(fallback_used).lower(),
-                "cacheStatus": "fallback" if fallback_used else "miss",
+                "fallbackReason": fallback_reason,
+                "cacheStatus": cache_status,
                 "responseTimeMs": str(response_time_ms),
+                "providerResponseLatencyMs": provider_diagnostics.get(
+                    "providerResponseLatencyMs",
+                    "",
+                ),
+                "pricingFreshness": self._pricing_age(provider_results),
                 "errors": " | ".join(provider_errors),
             },
         )
@@ -229,8 +239,41 @@ class PricingAggregationService:
         return "Stable"
 
     def _pricing_age(self, provider_results: list[PricingResult]) -> str:
+        if any(result.pricingAge == "live" for result in provider_results):
+            return "live"
         if any(result.pricingAge == "fresh" for result in provider_results):
             return "fresh"
         if any(result.pricingAge == "recent" for result in provider_results):
             return "recent"
         return provider_results[0].pricingAge or "unknown"
+
+    def _cache_status(
+        self,
+        provider_results: list[PricingResult],
+        fallback_used: bool,
+    ) -> str:
+        if fallback_used:
+            return "fallback"
+        if any(result.cacheStatus == "hit" for result in provider_results):
+            return "hit"
+        if any(result.cacheStatus == "miss" for result in provider_results):
+            return "miss"
+        return provider_results[0].cacheStatus or "unknown"
+
+    def _provider_diagnostics(
+        self,
+        provider_results: list[PricingResult],
+    ) -> dict[str, str]:
+        providers = []
+        latency_values = []
+        for result in provider_results:
+            provider = result.providerDiagnostics.get("provider")
+            if provider:
+                providers.append(provider)
+            latency = result.providerDiagnostics.get("responseLatencyMs")
+            if latency:
+                latency_values.append(latency)
+        return {
+            "providers": ", ".join(sorted(set(providers))),
+            "providerResponseLatencyMs": ", ".join(latency_values),
+        }

@@ -4,8 +4,8 @@ from app.services.pricing.base_pricing_provider import (
     PricingProviderUnavailableError,
 )
 from app.services.pricing.aggregation_service import PricingAggregationService
+from app.services.pricing.ebay_pricing_provider import EbayPricingProvider
 from app.services.pricing.external_pricing_providers import (
-    EbayPricingProvider,
     PriceChartingPricingProvider,
     TCGPlayerPricingProvider,
 )
@@ -13,7 +13,14 @@ from app.services.pricing.mock_pricing_provider import MockPricingProvider
 
 
 _mock_provider = MockPricingProvider()
-_ebay_provider = EbayPricingProvider()
+_ebay_provider = EbayPricingProvider(
+    access_token=settings.ebay_access_token,
+    browse_api_url=settings.ebay_browse_api_url,
+    marketplace_id=settings.ebay_marketplace_id,
+    timeout_seconds=settings.ebay_timeout_seconds,
+    cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
+    min_interval_ms=settings.pricing_provider_min_interval_ms,
+)
 _tcgplayer_provider = TCGPlayerPricingProvider()
 _pricecharting_provider = PriceChartingPricingProvider()
 
