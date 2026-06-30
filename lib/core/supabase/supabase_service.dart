@@ -30,7 +30,25 @@ abstract interface class SupabaseAuthGateway {
   Future<void> signOut(String accessToken);
 }
 
-class SupabaseService implements SupabaseAuthGateway {
+abstract interface class SupabaseDataGateway implements SupabaseAuthGateway {
+  SupabaseConfig get config;
+
+  Future<Response<T>> authenticatedGetWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Map<String, dynamic>? queryParameters,
+  });
+
+  Future<Response<T>> authenticatedPostWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  });
+}
+
+class SupabaseService implements SupabaseDataGateway {
   SupabaseService._(this.config)
     : _dio = Dio(
         BaseOptions(
@@ -52,6 +70,7 @@ class SupabaseService implements SupabaseAuthGateway {
   static SupabaseService? _instance;
   static const _sessionKey = 'supabase_auth_session';
 
+  @override
   final SupabaseConfig config;
   final Dio _dio;
   SupabaseAuthSession? _cachedSession;
@@ -259,6 +278,24 @@ class SupabaseService implements SupabaseAuthGateway {
     }
   }
 
+  @override
+  Future<Response<T>> authenticatedGetWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      return await _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        options: _authOptions(session),
+      );
+    } on DioException catch (error) {
+      logDioException(error);
+      rethrow;
+    }
+  }
+
   Future<Response<T>> authenticatedPost<T>(
     String path, {
     Object? data,
@@ -266,6 +303,27 @@ class SupabaseService implements SupabaseAuthGateway {
     Options? options,
   }) async {
     final session = await ensureAnonymousSession();
+    try {
+      return await _dio.post<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _mergeAuthOptions(session, options),
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: data);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Response<T>> authenticatedPostWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
     try {
       return await _dio.post<T>(
         path,

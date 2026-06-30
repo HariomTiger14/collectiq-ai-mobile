@@ -424,8 +424,10 @@ AuthRepository
 Current provider modes:
 
 - Local Anonymous: default device-only identity. The app is fully usable.
-- Supabase Anonymous: enabled only when Supabase dart defines are configured.
-- Email / Password: placeholder for future account screens.
+- Supabase Anonymous: retained for compatibility/testing, but production cloud
+  sync does not write portfolio data under anonymous sessions.
+- Email / Password: real Supabase sign-up, sign-in, persisted session, and
+  sign-out are available from Settings when Supabase is configured.
 - Google Sign-In: placeholder; no OAuth client secrets are bundled.
 - Apple Sign-In: placeholder; no OAuth secrets are bundled.
 
@@ -437,13 +439,29 @@ Cloud sync is also local-first:
 
 ```text
 Save collectible locally
--> Queue image/cloud work when configured
+-> Queue image/cloud work
+-> If signed in with Supabase email/password, upload under that auth user id
+-> If signed out/local, keep work local or retryable
 -> Report sync state in Settings
 -> Never block local portfolio persistence
 ```
 
 If cloud sync fails, the local portfolio remains the source of truth and Settings
 shows a recoverable sync status.
+
+Production cloud sync is intentionally tied to the current authenticated
+Supabase user. When an email/password user is signed in, database rows use that
+session's `auth.uid()` as `user_id`, and image uploads are stored under:
+
+```text
+collectible-images/{userId}/{collectibleCloudId}/image.ext
+```
+
+When the user signs out, local portfolio data is not deleted. Manual Sync and
+background image uploads stop using Supabase until another signed-in session is
+available. A fresh empty device may download cloud items after sign-in; an
+existing local portfolio does not resurrect unknown cloud rows during manual sync
+so locally deleted items do not unexpectedly reappear.
 
 Background image sync uses a persisted queue with these production states:
 
@@ -503,17 +521,31 @@ flutter run `
 Without these values, the app continues in Local Anonymous mode and stores the
 portfolio locally.
 
+To test production auth and sync:
+
+1. Enable Email provider in Supabase Auth settings.
+2. Apply the SQL schema and storage policies from `supabase/migrations/`.
+3. Run Flutter with the dart defines above.
+4. Open Settings.
+5. Create an account with Email / Password or sign in to an existing account.
+6. Scan and save a collectible; local save completes first.
+7. Tap Sync Now in Settings to upload local portfolio rows and process queued
+   image uploads.
+8. Confirm rows use the signed-in user's id and images are written to the
+   user-scoped folder in the `collectible-images` bucket.
+
 ### Auth test plan
 
 Use `docs/supabase_auth_test_plan.md` to validate:
 
 - local anonymous mode
-- anonymous sign-in
+- configured-but-signed-out local mode
 - email/password sign-in
+- email/password sign-up
 - sign out
 
-Authentication is foundation-only right now. The app must not require login to
-scan, save, view, search, sort, or delete local portfolio items.
+Authentication is optional. The app must not require login to scan, save, view,
+search, sort, or delete local portfolio items.
 
 ### Secret handling
 

@@ -11,7 +11,7 @@ import 'package:flutter/foundation.dart';
 class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
   const SupabaseCloudPortfolioRepository({required this.supabaseService});
 
-  final SupabaseService supabaseService;
+  final SupabaseDataGateway supabaseService;
 
   @override
   Future<SyncStatus> getSyncStatus() async {
@@ -23,12 +23,21 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
       );
     }
 
-    debugPrint('[Sync] ensuring anonymous Supabase session for sync status');
-    final session = await supabaseService.ensureAnonymousSession();
-    debugPrint('[Sync] Supabase current user id: ${session.userId}');
+    final session = await _currentSignedInSession();
+    if (session == null) {
+      return const SyncStatus(
+        state: SyncState.localOnly,
+        message:
+            'Sign in to enable Supabase cloud sync. Local portfolio is active.',
+        isCloudBackupEnabled: false,
+      );
+    }
+
+    debugPrint('[Sync] Supabase signed-in user id: ${session.userId}');
     return SyncStatus(
       state: SyncState.synced,
-      message: 'Cloud connected as anonymous user ${_shortId(session.userId)}.',
+      message:
+          'Cloud connected for ${session.email ?? _shortId(session.userId)}.',
       isCloudBackupEnabled: true,
       authenticatedUserId: session.userId,
       lastSyncedAt: DateTime.now(),
@@ -46,7 +55,16 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
       );
     }
 
-    final session = await supabaseService.ensureAnonymousSession();
+    final session = await _currentSignedInSession();
+    if (session == null) {
+      return SyncStatus(
+        state: SyncState.localOnly,
+        message: 'Sign in to sync saved collectibles. Local save is complete.',
+        isCloudBackupEnabled: false,
+        pendingItemCount: items.length,
+      );
+    }
+
     if (items.isEmpty) {
       return SyncStatus(
         state: SyncState.synced,
@@ -65,8 +83,9 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
         for (final item in items) _rowForItem(item, session.userId),
       ];
       debugPrint('[Sync] collectibles upsert payload keys: ${rows.first.keys}');
-      await supabaseService.authenticatedPost<List<dynamic>>(
+      await supabaseService.authenticatedPostWithSession<List<dynamic>>(
         '/rest/v1/${SupabaseTables.collectibles}',
+        session: session,
         queryParameters: const {'on_conflict': 'id'},
         data: rows,
         options: Options(
@@ -101,11 +120,18 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
       return const [];
     }
 
-    await supabaseService.ensureAnonymousSession();
-    final response = await supabaseService.authenticatedGet<List<dynamic>>(
-      '/rest/v1/${SupabaseTables.collectibles}',
-      queryParameters: const {'select': '*', 'order': 'updated_at.desc'},
-    );
+    final session = await _currentSignedInSession();
+    if (session == null) {
+      debugPrint('[Sync] cloud download skipped: signed-in session missing');
+      return const [];
+    }
+
+    final response = await supabaseService
+        .authenticatedGetWithSession<List<dynamic>>(
+          '/rest/v1/${SupabaseTables.collectibles}',
+          session: session,
+          queryParameters: const {'select': '*', 'order': 'updated_at.desc'},
+        );
 
     final rows = response.data ?? const [];
     return rows
@@ -225,6 +251,17 @@ class SupabaseCloudPortfolioRepository implements CloudPortfolioRepository {
     }
 
     return baseUri.resolve('/storage/v1/object/public/$storagePath').toString();
+  }
+
+  Future<SupabaseAuthSession?> _currentSignedInSession() async {
+    final session = await supabaseService.currentSession();
+    if (session == null || session.isAnonymous) {
+      debugPrint('[Sync] signed-in Supabase session available: false');
+      return null;
+    }
+
+    debugPrint('[Sync] signed-in Supabase session available: true');
+    return session;
   }
 }
 

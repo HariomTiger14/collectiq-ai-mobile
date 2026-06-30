@@ -263,13 +263,13 @@ void main() {
     await tester.ensureVisible(find.text('Cloud Sync'));
     await tester.pump();
     expect(find.text('Cloud status'), findsOneWidget);
-    expect(find.text('Anonymous User'), findsOneWidget);
+    expect(find.text('Signed-in user email'), findsOneWidget);
     expect(find.text('Pending uploads'), findsOneWidget);
     expect(find.text('Retryable uploads'), findsOneWidget);
     expect(find.text('Failed uploads'), findsOneWidget);
     expect(find.text('Last sync'), findsOneWidget);
     expect(find.text('Never'), findsOneWidget);
-    expect(find.text('Manual Sync'), findsOneWidget);
+    expect(find.text('Sync Now'), findsOneWidget);
     expect(find.text('Sync status'), findsOneWidget);
     expect(find.text('Local only'), findsWidgets);
     expect(find.text('Cloud backup'), findsOneWidget);

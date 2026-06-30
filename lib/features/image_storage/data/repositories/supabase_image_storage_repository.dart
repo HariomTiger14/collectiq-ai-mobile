@@ -47,7 +47,17 @@ class SupabaseImageStorageRepository implements ImageStorageRepository {
 
     final session =
         await (supabaseService ?? SupabaseService.instance(config: config))
-            .ensureAnonymousSession();
+            .currentSession();
+    if (session == null || session.isAnonymous) {
+      debugPrint(
+        '[Supabase Storage] upload skipped: signed-in session missing',
+      );
+      return fallbackRepository.uploadImage(
+        localPath: localPath,
+        collectibleId: collectibleId,
+      );
+    }
+
     final storagePath = storagePathFor(
       localPath: localPath,
       collectibleId: collectibleId,

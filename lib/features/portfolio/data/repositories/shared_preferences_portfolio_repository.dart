@@ -29,6 +29,17 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
   }
 
   @override
+  Future<void> upsertSyncedItem(CollectibleItem item) async {
+    final items = await getItems();
+    final updatedItems = [
+      item,
+      ...items.where((existingItem) => existingItem.id != item.id),
+    ]..sort(compareCollectiblesNewestFirst);
+    _logFinalOrder('upsertSyncedItem-before-persist', updatedItems);
+    await _saveItems(updatedItems);
+  }
+
+  @override
   Future<List<CollectibleItem>> getItems() async {
     final preferences = await SharedPreferences.getInstance();
     final encodedItems = preferences.getString(_itemsKey);

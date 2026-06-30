@@ -2346,6 +2346,115 @@ void main() {
     );
   });
 
+  group('Supabase authenticated cloud sync', () {
+    test('signed-out configured sync stays local-only', () async {
+      final repository = SupabaseCloudPortfolioRepository(
+        supabaseService: _FakeSupabaseDataGateway(session: null),
+      );
+
+      final status = await repository.uploadLocalItems([_testItem()]);
+
+      expect(status.state, SyncState.localOnly);
+      expect(status.isCloudBackupEnabled, isFalse);
+      expect(status.pendingItemCount, 1);
+      expect(status.message, contains('Sign in'));
+    });
+
+    test('signed-in sync uses authenticated user id', () async {
+      final gateway = _FakeSupabaseDataGateway(
+        session: const SupabaseAuthSession(
+          userId: 'email-user-123',
+          email: 'collector@example.com',
+          accessToken: 'email-token',
+          displayName: 'Collector',
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        ),
+      );
+      final repository = SupabaseCloudPortfolioRepository(
+        supabaseService: gateway,
+      );
+
+      final status = await repository.uploadLocalItems([_testItem()]);
+
+      expect(status.state, SyncState.synced);
+      expect(status.authenticatedUserId, 'email-user-123');
+      expect(gateway.lastPostPath, '/rest/v1/collectibles');
+      expect(gateway.lastPostedRows.single['user_id'], 'email-user-123');
+    });
+
+    test(
+      'anonymous Supabase session is not treated as production sync',
+      () async {
+        final repository = SupabaseCloudPortfolioRepository(
+          supabaseService: _FakeSupabaseDataGateway(
+            session: const SupabaseAuthSession(
+              userId: 'anonymous-user',
+              email: null,
+              accessToken: 'anonymous-token',
+              displayName: 'Guest',
+              isAnonymous: true,
+              projectUrl: 'https://example.supabase.co',
+            ),
+          ),
+        );
+
+        final status = await repository.getSyncStatus();
+
+        expect(status.state, SyncState.localOnly);
+        expect(status.isCloudConnected, isFalse);
+      },
+    );
+
+    test('sync failure becomes retryable and local items remain', () async {
+      SharedPreferences.setMockInitialValues({});
+      const portfolioRepository = SharedPreferencesPortfolioRepository();
+      await portfolioRepository.addItem(_testItem());
+      final repository = SupabaseCloudPortfolioRepository(
+        supabaseService: _FakeSupabaseDataGateway(
+          session: const SupabaseAuthSession(
+            userId: 'email-user-123',
+            email: 'collector@example.com',
+            accessToken: 'email-token',
+            displayName: 'Collector',
+            isAnonymous: false,
+            projectUrl: 'https://example.supabase.co',
+          ),
+          postError: DioException(
+            requestOptions: RequestOptions(path: '/rest/v1/collectibles'),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+      );
+
+      final status = await repository.uploadLocalItems(
+        await portfolioRepository.getItems(),
+      );
+      final localItems = await portfolioRepository.getItems();
+
+      expect(status.state, SyncState.failed);
+      expect(status.retryableItemCount, 1);
+      expect(localItems.single.id, _testItem().id);
+    });
+
+    test('sign-out does not delete local portfolio', () async {
+      SharedPreferences.setMockInitialValues({});
+      const portfolioRepository = SharedPreferencesPortfolioRepository();
+      final authRepository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(authRepository)],
+      );
+      addTearDown(container.dispose);
+
+      await portfolioRepository.addItem(_testItem());
+      await container.read(authControllerProvider.notifier).signOut();
+      final items = await portfolioRepository.getItems();
+
+      expect(items, hasLength(1));
+      expect(items.single.title, contains('Charizard'));
+    });
+  });
+
   group('SyncService', () {
     test('can mark local items as pending without cloud backup', () async {
       const repository = MockCloudPortfolioRepository();
@@ -3432,6 +3541,14 @@ class _ReturningPortfolioRepository implements PortfolioRepository {
   }
 
   @override
+  Future<void> upsertSyncedItem(CollectibleItem item) async {
+    _items = [
+      item,
+      ..._items.where((existingItem) => existingItem.id != item.id),
+    ];
+  }
+
+  @override
   Future<void> clearPortfolio() async {
     _items = const [];
   }
@@ -3577,6 +3694,116 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
   Future<void> signOut(String accessToken) async {
     signOutCalls += 1;
     lastSignOutToken = accessToken;
+  }
+}
+
+class _FakeSupabaseDataGateway implements SupabaseDataGateway {
+  _FakeSupabaseDataGateway({required this.session, this.postError});
+
+  final SupabaseAuthSession? session;
+  final Object? postError;
+  String? lastPostPath;
+  List<Map<String, dynamic>> lastPostedRows = const [];
+
+  @override
+  SupabaseConfig get config => const SupabaseConfig(
+    url: 'https://example.supabase.co',
+    anonKey: 'anon-key',
+    isEnabled: true,
+  );
+
+  @override
+  bool get isConfigured => true;
+
+  @override
+  Future<SupabaseAuthSession?> currentSession() async => session;
+
+  @override
+  Future<SupabaseAuthSession> ensureAnonymousSession() async {
+    return session ??
+        const SupabaseAuthSession(
+          userId: 'anonymous-user',
+          email: null,
+          accessToken: 'anonymous-token',
+          displayName: 'Anonymous Collector',
+          isAnonymous: true,
+          projectUrl: 'https://example.supabase.co',
+        );
+  }
+
+  @override
+  Future<SupabaseAuthSession> signInAnonymously() async {
+    return ensureAnonymousSession();
+  }
+
+  @override
+  Future<SupabaseAuthSession> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    return SupabaseAuthSession(
+      userId: 'email-user',
+      email: email,
+      accessToken: 'email-token',
+      displayName: email,
+      isAnonymous: false,
+      projectUrl: 'https://example.supabase.co',
+    );
+  }
+
+  @override
+  Future<SupabaseAuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    return SupabaseAuthSession(
+      userId: 'new-email-user',
+      email: email,
+      accessToken: 'new-email-token',
+      displayName: email,
+      isAnonymous: false,
+      projectUrl: 'https://example.supabase.co',
+    );
+  }
+
+  @override
+  Future<void> signOut(String accessToken) async {}
+
+  @override
+  Future<Response<T>> authenticatedGetWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: <dynamic>[] as T,
+      statusCode: 200,
+    );
+  }
+
+  @override
+  Future<Response<T>> authenticatedPostWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    final error = postError;
+    if (error != null) {
+      throw error;
+    }
+
+    lastPostPath = path;
+    lastPostedRows = (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: <dynamic>[] as T,
+      statusCode: 200,
+    );
   }
 }
 

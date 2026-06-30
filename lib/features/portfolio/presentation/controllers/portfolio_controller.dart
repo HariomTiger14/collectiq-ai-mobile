@@ -121,6 +121,23 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
+  /// Merges a cloud item into local state without changing its saved timestamp.
+  Future<void> upsertSyncedItem(CollectibleItem item) async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      await _repository.upsertSyncedItem(item);
+      final items = await _repository.getItems();
+      final sortedItems = collectiblesNewestFirst(items);
+      _logFinalOrder('upsertSyncedItem', sortedItems);
+      state = state.copyWith(items: sortedItems, isLoading: false);
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to merge cloud portfolio item.',
+      );
+    }
+  }
+
   /// Removes the item with [id] and refreshes portfolio state.
   Future<void> removeItem(String id) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);

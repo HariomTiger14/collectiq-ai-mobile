@@ -35,6 +35,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id ||
+          previous?.isSignedIn != next.isSignedIn) {
+        ref.read(syncControllerProvider.notifier).loadStatus();
+      }
+    });
+
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
@@ -351,15 +358,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       _SettingsRow(
                         icon: Icons.badge_outlined,
-                        title: 'Anonymous User',
+                        title: 'Signed-in user email',
                         subtitle:
                             authState.errorMessage ??
-                            'Supabase uses an anonymous session until full accounts are enabled.',
+                            'Cloud sync uses this Supabase account when signed in.',
                         trailing: authState.errorMessage != null
                             ? 'Needs attention'
-                            : authState.user?.isAnonymous == true
-                            ? 'Active'
-                            : 'Guest',
+                            : authState.user?.email ?? 'Local only',
                       ),
                       _SettingsRow(
                         icon: Icons.sync_outlined,
@@ -420,7 +425,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           label: Text(
                             syncState.isLoading || imageSyncState.isUploading
                                 ? 'Syncing...'
-                                : 'Manual Sync',
+                                : 'Sync Now',
                           ),
                         ),
                       ),
@@ -801,28 +806,32 @@ Future<void> _manualSync(
   debugPrint('[Sync] manual sync start');
   debugPrint('[Sync] local item count: ${localItems.length}');
   try {
-    await ref.read(imageSyncControllerProvider.notifier).processQueue();
-
     final syncController = ref.read(syncControllerProvider.notifier);
-    for (final item in localItems) {
-      debugPrint('[Sync] database upsert start: ${item.id}');
-      await syncController.uploadLocalItems([item]);
-      debugPrint('[Sync] database upsert success: ${item.id}');
-    }
+    await syncController.uploadLocalItems(localItems);
+    await ref.read(imageSyncControllerProvider.notifier).processQueue();
 
     final downloadedItems = await syncController.downloadCloudItems();
     debugPrint('[Sync] downloaded item count: ${downloadedItems.length}');
     final localItemsById = {for (final item in localItems) item.id: item};
+    final allowNewCloudItems = localItemsById.isEmpty;
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     for (final item in downloadedItems) {
       final localItem = localItemsById[item.id];
+      if (localItem == null && !allowNewCloudItems) {
+        debugPrint(
+          '[Sync] skipping unknown cloud item to avoid resurrecting a '
+          'locally deleted collectible: ${item.id}',
+        );
+        continue;
+      }
+
       final resolvedItem = localItem == null
           ? item
           : SyncConflict(localItem: localItem, cloudItem: item).resolve();
       if (localItem == null ||
           resolvedItem.createdAt.isAfter(localItem.createdAt)) {
         debugPrint('[Sync] merging cloud item: ${resolvedItem.id}');
-        await portfolioController.saveItem(resolvedItem);
+        await portfolioController.upsertSyncedItem(resolvedItem);
       }
     }
     await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
