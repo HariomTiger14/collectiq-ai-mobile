@@ -2,6 +2,29 @@
 
 A new Flutter project.
 
+## Onboarding + First-Time UX
+
+CollectIQ AI shows a first-launch onboarding screen that explains the core
+flow:
+
+```text
+Scan -> Analyze -> Save -> Track
+```
+
+The onboarding also makes the local-first model explicit: users can scan,
+analyze in mock/default mode, save to Portfolio, manage alerts, wishlist
+status, and goals without signing in. Cloud sync and account sign-in remain
+optional.
+
+The completion flag is stored locally as:
+
+```text
+onboarding_completed_v1
+```
+
+Settings includes a **Reset Onboarding** action for QA, demos, and beta tester
+handoffs.
+
 ## Master QA Automation
 
 CollectIQ AI includes a reusable local + attached Android device QA suite. The

@@ -7,6 +7,7 @@ import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dar
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -157,6 +158,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         title: 'Theme',
                         subtitle: 'System theme is used for now.',
                         trailing: 'System',
+                      ),
+                      const _SettingsRow(
+                        icon: Icons.tips_and_updates_outlined,
+                        title: 'First-launch onboarding',
+                        subtitle:
+                            'Replay the welcome guide, local-first notes, and first-scan path.',
+                        trailing: 'Available',
+                      ),
+                      _OnboardingResetPanel(
+                        onReset: () => _resetOnboarding(context),
                       ),
                       _SettingsRow(
                         icon: Icons.notifications_none_outlined,
@@ -573,6 +584,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
+                    title: 'Help & About',
+                    children: const [
+                      _SettingsRow(
+                        icon: Icons.document_scanner_outlined,
+                        title: 'How scanning works',
+                        subtitle:
+                            'Choose Camera or Gallery, review the image, analyze it, then save the result.',
+                        trailing: 'Guide',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.price_check_outlined,
+                        title: 'How pricing works',
+                        subtitle:
+                            'Pricing starts with safe mock data and is prepared for backend market providers.',
+                        trailing: 'Guide',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.cloud_queue_outlined,
+                        title: 'Local vs cloud mode',
+                        subtitle:
+                            'Local mode works without sign-in. Cloud sync is optional when configured.',
+                        trailing: 'Local-first',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.workspace_premium_outlined,
+                        title: 'Subscription info',
+                        subtitle:
+                            'Free mode is active. Pro and Premium billing are prepared but optional.',
+                        trailing: 'Free',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.security_outlined,
+                        title: 'Privacy and security',
+                        subtitle:
+                            'No secrets are stored in the app, and telemetry avoids personal content.',
+                        trailing: 'Safe',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
                     title: 'About',
                     children: const [
                       _SettingsRow(
@@ -612,6 +664,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref
         .read(authControllerProvider.notifier)
         .signInWithEmailPassword(email: email, password: password);
+  }
+
+  Future<void> _resetOnboarding(BuildContext context) async {
+    await ref.read(onboardingControllerProvider.notifier).reset();
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Onboarding will show the next time you open CollectIQ AI.',
+        ),
+      ),
+    );
   }
 }
 
@@ -822,6 +888,40 @@ class _NotificationActionsPanel extends StatelessWidget {
                   ? 'Checking...'
                   : 'Request Notification Permission',
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OnboardingResetPanel extends StatelessWidget {
+  const _OnboardingResetPanel({required this.onReset});
+
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Useful when handing the app to a new tester or reviewing the first-run flow.',
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('settings-reset-onboarding-button'),
+            onPressed: onReset,
+            icon: const Icon(Icons.restart_alt_outlined),
+            label: const Text('Reset Onboarding'),
           ),
         ),
       ],

@@ -18,6 +18,8 @@ import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/portfolio_visual_analytics.dart';
+import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -45,6 +47,71 @@ void main() {
     expect(find.text('Scan'), findsOneWidget);
     expect(find.text('Portfolio'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('onboarding appears on first launch', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(onboardingCompleted: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to CollectIQ AI'), findsOneWidget);
+    expect(find.text('How CollectIQ AI works'), findsOneWidget);
+    expect(find.text('Local-first by default'), findsOneWidget);
+    expect(find.text('Start Scanning'), findsOneWidget);
+    expect(find.text('Explore Dashboard'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+  });
+
+  testWidgets('onboarding Start Scanning navigates to Scan', (
+    WidgetTester tester,
+  ) async {
+    final repository = _FakeOnboardingRepository(completed: false);
+    await tester.pumpCollectIqApp(onboardingRepository: repository);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('onboarding-start-scanning')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('onboarding-start-scanning')));
+    await tester.pumpAndSettle();
+
+    expect(repository.completed, isTrue);
+    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('Scan with Camera'), findsOneWidget);
+  });
+
+  testWidgets('onboarding Explore Dashboard goes Home', (
+    WidgetTester tester,
+  ) async {
+    final repository = _FakeOnboardingRepository(completed: false);
+    await tester.pumpCollectIqApp(onboardingRepository: repository);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('onboarding-explore-dashboard')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('onboarding-explore-dashboard')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.completed, isTrue);
+    expect(find.text('Good Evening, Harry'), findsOneWidget);
+    expect(find.text('Build your collection dashboard'), findsOneWidget);
+    expect(find.text('Welcome to CollectIQ AI'), findsNothing);
+  });
+
+  testWidgets('onboarding does not reappear after completion', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(onboardingCompleted: true);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to CollectIQ AI'), findsNothing);
+    expect(find.text('Good Evening, Harry'), findsOneWidget);
   });
 
   testWidgets('portfolio value trend widget renders with snapshot data', (
@@ -139,6 +206,7 @@ void main() {
     expect(find.text('Welcome back to CollectIQ AI'), findsOneWidget);
     expect(find.text('Scan Collectible'), findsOneWidget);
     expect(find.text('Build your collection dashboard'), findsOneWidget);
+    expect(find.textContaining('price alerts, wishlist goals'), findsOneWidget);
     expect(find.text('Start First Scan'), findsOneWidget);
     expect(find.text('No collectibles scanned yet.'), findsOneWidget);
     expect(find.text('Dashboard Insights'), findsNothing);
@@ -315,6 +383,10 @@ void main() {
     expect(find.text('Portfolio'), findsWidgets);
     expect(find.text('Your collectible library'), findsOneWidget);
     expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(
+      find.textContaining('alerts, wishlist status, and goals'),
+      findsOneWidget,
+    );
     expect(find.text('Scan Collectible'), findsWidgets);
   });
 
@@ -356,9 +428,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('App Preferences'), findsOneWidget);
+    expect(find.text('First-launch onboarding'), findsOneWidget);
+    expect(find.text('Reset Onboarding'), findsOneWidget);
     expect(find.text('Plan & Usage'), findsOneWidget);
     expect(find.text('Current plan'), findsOneWidget);
-    expect(find.text('Free'), findsOneWidget);
+    expect(find.text('Free'), findsWidgets);
     expect(find.text('Scans used today'), findsOneWidget);
     expect(find.text('Remaining scans'), findsOneWidget);
     expect(find.text('Unlimited'), findsOneWidget);
@@ -420,10 +494,40 @@ void main() {
     expect(find.text('Offline portfolio'), findsOneWidget);
     expect(find.text('Active'), findsWidgets);
 
+    await tester.ensureVisible(find.text('Help & About'));
+    await tester.pump();
+    expect(find.text('Help & About'), findsOneWidget);
+    expect(find.text('How scanning works'), findsOneWidget);
+    expect(find.text('How pricing works'), findsOneWidget);
+    expect(find.text('Local vs cloud mode'), findsOneWidget);
+    expect(find.text('Subscription info'), findsOneWidget);
+    expect(find.text('Privacy and security'), findsOneWidget);
+
     await tester.ensureVisible(find.text('About'));
     await tester.pump();
     expect(find.text('About'), findsOneWidget);
     expect(find.text('App version'), findsOneWidget);
+  });
+
+  testWidgets('reset onboarding works from Settings', (
+    WidgetTester tester,
+  ) async {
+    final repository = _FakeOnboardingRepository(completed: true);
+    await tester.pumpCollectIqApp(onboardingRepository: repository);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-reset-onboarding-button')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('settings-reset-onboarding-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.completed, isFalse);
+    expect(find.text('Welcome to CollectIQ AI'), findsOneWidget);
   });
 
   testWidgets('settings signs in with mocked email auth repository', (
@@ -1643,7 +1747,7 @@ void main() {
     await tester.ensureVisible(find.text('Price Alerts'));
     await tester.pump();
     expect(find.text('Price Alerts'), findsOneWidget);
-    expect(find.text('No alerts for this collectible yet.'), findsOneWidget);
+    expect(find.textContaining('Create a local alert below'), findsOneWidget);
     expect(find.text('Alert if value rises 10%'), findsOneWidget);
     expect(find.text('Alert if value drops 10%'), findsOneWidget);
     expect(find.text('Remind when pricing is stale'), findsOneWidget);
@@ -1674,10 +1778,18 @@ extension on WidgetTester {
     UsageRepository? usageRepository,
     CameraService? cameraService,
     GalleryService? galleryService,
-  }) {
-    return pumpWidget(
+    bool onboardingCompleted = true,
+    OnboardingRepository? onboardingRepository,
+  }) async {
+    final effectiveOnboardingRepository =
+        onboardingRepository ??
+        _FakeOnboardingRepository(completed: onboardingCompleted);
+    await pumpWidget(
       ProviderScope(
         overrides: [
+          onboardingRepositoryProvider.overrideWithValue(
+            effectiveOnboardingRepository,
+          ),
           aiRecognitionServiceProvider.overrideWithValue(aiRecognitionService),
           if (aiAnalysisProviderConfig != null)
             aiAnalysisProviderConfigProvider.overrideWithValue(
@@ -1701,6 +1813,7 @@ extension on WidgetTester {
         child: const CollectIqApp(),
       ),
     );
+    await pump();
   }
 
   Future<void> pumpVisualAnalytics(Widget child) {
@@ -1796,6 +1909,22 @@ class _FailingAiAnalysisProvider implements AiAnalysisProvider {
   @override
   Future<AiAnalysisResult> analyze(AiAnalysisRequest request) {
     throw const AiAnalysisException('Provider failed safely.');
+  }
+}
+
+class _FakeOnboardingRepository implements OnboardingRepository {
+  _FakeOnboardingRepository({required this.completed});
+
+  bool completed;
+
+  @override
+  Future<bool> hasCompletedOnboarding() async {
+    return completed;
+  }
+
+  @override
+  Future<void> setOnboardingCompleted(bool completed) async {
+    this.completed = completed;
   }
 }
 

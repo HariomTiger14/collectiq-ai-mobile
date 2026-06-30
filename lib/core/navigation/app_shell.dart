@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
-import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
-import 'dart:async';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -82,6 +85,22 @@ class _AppShellState extends ConsumerState<AppShell>
     _selectTab(_scanTabIndex, reason: 'start-new-scan');
   }
 
+  Future<void> _completeOnboardingAndStartScan() async {
+    await ref.read(onboardingControllerProvider.notifier).complete();
+    if (!mounted) {
+      return;
+    }
+    _startNewScan();
+  }
+
+  Future<void> _completeOnboardingAndExploreDashboard() async {
+    await ref.read(onboardingControllerProvider.notifier).complete();
+    if (!mounted) {
+      return;
+    }
+    _selectTab(AppShellTabController.homeTab, reason: 'onboarding-dashboard');
+  }
+
   void _selectTab(int index, {String reason = 'navigation'}) {
     final previousIndex = ref.read(appShellTabControllerProvider);
     if (previousIndex == _scanTabIndex && index != _scanTabIndex) {
@@ -96,6 +115,7 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
+    final onboardingCompleted = ref.watch(onboardingControllerProvider);
     final selectedIndex = ref.watch(appShellTabControllerProvider);
     final tabs = <Widget>[
       KeyedSubtree(
@@ -121,7 +141,7 @@ class _AppShellState extends ConsumerState<AppShell>
       ),
     ];
 
-    return Scaffold(
+    final shell = Scaffold(
       key: const ValueKey('app-shell'),
       body: IndexedStack(
         key: const ValueKey('app-shell-indexed-stack'),
@@ -160,6 +180,22 @@ class _AppShellState extends ConsumerState<AppShell>
           ),
         ],
       ),
+    );
+
+    return onboardingCompleted.when(
+      data: (completed) {
+        if (completed) {
+          return shell;
+        }
+
+        return OnboardingScreen(
+          onStartScanning: _completeOnboardingAndStartScan,
+          onExploreDashboard: _completeOnboardingAndExploreDashboard,
+        );
+      },
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (_, _) => shell,
     );
   }
 }

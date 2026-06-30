@@ -53,6 +53,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_pricing_requ
 import 'package:collectiq_ai/features/market/domain/entities/market_pricing_result.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_provider.dart';
+import 'package:collectiq_ai/features/onboarding/data/repositories/shared_preferences_onboarding_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -87,6 +88,21 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  group('SharedPreferencesOnboardingRepository', () {
+    test('persists onboarding completion flag', () async {
+      SharedPreferences.setMockInitialValues({});
+      const repository = SharedPreferencesOnboardingRepository();
+
+      expect(await repository.hasCompletedOnboarding(), isFalse);
+
+      await repository.setOnboardingCompleted(true);
+      expect(await repository.hasCompletedOnboarding(), isTrue);
+
+      await repository.setOnboardingCompleted(false);
+      expect(await repository.hasCompletedOnboarding(), isFalse);
+    });
+  });
+
   group('CollectibleItem', () {
     test('toJson serializes all fields', () {
       final item = _testItem();

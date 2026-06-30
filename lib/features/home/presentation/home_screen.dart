@@ -297,7 +297,7 @@ class _EmptyDashboardHero extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Scan your first collectible to unlock portfolio value, category insights, highlights, and recent activity.',
+              'Scan your first collectible to unlock portfolio value, category insights, price alerts, wishlist goals, highlights, and recent activity.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -731,7 +731,7 @@ class _AlertSummaryMessage extends StatelessWidget {
             child: Text(
               hasTriggered
                   ? summary.messages.first
-                  : 'Create alerts from a collectible detail page to track value changes.',
+                  : 'No price alerts yet. Open a saved collectible detail page to create local alerts for value changes.',
               style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,

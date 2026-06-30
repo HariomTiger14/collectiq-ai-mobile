@@ -111,7 +111,7 @@ class PortfolioEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Analyze a scan and save it to start your portfolio.',
+            'Start with Camera or Gallery, analyze the collectible, then save it here to track value, alerts, wishlist status, and goals.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
