@@ -24,8 +24,9 @@ keeping mock/default mode safe, local-first, and free of hardcoded secrets.
 | App name | Verify Play Console name is `CollectIQ AI`. | Manual |
 | Launcher icon | Verify placeholder icon is acceptable for internal testers. | Manual |
 | Screenshots | Capture Home, Scan, Result, Portfolio, Detail, Settings. | Manual |
-| Privacy policy | Publish a beta privacy policy URL before inviting testers. | Manual |
-| Data Safety form | Declare local storage, optional account data, optional diagnostics. | Manual |
+| Privacy policy | Review `docs/PRIVACY_POLICY_DRAFT.md` and publish a beta privacy policy URL before inviting testers. | Manual |
+| Data Safety form | Use `docs/DATA_SAFETY_DRAFT.md` to map local storage, optional account data, images, diagnostics, sync, and billing. | Manual |
+| Permissions disclosure | Review `docs/PERMISSIONS_DISCLOSURE.md` against the Android manifest and runtime prompts. | Manual |
 | Tester list | Add internal tester emails or Google Group. | Manual |
 | Test accounts | Prepare optional Supabase email/password test accounts. | Manual |
 | Billing products | Configure test Pro/Premium product IDs in Play Console. | Manual |
@@ -54,6 +55,17 @@ Backend validation mode:
 AI_ANALYSIS_PROVIDER=openai_vision
 AI_BACKEND_ANALYSIS_ENDPOINT_URL=https://<beta-backend>/api/analyze
 ```
+
+## Privacy and Data Safety Drafts
+
+The beta compliance draft set is:
+
+- `docs/PRIVACY_POLICY_DRAFT.md`
+- `docs/DATA_SAFETY_DRAFT.md`
+- `docs/PERMISSIONS_DISCLOSURE.md`
+
+These are planning drafts only. Final Play Store copy and public policy text
+must be reviewed before launch.
 
 ## Final Beta Smoke Test Checklist
 

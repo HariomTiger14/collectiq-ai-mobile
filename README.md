@@ -32,6 +32,9 @@ Closed beta readiness is tracked in:
 - `docs/CLOSED_BETA_READINESS.md`
 - `docs/TESTER_FEEDBACK_TEMPLATE.md`
 - `docs/KNOWN_LIMITATIONS.md`
+- `docs/PRIVACY_POLICY_DRAFT.md`
+- `docs/DATA_SAFETY_DRAFT.md`
+- `docs/PERMISSIONS_DISCLOSURE.md`
 
 Generate a physical-device smoke checklist for each release candidate with:
 
@@ -40,9 +43,10 @@ scripts\run_beta_smoke_checklist.ps1
 ```
 
 The beta pack covers Play Store internal testing, tester feedback capture,
-known limitations, local-first/offline expectations, optional Supabase/backend
-configuration, billing test setup, and final manual smoke checks. Do not commit
-secrets or expose provider API keys in Flutter builds.
+known limitations, privacy and Data Safety drafts, permission disclosures,
+local-first/offline expectations, optional Supabase/backend configuration,
+billing test setup, and final manual smoke checks. Do not commit secrets or
+expose provider API keys in Flutter builds.
 
 ## Master QA Automation
 

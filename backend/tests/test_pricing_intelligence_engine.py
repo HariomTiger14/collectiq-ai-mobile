@@ -1,6 +1,6 @@
 import unittest
 
-from app.services.ai.mock_recognition_service import MockRecognitionProvider
+from app.services.ai.base_recognition_service import RecognitionResult
 from app.services.pricing.base_pricing_provider import MarketComparableSale
 from app.services.pricing.pricing_intelligence_engine import PricingConfidenceEngine
 
@@ -8,7 +8,28 @@ from app.services.pricing.pricing_intelligence_engine import PricingConfidenceEn
 class PricingIntelligenceEngineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = PricingConfidenceEngine()
-        self.recognition = MockRecognitionProvider().recognize("uploads/card.png")
+        self.recognition = RecognitionResult(
+            title="1999 Pokemon Charizard",
+            category="Trading Card",
+            confidence=94,
+            estimatedValue=1850,
+            condition="Near Mint",
+            recommendation="Consider grading before selling.",
+            description="Base Set Charizard trading card.",
+            detectedObjects=["card", "charizard"],
+            aiProvider="mock",
+            processingTimeMs=120,
+            primaryMatch="1999 Pokemon Charizard",
+            alternativeMatches=[],
+            confidenceExplanation="High confidence from title and card metadata.",
+            detectionQuality="Good",
+            aiReasoning="Card artwork and metadata match Charizard.",
+            year="1999",
+            brand="Pokemon",
+            setName="Base Set",
+            cardNumber="4/102",
+            rarity="Holo Rare",
+        )
 
     def test_confidence_engine_scores_stronger_data_higher(self) -> None:
         strong = self.engine.analyze(
