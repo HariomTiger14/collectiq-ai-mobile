@@ -798,10 +798,36 @@ CollectIQ AI now has a privacy-safe telemetry abstraction for beta testing:
 - `CrashReporter`: records non-fatal errors.
 - `NoopTelemetryService`: default implementation. It performs no external
   calls and keeps local/offline mode unchanged.
-- Firebase and Sentry are represented as config-driven placeholders until their
-  SDKs and project secrets are added intentionally.
+- `FirebaseTelemetryService`: real Firebase Analytics + Crashlytics
+  implementation, enabled only when explicitly configured.
+- Sentry remains a config-driven placeholder.
 
-Telemetry is disabled by default. To test placeholder status labels locally:
+Telemetry is disabled by default. Firebase can be enabled with native Firebase
+configuration files or with dart-define values supplied by CI/local developer
+configuration.
+
+Native Firebase config mode:
+
+```powershell
+flutter run `
+  --dart-define=COLLECTIQ_TELEMETRY_ENABLED=true `
+  --dart-define=COLLECTIQ_TELEMETRY_PROVIDER=firebase `
+  --dart-define=COLLECTIQ_FIREBASE_USE_NATIVE_CONFIG=true
+```
+
+Dart Firebase options mode:
+
+```powershell
+flutter run `
+  --dart-define=COLLECTIQ_TELEMETRY_ENABLED=true `
+  --dart-define=COLLECTIQ_TELEMETRY_PROVIDER=firebase `
+  --dart-define=COLLECTIQ_FIREBASE_API_KEY=<firebase-api-key> `
+  --dart-define=COLLECTIQ_FIREBASE_APP_ID=<firebase-app-id> `
+  --dart-define=COLLECTIQ_FIREBASE_MESSAGING_SENDER_ID=<sender-id> `
+  --dart-define=COLLECTIQ_FIREBASE_PROJECT_ID=<project-id>
+```
+
+To test placeholder status labels locally for Sentry:
 
 ```powershell
 flutter run `
@@ -810,8 +836,10 @@ flutter run `
   --dart-define=COLLECTIQ_SENTRY_DSN=placeholder-local-only
 ```
 
-Do not commit real DSNs, Firebase config files, analytics write keys, API keys,
-or crash reporting secrets.
+Do not commit real DSNs, Firebase config files, analytics write keys, provider
+API keys, or crash reporting secrets. Firebase API keys are not treated as
+provider secrets, but they should still be supplied through project config or
+CI/CD rather than hardcoded in Dart source.
 
 Privacy-safe event policy:
 
@@ -834,8 +862,13 @@ Settings -> Developer Diagnostics shows:
 - Crash reporting enabled/disabled.
 - Analytics enabled/disabled.
 
-Future Firebase/Sentry setup:
+Manual Firebase setup:
 
-- Add the SDK only when a production project is ready.
-- Keep secrets in platform config or CI/CD secrets, not source code.
+- Create a Firebase project.
+- Register the Android app/package.
+- Add `google-services.json` through secure project setup or CI, or pass
+  Firebase options via dart-define for controlled beta builds.
+- Enable Crashlytics and Analytics in Firebase Console.
+- Add Android Gradle Crashlytics/Google Services upload configuration before
+  production release if symbol/mapping uploads are required.
 - Preserve `NoopTelemetryService` as the offline/local fallback.

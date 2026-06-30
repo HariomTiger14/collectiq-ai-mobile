@@ -10,6 +10,7 @@ import 'package:image_picker_android/image_picker_android.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   _disableReleaseDebugLogs();
   _configureAndroidImagePicker();
   final bootstrapTelemetry = createAppTelemetryService(
@@ -24,6 +25,16 @@ void main() {
         reason: 'flutter_error',
       ),
     );
+  };
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    unawaited(
+      bootstrapTelemetry.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'platform_dispatcher_error',
+      ),
+    );
+    return false;
   };
   runZonedGuarded(
     () => runApp(const ProviderScope(child: CollectIqApp())),
