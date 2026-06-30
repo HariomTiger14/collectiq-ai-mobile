@@ -24,7 +24,13 @@ function Invoke-LoggedFlutterBuild {
   Push-Location $root
   try {
     "Running $Name at $(Get-Date -Format o)" | Tee-Object -FilePath $log
-    & $flutter @Arguments 2>&1 | Tee-Object -FilePath $log -Append
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+      & $flutter @Arguments 2>&1 | Tee-Object -FilePath $log -Append
+    } finally {
+      $ErrorActionPreference = $previousErrorActionPreference
+    }
     $exitCode = $LASTEXITCODE
   } finally {
     Pop-Location

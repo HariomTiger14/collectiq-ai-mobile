@@ -1,6 +1,6 @@
 # CollectIQ AI Validation Lab Report
 
-- Generated: 2026-06-30T07:19:13Z
+- Generated: 2026-06-30T14:14:43Z
 - Manifest: C:\Users\hario\Desktop\projects\collectiq_ai\validation\manifests\sample_manifest.json
 - Endpoint: http://127.0.0.1:8000/api/analyze
 

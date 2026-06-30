@@ -101,6 +101,26 @@ Coverage classification:
 See `docs/REAL_DEVICE_TEST_AUTOMATION.md` and
 `docs/PRODUCTION_READINESS_AUDIT.md` for the full matrix and release checklist.
 
+## Production Validation Dashboard
+
+Use the production validation dashboard when preparing a beta or release
+candidate. It aggregates Flutter QA, backend QA, Validation Lab results,
+Android build verification, and release-readiness signals into one report.
+
+```powershell
+scripts\run_production_validation_dashboard.ps1 -SkipValidationLabNetwork
+```
+
+The script writes:
+
+- `docs/PRODUCTION_VALIDATION_REPORT.md`
+- `build/test_reports/production_validation/production_validation_dashboard.md`
+- supporting logs under `build/test_reports/production_validation/`
+
+Automated runs stay in mock/default mode. Real AI accuracy, pricing provider
+agreement, and crash-free sessions require manual/local validation with a
+configured backend, licensed or user-owned images, and Firebase telemetry.
+
 ## Backend
 
 The local scanner backend is a FastAPI app in `backend/`.
