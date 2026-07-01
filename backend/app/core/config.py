@@ -16,8 +16,25 @@ CHUNK_SIZE = 1024 * 1024
 load_dotenv(BACKEND_ROOT / ".env")
 
 
+def parse_cors_allowed_origins(raw_value: str | None = None) -> tuple[str, ...]:
+    value = raw_value if raw_value is not None else os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,"
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+    return tuple(
+        origin.strip()
+        for origin in value.split(",")
+        if origin.strip()
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
+    environment: str = os.getenv("BACKEND_ENV", os.getenv("APP_ENV", "local"))
+    version: str = os.getenv("BACKEND_VERSION", "0.1.0")
+    port: int = int(os.getenv("PORT", "8000"))
+    cors_allowed_origins: tuple[str, ...] = parse_cors_allowed_origins()
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
     pricing_provider: str = os.getenv("PRICING_PROVIDER", "mock")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

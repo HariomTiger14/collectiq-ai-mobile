@@ -20,50 +20,25 @@ MIGRATIONS_DIR = ROOT / "supabase" / "migrations"
 CHECKS_SQL = ROOT / "supabase" / "setup" / "production_readiness_checks.sql"
 
 EXPECTED_TABLES = [
-    "users",
-    "collections",
-    "collectibles",
-    "scan_history",
-    "pricing_snapshots",
-    "favorites",
-    "wishlist",
+    "user_profiles",
+    "portfolio_items",
 ]
 
 EXPECTED_PUBLIC_POLICIES = [
     "Users can read own profile",
     "Users can insert own profile",
     "Users can update own profile",
-    "Users can delete own profile",
-    "Users can read own collections",
-    "Users can insert own collections",
-    "Users can update own collections",
-    "Users can delete own collections",
-    "Users can read own collectibles",
-    "Users can insert own collectibles",
-    "Users can update own collectibles",
-    "Users can delete own collectibles",
-    "Users can read own scan history",
-    "Users can insert own scan history",
-    "Users can update own scan history",
-    "Users can delete own scan history",
-    "Users can read own pricing snapshots",
-    "Users can insert own pricing snapshots",
-    "Users can update own pricing snapshots",
-    "Users can delete own pricing snapshots",
-    "Users can read own favorites",
-    "Users can insert own favorites",
-    "Users can delete own favorites",
-    "Users can read own wishlist",
-    "Users can insert own wishlist",
-    "Users can update own wishlist",
-    "Users can delete own wishlist",
+    "Users can read own portfolio items",
+    "Users can insert own portfolio items",
+    "Users can update own portfolio items",
+    "Users can delete own portfolio items",
 ]
 
 EXPECTED_STORAGE_POLICIES = [
-    "Users can read own collectible images",
-    "Users can upload own collectible images",
-    "Users can update own collectible images",
-    "Users can delete own collectible images",
+    "Users can read own portfolio images",
+    "Users can upload own portfolio images",
+    "Users can update own portfolio images",
+    "Users can delete own portfolio images",
 ]
 
 
@@ -122,34 +97,31 @@ def validate_local_sql() -> list[CheckResult]:
     results.extend(
         [
             CheckResult(
-                name="storage-bucket:collectible-images",
-                passed="values ('collectible-images', 'collectible-images', false)"
+                name="storage-bucket:collectiq-portfolio-images",
+                passed="values ('collectiq-portfolio-images', 'collectiq-portfolio-images', false)"
                 in normalized,
                 details="private storage bucket setup exists",
             ),
             CheckResult(
                 name="storage-path:user-folder",
-                passed="(storage.foldername(name))[1] = auth.uid()::text"
+                passed="(storage.foldername(name))[1] = 'users'"
                 in normalized,
-                details="{userId}/{collectibleCloudId}/image.ext policy exists",
+                details="users/{userId}/portfolio_images/{itemId}.jpg policy exists",
             ),
             CheckResult(
-                name="collectibles:soft-delete",
-                passed="add column if not exists deleted_at timestamptz"
-                in normalized,
-                details="soft delete columns are present",
+                name="portfolio-items:sync-status",
+                passed="'pendingupload'" in normalized and "'deleted'" in normalized,
+                details="sync status values are present",
             ),
             CheckResult(
-                name="collectibles:sync-status",
-                passed="add column if not exists sync_status text not null"
-                in normalized,
-                details="sync status columns are present",
+                name="portfolio-items:raw-json",
+                passed="raw_json jsonb" in normalized,
+                details="raw model payload column is present",
             ),
             CheckResult(
-                name="collectibles:user-id-owner",
-                passed="user_id uuid not null references public.users(id)"
-                in normalized
-                and "with check (auth.uid() = user_id)" in normalized,
+                name="portfolio-items:user-id-owner",
+                passed="user_id uuid not null references auth.users(id)"
+                in normalized,
                 details="rows are tied to auth.uid() through user_id",
             ),
             CheckResult(

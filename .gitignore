@@ -41,6 +41,10 @@ migrate_working_dir/
 .venv/
 .env
 
+# Local/SIT build configuration. Commit only the safe *.example templates.
+/config/*.env
+!/config/*.env.example
+
 # Validation lab local datasets. Keep scripts/manifests/docs in git, but never
 # commit imported image files or large dataset exports.
 /validation/images/**

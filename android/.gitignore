@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase client config is environment-specific. Keep local/dev/staging copies
+# off by default unless a reviewed non-production config is intentionally added.
+app/google-services.json

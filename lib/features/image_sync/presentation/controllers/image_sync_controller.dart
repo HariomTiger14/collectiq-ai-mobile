@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
-import 'package:collectiq_ai/features/image_storage/image_storage_providers.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/features/image_sync/data/repositories/shared_preferences_sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/sync_queue_snapshot.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
@@ -17,9 +17,8 @@ final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
 final uploadWorkerProvider = Provider<UploadWorker>((ref) {
   return UploadWorker(
     queueRepository: ref.watch(syncQueueRepositoryProvider),
-    imageStorageRepository: ref.watch(imageStorageRepositoryProvider),
     portfolioRepository: ref.watch(portfolioRepositoryProvider),
-    cloudPortfolioRepository: ref.watch(cloudPortfolioRepositoryProvider),
+    registry: ref.watch(cloudServiceRegistryProvider),
   );
 });
 
@@ -72,11 +71,13 @@ class ImageSyncState {
 class ImageSyncController extends Notifier<ImageSyncState> {
   late final SyncQueueRepository _queueRepository;
   late final UploadWorker _uploadWorker;
+  late final SupabaseConfig _supabaseConfig;
 
   @override
   ImageSyncState build() {
     _queueRepository = ref.watch(syncQueueRepositoryProvider);
     _uploadWorker = ref.watch(uploadWorkerProvider);
+    _supabaseConfig = ref.watch(supabaseConfigProvider);
     Future.microtask(loadSnapshot);
     return const ImageSyncState();
   }
@@ -96,6 +97,14 @@ class ImageSyncController extends Notifier<ImageSyncState> {
       debugPrint(
         '[ImageSync] upload not queued for non-local image: $localPath',
       );
+      return;
+    }
+
+    if (!_supabaseConfig.isConfigured) {
+      debugPrint(
+        '[ImageSync] upload not queued in local-only mode: $localPath',
+      );
+      await loadSnapshot();
       return;
     }
 

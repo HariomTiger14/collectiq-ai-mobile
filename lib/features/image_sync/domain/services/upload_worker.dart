@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
-import 'package:collectiq_ai/features/image_storage/domain/repositories/image_storage_repository.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
 import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/domain/services/retry_policy.dart';
@@ -11,16 +11,14 @@ import 'package:flutter/foundation.dart';
 class UploadWorker {
   const UploadWorker({
     required this.queueRepository,
-    required this.imageStorageRepository,
     required this.portfolioRepository,
-    this.cloudPortfolioRepository,
+    required this.registry,
     this.retryPolicy = const RetryPolicy(),
   });
 
   final SyncQueueRepository queueRepository;
-  final ImageStorageRepository imageStorageRepository;
   final PortfolioRepository portfolioRepository;
-  final CloudPortfolioRepository? cloudPortfolioRepository;
+  final CloudServiceRegistry registry;
   final RetryPolicy retryPolicy;
 
   Future<void> processQueue() async {
@@ -56,12 +54,23 @@ class UploadWorker {
 
     try {
       debugPrint('[ImageSync] upload start: ${task.id}');
-      final reference = await imageStorageRepository.uploadImage(
+      final userId = await registry.authService.currentUserId();
+      if (userId == null || userId.trim().isEmpty) {
+        await _markFailed(task, 'Cloud image storage requires sign in.');
+        return;
+      }
+
+      final destinationPath = CloudStoragePaths.portfolioImage(
+        userId: userId,
+        itemId: task.collectibleId,
+        extension: _extensionFor(task.localPath),
+      );
+      final reference = await registry.cloudStorageService.uploadImage(
         localPath: task.localPath,
-        collectibleId: task.collectibleId,
+        destinationPath: destinationPath,
       );
 
-      if (!reference.isRemote || reference.publicUrl == null) {
+      if (reference == null || reference.publicUrl == null) {
         debugPrint('[ImageSync] upload produced local reference only');
         await _markFailed(task, 'Cloud image storage is not configured.');
         return;
@@ -93,11 +102,6 @@ class UploadWorker {
   }
 
   Future<void> _uploadUpdatedCollectible(String collectibleId) async {
-    final cloudRepository = cloudPortfolioRepository;
-    if (cloudRepository == null) {
-      return;
-    }
-
     final items = await portfolioRepository.getItems();
     final updatedItems = items
         .where((item) => item.id == collectibleId)
@@ -107,7 +111,9 @@ class UploadWorker {
     }
 
     debugPrint('[ImageSync] database upsert start: $collectibleId');
-    await cloudRepository.uploadLocalItems(updatedItems);
+    for (final item in updatedItems) {
+      await registry.cloudPortfolioSyncService.syncItem(item);
+    }
     debugPrint('[ImageSync] database upsert success: $collectibleId');
   }
 
@@ -144,4 +150,18 @@ bool _isLocalImagePath(String imagePath) {
   }
 
   return true;
+}
+
+String _extensionFor(String path) {
+  final normalized = path.toLowerCase();
+  if (normalized.endsWith('.png')) {
+    return '.png';
+  }
+  if (normalized.endsWith('.webp')) {
+    return '.webp';
+  }
+  if (normalized.endsWith('.jpeg')) {
+    return '.jpeg';
+  }
+  return '.jpg';
 }

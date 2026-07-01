@@ -1,8 +1,12 @@
+import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/network/api_client.dart' as network;
+import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -29,6 +33,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isManualCloudSyncing = false;
 
   @override
   void dispose() {
@@ -49,7 +54,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
-    final portfolioState = ref.watch(portfolioControllerProvider);
+    final cloudRegistry = ref.watch(cloudServiceRegistryProvider);
+    final canRunCloudSync = _cloudSyncAvailable(cloudRegistry);
+    final supabaseConfig = ref.watch(supabaseConfigProvider);
+    final apiConfig = ref.watch(network.environmentConfigProvider);
     final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
     final subscriptionState = ref.watch(subscriptionControllerProvider);
@@ -87,6 +95,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _SettingsCard(
+                    title: 'SIT Readiness',
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.route_outlined,
+                        title: 'Environment',
+                        subtitle:
+                            cloudRegistry.config.environment ==
+                                AppEnvironment.sit
+                            ? 'System integration test mode is active.'
+                            : 'Run CollectIQ SIT with APP_ENV=sit for cloud validation.',
+                        trailing: cloudRegistry.config.environment.label,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.cloud_done_outlined,
+                        title: 'Supabase configured',
+                        subtitle: supabaseConfig.isConfigured
+                            ? 'Supabase URL and anon key are present.'
+                            : 'Setup required: provide SUPABASE_URL and SUPABASE_ANON_KEY in config/sit.env or dart-defines.',
+                        trailing: supabaseConfig.isConfigured ? 'Yes' : 'No',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.person_outline,
+                        title: 'Auth status',
+                        subtitle: authState.isSignedIn
+                            ? authState.user?.email ??
+                                  authState.user?.id ??
+                                  'Signed in'
+                            : 'Signed out. Sign in with email/password before cloud sync.',
+                        trailing: authState.isSignedIn
+                            ? 'Signed in'
+                            : 'Signed out',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.storage_outlined,
+                        title: 'Storage sync',
+                        subtitle: supabaseConfig.isConfigured
+                            ? 'Bucket collectiq-portfolio-images is expected in Supabase.'
+                            : 'Storage requires Supabase setup.',
+                        trailing: supabaseConfig.isConfigured
+                            ? 'Ready'
+                            : 'Not ready',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.sync_outlined,
+                        title: 'Portfolio sync',
+                        subtitle: syncState.status.message,
+                        trailing: syncState.status.isCloudConnected
+                            ? 'Ready'
+                            : 'Not ready',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.http_outlined,
+                        title: 'AI backend URL configured',
+                        subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
+                            ? apiConfig.baseUrl
+                            : 'Setup recommended: provide API_BASE_URL in config/sit.env for phone builds.',
+                        trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
+                            ? 'Yes'
+                            : 'Default',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.schedule_outlined,
+                        title: 'Last sync status',
+                        subtitle:
+                            syncState.errorMessage ?? syncState.status.message,
+                        trailing: syncState.status.statusLabel,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
@@ -133,19 +212,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   .signOut()
                             : null,
                       ),
-                      const _SettingsRow(
+                      _SettingsRow(
                         icon: Icons.g_mobiledata_outlined,
                         title: 'Google Sign-In',
                         subtitle:
                             'OAuth provider placeholder. No Google keys are bundled.',
                         trailing: 'Coming soon',
+                        message: 'Google Sign-In is coming soon.',
                       ),
-                      const _SettingsRow(
+                      _SettingsRow(
                         icon: Icons.apple,
                         title: 'Apple Sign-In',
                         subtitle:
                             'OAuth provider placeholder. No Apple keys are bundled.',
                         trailing: 'Coming soon',
+                        message: 'Apple Sign-In is coming soon.',
                       ),
                     ],
                   ),
@@ -153,18 +234,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsCard(
                     title: 'App Preferences',
                     children: [
-                      const _SettingsRow(
+                      _SettingsRow(
                         icon: Icons.palette_outlined,
                         title: 'Theme',
                         subtitle: 'System theme is used for now.',
                         trailing: 'System',
+                        message: 'Theme follows the system setting for now.',
                       ),
-                      const _SettingsRow(
+                      _SettingsRow(
                         icon: Icons.tips_and_updates_outlined,
                         title: 'First-launch onboarding',
                         subtitle:
                             'Replay the welcome guide, local-first notes, and first-scan path.',
                         trailing: 'Available',
+                        message: 'Use Reset Onboarding below to replay it.',
                       ),
                       _OnboardingResetPanel(
                         onReset: () => _resetOnboarding(context),
@@ -518,16 +601,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           imageSyncState.snapshot.lastSyncAt,
                         ),
                       ),
+                      Text(
+                        canRunCloudSync
+                            ? 'Sync portfolio images and metadata with the configured SIT/dev cloud project.'
+                            : 'Cloud sync is disabled in this environment',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
                           onPressed:
-                              syncState.isLoading || imageSyncState.isUploading
+                              !canRunCloudSync ||
+                                  _isManualCloudSyncing ||
+                                  syncState.isLoading ||
+                                  imageSyncState.isUploading
                               ? null
-                              : () => _manualSync(ref, portfolioState.items),
+                              : () => _manualCloudSync(ref, cloudRegistry),
                           icon: const Icon(Icons.sync_outlined),
                           label: Text(
-                            syncState.isLoading || imageSyncState.isUploading
+                            _isManualCloudSyncing ||
+                                    syncState.isLoading ||
+                                    imageSyncState.isUploading
                                 ? 'Syncing...'
                                 : 'Sync Now',
                           ),
@@ -538,33 +635,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'Storage',
-                    children: const [
+                    children: [
                       _SettingsRow(
                         icon: Icons.phone_android_outlined,
                         title: 'Local images',
                         subtitle:
                             'Captured and uploaded images stay on this device by default.',
                         trailing: 'Active',
+                        message: 'Local image storage is active.',
                       ),
                       _SettingsRow(
                         icon: Icons.cloud_queue_outlined,
                         title: 'Supabase Storage',
                         subtitle:
-                            'Cloud image storage is prepared for future sync.',
-                        trailing: 'Ready',
+                            'Cloud image storage requires Supabase setup and is not enabled in local mode.',
+                        trailing: 'Requires setup',
+                        message:
+                            'Supabase Storage requires cloud setup and is disabled in local mode.',
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'Data & Privacy',
-                    children: const [
+                    children: [
                       _SettingsRow(
                         icon: Icons.storage_outlined,
                         title: 'Offline portfolio',
                         subtitle:
                             'Camera, gallery, analyze, save, and portfolio stay available without sign in.',
                         trailing: 'Active',
+                        message: 'Offline portfolio is active.',
                       ),
                       _SettingsRow(
                         icon: Icons.file_download_outlined,
@@ -572,6 +673,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'Portfolio export will be available in a future release.',
                         trailing: 'Soon',
+                        message: 'Portfolio export is coming soon.',
                       ),
                       _SettingsRow(
                         icon: Icons.privacy_tip_outlined,
@@ -579,19 +681,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'Review privacy details when cloud accounts are enabled.',
                         trailing: 'View',
+                        message:
+                            'Privacy policy content is coming soon for the production release.',
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'Help & About',
-                    children: const [
+                    children: [
                       _SettingsRow(
                         icon: Icons.document_scanner_outlined,
                         title: 'How scanning works',
                         subtitle:
                             'Choose Camera or Gallery, review the image, analyze it, then save the result.',
                         trailing: 'Guide',
+                        message:
+                            'Scanning stays local until analysis. Camera/gallery images use the local FastAPI backend for normal mock-mode analysis.',
                       ),
                       _SettingsRow(
                         icon: Icons.price_check_outlined,
@@ -599,6 +705,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'Pricing starts with safe mock data and is prepared for backend market providers.',
                         trailing: 'Guide',
+                        message:
+                            'Pricing uses mock/local estimates unless backend providers are configured.',
                       ),
                       _SettingsRow(
                         icon: Icons.cloud_queue_outlined,
@@ -606,6 +714,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'Local mode works without sign-in. Cloud sync is optional when configured.',
                         trailing: 'Local-first',
+                        message:
+                            'Local mode is active. Cloud sync requires explicit dev or staging setup.',
                       ),
                       _SettingsRow(
                         icon: Icons.workspace_premium_outlined,
@@ -613,6 +723,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'Free mode is active. Pro and Premium billing are prepared but optional.',
                         trailing: 'Free',
+                        message:
+                            'Billing is not configured. Free local mode remains active.',
                       ),
                       _SettingsRow(
                         icon: Icons.security_outlined,
@@ -620,25 +732,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         subtitle:
                             'No secrets are stored in the app, and telemetry avoids personal content.',
                         trailing: 'Safe',
+                        message:
+                            'Local MVP avoids secrets and keeps images on-device unless cloud is configured.',
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SettingsCard(
                     title: 'About',
-                    children: const [
+                    children: [
                       _SettingsRow(
                         icon: Icons.article_outlined,
                         title: 'Terms',
                         subtitle:
                             'Terms placeholder for the production release.',
                         trailing: 'View',
+                        message:
+                            'Terms are coming soon for production release.',
                       ),
                       _SettingsRow(
                         icon: Icons.info_outline,
                         title: 'App version',
                         subtitle: 'CollectIQ AI mobile preview.',
                         trailing: '0.1.0',
+                        message: 'CollectIQ AI mobile preview 0.1.0.',
                       ),
                     ],
                   ),
@@ -649,6 +766,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  bool _cloudSyncAvailable(CloudServiceRegistry registry) {
+    final environment = registry.config.environment;
+    final flags = registry.config.featureFlags;
+    return environment.allowsNonProductionCloud &&
+        flags.useCloudPortfolioSync &&
+        flags.useCloudImageStorage;
+  }
+
+  Future<void> _manualCloudSync(
+    WidgetRef ref,
+    CloudServiceRegistry registry,
+  ) async {
+    if (!_cloudSyncAvailable(registry) || _isManualCloudSyncing) {
+      return;
+    }
+
+    setState(() => _isManualCloudSyncing = true);
+    await registry.analyticsService.trackEvent('manual_sync_clicked');
+    await registry.analyticsService.trackEvent('portfolio_sync_started');
+
+    try {
+      final syncStatus = await registry.cloudPortfolioSyncService
+          .getSyncStatus();
+      if (!syncStatus.enabled) {
+        await ref.read(syncControllerProvider.notifier).loadStatus();
+        if (mounted) {
+          _showSettingsSnackBar(syncStatus.message);
+        }
+        return;
+      }
+      final portfolioRepository = ref.read(portfolioRepositoryProvider);
+      final mergedCount = await CloudPortfolioSyncCoordinator(
+        registry: registry,
+        portfolioRepository: portfolioRepository,
+      ).syncNow();
+      final failedCount = (await portfolioRepository.getItems())
+          .where((item) => item.syncStatus == CloudItemSyncStatus.failed)
+          .length;
+      await ref.read(portfolioControllerProvider.notifier).loadItems();
+      await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
+      await ref.read(syncControllerProvider.notifier).loadStatus();
+      if (failedCount > 0) {
+        await registry.analyticsService.trackEvent(
+          'portfolio_sync_failed',
+          properties: {'failed_count': failedCount},
+        );
+        if (mounted) {
+          _showSettingsSnackBar(
+            '$failedCount item${failedCount == 1 ? '' : 's'} could not sync. Local portfolio is still available.',
+          );
+        }
+      } else {
+        await registry.analyticsService.trackEvent('portfolio_sync_success');
+        if (mounted) {
+          _showSettingsSnackBar(
+            mergedCount > 0
+                ? 'Cloud sync complete. $mergedCount cloud item${mergedCount == 1 ? '' : 's'} merged.'
+                : 'Cloud sync complete',
+          );
+        }
+      }
+    } on Object catch (error) {
+      await registry.analyticsService.trackEvent(
+        'portfolio_sync_failed',
+        properties: {'error': error.runtimeType.toString()},
+      );
+      if (mounted) {
+        _showSettingsSnackBar(
+          'Cloud sync failed. Local portfolio is still available.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isManualCloudSyncing = false);
+      }
+    }
+  }
+
+  void _showSettingsSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _submitEmailAuth({required bool signUp}) async {
@@ -1052,70 +1253,105 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.message,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String trailing;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.56),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Icon(icon, color: colorScheme.primary),
-        ),
-        const SizedBox(width: AppSpacing.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: () => _showRowMessage(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Row(
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.56),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(icon, color: colorScheme.primary),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+              const SizedBox(width: AppSpacing.md),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 104),
+                child: Text(
+                  trailing,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 92),
-          child: Text(
-            trailing,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.end,
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
+  }
+
+  void _showRowMessage(BuildContext context) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message ?? _defaultMessage)));
+  }
+
+  String get _defaultMessage {
+    final normalizedTrailing = trailing.toLowerCase();
+    final normalizedSubtitle = subtitle.toLowerCase();
+    if (normalizedTrailing.contains('soon')) {
+      return '$title is coming soon.';
+    }
+    if (normalizedTrailing.contains('requires setup') ||
+        normalizedSubtitle.contains('requires') ||
+        normalizedSubtitle.contains('cloud')) {
+      return '$title requires cloud setup in a dev or staging build.';
+    }
+    if (normalizedTrailing.contains('not configured')) {
+      return '$title is not configured for this local build.';
+    }
+    return '$title: $trailing';
   }
 }
 
@@ -1191,51 +1427,4 @@ BillingProduct? _productForPlan(
   }
 
   return null;
-}
-
-Future<void> _manualSync(
-  WidgetRef ref,
-  List<CollectibleItem> localItems,
-) async {
-  debugPrint('[Sync] manual sync start');
-  debugPrint('[Sync] local item count: ${localItems.length}');
-  try {
-    final syncController = ref.read(syncControllerProvider.notifier);
-    await syncController.uploadLocalItems(localItems);
-    await ref.read(imageSyncControllerProvider.notifier).processQueue();
-
-    final downloadedItems = await syncController.downloadCloudItems();
-    debugPrint('[Sync] downloaded item count: ${downloadedItems.length}');
-    final localItemsById = {for (final item in localItems) item.id: item};
-    final allowNewCloudItems = localItemsById.isEmpty;
-    final portfolioController = ref.read(portfolioControllerProvider.notifier);
-    for (final item in downloadedItems) {
-      final localItem = localItemsById[item.id];
-      if (localItem == null && !allowNewCloudItems) {
-        debugPrint(
-          '[Sync] skipping unknown cloud item to avoid resurrecting a '
-          'locally deleted collectible: ${item.id}',
-        );
-        continue;
-      }
-
-      final resolvedItem = localItem == null
-          ? item
-          : SyncConflict(localItem: localItem, cloudItem: item).resolve();
-      if (localItem == null ||
-          resolvedItem.createdAt.isAfter(localItem.createdAt)) {
-        debugPrint('[Sync] merging cloud item: ${resolvedItem.id}');
-        await portfolioController.upsertSyncedItem(resolvedItem);
-      }
-    }
-    await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
-    debugPrint('[Sync] manual sync complete');
-  } on Object catch (error, stackTrace) {
-    debugPrint('[Sync] manual sync caught exception: $error');
-    debugPrint('$stackTrace');
-    ref
-        .read(syncControllerProvider.notifier)
-        .markManualSyncFailed(error, pendingItemCount: localItems.length);
-    await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
-  }
 }

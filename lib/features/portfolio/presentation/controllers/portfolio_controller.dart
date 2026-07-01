@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
@@ -113,6 +115,7 @@ class PortfolioController extends Notifier<PortfolioState> {
       final sortedItems = collectiblesNewestFirst(persistedItems);
       _logFinalOrder('saveItem-reload', sortedItems);
       state = state.copyWith(items: sortedItems, isLoading: false);
+      await _syncPendingCloudItems();
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -138,6 +141,31 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
+  /// Updates [item] locally and refreshes portfolio state.
+  Future<void> updateItem(CollectibleItem item) async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      await _repository.updateItem(item);
+      final immediateItems = collectiblesNewestFirst([
+        item,
+        ...state.items.where((existingItem) => existingItem.id != item.id),
+      ]);
+      _logFinalOrder('updateItem-immediate', immediateItems);
+      state = state.copyWith(items: immediateItems, isLoading: false);
+
+      final persistedItems = await _repository.getItems();
+      final sortedItems = collectiblesNewestFirst(persistedItems);
+      _logFinalOrder('updateItem-reload', sortedItems);
+      state = state.copyWith(items: sortedItems, isLoading: false);
+      await _syncUpdatedCloudItem(item);
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to update portfolio item.',
+      );
+    }
+  }
+
   /// Removes the item with [id] and refreshes portfolio state.
   Future<void> removeItem(String id) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
@@ -147,6 +175,7 @@ class PortfolioController extends Notifier<PortfolioState> {
       final sortedItems = collectiblesNewestFirst(items);
       _logFinalOrder('removeItem', sortedItems);
       state = state.copyWith(items: sortedItems, isLoading: false);
+      await _deleteCloudItem(id);
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -186,6 +215,43 @@ class PortfolioController extends Notifier<PortfolioState> {
         'displayTimestamp='
         '${collectibleDisplayTimestamp(item).toIso8601String()}',
       );
+    }
+  }
+
+  Future<void> _syncPendingCloudItems() async {
+    try {
+      await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).syncPendingItems();
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+    } on Object catch (error) {
+      debugPrint('[PortfolioController] cloud save sync skipped: $error');
+    }
+  }
+
+  Future<void> _syncUpdatedCloudItem(CollectibleItem item) async {
+    try {
+      await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).syncUpdatedItem(item);
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+    } on Object catch (error) {
+      debugPrint('[PortfolioController] cloud update sync skipped: $error');
+    }
+  }
+
+  Future<void> _deleteCloudItem(String id) async {
+    try {
+      await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).deleteCloudItem(id);
+    } on Object catch (error) {
+      debugPrint('[PortfolioController] cloud delete sync skipped: $error');
     }
   }
 }

@@ -6,6 +6,7 @@ from unittest.mock import patch
 import httpx
 from fastapi.testclient import TestClient
 
+from app.core.config import parse_cors_allowed_origins
 from app.main import app
 from app.services.ai.openai_recognition_provider import OpenAIRecognitionProvider
 
@@ -18,7 +19,23 @@ class ApiEndpointsTest(unittest.TestCase):
         response = self.client.get("/health")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok"})
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertIn("environment", payload)
+        self.assertIn("ai_provider", payload)
+        self.assertIn("pricing_provider", payload)
+        self.assertIn("version", payload)
+
+    def test_health_does_not_expose_secrets(self) -> None:
+        response = self.client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        serialized = json.dumps(payload)
+        self.assertNotIn("OPENAI_API_KEY", serialized)
+        self.assertNotIn("api_key", serialized.lower())
+        self.assertNotIn("secret", serialized.lower())
+        self.assertNotIn("token", serialized.lower())
 
     def test_scanner_analyze_happy_path(self) -> None:
         response = self.client.post(
@@ -59,7 +76,12 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertTrue(payload["aiReasoning"])
         self.assertIn("year", payload)
         self.assertIn("brand", payload)
+        self.assertIn("manufacturer", payload)
         self.assertIn("setName", payload)
+        self.assertIn("series", payload)
+        self.assertIn("country", payload)
+        self.assertIn("estimated_value_low", payload)
+        self.assertIn("estimated_value_high", payload)
         self.assertIn("playerOrCharacter", payload)
         self.assertIn("material", payload)
         self.assertIn("notes", payload)
@@ -71,6 +93,8 @@ class ApiEndpointsTest(unittest.TestCase):
             pricing["highEstimate"],
             pricing["estimatedMarketValue"],
         )
+        self.assertEqual(payload["estimated_value_low"], pricing["lowEstimate"])
+        self.assertEqual(payload["estimated_value_high"], pricing["highEstimate"])
         self.assertEqual(pricing["currency"], "AUD")
         self.assertTrue(pricing["pricingSource"])
         self.assertGreaterEqual(pricing["pricingConfidence"], 0)
@@ -130,6 +154,30 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(error["code"], "ai_provider_not_configured")
         self.assertIn("OPENAI_API_KEY", error["message"])
         self.assertFalse(error["retryable"])
+
+    def test_scanner_analyze_openai_without_key_returns_safe_error(self) -> None:
+        with patch(
+            "app.routers.scanner.get_ai_recognition_provider",
+            return_value=OpenAIRecognitionProvider(api_key=""),
+        ):
+            response = self.client.post(
+                "/scanner/analyze",
+                files={"image": ("card.png", b"image-bytes", "image/png")},
+            )
+
+        self.assertEqual(response.status_code, 501)
+        self.assertFalse(response.json()["success"])
+        self.assertIn("OPENAI_API_KEY", response.json()["error"])
+
+    def test_cors_config_loads_from_env_value(self) -> None:
+        origins = parse_cors_allowed_origins(
+            "https://collectiq-sit.example.com, http://localhost:8000"
+        )
+
+        self.assertEqual(
+            origins,
+            ("https://collectiq-sit.example.com", "http://localhost:8000"),
+        )
 
     def test_api_analyze_openai_success_returns_contract_response(self) -> None:
         provider = OpenAIRecognitionProvider(

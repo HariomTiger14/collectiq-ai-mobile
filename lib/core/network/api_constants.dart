@@ -5,6 +5,9 @@ enum AppEnvironment {
   /// Local development and developer testing.
   development,
 
+  /// Phone/system integration testing against safe non-production services.
+  sit,
+
   /// Pre-production validation environment.
   staging,
 
@@ -15,13 +18,25 @@ enum AppEnvironment {
 /// Runtime environment configuration for API access.
 class EnvironmentConfig {
   /// Creates an immutable environment configuration.
-  const EnvironmentConfig({required this.environment});
+  const EnvironmentConfig({
+    required this.environment,
+    this.baseUrlOverride = '',
+  });
 
   /// Active backend environment.
   final AppEnvironment environment;
 
+  /// Optional backend base URL supplied by local ignored config.
+  final String baseUrlOverride;
+
   /// Base URL for the active environment.
-  String get baseUrl => ApiConstants.baseUrlFor(environment);
+  String get baseUrl {
+    final override = baseUrlOverride.trim();
+    if (override.isNotEmpty) {
+      return override;
+    }
+    return ApiConstants.baseUrlFor(environment);
+  }
 
   /// Creates environment configuration from a compile-time value.
   factory EnvironmentConfig.fromEnvironment() {
@@ -29,13 +44,22 @@ class EnvironmentConfig {
       'APP_ENV',
       defaultValue: 'development',
     );
+    const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+    const legacyApiBaseUrl = String.fromEnvironment('COLLECTIQ_API_BASE_URL');
+    final baseUrlOverride = apiBaseUrl.trim().isNotEmpty
+        ? apiBaseUrl
+        : legacyApiBaseUrl;
 
-    return EnvironmentConfig(environment: _parseEnvironment(value));
+    return EnvironmentConfig(
+      environment: _parseEnvironment(value),
+      baseUrlOverride: baseUrlOverride,
+    );
   }
 
   static AppEnvironment _parseEnvironment(String value) {
     return switch (value.toLowerCase()) {
       'production' || 'prod' => AppEnvironment.production,
+      'sit' || 'system-test' || 'system_integration_test' => AppEnvironment.sit,
       'staging' || 'stage' => AppEnvironment.staging,
       _ => AppEnvironment.development,
     };
@@ -71,6 +95,7 @@ class ApiConstants {
   static String baseUrlFor(AppEnvironment environment) {
     return switch (environment) {
       AppEnvironment.development => _developmentBaseUrl,
+      AppEnvironment.sit => _developmentBaseUrl,
       AppEnvironment.staging => 'https://staging-api.collectiq.ai',
       AppEnvironment.production => 'https://api.collectiq.ai',
     };

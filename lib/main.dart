@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/cloud/cloud_app_startup.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
@@ -16,10 +19,21 @@ void main() {
   final bootstrapTelemetry = createAppTelemetryService(
     TelemetryConfig.fromEnvironment(),
   );
+  final cloudRegistry = CloudServiceRegistry.fromConfig(
+    EnvironmentConfig.fromEnvironment(),
+  );
+  unawaited(CloudAppStartup(registry: cloudRegistry).run());
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     unawaited(
       bootstrapTelemetry.recordNonFatalError(
+        details.exception,
+        stackTrace: details.stack,
+        reason: 'flutter_error',
+      ),
+    );
+    unawaited(
+      cloudRegistry.crashReportingService.recordNonFatalError(
         details.exception,
         stackTrace: details.stack,
         reason: 'flutter_error',
@@ -34,18 +48,34 @@ void main() {
         reason: 'platform_dispatcher_error',
       ),
     );
+    unawaited(
+      cloudRegistry.crashReportingService.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'platform_dispatcher_error',
+      ),
+    );
     return false;
   };
-  runZonedGuarded(
-    () => runApp(const ProviderScope(child: CollectIqApp())),
-    (error, stackTrace) => unawaited(
+  runZonedGuarded(() => runApp(const ProviderScope(child: CollectIqApp())), (
+    error,
+    stackTrace,
+  ) {
+    unawaited(
       bootstrapTelemetry.recordNonFatalError(
         error,
         stackTrace: stackTrace,
         reason: 'uncaught_zone_error',
       ),
-    ),
-  );
+    );
+    unawaited(
+      cloudRegistry.crashReportingService.recordNonFatalError(
+        error,
+        stackTrace: stackTrace,
+        reason: 'uncaught_zone_error',
+      ),
+    );
+  });
 }
 
 void _disableReleaseDebugLogs() {

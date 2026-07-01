@@ -1,9 +1,9 @@
 # CollectIQ AI Production Validation Report
 
-- Generated: 2026-07-01T00:17:41.8548099+10:00
-- Duration: 00:03:32.3218356
+- Generated: 2026-07-01T00:26:20.3899384+10:00
+- Duration: 00:01:04.0493750
 - Report source: `scripts/run_production_validation_dashboard.ps1`
-- Validation manifest: `C:\Users\hario\Desktop\projects\collectiq_ai\validation\manifests\sample_manifest.json`
+- Validation manifest: `validation\manifests\local_sample_manifest.json`
 - Validation endpoint: `http://127.0.0.1:8000/api/analyze`
 
 ## Executive Summary
@@ -15,10 +15,10 @@
 
 | Metric | Current Status |
 | --- | --- |
-| AI accuracy | No images available |
-| Pricing provider agreement | No images available |
-| Average confidence | No images available |
-| Average latency | No images available |
+| AI accuracy | Not measured |
+| Pricing provider agreement | Not measured |
+| Average confidence | Not measured |
+| Average latency | Not measured |
 | Sync success rate | Covered by Flutter sync tests; live Supabase rate requires configured project run. |
 | Billing status | Google Play Billing foundation tested; production products require Play Console setup. |
 | Crash-free sessions | Telemetry/Crashlytics integration available; live crash-free sessions require Firebase configuration and beta traffic. |

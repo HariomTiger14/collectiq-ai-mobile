@@ -33,6 +33,26 @@ class CollectibleAlternativeMatch {
   }
 }
 
+enum CloudItemSyncStatus {
+  localOnly,
+  pendingUpload,
+  synced,
+  failed;
+
+  static CloudItemSyncStatus fromJson(Object? value) {
+    if (value is! String) {
+      return CloudItemSyncStatus.localOnly;
+    }
+
+    return switch (value.trim()) {
+      'pendingUpload' => CloudItemSyncStatus.pendingUpload,
+      'synced' => CloudItemSyncStatus.synced,
+      'failed' => CloudItemSyncStatus.failed,
+      _ => CloudItemSyncStatus.localOnly,
+    };
+  }
+}
+
 /// Shared domain entity representing a collectible stored in the portfolio.
 class CollectibleItem {
   /// Creates an immutable collectible item.
@@ -48,6 +68,9 @@ class CollectibleItem {
     required this.createdAt,
     this.imageStoragePath,
     this.cloudImageUrl,
+    this.syncStatus = CloudItemSyncStatus.localOnly,
+    this.lastSyncedAt,
+    this.syncError,
     this.pricing,
     this.marketSummary,
     this.primaryMatch,
@@ -101,6 +124,12 @@ class CollectibleItem {
   /// Public cloud image URL after background upload completes.
   final String? cloudImageUrl;
 
+  final CloudItemSyncStatus syncStatus;
+
+  final DateTime? lastSyncedAt;
+
+  final String? syncError;
+
   /// Canonical date and time the item was saved into the local portfolio.
   final DateTime createdAt;
 
@@ -142,6 +171,9 @@ class CollectibleItem {
       imagePath: json['imagePath'] as String,
       imageStoragePath: _optionalString(json['imageStoragePath']),
       cloudImageUrl: _optionalString(json['cloudImageUrl']),
+      syncStatus: CloudItemSyncStatus.fromJson(json['syncStatus']),
+      lastSyncedAt: _optionalDateTime(json['lastSyncedAt']),
+      syncError: _optionalString(json['syncError']),
       createdAt: _savedAtFromJson(json),
       pricing: json['pricing'] is Map<String, dynamic>
           ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
@@ -190,6 +222,9 @@ class CollectibleItem {
       'imagePath': imagePath,
       'imageStoragePath': imageStoragePath,
       'cloudImageUrl': cloudImageUrl,
+      'syncStatus': syncStatus.name,
+      'lastSyncedAt': lastSyncedAt?.toIso8601String(),
+      'syncError': syncError,
       'savedAt': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'pricing': pricing?.toJson(),
@@ -234,6 +269,9 @@ class CollectibleItem {
       imagePath: imagePath,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
+      syncStatus: CloudItemSyncStatus.synced,
+      lastSyncedAt: DateTime.now(),
+      syncError: null,
       createdAt: createdAt,
       pricing: pricing,
       marketSummary: marketSummary,
@@ -272,6 +310,9 @@ class CollectibleItem {
       imagePath: imagePath,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
+      syncStatus: syncStatus,
+      lastSyncedAt: lastSyncedAt,
+      syncError: syncError,
       createdAt: savedAt,
       pricing: pricing,
       marketSummary: marketSummary,
@@ -294,6 +335,105 @@ class CollectibleItem {
       mint: mint,
       material: material,
       notes: notes,
+    );
+  }
+
+  CollectibleItem copyWithCloudSync({
+    CloudItemSyncStatus? syncStatus,
+    String? imageStoragePath,
+    String? cloudImageUrl,
+    DateTime? lastSyncedAt,
+    String? syncError,
+    bool clearSyncError = false,
+  }) {
+    return CollectibleItem(
+      id: id,
+      title: title,
+      category: category,
+      estimatedValue: estimatedValue,
+      confidence: confidence,
+      condition: condition,
+      recommendation: recommendation,
+      imagePath: imagePath,
+      imageStoragePath: imageStoragePath ?? this.imageStoragePath,
+      cloudImageUrl: cloudImageUrl ?? this.cloudImageUrl,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      syncError: clearSyncError ? null : syncError ?? this.syncError,
+      createdAt: createdAt,
+      pricing: pricing,
+      marketSummary: marketSummary,
+      primaryMatch: primaryMatch,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation: confidenceExplanation,
+      detectionQuality: detectionQuality,
+      aiReasoning: aiReasoning,
+      year: year,
+      brand: brand,
+      setName: setName,
+      series: series,
+      cardNumber: cardNumber,
+      playerOrCharacter: playerOrCharacter,
+      rarity: rarity,
+      estimatedGrade: estimatedGrade,
+      language: language,
+      edition: edition,
+      country: country,
+      mint: mint,
+      material: material,
+      notes: notes,
+    );
+  }
+
+  /// Creates a copy with locally editable profile fields changed.
+  CollectibleItem copyWith({
+    String? title,
+    String? category,
+    double? estimatedValue,
+    PricingInfo? pricing,
+    MarketSummary? marketSummary,
+    String? year,
+    String? brand,
+    String? series,
+    String? country,
+    String? notes,
+  }) {
+    return CollectibleItem(
+      id: id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      estimatedValue: estimatedValue ?? this.estimatedValue,
+      confidence: confidence,
+      condition: condition,
+      recommendation: recommendation,
+      imagePath: imagePath,
+      imageStoragePath: imageStoragePath,
+      cloudImageUrl: cloudImageUrl,
+      syncStatus: syncStatus,
+      lastSyncedAt: lastSyncedAt,
+      syncError: syncError,
+      createdAt: createdAt,
+      pricing: pricing ?? this.pricing,
+      marketSummary: marketSummary ?? this.marketSummary,
+      primaryMatch: primaryMatch,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation: confidenceExplanation,
+      detectionQuality: detectionQuality,
+      aiReasoning: aiReasoning,
+      year: year ?? this.year,
+      brand: brand ?? this.brand,
+      setName: setName,
+      series: series ?? this.series,
+      cardNumber: cardNumber,
+      playerOrCharacter: playerOrCharacter,
+      rarity: rarity,
+      estimatedGrade: estimatedGrade,
+      language: language,
+      edition: edition,
+      country: country ?? this.country,
+      mint: mint,
+      material: material,
+      notes: notes ?? this.notes,
     );
   }
 }

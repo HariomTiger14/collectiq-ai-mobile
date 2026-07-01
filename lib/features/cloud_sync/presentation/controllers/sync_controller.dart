@@ -1,38 +1,103 @@
-import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
-import 'package:collectiq_ai/features/cloud_sync/data/repositories/mock_cloud_portfolio_repository.dart';
-import 'package:collectiq_ai/features/cloud_sync/data/repositories/supabase_cloud_portfolio_repository.dart';
-import 'package:collectiq_ai/features/cloud_sync/data/services/local_first_sync_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
-import 'package:collectiq_ai/features/cloud_sync/domain/repositories/cloud_portfolio_repository.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Provides the cloud portfolio repository.
-final cloudPortfolioRepositoryProvider = Provider<CloudPortfolioRepository>((
-  ref,
-) {
-  final supabaseService = ref.watch(supabaseServiceProvider);
-  if (!supabaseService.isConfigured) {
-    return const MockCloudPortfolioRepository();
+final syncServiceProvider = Provider<SyncService>((ref) {
+  return RegistrySyncService(registry: ref.watch(cloudServiceRegistryProvider));
+});
+
+class RegistrySyncService implements SyncService {
+  const RegistrySyncService({required this.registry});
+
+  final CloudServiceRegistry registry;
+
+  @override
+  Future<SyncStatus> currentStatus() async {
+    final status = await registry.cloudPortfolioSyncService.getSyncStatus();
+    if (!status.enabled) {
+      return SyncStatus(
+        state: SyncState.localOnly,
+        message: status.message,
+        isCloudBackupEnabled: false,
+        authenticatedUserId: status.userId,
+        lastSyncedAt: status.lastSyncedAt,
+      );
+    }
+
+    return SyncStatus(
+      state: SyncState.synced,
+      message: status.message,
+      isCloudBackupEnabled: true,
+      authenticatedUserId: status.userId,
+      lastSyncedAt: status.lastSyncedAt,
+    );
   }
 
-  return SupabaseCloudPortfolioRepository(supabaseService: supabaseService);
-});
+  @override
+  Future<SyncStatus> markPending(List<CollectibleItem> localItems) async {
+    return SyncStatus(
+      state: SyncState.pending,
+      message: 'Cloud sync is not enabled. Local changes are waiting.',
+      isCloudBackupEnabled: false,
+      pendingItemCount: localItems.length,
+    );
+  }
 
-final syncServiceProvider = Provider<SyncService>((ref) {
-  return LocalFirstSyncService(
-    repository: ref.watch(cloudPortfolioRepositoryProvider),
-  );
-});
+  @override
+  Future<SyncStatus> syncLocalItems(List<CollectibleItem> localItems) async {
+    final status = await registry.cloudPortfolioSyncService.getSyncStatus();
+    if (!status.enabled) {
+      return SyncStatus(
+        state: SyncState.localOnly,
+        message: status.message,
+        isCloudBackupEnabled: false,
+        pendingItemCount: localItems.length,
+        authenticatedUserId: status.userId,
+      );
+    }
+
+    try {
+      for (final item in localItems) {
+        await registry.cloudPortfolioSyncService.syncItem(item);
+      }
+      return SyncStatus(
+        state: SyncState.synced,
+        message: 'Cloud sync complete.',
+        isCloudBackupEnabled: true,
+        authenticatedUserId: status.userId,
+        lastSyncedAt: DateTime.now(),
+      );
+    } on Object catch (_) {
+      return SyncStatus(
+        state: SyncState.failed,
+        message: 'Cloud sync failed. Changes remain saved locally.',
+        isCloudBackupEnabled: true,
+        pendingItemCount: localItems.length,
+        retryableItemCount: localItems.length,
+        authenticatedUserId: status.userId,
+      );
+    }
+  }
+
+  @override
+  Future<List<CollectibleItem>> downloadCloudItems() {
+    return registry.cloudPortfolioSyncService.fetchItems();
+  }
+}
 
 /// Placeholder sync state for future cloud backup.
 class SyncControllerState {
   /// Creates sync controller state.
   const SyncControllerState({
-    this.status = MockCloudPortfolioRepository.localOnlyStatus,
+    this.status = const SyncStatus(
+      state: SyncState.localOnly,
+      message: 'Cloud sync is not configured. Portfolio is saved locally.',
+      isCloudBackupEnabled: false,
+    ),
     this.isLoading = false,
     this.errorMessage,
   });

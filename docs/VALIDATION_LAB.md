@@ -20,7 +20,9 @@ unless you manually enable real backend providers.
 ```text
 validation/
   images/
+    local_sample/
   manifests/
+    local_sample_manifest.json
   reports/
 ```
 
@@ -51,6 +53,33 @@ See `docs/PUBLIC_DATASET_SOURCES.md` for a catalog of safe source types,
 license notes, and expected metadata fields.
 
 ## Import a Dataset
+
+For the first measurable run, use the local sample workflow. It creates the
+safe local folder, imports user-owned/open images if provided, runs a dry-run,
+and writes `docs/FIRST_VALIDATION_RUN_REPORT.md`.
+
+```powershell
+scripts\run_first_validation_dataset.ps1
+```
+
+To import images from a local folder:
+
+```powershell
+scripts\run_first_validation_dataset.ps1 `
+  -SourceImageFolder C:\path\to\owned-or-open-images `
+  -Metadata C:\path\to\metadata.csv
+```
+
+Then fill any missing labels in:
+
+```text
+validation/manifests/local_sample_manifest.json
+```
+
+Required labels for meaningful scoring are `expected_name` and
+`expected_category`. Optional but useful labels are `expected_brand`,
+`expected_set`, `expected_year`, `expected_price_min`, and
+`expected_price_max`.
 
 Use the importer when you have a local folder plus optional CSV/JSON metadata.
 Images are ignored by git and should remain local.

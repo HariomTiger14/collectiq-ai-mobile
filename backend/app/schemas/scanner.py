@@ -41,6 +41,9 @@ class ScannerAnalysisResponse(BaseModel):
     brand: str | None = None
     setName: str | None = None
     series: str | None = None
+    manufacturer: str | None = None
+    estimated_value_low: int | None = None
+    estimated_value_high: int | None = None
     cardNumber: str | None = None
     playerOrCharacter: str | None = None
     rarity: str | None = None

@@ -1,4 +1,8 @@
 filename,status,expected_name,actual_name,expected_category,actual_category,expected_brand,actual_brand,expected_set,actual_set,expected_year,actual_year,expected_price_min,expected_price_max,actual_estimated_value,confidence,latency_ms,fallback_reason,category_match,name_keyword_match,set_match,year_match,price_in_range,error
-pokemon_card_placeholder.jpg,missing_image,1999 Pokemon Charizard Holo,,Pokemon Card,,Pokemon,,Base Set,,1999,,1000.0,3000.0,,,,,False,False,,,,Image file is missing from validation/images.
-sports_card_placeholder.jpg,missing_image,1986 Fleer Michael Jordan Rookie,,Sports Card,,Fleer,,Fleer Basketball,,1986,,5000.0,25000.0,,,,,False,False,,,,Image file is missing from validation/images.
-coin_placeholder.jpg,missing_image,1921 Morgan Silver Dollar,,Coin,,United States Mint,,Morgan Dollar,,1921,,25.0,150.0,,,,,False,False,,,,Image file is missing from validation/images.
+1998 National Geographic “Mola Pillow” Curiosity Kits Activity Complete Open Box.jpg,dry_run,National Geographic Curiosity Kits Mola Pillow Activity Kit,,Craft Activity Kit,,National Geographic Curiosity Kits,,Curiosity Kits,,1998,,,,,,,,False,False,,,,
+980s 'Pogo Ball Classic' by Hasboro Toys still in the box..jpg,dry_run,Pogo Bal Classic,,Toy,,Hasbro,,Unknown,,1980s,,,,,,,,False,False,,,,
+Australia 1955 UnitedNation 50th Anniversary 20c.jpg,dry_run,United Nations Fiftieth Anniversary 20 cents coin,,Coin,,Unknown,,United Nations Fiftieth Anniversary,,Unknown,,,,,,,,False,False,,,,
+HEMAN.jpeg,dry_run,He-Man action figure,,Action Figure,,Masters of the Universe,,Unknown,,Unknown,,,,,,,,False,False,,,,
+Owner's Pokémon (TCG).jpg,dry_run,Brock's Sandslash,,Pokemon Trading Card,,Pokemon,,Gym Heroes,,2000,,,,,,,,False,False,,,,
+Petretti's Coca-cola Collectables Price Guide.webp,dry_run,"Petretti's Coca-Cola Collectibles Price Guide, 10th Edition",,Collectibles Reference Book,,Coca-Cola,,Petretti's Coca-Cola Collectibles Price Guide,,Unknown,,,,,,,,False,False,,,,
+Pokémon's Pikachu Illustrator card.jpg,dry_run,Pikachu Illustrator Holo CoroCoro Comics Promo,,Pokemon Trading Card,,Pokemon,,Japanese Promo,,1998,,,,,,,,False,False,,,,

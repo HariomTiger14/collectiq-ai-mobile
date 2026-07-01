@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
@@ -935,6 +937,13 @@ class ScannerController extends Notifier<ScannerState> {
     );
     await ref.read(portfolioControllerProvider.notifier).saveItem(item);
     _logFlow('portfolio updated', details: {'itemId': item.id});
+    _trackCloudAnalytics(
+      'portfolio_item_saved',
+      properties: {
+        'category': item.category,
+        'source': _imageSourceFor(item.imagePath),
+      },
+    );
     _trackTelemetry(
       TelemetryEventNames.saveToPortfolio,
       properties: {
@@ -945,6 +954,7 @@ class ScannerController extends Notifier<ScannerState> {
     await ref
         .read(imageSyncControllerProvider.notifier)
         .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
+    unawaited(_syncSavedItemIfEnabled(itemId: item.id));
     state = state.copyWith(isSavedToPortfolio: true);
     return true;
   }
@@ -1096,7 +1106,7 @@ class ScannerController extends Notifier<ScannerState> {
     return switch (error.statusCode) {
       413 => 'Image is too large. Please choose an image under 10MB.',
       415 => 'Please select a PNG, JPG, or JPEG image.',
-      _ => 'Unable to connect to AI service.',
+      _ => 'AI backend is not reachable. Check your internet/backend setup.',
     };
   }
 
@@ -1124,6 +1134,59 @@ class ScannerController extends Notifier<ScannerState> {
     Map<String, Object?> properties = const {},
   }) {
     unawaited(_telemetry.trackEvent(eventName, properties: properties));
+  }
+
+  Future<void> _syncSavedItemIfEnabled({required String itemId}) async {
+    final registry = ref.read(cloudServiceRegistryProvider);
+    if (!_cloudPortfolioSyncEnabled(registry)) {
+      return;
+    }
+
+    _trackCloudAnalytics('portfolio_sync_started');
+    try {
+      final repository = ref.read(portfolioRepositoryProvider);
+      await CloudPortfolioSyncCoordinator(
+        registry: registry,
+        portfolioRepository: repository,
+      ).syncPendingItems();
+      final savedItem = (await repository.getItems())
+          .where((item) => item.id == itemId)
+          .firstOrNull;
+      await ref.read(portfolioControllerProvider.notifier).loadItems();
+      if (savedItem?.syncStatus == CloudItemSyncStatus.failed) {
+        _trackCloudAnalytics(
+          'portfolio_sync_failed',
+          properties: {'error': savedItem?.syncError ?? 'item_sync_failed'},
+        );
+      } else {
+        _trackCloudAnalytics('portfolio_sync_success');
+      }
+    } on Object catch (error) {
+      _trackCloudAnalytics(
+        'portfolio_sync_failed',
+        properties: {'error': error.runtimeType.toString()},
+      );
+    }
+  }
+
+  bool _cloudPortfolioSyncEnabled(CloudServiceRegistry registry) {
+    final environment = registry.config.environment;
+    final flags = registry.config.featureFlags;
+    return environment.allowsNonProductionCloud &&
+        flags.useCloudPortfolioSync &&
+        flags.useCloudImageStorage;
+  }
+
+  void _trackCloudAnalytics(
+    String name, {
+    Map<String, Object?> properties = const {},
+  }) {
+    unawaited(
+      ref
+          .read(cloudServiceRegistryProvider)
+          .analyticsService
+          .trackEvent(name, properties: properties),
+    );
   }
 
   void _recordTelemetryError(

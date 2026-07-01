@@ -8,6 +8,9 @@ abstract interface class PortfolioRepository {
   /// Upserts a cloud-synced item without changing its original saved timestamp.
   Future<void> upsertSyncedItem(CollectibleItem item);
 
+  /// Updates an existing local portfolio item without changing its saved time.
+  Future<void> updateItem(CollectibleItem item);
+
   /// Returns all saved portfolio items.
   Future<List<CollectibleItem>> getItems();
 

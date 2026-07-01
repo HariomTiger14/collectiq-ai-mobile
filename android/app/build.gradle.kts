@@ -4,6 +4,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.lifecycle(
+        "google-services.json not found; Firebase Android config is skipped for this build."
+    )
+}
+
 android {
     namespace = "com.collectiq.ai"
     compileSdk = flutter.compileSdkVersion
@@ -20,6 +28,21 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("local") {
+            dimension = "environment"
+            applicationIdSuffix = ".local"
+        }
+        create("sit") {
+            dimension = "environment"
+            applicationIdSuffix = ".sit"
+        }
+        create("prod") {
+            dimension = "environment"
+        }
     }
 
     signingConfigs {

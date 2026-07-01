@@ -3,20 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import UPLOAD_DIR
+from app.core.config import UPLOAD_DIR, settings
 from app.routers import api_analyze, health, portfolio, scanner
 
 
 app = FastAPI(
     title="CollectIQ AI Backend",
-    version="0.1.0",
+    version=settings.version,
     description="Local backend for CollectIQ AI scanner workflows.",
 )
 
+_allow_origins = list(settings.cors_allowed_origins)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials="*" not in _allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

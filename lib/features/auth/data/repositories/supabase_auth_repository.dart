@@ -22,7 +22,11 @@ class SupabaseAuthRepository implements AuthRepository {
     }
 
     debugPrint('[Auth] loading Supabase current user');
-    final session = await supabaseService.ensureAnonymousSession();
+    final session = await supabaseService.currentSession();
+    if (session == null) {
+      debugPrint('[Auth] no Supabase session; user is signed out');
+      return null;
+    }
     debugPrint('[Auth] current Supabase user id: ${session.userId}');
     return _userFromSession(session);
   }

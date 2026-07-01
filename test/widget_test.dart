@@ -398,6 +398,16 @@ void main() {
 
     expect(find.text('Settings'), findsWidgets);
     expect(find.text('Manage account and cloud sync options.'), findsOneWidget);
+    expect(find.text('SIT Readiness'), findsOneWidget);
+    expect(find.text('Environment'), findsOneWidget);
+    expect(find.text('Supabase configured'), findsOneWidget);
+    expect(
+      find.text(
+        'Setup required: provide SUPABASE_URL and SUPABASE_ANON_KEY in config/sit.env or dart-defines.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('AI backend URL configured'), findsOneWidget);
     expect(find.text('Account'), findsOneWidget);
     expect(find.text('Account mode'), findsOneWidget);
     expect(find.text('Local Anonymous'), findsOneWidget);
@@ -438,6 +448,10 @@ void main() {
     expect(find.text('Unlimited'), findsOneWidget);
     expect(find.text('Payment status'), findsOneWidget);
     expect(find.text('Not configured'), findsWidgets);
+    expect(
+      find.text('Cloud sync is disabled in this environment'),
+      findsOneWidget,
+    );
     expect(find.text('Pro'), findsOneWidget);
     expect(find.text('Premium'), findsOneWidget);
     expect(find.text('AI & Scanning'), findsOneWidget);
@@ -507,6 +521,84 @@ void main() {
     await tester.pump();
     expect(find.text('About'), findsOneWidget);
     expect(find.text('App version'), findsOneWidget);
+  });
+
+  testWidgets('settings rows respond with safe local messages', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Google Sign-In'));
+    await tester.pump();
+    await tester.tap(find.text('Google Sign-In'));
+    await tester.pumpAndSettle();
+    expect(find.text('Google Sign-In is coming soon.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+
+    await tester.tap(find.text('Theme'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Theme follows the system setting for now.'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 4));
+
+    await tester.ensureVisible(find.text('Supabase Storage'));
+    await tester.pump();
+    await tester.tap(find.text('Supabase Storage'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Supabase Storage requires cloud setup and is disabled in local mode.',
+      ),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 4));
+
+    await tester.ensureVisible(find.text('Export portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Export portfolio'));
+    await tester.pumpAndSettle();
+    expect(find.text('Portfolio export is coming soon.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+
+    await tester.ensureVisible(find.text('Local vs cloud mode'));
+    await tester.pump();
+    await tester.tap(find.text('Local vs cloud mode'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Local mode is active. Cloud sync requires explicit dev or staging setup.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('settings disabled cloud controls show config-required state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cloud Sync'));
+    await tester.pump();
+
+    expect(
+      find.text('Cloud sync is disabled in this environment'),
+      findsOneWidget,
+    );
+    final syncButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Sync Now'),
+    );
+    expect(syncButton.onPressed, isNull);
+
+    await tester.ensureVisible(find.text('Supabase Storage'));
+    await tester.pump();
+    expect(find.text('Requires setup'), findsOneWidget);
   });
 
   testWidgets('reset onboarding works from Settings', (
@@ -843,7 +935,12 @@ void main() {
     await tester.tap(find.text('Analyze with AI'));
     await tester.pump();
 
-    expect(find.text('Unable to connect to AI service.'), findsOneWidget);
+    expect(
+      find.text(
+        'AI backend is not reachable. Check your internet/backend setup.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('AI Result'), findsNothing);
   });
 
@@ -1612,6 +1709,108 @@ void main() {
     expect(find.text('Wishlist Status'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
+  });
+
+  testWidgets('edit collectible persists locally and preserves image path', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"edit-card","title":"Editable Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"test/fixtures/persistent-camera-card.jpg","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","series":"Pokemon TCG","country":"United States","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"}}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('portfolio-item-edit-card')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('portfolio-item-edit-card')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-edit-button')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-edit-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Edit collectible'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-title-field')),
+      'Edited Silver Eagle',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-category-field')),
+      'Coin',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-manufacturer-field')),
+      'US Mint',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-series-field')),
+      'American Eagle',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-year-field')),
+      '2001',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-country-field')),
+      'United States',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-low-value-field')),
+      '250',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-high-value-field')),
+      '350',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-notes-field')),
+      'Edited local notes.',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('edit-collectible-save-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collectible updated'), findsOneWidget);
+    expect(find.text('Edited Silver Eagle'), findsWidgets);
+    expect(find.text('Coin'), findsWidgets);
+    expect(find.text('AUD 300'), findsWidgets);
+    expect(find.text('US Mint'), findsOneWidget);
+    expect(find.text('American Eagle'), findsOneWidget);
+    expect(find.text('Edited local notes.'), findsOneWidget);
+
+    final preferences = await SharedPreferences.getInstance();
+    final encodedItems = preferences.getString('portfolio_items');
+    expect(encodedItems, isNotNull);
+    final decodedItems = jsonDecode(encodedItems!) as List<dynamic>;
+    final savedItem = decodedItems.single as Map<String, dynamic>;
+    expect(savedItem['title'], 'Edited Silver Eagle');
+    expect(savedItem['category'], 'Coin');
+    expect(savedItem['estimatedValue'], 300);
+    expect(savedItem['imagePath'], 'test/fixtures/persistent-camera-card.jpg');
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Edited Silver Eagle'), findsOneWidget);
+    expect(find.text('Coin'), findsWidgets);
+    expect(find.text('AUD 300'), findsWidgets);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Collection Value'), findsOneWidget);
+    expect(find.text('AUD 300'), findsWidgets);
   });
 
   testWidgets('home recent activity tap opens detail page', (

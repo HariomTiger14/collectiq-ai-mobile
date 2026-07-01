@@ -6,14 +6,16 @@ import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Detail page for a saved portfolio collectible.
-class CollectibleDetailPage extends StatelessWidget {
+class CollectibleDetailPage extends ConsumerWidget {
   /// Creates a collectible detail page.
   const CollectibleDetailPage({required this.item, this.onDelete, super.key});
 
@@ -24,7 +26,13 @@ class CollectibleDetailPage extends StatelessWidget {
   final Future<bool> Function(String itemId)? onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final portfolioItems = ref.watch(portfolioControllerProvider).items;
+    final currentItem =
+        portfolioItems
+            .where((portfolioItem) => portfolioItem.id == item.id)
+            .firstOrNull ??
+        item;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -32,6 +40,18 @@ class CollectibleDetailPage extends StatelessWidget {
       appBar: AppBar(
         leading: const BackButton(),
         title: const Text('Collectible Details'),
+        actions: [
+          IconButton(
+            key: const ValueKey('collectible-detail-edit-button'),
+            tooltip: 'Edit collectible',
+            onPressed: () => _showEditCollectibleDialog(
+              context: context,
+              ref: ref,
+              item: currentItem,
+            ),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -47,30 +67,271 @@ class CollectibleDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ImagePreview(item: item),
+                  _ImagePreview(item: currentItem),
                   const SizedBox(height: AppSpacing.xl),
-                  _DetailHeader(item: item),
+                  _DetailHeader(item: currentItem),
                   const SizedBox(height: AppSpacing.xl),
                   AppPriceHero(
                     label: 'Estimated market value',
-                    value: _formatAud(item.estimatedValue),
-                    subtitle: item.pricing == null
+                    value: _formatAud(currentItem.estimatedValue),
+                    subtitle: currentItem.pricing == null
                         ? 'Based on the saved AI estimate'
-                        : 'Value range: ${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+                        : 'Value range: ${_formatMoney(currentItem.pricing!.lowEstimate, currentItem.pricing!.currency)} - ${_formatMoney(currentItem.pricing!.highEstimate, currentItem.pricing!.currency)}',
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  _WishlistStatusSection(item: item),
+                  _WishlistStatusSection(item: currentItem),
                   const SizedBox(height: AppSpacing.xl),
-                  _DetailSections(item: item),
+                  _DetailSections(item: currentItem),
                   const SizedBox(height: AppSpacing.xl),
-                  _PriceAlertSection(item: item),
+                  _PriceAlertSection(item: currentItem),
                   const SizedBox(height: AppSpacing.xl),
-                  _ActionButtons(onDelete: onDelete, itemId: item.id),
+                  _ActionButtons(onDelete: onDelete, itemId: currentItem.id),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+Future<void> _showEditCollectibleDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required CollectibleItem item,
+}) async {
+  final editedItem = await showDialog<CollectibleItem>(
+    context: context,
+    builder: (_) => _EditCollectibleDialog(item: item),
+  );
+  if (editedItem == null) {
+    return;
+  }
+
+  await ref.read(portfolioControllerProvider.notifier).updateItem(editedItem);
+  if (context.mounted) {
+    _showDetailSnackBar(context, 'Collectible updated');
+  }
+}
+
+class _EditCollectibleDialog extends StatefulWidget {
+  const _EditCollectibleDialog({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  State<_EditCollectibleDialog> createState() => _EditCollectibleDialogState();
+}
+
+class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _manufacturerController;
+  late final TextEditingController _seriesController;
+  late final TextEditingController _yearController;
+  late final TextEditingController _countryController;
+  late final TextEditingController _lowValueController;
+  late final TextEditingController _highValueController;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    final pricing = widget.item.pricing;
+    final fallbackValue = widget.item.estimatedValue;
+    _titleController = TextEditingController(text: widget.item.title);
+    _categoryController = TextEditingController(text: widget.item.category);
+    _manufacturerController = TextEditingController(
+      text: widget.item.brand ?? '',
+    );
+    _seriesController = TextEditingController(text: widget.item.series ?? '');
+    _yearController = TextEditingController(text: widget.item.year ?? '');
+    _countryController = TextEditingController(text: widget.item.country ?? '');
+    _lowValueController = TextEditingController(
+      text: _decimalText(pricing?.lowEstimate ?? fallbackValue),
+    );
+    _highValueController = TextEditingController(
+      text: _decimalText(pricing?.highEstimate ?? fallbackValue),
+    );
+    _notesController = TextEditingController(text: widget.item.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _categoryController.dispose();
+    _manufacturerController.dispose();
+    _seriesController.dispose();
+    _yearController.dispose();
+    _countryController.dispose();
+    _lowValueController.dispose();
+    _highValueController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit collectible'),
+      content: SizedBox(
+        width: 560,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-title-field'),
+                  controller: _titleController,
+                  label: 'Title',
+                  validator: _requiredText,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-category-field'),
+                  controller: _categoryController,
+                  label: 'Category',
+                  validator: _requiredText,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-manufacturer-field'),
+                  controller: _manufacturerController,
+                  label: 'Manufacturer',
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-series-field'),
+                  controller: _seriesController,
+                  label: 'Series',
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-year-field'),
+                  controller: _yearController,
+                  label: 'Year',
+                  keyboardType: TextInputType.number,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-country-field'),
+                  controller: _countryController,
+                  label: 'Country',
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-low-value-field'),
+                  controller: _lowValueController,
+                  label: 'Estimated value low',
+                  keyboardType: TextInputType.number,
+                  validator: _requiredMoney,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-high-value-field'),
+                  controller: _highValueController,
+                  label: 'Estimated value high',
+                  keyboardType: TextInputType.number,
+                  validator: _requiredMoney,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-notes-field'),
+                  controller: _notesController,
+                  label: 'Notes',
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          key: const ValueKey('edit-collectible-save-button'),
+          onPressed: _save,
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  void _save() {
+    if (_formKey.currentState?.validate() != true) {
+      return;
+    }
+
+    final low = _parseMoney(_lowValueController.text);
+    final high = _parseMoney(_highValueController.text);
+    final normalizedLow = low <= high ? low : high;
+    final normalizedHigh = high >= low ? high : low;
+    final estimatedValue = (normalizedLow + normalizedHigh) / 2;
+    Navigator.of(context).pop(
+      widget.item.copyWith(
+        title: _titleController.text.trim(),
+        category: _categoryController.text.trim(),
+        estimatedValue: estimatedValue,
+        pricing: _updatedPricing(
+          widget.item,
+          normalizedLow,
+          normalizedHigh,
+          estimatedValue,
+        ),
+        marketSummary: _updatedMarketSummary(
+          widget.item.marketSummary,
+          normalizedLow,
+          normalizedHigh,
+          estimatedValue,
+        ),
+        year: _yearController.text.trim(),
+        brand: _manufacturerController.text.trim(),
+        series: _seriesController.text.trim(),
+        country: _countryController.text.trim(),
+        notes: _notesController.text.trim(),
+      ),
+    );
+  }
+
+  String? _requiredText(String? value) {
+    return (value ?? '').trim().isEmpty ? 'Required' : null;
+  }
+
+  String? _requiredMoney(String? value) {
+    final parsed = _parseMoney(value ?? '');
+    if (parsed <= 0) {
+      return 'Enter a value above 0';
+    }
+    return null;
+  }
+}
+
+class _EditTextField extends StatelessWidget {
+  const _EditTextField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.validator,
+    this.maxLines = 1,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final FormFieldValidator<String>? validator;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        maxLines: maxLines,
+        decoration: InputDecoration(labelText: label),
       ),
     );
   }
@@ -399,6 +660,35 @@ class _DetailSections extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
+        AppProfileSection(
+          title: 'Sync Status',
+          children: [
+            AppCompactMetadata(
+              items: [
+                AppMetadataItem(
+                  label: 'Status',
+                  value: _syncStatusLabel(item.syncStatus),
+                ),
+                if (item.lastSyncedAt != null)
+                  AppMetadataItem(
+                    label: 'Last synced',
+                    value: _formatDate(item.lastSyncedAt!),
+                  ),
+              ],
+            ),
+            if (item.syncStatus == CloudItemSyncStatus.failed &&
+                (item.syncError ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                item.syncError!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
         if (_hasAiReview(item)) ...[
           AppProfileSection(
             title: 'AI Review',
@@ -445,6 +735,15 @@ class _DetailSections extends StatelessWidget {
         _PriceHistorySection(item: item),
       ],
     );
+  }
+
+  String _syncStatusLabel(CloudItemSyncStatus status) {
+    return switch (status) {
+      CloudItemSyncStatus.localOnly => 'Local only',
+      CloudItemSyncStatus.pendingUpload => 'Pending upload',
+      CloudItemSyncStatus.synced => 'Synced',
+      CloudItemSyncStatus.failed => 'Sync failed',
+    };
   }
 
   bool _hasAiReview(CollectibleItem item) {
@@ -1439,6 +1738,60 @@ String _formatAud(double value) {
     (match) => ',',
   );
   return 'AUD $withCommas';
+}
+
+double _parseMoney(String value) {
+  final normalized = value.replaceAll(',', '').replaceAll(r'$', '').trim();
+  return double.tryParse(normalized) ?? 0;
+}
+
+String _decimalText(double value) {
+  if (value % 1 == 0) {
+    return value.toStringAsFixed(0);
+  }
+  return value.toStringAsFixed(2);
+}
+
+PricingInfo _updatedPricing(
+  CollectibleItem item,
+  double low,
+  double high,
+  double estimatedValue,
+) {
+  final pricing = item.pricing;
+  return PricingInfo(
+    estimatedMarketValue: estimatedValue,
+    lowEstimate: low,
+    highEstimate: high,
+    currency: pricing?.currency ?? 'AUD',
+    pricingSource: pricing?.pricingSource ?? 'Local edit',
+    pricingConfidence: pricing?.pricingConfidence ?? 0,
+    lastUpdated: pricing?.lastUpdated,
+  );
+}
+
+MarketSummary? _updatedMarketSummary(
+  MarketSummary? summary,
+  double low,
+  double high,
+  double estimatedValue,
+) {
+  if (summary == null) {
+    return null;
+  }
+
+  return MarketSummary(
+    averagePrice: estimatedValue,
+    medianPrice: estimatedValue,
+    lowPrice: low,
+    highPrice: high,
+    salesCount: summary.salesCount,
+    trendLabel: summary.trendLabel,
+    confidence: summary.confidence,
+    lastUpdated: summary.lastUpdated,
+    sources: summary.sources,
+    comps: summary.comps,
+  );
 }
 
 String _formatDate(DateTime date) {
