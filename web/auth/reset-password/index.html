@@ -4,7 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reset Your Packlox Password</title>
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="/auth/reset-password/styles.css">
+  <!-- 1. Safe storage override -->
+  <script>
+    window.localStorage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {}
+    };
+  </script>
 </head>
 <body>
   <main class="page-shell">
@@ -36,6 +44,7 @@
               required
             >
             <button
+              id="togglePassword"
               class="toggle-password"
               type="button"
               data-target="password"
@@ -70,6 +79,7 @@
               required
             >
             <button
+              id="toggleConfirmPassword"
               class="toggle-password"
               type="button"
               data-target="confirm-password"
@@ -91,7 +101,11 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="./reset-password.js"></script>
+  <!-- 2. Local Supabase module -->
+  <script type="module" src="/auth/reset-password/vendor/supabase-js-v2.js"></script>
+
+  <!-- 3. My modules -->
+  <script type="module" src="/auth/reset-password/supabaseClient.js"></script>
+  <script type="module" src="/auth/reset-password/reset-password.js"></script>
 </body>
 </html>
