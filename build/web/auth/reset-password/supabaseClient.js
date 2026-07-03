@@ -12,3 +12,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export { supabase };
+
+// LIVE VERIFICATION (for Cloudflare Pages)
+// Paste this in browser console to confirm the deployed file is correct:
+// fetch('/auth/reset-password/supabaseClient.js')
+//   .then(r => r.text())
+//   .then(t => console.log(t));
