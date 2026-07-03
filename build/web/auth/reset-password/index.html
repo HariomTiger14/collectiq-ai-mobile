@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reset Your Packlox Password</title>
   <link rel="stylesheet" href="/auth/reset-password/styles.css">
+  <!-- 1. Safe storage override -->
+  <script>
+    // Force safe storage BEFORE Supabase loads
+    window.localStorage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {}
+    };
+  </script>
 </head>
 <body>
   <main class="page-shell">

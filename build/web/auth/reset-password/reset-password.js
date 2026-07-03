@@ -359,7 +359,7 @@ function peekPassword(button, input) {
   );
 }
 
-function setupPasswordToggles() {
+function attachPeekHandlers() {
   const passwordToggle =
     getElement('togglePassword') ||
     document.querySelector('[data-target="password"]');
@@ -380,7 +380,7 @@ function setupPasswordToggles() {
   }
 }
 
-function setupRealtimeValidation() {
+function attachStrengthHandlers() {
   elements.password.addEventListener('input', () => {
     updateStrengthMeter();
     validatePasswordField();
@@ -393,10 +393,20 @@ function setupRealtimeValidation() {
   elements.confirmPassword.addEventListener('input', validateConfirmField);
 }
 
+function attachSubmitHandler() {
+  elements.form.addEventListener('submit', submitNewPassword);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  if (!supabase) {
+    console.error('Supabase not ready — handlers not attached');
+    return;
+  }
+
   cacheElements();
-  setupPasswordToggles();
-  setupRealtimeValidation();
+  attachPeekHandlers();
+  attachStrengthHandlers();
+  attachSubmitHandler();
   updateStrengthMeter();
 
   const params = paramsFromUrl();
@@ -408,6 +418,4 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (!hasRecoveryToken()) {
     setMissingTokenMessage();
   }
-
-  elements.form.addEventListener('submit', submitNewPassword);
 });
