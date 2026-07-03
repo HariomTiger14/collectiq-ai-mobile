@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Packlox Email Confirmation</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <p class="eyebrow">Packlox</p>
+      <h1>Email confirmation</h1>
+      <p class="lede">Completing your Packlox email confirmation.</p>
+      <p id="message" class="message">Checking confirmation link...</p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script src="../auth-page.js"></script>
+  <script>
+    window.PackloxAuthPages.initCallbackPage();
+  </script>
+</body>
+</html>

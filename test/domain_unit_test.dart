@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:io';
 import 'package:collectiq_ai/features/ai/data/clients/http_ai_backend_client.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
@@ -17,14 +17,17 @@ import 'package:collectiq_ai/core/cloud/supabase/supabase_cloud_storage_service.
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/config/feature_flags.dart';
+import 'package:collectiq_ai/core/supabase/supabase_auth_response_normalizer.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_callback_result.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_conflict.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
@@ -91,6 +94,7 @@ import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1818,6 +1822,522 @@ void main() {
       expect(config.anonKey, isEmpty);
     });
 
+    test('SIT config with anon key reports configured safely', () {
+      const config = SupabaseConfig(
+        url: 'https://example.supabase.co',
+        anonKey: 'public-anon-key',
+        isEnabled: true,
+      );
+
+      expect(config.isConfigured, isTrue);
+      expect(config.hasUrl, isTrue);
+      expect(config.hasAnonKey, isTrue);
+      expect(config.anonKeyLength, 'public-anon-key'.length);
+      expect(config.maskedAnonKeyLengthLabel, '15 characters');
+      expect(config.maskedAnonKeyLengthLabel, isNot(contains('public')));
+    });
+
+    test('missing anon key reports setup required state', () {
+      const config = SupabaseConfig(
+        url: 'https://example.supabase.co',
+        anonKey: '',
+        isEnabled: true,
+      );
+
+      expect(config.isConfigured, isFalse);
+      expect(config.hasUrl, isTrue);
+      expect(config.hasAnonKey, isFalse);
+      expect(config.anonKeyLength, 0);
+      expect(config.maskedAnonKeyLengthLabel, '0');
+    });
+
+    test(
+      'SIT scripts pass required dart defines without hardcoded secrets',
+      () {
+        for (final path in ['run_sit.bat', 'build_sit_apk.bat']) {
+          final script = File(path).readAsStringSync();
+
+          expect(script, contains('--dart-define=SUPABASE_URL=%SUPABASE_URL%'));
+          expect(
+            script,
+            contains('--dart-define=SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY%'),
+          );
+          expect(script, contains('--dart-define=API_BASE_URL=%API_BASE_URL%'));
+          expect(script, contains('--dart-define=APP_ENV=sit'));
+          expect(script, contains('--dart-define=USE_CLOUD_AUTH=true'));
+          expect(
+            script,
+            contains('--dart-define=USE_CLOUD_PORTFOLIO_SYNC=true'),
+          );
+          expect(
+            script,
+            contains('--dart-define=USE_CLOUD_IMAGE_STORAGE=true'),
+          );
+          expect(script, contains('scripts\\load_env.bat'));
+          expect(script, isNot(contains('ljrkhamgbgtsicqdisos')));
+        }
+      },
+    );
+
+    test('auth error mapper handles common Supabase auth failures', () {
+      final missingKey = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            statusCode: 401,
+            data: const {'message': 'No API key found in request'},
+          ),
+        ),
+      );
+      final network = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      final confirmationRequired = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/token'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/token'),
+            statusCode: 400,
+            data: const {'message': 'Email not confirmed'},
+          ),
+        ),
+      );
+      final alreadyRegistered = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            statusCode: 422,
+            data: const {'message': 'User already registered'},
+          ),
+        ),
+      );
+      final invalidCredentials = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/token'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/token'),
+            statusCode: 400,
+            data: const {'error_description': 'Invalid login credentials'},
+          ),
+        ),
+      );
+      final weakPassword = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            statusCode: 422,
+            data: const {'message': 'Weak password'},
+          ),
+        ),
+      );
+      final rateLimited = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            statusCode: 429,
+            data: const {'code': 'over_email_send_rate_limit'},
+          ),
+        ),
+      );
+      final unmappedHttpError = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/signup'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            statusCode: 500,
+            data: const {},
+          ),
+        ),
+      );
+
+      expect(missingKey, 'Supabase anon key is missing from SIT config.');
+      expect(
+        network,
+        'Unable to reach Supabase. Check your internet connection.',
+      );
+      expect(
+        confirmationRequired,
+        'Please confirm your email before signing in.',
+      );
+      expect(alreadyRegistered, 'An account already exists. Please sign in.');
+      expect(invalidCredentials, 'Invalid email or password.');
+      expect(weakPassword, 'Password is too weak. Use a stronger password.');
+      expect(
+        rateLimited,
+        'Too many auth requests. Wait a moment and try again.',
+      );
+      expect(
+        unmappedHttpError,
+        'Supabase is temporarily unavailable. Please try again soon.',
+      );
+      expect(unmappedHttpError, isNot(contains('Unable to connect')));
+    });
+
+    test(
+      'auth error mapper handles unknown account separately when proven',
+      () {
+        final message = SupabaseService.authFailureMessageForTesting(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/v1/token'),
+            response: Response<Map<String, dynamic>>(
+              requestOptions: RequestOptions(path: '/auth/v1/token'),
+              statusCode: 400,
+              data: const {'message': 'User not found'},
+            ),
+          ),
+        );
+
+        expect(message, 'Please sign up first.');
+      },
+    );
+
+    test(
+      'confirmation resend error mapper handles expected Supabase responses',
+      () {
+        final rateLimited =
+            SupabaseService.confirmationFailureMessageForTesting(
+              DioException(
+                requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                response: Response<Map<String, dynamic>>(
+                  requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                  statusCode: 429,
+                  data: const {'code': 'over_email_send_rate_limit'},
+                ),
+              ),
+            );
+        final alreadyConfirmed =
+            SupabaseService.confirmationFailureMessageForTesting(
+              DioException(
+                requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                response: Response<Map<String, dynamic>>(
+                  requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                  statusCode: 400,
+                  data: const {'message': 'User already confirmed'},
+                ),
+              ),
+            );
+        final invalidEmail =
+            SupabaseService.confirmationFailureMessageForTesting(
+              DioException(
+                requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                response: Response<Map<String, dynamic>>(
+                  requestOptions: RequestOptions(path: '/auth/v1/resend'),
+                  statusCode: 400,
+                  data: const {'message': 'Invalid email'},
+                ),
+              ),
+            );
+        final network = SupabaseService.confirmationFailureMessageForTesting(
+          DioException(
+            requestOptions: RequestOptions(path: '/auth/v1/resend'),
+            type: DioExceptionType.connectionError,
+          ),
+        );
+        final retryAfter = SupabaseService.retryAfterDurationForTesting(
+          Headers.fromMap({
+            'retry-after': ['123'],
+          }),
+        );
+
+        expect(rateLimited, AuthMessages.confirmationRateLimited);
+        expect(retryAfter, const Duration(seconds: 123));
+        expect(
+          alreadyConfirmed,
+          'Your email is already confirmed. Please sign in.',
+        );
+        expect(invalidEmail, 'Please enter a valid email address.');
+        expect(
+          network,
+          'Unable to reach Supabase. Check your internet connection.',
+        );
+      },
+    );
+
+    group('SupabaseAuthResponseNormalizer contract', () {
+      SupabaseAuthNormalizedResult normalize({
+        required SupabaseAuthAction action,
+        required int? statusCode,
+        required Object? body,
+        Headers? headers,
+      }) {
+        return SupabaseAuthResponseNormalizer.normalizeResponse(
+          action: action,
+          statusCode: statusCode,
+          body: body,
+          headers: headers,
+        );
+      }
+
+      test('normalizes wrapped signup user with null session', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signUp,
+          statusCode: 200,
+          body: const {
+            'user': {'id': 'user-1', 'email': 'new@example.com'},
+            'session': null,
+          },
+        );
+
+        expect(
+          result.status,
+          SupabaseAuthNormalizedStatus.confirmationRequired,
+        );
+        expect(result.metadata.hasUser, isTrue);
+        expect(result.metadata.hasSession, isFalse);
+      });
+
+      test('normalizes direct signup user object with confirmation fields', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signUp,
+          statusCode: 200,
+          body: const {
+            'id': 'user-1',
+            'email': 'new@example.com',
+            'aud': 'authenticated',
+            'role': 'authenticated',
+            'confirmation_sent_at': '2026-07-02T00:00:00Z',
+          },
+        );
+
+        expect(
+          result.status,
+          SupabaseAuthNormalizedStatus.confirmationRequired,
+        );
+        expect(result.metadata.hasDirectId, isTrue);
+        expect(result.metadata.hasDirectEmail, isTrue);
+        expect(result.metadata.hasConfirmationSentAt, isTrue);
+      });
+
+      test('normalizes direct signup user object with identities', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signUp,
+          statusCode: 200,
+          body: const {
+            'id': 'user-1',
+            'email': 'new@example.com',
+            'identities': [],
+          },
+        );
+
+        expect(
+          result.status,
+          SupabaseAuthNormalizedStatus.confirmationRequired,
+        );
+        expect(result.metadata.hasIdentities, isTrue);
+      });
+
+      test('normalizes empty and string 2xx signup bodies as confirmation', () {
+        for (final response in [
+          (statusCode: 200, body: null),
+          (statusCode: 200, body: const <String, dynamic>{}),
+          (statusCode: 201, body: null),
+          (statusCode: 200, body: 'OK'),
+        ]) {
+          final result = normalize(
+            action: SupabaseAuthAction.signUp,
+            statusCode: response.statusCode,
+            body: response.body,
+          );
+
+          expect(
+            result.status,
+            SupabaseAuthNormalizedStatus.confirmationRequired,
+          );
+        }
+      });
+
+      test('normalizes already registered response', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signUp,
+          statusCode: 400,
+          body: const {'msg': 'User already registered'},
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.alreadyRegistered);
+        expect(result.metadata.hasErrorMessage, isTrue);
+      });
+
+      test('normalizes email not confirmed response', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signIn,
+          statusCode: 400,
+          body: const {'message': 'Email not confirmed'},
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.emailNotConfirmed);
+      });
+
+      test('normalizes invalid login response', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signIn,
+          statusCode: 400,
+          body: const {
+            'error': 'invalid_grant',
+            'error_description': 'Invalid login credentials',
+          },
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.invalidCredentials);
+        expect(result.metadata.hasErrorCode, isTrue);
+      });
+
+      test('normalizes missing API key response', () {
+        final result = normalize(
+          action: SupabaseAuthAction.signUp,
+          statusCode: 401,
+          body: const {'message': 'No API key found in request'},
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.configMissing);
+      });
+
+      test('normalizes rate limit response with retry-after', () {
+        final result = normalize(
+          action: SupabaseAuthAction.resendConfirmation,
+          statusCode: 429,
+          body: const {'code': 'over_email_send_rate_limit'},
+          headers: Headers.fromMap({
+            'retry-after': ['90'],
+          }),
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.rateLimited);
+        expect(result.retryAfter, const Duration(seconds: 90));
+        expect(result.cooldownSource, 'retry-after');
+      });
+
+      test('normalizes network timeout separately from HTTP errors', () {
+        final result = SupabaseAuthResponseNormalizer.normalizeException(
+          action: SupabaseAuthAction.signUp,
+          error: DioException(
+            requestOptions: RequestOptions(path: '/auth/v1/signup'),
+            type: DioExceptionType.connectionTimeout,
+          ),
+        );
+
+        expect(result.status, SupabaseAuthNormalizedStatus.networkFailure);
+        expect(result.metadata.httpStatus, isNull);
+      });
+    });
+
+    test(
+      'signup success responses without session require email confirmation',
+      () {
+        const baseUser = {
+          'id': 'new-user',
+          'email': 'collector@example.com',
+          'user_metadata': {'display_name': 'collector@example.com'},
+        };
+        final responses = [
+          (statusCode: 200, data: const {'user': baseUser, 'session': null}),
+          (statusCode: 201, data: const {'user': baseUser, 'session': null}),
+          (
+            statusCode: 200,
+            data: const {
+              'user': {...baseUser, 'identities': []},
+            },
+          ),
+          (
+            statusCode: 200,
+            data: const {
+              'id': 'new-user',
+              'email': 'collector@example.com',
+              'aud': 'authenticated',
+              'role': 'authenticated',
+              'confirmation_sent_at': '2026-07-02T00:00:00Z',
+            },
+          ),
+          (
+            statusCode: 201,
+            data: const {
+              'id': 'new-user',
+              'email': 'collector@example.com',
+              'identities': [],
+            },
+          ),
+        ];
+
+        for (final response in responses) {
+          expect(
+            SupabaseService.isEmailConfirmationSignUpResponseForTesting(
+              statusCode: response.statusCode,
+              data: response.data,
+            ),
+            isTrue,
+          );
+        }
+      },
+    );
+
+    test('empty successful signup response is confirmation email sent', () {
+      expect(
+        SupabaseService.isEmptySuccessfulSignUpResponseForTesting(
+          statusCode: 200,
+          data: null,
+        ),
+        isTrue,
+      );
+      expect(
+        SupabaseService.isEmptySuccessfulSignUpResponseForTesting(
+          statusCode: 201,
+          data: const {},
+        ),
+        isTrue,
+      );
+      expect(
+        SupabaseService.isEmptySuccessfulSignUpResponseForTesting(
+          statusCode: 400,
+          data: const {},
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'unexpected non-success signup response is not confirmation success',
+      () {
+        expect(
+          SupabaseService.isEmailConfirmationSignUpResponseForTesting(
+            statusCode: 400,
+            data: const {'message': 'Unknown shape'},
+          ),
+          isFalse,
+        );
+        expect(
+          SupabaseService.isEmptySuccessfulSignUpResponseForTesting(
+            statusCode: 400,
+            data: const {'message': 'Unknown shape'},
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'signup response without session is treated as email confirmation',
+      () {
+        final session = SupabaseAuthSession.fromJson(const {
+          'user': {
+            'id': 'new-user',
+            'email': 'collector@example.com',
+            'user_metadata': {'display_name': 'collector@example.com'},
+          },
+        }, projectUrl: 'https://example.supabase.co');
+
+        expect(session.userId, 'new-user');
+        expect(session.accessToken, isEmpty);
+        expect(session.isEmailConfirmationPending, isTrue);
+        expect(session.hasAuthenticatedSession, isFalse);
+      },
+    );
+
     test('migration creates the portfolio_items schema used by sync', () {
       final migration = File(
         'supabase/migrations/202607010001_collectiq_portfolio_items_schema.sql',
@@ -1921,6 +2441,32 @@ void main() {
       },
     );
 
+    test('email auth reports missing config instead of mock sign-in', () async {
+      final service = SupabaseService.instance(
+        config: const SupabaseConfig(url: '', anonKey: '', isEnabled: false),
+      );
+      final repository = SupabaseAuthRepository(supabaseService: service);
+
+      await expectLater(
+        repository.signInWithEmailPassword(
+          email: 'collector@example.com',
+          password: 'password123',
+        ),
+        throwsA(isA<SupabaseNotConfiguredException>()),
+      );
+      await expectLater(
+        repository.signUpWithEmailPassword(
+          email: 'collector@example.com',
+          password: 'password123',
+        ),
+        throwsA(isA<SupabaseNotConfiguredException>()),
+      );
+      await expectLater(
+        repository.sendPasswordResetEmail(email: 'collector@example.com'),
+        throwsA(isA<SupabaseNotConfiguredException>()),
+      );
+    });
+
     test('email sign-in success maps Supabase session to app user', () async {
       final gateway = _FakeSupabaseAuthGateway(
         passwordSession: const SupabaseAuthSession(
@@ -1970,6 +2516,46 @@ void main() {
       expect(gateway.signUpCalls, 1);
     });
 
+    test('email sign-up confirmation exception stays signed out', () async {
+      final repository = SupabaseAuthRepository(
+        supabaseService: _FakeSupabaseAuthGateway(
+          signUpError: const SupabaseEmailConfirmationRequiredException(),
+        ),
+      );
+
+      await expectLater(
+        repository.signUpWithEmailPassword(
+          email: 'new@example.com',
+          password: 'password123',
+        ),
+        throwsA(isA<SupabaseEmailConfirmationRequiredException>()),
+      );
+    });
+
+    test(
+      'resend confirmation calls Supabase resend endpoint gateway',
+      () async {
+        final gateway = _FakeSupabaseAuthGateway();
+        final repository = SupabaseAuthRepository(supabaseService: gateway);
+
+        await repository.resendEmailConfirmation(email: 'new@example.com');
+
+        expect(gateway.resendCalls, 1);
+        expect(gateway.lastResendEmail, 'new@example.com');
+        expect(gateway.signUpCalls, 0);
+      },
+    );
+
+    test('password reset calls Supabase recovery gateway', () async {
+      final gateway = _FakeSupabaseAuthGateway();
+      final repository = SupabaseAuthRepository(supabaseService: gateway);
+
+      await repository.sendPasswordResetEmail(email: 'reset@example.com');
+
+      expect(gateway.passwordResetCalls, 1);
+      expect(gateway.lastPasswordResetEmail, 'reset@example.com');
+    });
+
     test('email sign-in failure surfaces auth exception', () async {
       final repository = SupabaseAuthRepository(
         supabaseService: _FakeSupabaseAuthGateway(
@@ -1990,6 +2576,21 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('email sign-in before confirmation uses confirmation message', () {
+      final message = SupabaseService.authFailureMessageForTesting(
+        DioException(
+          requestOptions: RequestOptions(path: '/auth/v1/token'),
+          response: Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/auth/v1/token'),
+            statusCode: 400,
+            data: const {'message': 'Email not confirmed'},
+          ),
+        ),
+      );
+
+      expect(message, 'Please confirm your email before signing in.');
     });
 
     test('sign-out clears Supabase session', () async {
@@ -2031,6 +2632,47 @@ void main() {
       expect(user.email, 'collector@example.com');
       expect(user.provider, AuthProviderType.emailPassword);
       expect(user.isCloudBacked, isTrue);
+    });
+
+    test('same device can switch signed-in Supabase users', () async {
+      final repository = _ScriptedAuthRepository(
+        initialUser: const AppUser(
+          id: 'user-a',
+          displayName: 'user-a@example.com',
+          email: 'user-a@example.com',
+          provider: AuthProviderType.emailPassword,
+        ),
+        emailUser: const AppUser(
+          id: 'user-b',
+          displayName: 'user-b@example.com',
+          email: 'user-b@example.com',
+          provider: AuthProviderType.emailPassword,
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(authControllerProvider).user!.id, 'user-a');
+
+      await container.read(authControllerProvider.notifier).signOut();
+      expect(container.read(authControllerProvider).isSignedIn, isFalse);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'user-b@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isTrue);
+      expect(state.user!.id, 'user-b');
+      expect(state.user!.email, 'user-b@example.com');
+      expect(repository.signOutCalls, 1);
     });
 
     test('auth session cache is scoped to the Supabase project URL', () async {
@@ -2188,9 +2830,278 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isTrue);
+      expect(state.status, AuthFlowStatus.signedIn);
       expect(state.user!.email, 'harry@example.com');
       expect(state.accountModeLabel, 'Email / Password');
       expect(state.errorMessage, isNull);
+      expect(state.infoMessage, AuthMessages.signedIn);
+    });
+
+    test('email sign-in exposes loading state and visible result', () async {
+      final completer = Completer<AppUser>();
+      final repository = _ScriptedAuthRepository(signInCompleter: completer);
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      final signIn = container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      var state = container.read(authControllerProvider);
+      expect(state.isLoading, isTrue);
+      expect(state.status, AuthFlowStatus.signingIn);
+      expect(state.errorMessage, isNull);
+
+      completer.complete(
+        const AppUser(
+          id: 'email-user',
+          displayName: 'harry@example.com',
+          email: 'harry@example.com',
+          provider: AuthProviderType.emailPassword,
+        ),
+      );
+      await signIn;
+
+      state = container.read(authControllerProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.status, AuthFlowStatus.signedIn);
+      expect(state.infoMessage, AuthMessages.signedIn);
+      expect(state.errorMessage, isNull);
+    });
+
+    test('email sign-in timeout shows visible auth timeout result', () async {
+      final repository = _ScriptedAuthRepository(
+        signInError: TimeoutException(AuthMessages.authTimedOut),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.isSignedIn, isFalse);
+      expect(state.errorMessage, AuthMessages.authTimedOut);
+    });
+
+    test('email sign-in validation stops repository call', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(email: '', password: '');
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.signedOut);
+      expect(state.errorMessage, 'Enter an email address.');
+      expect(repository.signInCalls, 0);
+    });
+
+    test('email sign-in invalid email stops repository call', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(email: 'not-an-email', password: 'secret');
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.signedOut);
+      expect(state.errorMessage, 'Please enter a valid email address.');
+      expect(repository.signInCalls, 0);
+    });
+
+    test('email sign-up validation stops repository call', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'collector@example.com',
+            password: '12345',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.signedOut);
+      expect(state.errorMessage, 'Password must be at least 6 characters.');
+      expect(repository.signUpCalls, 0);
+    });
+
+    test('password reset sends email and shows success message', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email: 'reset@example.com');
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.errorMessage, isNull);
+      expect(state.infoMessage, AuthMessages.passwordResetSentWithCooldown);
+      expect(
+        state.lastPasswordResetRedirectUrl,
+        SupabaseService.passwordResetRedirectUri,
+      );
+      expect(state.lastPasswordResetStatus, 'sent');
+      expect(state.passwordResetCooldownSource, 'success');
+      expect(state.passwordResetCooldownUntil, isNotNull);
+      expect(repository.passwordResetCalls, 1);
+      expect(repository.lastPasswordResetEmail, 'reset@example.com');
+    });
+
+    test('password reset is blocked during success cooldown', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email: 'reset@example.com');
+      await container
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email: 'reset@example.com');
+
+      final state = container.read(authControllerProvider);
+      expect(repository.passwordResetCalls, 1);
+      expect(state.infoMessage, startsWith('Reset available in '));
+      expect(state.lastPasswordResetStatus, 'blocked');
+    });
+
+    test(
+      'password reset rate limit shows clear message and cooldown',
+      () async {
+        final repository = _ScriptedAuthRepository(
+          passwordResetError: const SupabasePasswordResetRateLimitedException(
+            cooldown: Duration(minutes: 5),
+            cooldownSource: 'fallback',
+          ),
+        );
+        final container = ProviderContainer(
+          overrides: [authRepositoryProvider.overrideWithValue(repository)],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .sendPasswordResetEmail(email: 'reset@example.com');
+
+        final state = container.read(authControllerProvider);
+        expect(state.infoMessage, isNull);
+        expect(state.errorMessage, AuthMessages.passwordResetRateLimited);
+        expect(state.lastPasswordResetStatus, 'rate-limited');
+        expect(state.passwordResetCooldownSource, 'fallback');
+        expect(state.passwordResetRateLimitedUntil, isNotNull);
+        expect(repository.passwordResetCalls, 1);
+      },
+    );
+
+    test('password reset validates email before repository call', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.notifier).loadCurrentUser();
+
+      await container
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email: 'not-an-email');
+
+      final state = container.read(authControllerProvider);
+      expect(state.errorMessage, 'Please enter a valid email address.');
+      expect(repository.passwordResetCalls, 0);
+    });
+
+    test('password reset failure shows user-safe error', () async {
+      final repository = _ScriptedAuthRepository(
+        passwordResetError: const SupabaseAuthException(
+          'Unable to reach Supabase. Check your internet connection.',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email: 'reset@example.com');
+
+      final state = container.read(authControllerProvider);
+      expect(state.infoMessage, isNull);
+      expect(
+        state.errorMessage,
+        'Unable to reach Supabase. Check your internet connection.',
+      );
+      expect(repository.passwordResetCalls, 1);
+    });
+
+    test('anonymous cloud session is not treated as email signed in', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              initialUser: const AppUser(
+                id: 'anonymous-user',
+                displayName: 'Anonymous Collector',
+                email: null,
+                isAnonymous: true,
+                provider: AuthProviderType.supabaseAnonymous,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.isAnonymousCloudSession, isTrue);
+      expect(state.statusLabel, 'Anonymous dev session');
     });
 
     test('email sign-up success updates auth state', () async {
@@ -2219,8 +3130,621 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isTrue);
+      expect(state.status, AuthFlowStatus.signedIn);
       expect(state.user!.email, 'new@example.com');
       expect(state.accountModeLabel, 'Email / Password');
+      expect(state.infoMessage, AuthMessages.signedIn);
+    });
+
+    test(
+      'email sign-up confirmation keeps signed-out state with message',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(
+              _ScriptedAuthRepository(
+                signUpError: const SupabaseEmailConfirmationRequiredException(),
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .signUpWithEmailPassword(
+              email: 'new@example.com',
+              password: 'password123',
+            );
+
+        final state = container.read(authControllerProvider);
+        expect(state.isSignedIn, isFalse);
+        expect(state.status, AuthFlowStatus.confirmationRequired);
+        expect(state.isLocalMode, isTrue);
+        expect(state.errorMessage, isNull);
+        expect(
+          state.infoMessage,
+          SupabaseEmailConfirmationRequiredException.message,
+        );
+      },
+    );
+
+    test(
+      'empty successful sign-up keeps signed-out state with sent message',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(
+              _ScriptedAuthRepository(
+                signUpError: const SupabaseEmailConfirmationSentException(),
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .signUpWithEmailPassword(
+              email: 'new@example.com',
+              password: 'password123',
+            );
+
+        final state = container.read(authControllerProvider);
+        expect(state.isSignedIn, isFalse);
+        expect(state.status, AuthFlowStatus.confirmationRequired);
+        expect(state.errorMessage, isNull);
+        expect(state.infoMessage, AuthMessages.confirmationEmailSentSignIn);
+        expect(state.pendingConfirmationEmail, 'new@example.com');
+      },
+    );
+
+    test('email sign-up network failure remains an auth error', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              signUpError: const SupabaseAuthException(
+                'Unable to reach Supabase. Check your internet connection.',
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'new@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.networkError);
+      expect(state.infoMessage, isNull);
+      expect(
+        state.errorMessage,
+        'Unable to reach Supabase. Check your internet connection.',
+      );
+    });
+
+    test('resend confirmation keeps signed out with sent message', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      final start = DateTime(2026, 7, 2, 10);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email: 'new@example.com', now: start);
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.pendingConfirmationEmail, 'new@example.com');
+      expect(state.infoMessage, AuthMessages.confirmationEmailSent);
+      expect(state.resendCooldownUntil, start.add(const Duration(seconds: 60)));
+      expect(state.lastResendStatus, 'sent');
+      expect(state.resendCooldownSource, 'success');
+      expect(repository.resendCalls, 1);
+      expect(repository.lastResendEmail, 'new@example.com');
+      expect(repository.signUpCalls, 0);
+    });
+
+    test('resend confirmation is blocked during success cooldown', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      final start = DateTime(2026, 7, 2, 10);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email: 'new@example.com', now: start);
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(
+            email: 'new@example.com',
+            now: start.add(const Duration(seconds: 1)),
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(repository.resendCalls, 1);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.infoMessage, 'Resend available in 59s');
+    });
+
+    test('sign-in unconfirmed email stores pending resend email', () async {
+      final repository = _ScriptedAuthRepository(
+        signInError: const SupabaseAuthException(
+          'Please confirm your email before signing in.',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'new@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.pendingConfirmationEmail, 'new@example.com');
+      expect(
+        state.errorMessage,
+        'Please confirm your email before signing in.',
+      );
+    });
+
+    test('rate-limit resend with Retry-After uses header value', () async {
+      final repository = _ScriptedAuthRepository(
+        resendError: const SupabaseConfirmationRateLimitedException(
+          cooldown: Duration(seconds: 123),
+          cooldownSource: 'retry-after',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      final start = DateTime(2026, 7, 2, 10);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email: 'new@example.com', now: start);
+
+      final state = container.read(authControllerProvider);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.errorMessage, AuthMessages.confirmationRateLimited);
+      expect(state.infoMessage, isNull);
+      expect(
+        state.resendRateLimitedUntil,
+        start.add(const Duration(seconds: 123)),
+      );
+      expect(state.lastResendStatus, 'rate-limited');
+      expect(state.resendCooldownSource, 'retry-after');
+      expect(repository.resendCalls, 1);
+    });
+
+    test(
+      'rate-limit resend without Retry-After uses fallback five minutes',
+      () async {
+        final repository = _ScriptedAuthRepository(
+          resendError: const SupabaseConfirmationRateLimitedException(
+            cooldown: Duration(minutes: 5),
+            cooldownSource: 'fallback',
+          ),
+        );
+        final container = ProviderContainer(
+          overrides: [authRepositoryProvider.overrideWithValue(repository)],
+        );
+        addTearDown(container.dispose);
+        container.read(authControllerProvider);
+        await Future<void>.delayed(Duration.zero);
+        final start = DateTime(2026, 7, 2, 10);
+
+        await container
+            .read(authControllerProvider.notifier)
+            .resendConfirmationEmail(email: 'new@example.com', now: start);
+        await container
+            .read(authControllerProvider.notifier)
+            .resendConfirmationEmail(
+              email: 'new@example.com',
+              now: start.add(const Duration(seconds: 10)),
+            );
+
+        final state = container.read(authControllerProvider);
+        expect(repository.resendCalls, 1);
+        expect(state.status, AuthFlowStatus.confirmationRequired);
+        expect(state.infoMessage, 'Resend available in 290s');
+        expect(state.errorMessage, isNull);
+        expect(state.lastResendStatus, 'rate-limited');
+        expect(state.resendCooldownSource, 'fallback');
+        expect(
+          state.resendRateLimitedUntil,
+          start.add(const Duration(minutes: 5)),
+        );
+      },
+    );
+
+    test('failed resend does not show email sent message', () async {
+      final repository = _ScriptedAuthRepository(
+        resendError: const SupabaseAuthException('Supabase Auth failed.'),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email: 'new@example.com');
+
+      final state = container.read(authControllerProvider);
+      expect(state.infoMessage, isNull);
+      expect(state.errorMessage, 'Supabase Auth failed.');
+      expect(state.lastResendStatus, 'failed');
+      expect(state.resendCooldownSource, 'none');
+      expect(state.resendCooldownUntil, isNull);
+      expect(state.resendRateLimitedUntil, isNull);
+    });
+
+    test('resend confirmation requires email address', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email: '');
+
+      final state = container.read(authControllerProvider);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.errorMessage, 'Enter an email address.');
+      expect(repository.resendCalls, 0);
+    });
+
+    test('resend confirmation max attempts blocks fourth resend', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      final start = DateTime(2026, 7, 2, 10);
+      final notifier = container.read(authControllerProvider.notifier);
+
+      await notifier.resendConfirmationEmail(
+        email: 'new@example.com',
+        now: start,
+      );
+      await notifier.resendConfirmationEmail(
+        email: 'new@example.com',
+        now: start.add(const Duration(seconds: 61)),
+      );
+      await notifier.resendConfirmationEmail(
+        email: 'new@example.com',
+        now: start.add(const Duration(seconds: 122)),
+      );
+      await notifier.resendConfirmationEmail(
+        email: 'new@example.com',
+        now: start.add(const Duration(seconds: 183)),
+      );
+
+      final state = container.read(authControllerProvider);
+      expect(repository.resendCalls, 3);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.errorMessage, AuthMessages.confirmationMaxAttempts);
+    });
+
+    test('deep link parser handles callback with access and refresh token', () {
+      final result = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback#access_token=access-secret&refresh_token=refresh-secret&type=signup',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(result.status, AuthCallbackStatus.signedIn);
+      expect(result.accessToken, 'access-secret');
+      expect(result.refreshToken, 'refresh-secret');
+      expect(result.type, 'signup');
+    });
+
+    test('deep link parser handles confirmation without session', () {
+      final result = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback?type=signup&token_hash=hash-value',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(result.status, AuthCallbackStatus.confirmedNoSession);
+      expect(result.tokenHash, 'hash-value');
+    });
+
+    test('deep link parser ignores password recovery callbacks', () {
+      final withTokens = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback#access_token=access-secret&refresh_token=refresh-secret&type=recovery',
+        environment: AppEnvironment.sit,
+      );
+      final withTokenHash = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback?type=recovery&token_hash=hash-value',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(withTokens.status, AuthCallbackStatus.ignored);
+      expect(withTokenHash.status, AuthCallbackStatus.ignored);
+    });
+
+    test('https Packlox reset password links are ignored by mobile parser', () {
+      final result = AuthCallbackParser.parse(
+        'https://packlox.com/auth/reset-password#access_token=access-secret&refresh_token=refresh-secret&type=recovery',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(result.status, AuthCallbackStatus.ignored);
+    });
+
+    test('deep link parser maps expired callback error', () {
+      final result = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback?error=access_denied&error_description=Email%20link%20is%20invalid%20or%20expired',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(result.status, AuthCallbackStatus.invalidOrExpired);
+      expect(result.error, 'access_denied');
+    });
+
+    test('deep link parser reports malformed SIT callback safely', () {
+      final result = AuthCallbackParser.parse(
+        'collectiq-sit://auth/not-callback?access_token=access-secret',
+        environment: AppEnvironment.sit,
+      );
+
+      expect(result.status, AuthCallbackStatus.error);
+    });
+
+    test('local mode ignores SIT auth callback safely', () {
+      final result = AuthCallbackParser.parse(
+        'collectiq-sit://auth/callback#access_token=access-secret&refresh_token=refresh-secret&type=signup',
+        environment: AppEnvironment.local,
+      );
+
+      expect(result.status, AuthCallbackStatus.ignored);
+    });
+
+    test('auth callback with session signs in without logging tokens', () async {
+      final gateway = _FakeSupabaseAuthGateway();
+      final platform = _FakeAuthDeepLinkPlatform(
+        initialLink:
+            'collectiq-sit://auth/callback#access_token=access-secret&refresh_token=refresh-secret&type=signup',
+      );
+      final logs = <String>[];
+      final previousDebugPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) {
+          logs.add(message);
+        }
+      };
+      addTearDown(() => debugPrint = previousDebugPrint);
+      final container = ProviderContainer(
+        overrides: [
+          environmentConfigProvider.overrideWithValue(
+            const EnvironmentConfig(environment: AppEnvironment.sit),
+          ),
+          authRepositoryProvider.overrideWithValue(_ScriptedAuthRepository()),
+          authCallbackGatewayProvider.overrideWithValue(gateway),
+          authDeepLinkPlatformProvider.overrideWithValue(platform),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      await container.read(authDeepLinkCoordinatorProvider).start();
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isTrue);
+      expect(state.user?.email, 'callback@example.com');
+      expect(state.infoMessage, AuthMessages.emailConfirmed);
+      expect(gateway.callbackCalls, 1);
+      expect(gateway.lastCallbackAccessToken, 'access-secret');
+      expect(logs.join('\n'), isNot(contains('access-secret')));
+      expect(logs.join('\n'), isNot(contains('refresh-secret')));
+    });
+
+    test('auth callback without session asks user to sign in', () async {
+      final platform = _FakeAuthDeepLinkPlatform(
+        initialLink:
+            'collectiq-sit://auth/callback?type=signup&token_hash=hash-value',
+      );
+      final container = ProviderContainer(
+        overrides: [
+          environmentConfigProvider.overrideWithValue(
+            const EnvironmentConfig(environment: AppEnvironment.sit),
+          ),
+          authRepositoryProvider.overrideWithValue(_ScriptedAuthRepository()),
+          authDeepLinkPlatformProvider.overrideWithValue(platform),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      await container.read(authDeepLinkCoordinatorProvider).start();
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.infoMessage, AuthMessages.emailConfirmedSignIn);
+    });
+
+    test(
+      'auth callback diagnostics store keys only without token values',
+      () async {
+        final platform = _FakeAuthDeepLinkPlatform(
+          initialLink:
+              'collectiq-sit://auth/not-callback?access_token=access-secret&refresh_token=refresh-secret',
+        );
+        final container = ProviderContainer(
+          overrides: [
+            environmentConfigProvider.overrideWithValue(
+              const EnvironmentConfig(environment: AppEnvironment.sit),
+            ),
+            authRepositoryProvider.overrideWithValue(_ScriptedAuthRepository()),
+            authDeepLinkPlatformProvider.overrideWithValue(platform),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        container.read(authControllerProvider);
+        await Future<void>.delayed(Duration.zero);
+        await container.read(authDeepLinkCoordinatorProvider).start();
+
+        final state = container.read(authControllerProvider);
+        final metadata = container.read(authDeepLinkMetadataProvider);
+        expect(state.errorMessage, AuthMessages.confirmationCallbackFailed);
+        expect(metadata, isNotNull);
+        expect(metadata!.received, isTrue);
+        expect(metadata.result, AuthCallbackStatus.error);
+        expect(metadata.scheme, 'collectiq-sit');
+        expect(metadata.host, 'auth');
+        expect(metadata.path, '/not-callback');
+        expect(
+          metadata.queryKeys,
+          containsAll(['access_token', 'refresh_token']),
+        );
+        expect(metadata.queryKeysLabel, isNot(contains('access-secret')));
+        expect(metadata.queryKeysLabel, isNot(contains('refresh-secret')));
+      },
+    );
+
+    test('auth callback expired link shows invalid message', () async {
+      final platform = _FakeAuthDeepLinkPlatform(
+        initialLink:
+            'collectiq-sit://auth/callback?error=access_denied&error_description=invalid%20or%20expired',
+      );
+      final container = ProviderContainer(
+        overrides: [
+          environmentConfigProvider.overrideWithValue(
+            const EnvironmentConfig(environment: AppEnvironment.sit),
+          ),
+          authRepositoryProvider.overrideWithValue(_ScriptedAuthRepository()),
+          authDeepLinkPlatformProvider.overrideWithValue(platform),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      await container.read(authDeepLinkCoordinatorProvider).start();
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.errorMessage, AuthMessages.confirmationLinkInvalid);
+    });
+
+    test('repeated sign-up before confirmation shows resent message', () async {
+      final repository = _ScriptedAuthRepository(
+        signUpError: const SupabaseEmailConfirmationRequiredException(),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'new@example.com',
+            password: 'password123',
+          );
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'new@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(state.infoMessage, AuthMessages.confirmationResent);
+      expect(repository.signUpCalls, 2);
+    });
+
+    test('missing Supabase config shows configuration message', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              signInError: const SupabaseNotConfiguredException(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.configurationError);
+      expect(
+        state.errorMessage,
+        'Supabase configuration is missing or invalid.',
+      );
+    });
+
+    test('email sign-in before confirmation stays signed out', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              signInError: const SupabaseAuthException(
+                'Please confirm your email before signing in.',
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signInWithEmailPassword(
+            email: 'harry@example.com',
+            password: 'password123',
+          );
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.confirmationRequired);
+      expect(
+        state.errorMessage,
+        'Please confirm your email before signing in.',
+      );
     });
 
     test('email sign-in failure leaves local mode with error', () async {
@@ -2244,6 +3768,7 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.signedOut);
       expect(state.errorMessage, 'Invalid email or password.');
     });
 
@@ -2271,8 +3796,29 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.signedOut);
       expect(state.isLocalMode, isTrue);
       expect(repository.signOutCalls, 1);
+    });
+
+    test('expired restored session is cleared and reported', () async {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _ScriptedAuthRepository(
+              currentUserError: const SupabaseSessionExpiredException(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(authControllerProvider);
+      expect(state.isSignedIn, isFalse);
+      expect(state.status, AuthFlowStatus.sessionExpired);
+      expect(state.errorMessage, SupabaseSessionExpiredException.message);
     });
   });
 
@@ -4720,14 +6266,23 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
     this.passwordSession,
     this.signUpSession,
     this.signInError,
+    this.signUpError,
   });
 
   final SupabaseAuthSession? currentSessionValue;
   final SupabaseAuthSession? passwordSession;
   final SupabaseAuthSession? signUpSession;
   final Object? signInError;
+  final Object? signUpError;
   var signInCalls = 0;
   var signUpCalls = 0;
+  var callbackCalls = 0;
+  String? lastCallbackAccessToken;
+  String? lastCallbackRefreshToken;
+  var resendCalls = 0;
+  String? lastResendEmail;
+  var passwordResetCalls = 0;
+  String? lastPasswordResetEmail;
   var signOutCalls = 0;
   String? lastSignOutToken;
 
@@ -4782,6 +6337,10 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
     required String password,
   }) async {
     signUpCalls += 1;
+    final error = signUpError;
+    if (error != null) {
+      throw error;
+    }
     return signUpSession ??
         SupabaseAuthSession(
           userId: 'new-email-user',
@@ -4797,6 +6356,36 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
   Future<void> signOut(String accessToken) async {
     signOutCalls += 1;
     lastSignOutToken = accessToken;
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {
+    resendCalls += 1;
+    lastResendEmail = email;
+  }
+
+  @override
+  Future<void> resetPasswordForEmail({required String email}) async {
+    passwordResetCalls += 1;
+    lastPasswordResetEmail = email;
+  }
+
+  @override
+  Future<SupabaseAuthSession> completeAuthCallback({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    callbackCalls += 1;
+    lastCallbackAccessToken = accessToken;
+    lastCallbackRefreshToken = refreshToken;
+    return SupabaseAuthSession(
+      userId: 'callback-user',
+      email: 'callback@example.com',
+      accessToken: accessToken,
+      displayName: 'callback@example.com',
+      isAnonymous: false,
+      projectUrl: 'https://example.supabase.co',
+    );
   }
 }
 
@@ -4873,6 +6462,27 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
   Future<void> signOut(String accessToken) async {}
 
   @override
+  Future<void> resendEmailConfirmation({required String email}) async {}
+
+  @override
+  Future<void> resetPasswordForEmail({required String email}) async {}
+
+  @override
+  Future<SupabaseAuthSession> completeAuthCallback({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    return SupabaseAuthSession(
+      userId: 'callback-user',
+      email: 'callback@example.com',
+      accessToken: accessToken,
+      displayName: 'callback@example.com',
+      isAnonymous: false,
+      projectUrl: 'https://example.supabase.co',
+    );
+  }
+
+  @override
   Future<Response<T>> authenticatedGetWithSession<T>(
     String path, {
     required SupabaseAuthSession session,
@@ -4910,12 +6520,49 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
   }
 }
 
-class _ScriptedAuthRepository implements AuthRepository {
-  _ScriptedAuthRepository({this.emailUser, this.signUpUser, this.signInError});
+class _FakeAuthDeepLinkPlatform implements AuthDeepLinkPlatform {
+  _FakeAuthDeepLinkPlatform({this.initialLink});
 
+  final String? initialLink;
+  Future<void> Function(String link)? handler;
+
+  @override
+  Future<String?> getInitialLink() async => initialLink;
+
+  @override
+  void setLinkHandler(Future<void> Function(String link) handler) {
+    this.handler = handler;
+  }
+}
+
+class _ScriptedAuthRepository implements AuthRepository {
+  _ScriptedAuthRepository({
+    this.initialUser,
+    this.emailUser,
+    this.signUpUser,
+    this.signInCompleter,
+    this.signInError,
+    this.signUpError,
+    this.resendError,
+    this.passwordResetError,
+    this.currentUserError,
+  });
+
+  final AppUser? initialUser;
   final AppUser? emailUser;
   final AppUser? signUpUser;
+  final Completer<AppUser>? signInCompleter;
   final Object? signInError;
+  final Object? signUpError;
+  final Object? resendError;
+  final Object? passwordResetError;
+  final Object? currentUserError;
+  var signInCalls = 0;
+  var signUpCalls = 0;
+  var resendCalls = 0;
+  var passwordResetCalls = 0;
+  String? lastResendEmail;
+  String? lastPasswordResetEmail;
   var signOutCalls = 0;
 
   static const _localUser = AppUser(
@@ -4928,7 +6575,13 @@ class _ScriptedAuthRepository implements AuthRepository {
   );
 
   @override
-  Future<AppUser?> currentUser() async => _localUser;
+  Future<AppUser?> currentUser() async {
+    final error = currentUserError;
+    if (error != null) {
+      throw error;
+    }
+    return initialUser ?? _localUser;
+  }
 
   @override
   Future<AppUser> signIn() async => _localUser;
@@ -4941,9 +6594,14 @@ class _ScriptedAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
+    signInCalls += 1;
     final error = signInError;
     if (error != null) {
       throw error;
+    }
+    final completer = signInCompleter;
+    if (completer != null) {
+      return completer.future;
     }
     return emailUser ??
         AppUser(
@@ -4959,6 +6617,11 @@ class _ScriptedAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
+    signUpCalls += 1;
+    final error = signUpError;
+    if (error != null) {
+      throw error;
+    }
     return signUpUser ??
         AppUser(
           id: 'new-email-user',
@@ -4966,6 +6629,26 @@ class _ScriptedAuthRepository implements AuthRepository {
           email: email,
           provider: AuthProviderType.emailPassword,
         );
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {
+    resendCalls += 1;
+    lastResendEmail = email;
+    final error = resendError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    passwordResetCalls += 1;
+    lastPasswordResetEmail = email;
+    final error = passwordResetError;
+    if (error != null) {
+      throw error;
+    }
   }
 
   @override

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset Packlox Password</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <p class="eyebrow">Packlox</p>
+      <h1>Reset password</h1>
+      <p class="lede">Enter a new password for your Packlox account.</p>
+      <form id="reset-form">
+        <label for="password">New password</label>
+        <input id="password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+        <label for="confirm-password">Confirm password</label>
+        <input id="confirm-password" name="confirm-password" type="password" minlength="6" autocomplete="new-password" required>
+        <button id="submit" type="submit">Update Password</button>
+      </form>
+      <p id="message" class="message" hidden></p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script src="../auth-page.js"></script>
+  <script>
+    window.PackloxAuthPages.initResetPasswordPage();
+  </script>
+</body>
+</html>

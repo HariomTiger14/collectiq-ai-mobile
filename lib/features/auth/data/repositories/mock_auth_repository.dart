@@ -52,6 +52,20 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> resendEmailConfirmation({required String email}) async {
+    throw const AuthException(
+      'Email confirmation requires Supabase configuration. Local mode remains available.',
+    );
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    throw const AuthException(
+      'Password reset requires Supabase configuration. Local mode remains available.',
+    );
+  }
+
+  @override
   Future<AppUser> signInWithGoogle() async {
     throw const AuthException(
       'Google sign-in is coming soon. Local mode remains available.',

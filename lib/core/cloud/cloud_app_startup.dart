@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:flutter/foundation.dart';
 
 class CloudAppStartup {
@@ -38,6 +39,10 @@ class CloudAppStartup {
       }
     }
     if (!flags.useCloudAuth) {
+      return;
+    }
+    if (environment == AppEnvironment.sit) {
+      await registry.analyticsService.trackEvent('sit_email_auth_required');
       return;
     }
 

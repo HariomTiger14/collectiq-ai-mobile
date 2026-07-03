@@ -1,7 +1,15 @@
 @echo off
 setlocal
 set "ROOT=%~dp0"
-if not defined FLUTTER_BIN set "FLUTTER_BIN=flutter"
+cd /d "%ROOT%" || exit /b 1
+
+if /i "%FLUTTER_BIN%"=="flutter" set "FLUTTER_BIN="
+if not defined FLUTTER_BIN (
+  for /f "delims=" %%F in ('where flutter.bat 2^>nul') do (
+    if not defined FLUTTER_BIN set "FLUTTER_BIN=%%F"
+  )
+)
+if not defined FLUTTER_BIN set "FLUTTER_BIN=flutter.bat"
 
 call "%ROOT%scripts\load_env.bat" "%ROOT%config\sit.env"
 

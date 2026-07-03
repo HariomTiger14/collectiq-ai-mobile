@@ -55,10 +55,7 @@ class SupabaseAuthRepository implements AuthRepository {
     required String password,
   }) async {
     if (!supabaseService.isConfigured) {
-      return fallbackRepository.signInWithEmailPassword(
-        email: email,
-        password: password,
-      );
+      throw const SupabaseNotConfiguredException();
     }
 
     final session = await supabaseService.signInWithPassword(
@@ -74,10 +71,7 @@ class SupabaseAuthRepository implements AuthRepository {
     required String password,
   }) async {
     if (!supabaseService.isConfigured) {
-      return fallbackRepository.signUpWithEmailPassword(
-        email: email,
-        password: password,
-      );
+      throw const SupabaseNotConfiguredException();
     }
 
     final session = await supabaseService.signUpWithPassword(
@@ -85,6 +79,24 @@ class SupabaseAuthRepository implements AuthRepository {
       password: password,
     );
     return _userFromSession(session);
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {
+    if (!supabaseService.isConfigured) {
+      throw const SupabaseNotConfiguredException();
+    }
+
+    await supabaseService.resendEmailConfirmation(email: email);
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    if (!supabaseService.isConfigured) {
+      throw const SupabaseNotConfiguredException();
+    }
+
+    await supabaseService.resetPasswordForEmail(email: email);
   }
 
   @override

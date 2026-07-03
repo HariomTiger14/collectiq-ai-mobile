@@ -16,9 +16,20 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var permissionResult: MethodChannel.Result? = null
+    private var authLinkChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        authLinkChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AUTH_LINK_CHANNEL,
+        )
+        authLinkChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialLink" -> result.success(authLinkFromIntent(intent))
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             NOTIFICATION_CHANNEL,
@@ -43,6 +54,15 @@ class MainActivity : FlutterActivity() {
 
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val authLink = authLinkFromIntent(intent)
+        if (authLink != null) {
+            authLinkChannel?.invokeMethod("authLink", authLink)
         }
     }
 
@@ -173,8 +193,20 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val AUTH_LINK_CHANNEL = "collectiq_ai/auth_links"
         private const val NOTIFICATION_CHANNEL = "collectiq_ai/notifications"
         private const val PRICE_ALERT_CHANNEL_ID = "collectiq_price_alerts"
         private const val POST_NOTIFICATIONS_REQUEST_CODE = 4301
+    }
+
+    private fun authLinkFromIntent(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) {
+            return null
+        }
+        val data = intent.data ?: return null
+        if (data.host != "auth" || data.path != "/callback") {
+            return null
+        }
+        return data.toString()
     }
 }

@@ -28,6 +28,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["authRedirectScheme"] = "collectiq"
     }
 
     flavorDimensions += "environment"
@@ -35,13 +36,16 @@ android {
         create("local") {
             dimension = "environment"
             applicationIdSuffix = ".local"
+            manifestPlaceholders["authRedirectScheme"] = "collectiq-local"
         }
         create("sit") {
             dimension = "environment"
             applicationIdSuffix = ".sit"
+            manifestPlaceholders["authRedirectScheme"] = "collectiq-sit"
         }
         create("prod") {
             dimension = "environment"
+            manifestPlaceholders["authRedirectScheme"] = "collectiq"
         }
     }
 

@@ -132,9 +132,70 @@ For SIT:
 2. Enable email/password sign-in.
 3. Decide whether email confirmation is required for testers.
 4. If email confirmation is enabled, make sure tester emails can receive confirmation links.
-5. Confirm redirect URLs are suitable for the DEV/SIT project if confirmation or password recovery links are used.
+5. Open **Authentication > URL Configuration** and set mobile plus Packlox web redirect URLs.
+
+SIT:
+
+```text
+Site URL: https://packlox.com/auth/callback
+Redirect URLs:
+collectiq-sit://auth/callback
+https://packlox.com/auth/callback
+https://packlox.com/auth/reset-password
+```
+
+Future production, reserved only:
+
+```text
+collectiq://auth/callback
+```
+
+Do not use `localhost` for Android email confirmation. The phone must receive
+the custom `collectiq-sit` scheme when testing mobile confirmation, and
+password recovery must be able to open the browser route
+`https://packlox.com/auth/reset-password` from any device.
+
+Password recovery must not use `collectiq-sit://auth/callback`. If Android
+opens the app from a reset password email, the recovery email was generated with
+the wrong redirect URL or the tester clicked an older email. Generate a fresh
+Forgot Password email after updating Supabase URL Configuration.
+
+The mobile app can show the recovery redirect URL it supplied to Supabase in
+**SIT Readiness > Password recovery redirect**, but Supabase does not return the
+actual generated email link to the anon recover request. To confirm the exact
+link, inspect the received reset email or the Supabase email template/logs.
+
+If the confirmation link opens a blank browser page instead of returning to the
+app, return to CollectIQ SIT manually and tap **Sign In** after email
+confirmation. Then check **SIT Readiness > Last deep link received** to see
+whether Android delivered the callback to the app.
 
 The app uses email/password auth for SIT. Anonymous auth can remain disabled unless you intentionally test guest cloud startup behavior.
+
+## 5a. Packlox Web Auth Pages
+
+The repository includes minimal static pages for browser auth flows:
+
+```text
+web/auth/callback/index.html
+web/auth/reset-password/index.html
+```
+
+Deploy them so these routes resolve:
+
+```text
+https://packlox.com/auth/callback
+https://packlox.com/auth/reset-password
+```
+
+The browser pages load public Supabase config from:
+
+```text
+web/auth/config.js
+```
+
+Replace the placeholder values during deployment. Commit no real secrets. The
+anon key is public, but the service-role key must never be used in these pages.
 
 ## 6. Find `SUPABASE_URL`
 

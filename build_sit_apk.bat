@@ -1,7 +1,15 @@
 @echo off
 setlocal
 set "ROOT=%~dp0"
-if not defined FLUTTER_BIN set "FLUTTER_BIN=flutter"
+cd /d "%ROOT%" || exit /b 1
+
+if /i "%FLUTTER_BIN%"=="flutter" set "FLUTTER_BIN="
+if not defined FLUTTER_BIN (
+  for /f "delims=" %%F in ('where flutter.bat 2^>nul') do (
+    if not defined FLUTTER_BIN set "FLUTTER_BIN=%%F"
+  )
+)
+if not defined FLUTTER_BIN set "FLUTTER_BIN=flutter.bat"
 
 call "%ROOT%scripts\load_env.bat" "%ROOT%config\sit.env"
 
@@ -21,6 +29,9 @@ if not defined SUPABASE_URL echo [CollectIQ SIT] SUPABASE_URL is not set. Cloud 
 if not defined SUPABASE_ANON_KEY echo [CollectIQ SIT] SUPABASE_ANON_KEY is not set. Cloud services will fall back safely.
 if not defined API_BASE_URL echo [CollectIQ SIT] API_BASE_URL is not set. Backend AI will use the built-in development default.
 
+set "BUILD_LOG=%TEMP%\collectiq_sit_build_%RANDOM%_%RANDOM%.log"
+echo [CollectIQ SIT] Building debug APK...
+
 call "%FLUTTER_BIN%" build apk ^
   --debug ^
   --flavor sit ^
@@ -34,4 +45,16 @@ call "%FLUTTER_BIN%" build apk ^
   %SUPABASE_ANON_KEY_DEFINE% ^
   %API_BASE_URL_DEFINE% ^
   %AI_BACKEND_DEFINE% ^
-  %*
+  %* > "%BUILD_LOG%" 2>&1
+
+set "BUILD_EXIT=%ERRORLEVEL%"
+if not "%BUILD_EXIT%"=="0" (
+  echo [CollectIQ SIT] Build failed. Sanitized output:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -LiteralPath '%BUILD_LOG%' | ForEach-Object { $_ -replace '-Pdart-defines=[^ ]+', '-Pdart-defines=<redacted>' -replace 'SUPABASE_ANON_KEY=[^ ]+', 'SUPABASE_ANON_KEY=<redacted>' -replace 'SUPABASE_URL=[^ ]+', 'SUPABASE_URL=<redacted>' -replace 'API_BASE_URL=[^ ]+', 'API_BASE_URL=<redacted>' }"
+  del "%BUILD_LOG%" >nul 2>nul
+  exit /b %BUILD_EXIT%
+)
+
+del "%BUILD_LOG%" >nul 2>nul
+echo [CollectIQ SIT] Built build\app\outputs\flutter-apk\app-sit-debug.apk
+exit /b 0

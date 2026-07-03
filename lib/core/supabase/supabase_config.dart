@@ -24,6 +24,15 @@ class SupabaseConfig {
 
   bool get hasAnonKey => anonKey.isNotEmpty;
 
+  int get anonKeyLength => anonKey.length;
+
+  String get maskedAnonKeyLengthLabel {
+    if (!hasAnonKey) {
+      return '0';
+    }
+    return '$anonKeyLength characters';
+  }
+
   Uri? get baseUri {
     if (url.isEmpty) {
       return null;
@@ -45,5 +54,6 @@ class SupabaseConfig {
     debugPrint('[Supabase] enabled: $isEnabled');
     debugPrint('[Supabase] URL configured: $hasUrl');
     debugPrint('[Supabase] anon key configured: $hasAnonKey');
+    debugPrint('[Supabase] anon key length: $anonKeyLength');
   }
 }

@@ -26,6 +26,12 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  /// Resends a Supabase email confirmation message when supported.
+  Future<void> resendEmailConfirmation({required String email});
+
+  /// Sends a password reset email when supported.
+  Future<void> sendPasswordResetEmail({required String email});
+
   /// Signs in with Google when supported by the auth provider.
   Future<AppUser> signInWithGoogle();
 

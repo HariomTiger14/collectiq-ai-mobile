@@ -74,6 +74,26 @@ void main() {
     });
 
     test(
+      'SIT startup requires email auth and skips anonymous sign-in',
+      () async {
+        final auth = _RecordingAuthService();
+        final analytics = _RecordingAnalyticsService();
+
+        await CloudAppStartup(
+          registry: _registry(
+            environment: AppEnvironment.sit,
+            authService: auth,
+            analyticsService: analytics,
+          ),
+        ).run();
+
+        expect(auth.signInCount, 0);
+        expect(analytics.events, contains('sit_email_auth_required'));
+        expect(analytics.events, isNot(contains('anonymous_auth_success')));
+      },
+    );
+
+    test(
       'dev cloud flags validate cloud sync availability at startup',
       () async {
         final remoteConfig = _RecordingRemoteConfigService();

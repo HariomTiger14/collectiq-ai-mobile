@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/api_client.dart' as network;
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -33,10 +38,22 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  Timer? _resendCountdownTimer;
   bool _isManualCloudSyncing = false;
 
   @override
+  void initState() {
+    super.initState();
+    _resendCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _resendCountdownTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -49,14 +66,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           previous?.isSignedIn != next.isSignedIn) {
         ref.read(syncControllerProvider.notifier).loadStatus();
       }
+      if (previous?.isSignedIn == false && next.isSignedIn) {
+        ref
+            .read(appShellTabControllerProvider.notifier)
+            .selectTab(AppShellTabController.homeTab, reason: 'auth-sign-in');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(AuthMessages.signedIn)));
+      }
     });
 
     final authState = ref.watch(authControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
     final cloudRegistry = ref.watch(cloudServiceRegistryProvider);
-    final canRunCloudSync = _cloudSyncAvailable(cloudRegistry);
+    final canRunCloudSync =
+        _cloudSyncAvailable(cloudRegistry) && authState.isSignedIn;
     final supabaseConfig = ref.watch(supabaseConfigProvider);
+    final lastAuthAttempt = ref.watch(supabaseAuthAttemptMetadataProvider);
+    final lastDeepLink = ref.watch(authDeepLinkMetadataProvider);
     final apiConfig = ref.watch(network.environmentConfigProvider);
     final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
@@ -64,6 +92,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final notificationState = ref.watch(
       priceAlertNotificationControllerProvider,
     );
+    final isSitEnvironment =
+        cloudRegistry.config.environment == AppEnvironment.sit;
+    final now = DateTime.now();
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -103,9 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _SettingsRow(
                         icon: Icons.route_outlined,
                         title: 'Environment',
-                        subtitle:
-                            cloudRegistry.config.environment ==
-                                AppEnvironment.sit
+                        subtitle: isSitEnvironment
                             ? 'System integration test mode is active.'
                             : 'Run CollectIQ SIT with APP_ENV=sit for cloud validation.',
                         trailing: cloudRegistry.config.environment.label,
@@ -119,17 +148,173 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         trailing: supabaseConfig.isConfigured ? 'Yes' : 'No',
                       ),
                       _SettingsRow(
+                        icon: Icons.link_outlined,
+                        title: 'Supabase URL configured',
+                        subtitle: supabaseConfig.hasUrl
+                            ? 'SUPABASE_URL was included in the app config.'
+                            : 'Missing SUPABASE_URL in SIT config.',
+                        trailing: supabaseConfig.hasUrl ? 'Yes' : 'No',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.vpn_key_outlined,
+                        title: 'Supabase anon key configured',
+                        subtitle: supabaseConfig.hasAnonKey
+                            ? 'SUPABASE_ANON_KEY was included in the app config.'
+                            : 'Missing SUPABASE_ANON_KEY in SIT config.',
+                        trailing: supabaseConfig.hasAnonKey ? 'Yes' : 'No',
+                      ),
+                      _SettingsRow(
+                        icon: Icons.password_outlined,
+                        title: 'Supabase anon key length',
+                        subtitle:
+                            'Masked diagnostic only. The key value is never shown.',
+                        trailing: supabaseConfig.maskedAnonKeyLengthLabel,
+                      ),
+                      _SettingsRow(
                         icon: Icons.person_outline,
                         title: 'Auth status',
                         subtitle: authState.isSignedIn
                             ? authState.user?.email ??
                                   authState.user?.id ??
                                   'Signed in'
+                            : authState.isAnonymousCloudSession
+                            ? 'Anonymous/dev session detected. Sign in with email/password for real SIT sync.'
                             : 'Signed out. Sign in with email/password before cloud sync.',
                         trailing: authState.isSignedIn
                             ? 'Signed in'
+                            : authState.isAnonymousCloudSession
+                            ? 'Anonymous'
                             : 'Signed out',
                       ),
+                      if (isSitEnvironment) ...[
+                        _SettingsRow(
+                          icon: Icons.mark_email_unread_outlined,
+                          title: 'Pending confirmation email',
+                          subtitle:
+                              'Masked diagnostic for confirmation resend troubleshooting.',
+                          trailing: _maskedEmail(
+                            authState.pendingConfirmationEmail,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.history_outlined,
+                          title: 'Last resend attempted',
+                          subtitle:
+                              'Shows when the app last asked Supabase to resend confirmation.',
+                          trailing: _formatDiagnosticDate(
+                            authState.lastResendAttemptedAt,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.fact_check_outlined,
+                          title: 'Last resend status',
+                          subtitle:
+                              'Sent, rate-limited, failed, or none for this app session.',
+                          trailing: authState.lastResendStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.timer_outlined,
+                          title: 'Cooldown remaining',
+                          subtitle:
+                              'Active resend wait time from success or Supabase rate-limit response.',
+                          trailing: _formatDiagnosticDuration(
+                            authState.activeResendCooldownRemaining(now),
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.block_outlined,
+                          title: 'Cooldown source',
+                          subtitle:
+                              'Success, retry-after, fallback, app-limit, or none.',
+                          trailing: authState.resendCooldownSource,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.lock_reset_outlined,
+                          title: 'Password recovery redirect',
+                          subtitle:
+                              'Exact redirect URL the app asks Supabase to place in reset emails.',
+                          trailing:
+                              authState.lastPasswordResetRedirectUrl ??
+                              SupabaseService.passwordResetRedirectUri,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.manage_history_outlined,
+                          title: 'Last password reset status',
+                          subtitle:
+                              'Sent, rate-limited, failed, blocked, or none for this app session.',
+                          trailing: authState.lastPasswordResetStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.timer_outlined,
+                          title: 'Password reset cooldown',
+                          subtitle:
+                              'Active wait time after reset email success or Supabase rate-limit response.',
+                          trailing: _formatDiagnosticDuration(
+                            authState.activePasswordResetCooldownRemaining(now),
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.rule_outlined,
+                          title: 'Password reset cooldown source',
+                          subtitle: 'Success, retry-after, fallback, or none.',
+                          trailing: authState.passwordResetCooldownSource,
+                        ),
+                        const _SettingsRow(
+                          icon: Icons.tips_and_updates_outlined,
+                          title: 'Testing email tip',
+                          subtitle: AuthMessages.confirmationTestingTip,
+                          trailing: 'SIT only',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.manage_search_outlined,
+                          title: 'Last auth attempt',
+                          subtitle: lastAuthAttempt == null
+                              ? 'No Supabase auth response captured this session.'
+                              : 'Action ${lastAuthAttempt.actionLabel}, status ${lastAuthAttempt.httpStatus ?? 'none'}, body ${lastAuthAttempt.bodyType}.',
+                          trailing:
+                              lastAuthAttempt?.statusLabel ?? 'Not captured',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.key_outlined,
+                          title: 'Last auth response keys',
+                          subtitle:
+                              'Keys only. Tokens, passwords, and full response bodies are never shown.',
+                          trailing: lastAuthAttempt?.keysLabel ?? 'none',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.verified_user_outlined,
+                          title: 'Last auth response shape',
+                          subtitle: lastAuthAttempt == null
+                              ? 'No sanitized response metadata yet.'
+                              : 'user=${lastAuthAttempt.hasUser}, session=${lastAuthAttempt.hasSession}, id=${lastAuthAttempt.hasDirectId}, email=${lastAuthAttempt.hasDirectEmail}, confirmation=${lastAuthAttempt.hasConfirmationSentAt}',
+                          trailing: _formatDiagnosticDate(
+                            lastAuthAttempt?.timestamp,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.link_outlined,
+                          title: 'Last deep link received',
+                          subtitle: lastDeepLink == null
+                              ? 'No auth callback link captured this session.'
+                              : 'scheme=${lastDeepLink.scheme ?? 'none'}, host=${lastDeepLink.host ?? 'none'}, path=${lastDeepLink.path ?? 'none'}',
+                          trailing: lastDeepLink?.receivedLabel ?? 'No',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.rule_outlined,
+                          title: 'Last deep link result',
+                          subtitle:
+                              lastDeepLink?.errorMessage ??
+                              'Callback result is shown without token values.',
+                          trailing: lastDeepLink?.resultLabel ?? 'none',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.key_off_outlined,
+                          title: 'Last deep link query keys',
+                          subtitle:
+                              'Keys only. Access tokens and refresh tokens are never shown.',
+                          trailing: lastDeepLink?.queryKeysLabel ?? 'none',
+                        ),
+                      ],
                       _SettingsRow(
                         icon: Icons.storage_outlined,
                         title: 'Storage sync',
@@ -159,6 +344,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : 'Default',
                       ),
                       _SettingsRow(
+                        icon: Icons.api_outlined,
+                        title: 'API backend configured',
+                        subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
+                            ? 'API_BASE_URL was included in the app config.'
+                            : 'Using the built-in development backend default.',
+                        trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
+                            ? 'Yes'
+                            : 'Default',
+                      ),
+                      _SettingsRow(
                         icon: Icons.schedule_outlined,
                         title: 'Last sync status',
                         subtitle:
@@ -176,6 +371,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         title: 'Account mode',
                         subtitle:
                             authState.errorMessage ??
+                            authState.infoMessage ??
                             'CollectIQ AI stays fully usable in local-first mode.',
                         trailing: authState.accountModeLabel,
                       ),
@@ -193,6 +389,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : 'Sign In',
                         subtitle:
                             authState.errorMessage ??
+                            authState.infoMessage ??
                             (authState.isSignedIn
                                 ? authState.user!.displayName
                                 : 'Cloud sign-in is optional and prepared for a future release.'),
@@ -206,11 +403,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         authState: authState,
                         onSignIn: () => _submitEmailAuth(signUp: false),
                         onSignUp: () => _submitEmailAuth(signUp: true),
+                        onResendConfirmation: () => _resendConfirmationEmail(),
+                        onForgotPassword: () => _sendPasswordResetEmail(),
                         onSignOut: authState.isSignedIn
                             ? () => ref
                                   .read(authControllerProvider.notifier)
                                   .signOut()
                             : null,
+                        syncStatusLabel: syncState.status.statusLabel,
                       ),
                       _SettingsRow(
                         icon: Icons.g_mobiledata_outlined,
@@ -852,6 +1052,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _maskedEmail(String? email) {
+    final trimmed = email?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'None';
+    }
+    final atIndex = trimmed.indexOf('@');
+    if (atIndex <= 0 || atIndex == trimmed.length - 1) {
+      return '***';
+    }
+    final local = trimmed.substring(0, atIndex);
+    final domain = trimmed.substring(atIndex + 1);
+    return '${local[0]}***@$domain';
+  }
+
+  String _formatDiagnosticDate(DateTime? value) {
+    if (value == null) {
+      return 'Never';
+    }
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    return '$hour:$minute:$second';
+  }
+
+  String _formatDiagnosticDuration(Duration? value) {
+    if (value == null || value <= Duration.zero) {
+      return 'None';
+    }
+    final seconds = value.inSeconds < 1 ? 1 : value.inSeconds;
+    if (seconds < 60) {
+      return '${seconds}s';
+    }
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    if (remainingSeconds == 0) {
+      return '${minutes}m';
+    }
+    return '${minutes}m ${remainingSeconds}s';
+  }
+
   Future<void> _submitEmailAuth({required bool signUp}) async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -865,6 +1106,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref
         .read(authControllerProvider.notifier)
         .signInWithEmailPassword(email: email, password: password);
+  }
+
+  Future<void> _resendConfirmationEmail() async {
+    final authState = ref.read(authControllerProvider);
+    await ref
+        .read(authControllerProvider.notifier)
+        .resendConfirmationEmail(
+          email:
+              authState.pendingConfirmationEmail ??
+              _emailController.text.trim(),
+        );
+  }
+
+  Future<void> _sendPasswordResetEmail() async {
+    await ref
+        .read(authControllerProvider.notifier)
+        .sendPasswordResetEmail(email: _emailController.text.trim());
   }
 
   Future<void> _resetOnboarding(BuildContext context) async {
@@ -889,7 +1147,10 @@ class _AuthEmailPanel extends StatelessWidget {
     required this.authState,
     required this.onSignIn,
     required this.onSignUp,
+    required this.onResendConfirmation,
+    required this.onForgotPassword,
     required this.onSignOut,
+    required this.syncStatusLabel,
   });
 
   final TextEditingController emailController;
@@ -897,14 +1158,133 @@ class _AuthEmailPanel extends StatelessWidget {
   final AuthState authState;
   final VoidCallback onSignIn;
   final VoidCallback onSignUp;
+  final VoidCallback onResendConfirmation;
+  final VoidCallback onForgotPassword;
   final VoidCallback? onSignOut;
+  final String syncStatusLabel;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLoading = authState.isLoading;
+    final resendCountdownLabel = authState.resendCountdownLabel(DateTime.now());
+    final resendBlocked = resendCountdownLabel != null;
+    final passwordResetCountdownLabel = authState.passwordResetCountdownLabel(
+      DateTime.now(),
+    );
+    final passwordResetBlocked = passwordResetCountdownLabel != null;
     final signedInEmail = authState.user?.email;
+    final loadingLabel = switch (authState.status) {
+      AuthFlowStatus.signingIn => 'Signing in...',
+      AuthFlowStatus.signingUp => 'Creating account...',
+      AuthFlowStatus.signingOut => 'Signing out...',
+      AuthFlowStatus.sessionRestoring => 'Checking session...',
+      _ => 'Working...',
+    };
+    final statusText = authState.isSignedIn
+        ? 'Signed in'
+        : isLoading
+        ? loadingLabel
+        : authState.isAnonymousCloudSession
+        ? 'Anonymous'
+        : 'Ready';
+    final helperText = authState.isSignedIn
+        ? signedInEmail ?? authState.user!.displayName
+        : authState.isAnonymousCloudSession
+        ? 'Anonymous/dev session. Use email/password for real SIT auth.'
+        : 'Optional Supabase account. Local mode remains available.';
+
+    if (authState.isSignedIn) {
+      return Column(
+        key: const ValueKey('settings-auth-account-panel'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.56),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(
+                  Icons.account_circle_outlined,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      signedInEmail ?? authState.user!.displayName,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Auth status connected',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                'Connected',
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _SettingsRow(
+            icon: Icons.verified_user_outlined,
+            title: 'Auth status',
+            subtitle: 'Signed in with email/password.',
+            trailing: 'Connected',
+          ),
+          _SettingsRow(
+            icon: Icons.sync_outlined,
+            title: 'Sync status',
+            subtitle: 'Cloud sync is available when Supabase is configured.',
+            trailing: syncStatusLabel,
+          ),
+          if (authState.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              authState.errorMessage!,
+              style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
+            ),
+          ],
+          if (authState.infoMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              authState.infoMessage!,
+              style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const ValueKey('settings-auth-sign-out-button'),
+              onPressed: isLoading ? null : onSignOut,
+              icon: const Icon(Icons.logout_outlined),
+              label: const Text('Sign Out'),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -933,9 +1313,7 @@ class _AuthEmailPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    authState.isSignedIn
-                        ? signedInEmail ?? authState.user!.displayName
-                        : 'Optional Supabase account. Local mode remains available.',
+                    helperText,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -945,7 +1323,7 @@ class _AuthEmailPanel extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.md),
             Text(
-              authState.isSignedIn ? 'Signed in' : 'Ready',
+              statusText,
               style: textTheme.labelLarge?.copyWith(
                 color: colorScheme.primary,
                 fontWeight: FontWeight.w700,
@@ -954,6 +1332,17 @@ class _AuthEmailPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        if (isLoading) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            loadingLabel,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         TextField(
           key: const ValueKey('settings-auth-email-field'),
           controller: emailController,
@@ -984,6 +1373,13 @@ class _AuthEmailPanel extends StatelessWidget {
             style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
           ),
         ],
+        if (authState.infoMessage != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            authState.infoMessage!,
+            style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         SizedBox(
           width: double.infinity,
@@ -991,7 +1387,7 @@ class _AuthEmailPanel extends StatelessWidget {
             key: const ValueKey('settings-auth-sign-in-button'),
             onPressed: isLoading ? null : onSignIn,
             icon: const Icon(Icons.login_outlined),
-            label: Text(isLoading ? 'Working...' : 'Sign In'),
+            label: Text(isLoading ? loadingLabel : 'Sign In'),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1004,18 +1400,34 @@ class _AuthEmailPanel extends StatelessWidget {
             label: const Text('Sign Up'),
           ),
         ),
-        if (authState.isSignedIn) ...[
+        if (authState.status == AuthFlowStatus.confirmationRequired &&
+            authState.pendingConfirmationEmail != null &&
+            !authState.isSignedIn) ...[
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
             width: double.infinity,
-            child: TextButton.icon(
-              key: const ValueKey('settings-auth-sign-out-button'),
-              onPressed: isLoading ? null : onSignOut,
-              icon: const Icon(Icons.logout_outlined),
-              label: const Text('Sign Out'),
+            child: OutlinedButton.icon(
+              key: const ValueKey('settings-auth-resend-confirmation-button'),
+              onPressed: isLoading || resendBlocked
+                  ? null
+                  : onResendConfirmation,
+              icon: const Icon(Icons.mark_email_unread_outlined),
+              label: Text(resendCountdownLabel ?? 'Resend Confirmation'),
             ),
           ),
         ],
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            key: const ValueKey('settings-auth-forgot-password-button'),
+            onPressed: isLoading || passwordResetBlocked
+                ? null
+                : onForgotPassword,
+            icon: const Icon(Icons.help_outline),
+            label: Text(passwordResetCountdownLabel ?? 'Forgot Password'),
+          ),
+        ),
       ],
     );
   }
