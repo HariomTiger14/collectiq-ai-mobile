@@ -5,11 +5,15 @@ if (!window.supabase) {
   throw new Error('Supabase JavaScript client failed to load.');
 }
 
-const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    detectSessionInUrl: false,
-    persistSession: false,
+export const supabase = window.supabase.createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
   },
-});
+);
 
 export default supabase;

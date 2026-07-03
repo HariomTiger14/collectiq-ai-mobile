@@ -1,4 +1,4 @@
-import supabase from './supabaseClient.js';
+import { supabase } from '/auth/reset-password/supabaseClient.js';
 
 const redirectSeconds = 5;
 const loginPath = '/auth/login';
@@ -83,7 +83,7 @@ function paramsFromUrl() {
   return params;
 }
 
-function recoveryHashTokens() {
+function extractTokenFromHash() {
   const hashParams = hashParamsFromUrl();
 
   return {
@@ -95,6 +95,8 @@ function recoveryHashTokens() {
     type: hashParams.get('type'),
   };
 }
+
+const recoveryHashTokens = extractTokenFromHash;
 
 function getRecoveryToken(params) {
   return params.get('token') || params.get('token_hash');
@@ -199,7 +201,7 @@ function passwordValidationMessage(password) {
   return '';
 }
 
-function updateStrength() {
+function updateStrengthMeter() {
   const password = elements.password.value;
   const score = passwordScore(password);
   const details = strengthDetails(score);
@@ -216,7 +218,7 @@ function validatePasswordField() {
   const message = passwordValidationMessage(elements.password.value);
   elements.password.setAttribute('aria-invalid', String(Boolean(message)));
   setFieldMessage(elements.passwordError, message);
-  updateStrength();
+  updateStrengthMeter();
 
   return !message;
 }
@@ -303,7 +305,7 @@ async function clearRecoverySession() {
   }
 }
 
-async function handleSubmit(event) {
+async function submitNewPassword(event) {
   event.preventDefault();
   clearMessage();
 
@@ -345,23 +347,42 @@ async function handleSubmit(event) {
   }
 }
 
-function setupPasswordToggles() {
-  elements.toggleButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const input = getElement(button.dataset.target);
-      const isHidden = input.type === 'password';
+function peekPassword(button, input) {
+  const isHidden = input.type === 'password';
 
-      input.type = isHidden ? 'text' : 'password';
-      button.setAttribute(
-        'aria-label',
-        `${isHidden ? 'Hide' : 'Show'} ${input.id === 'password' ? 'new' : 'confirmed'} password`,
-      );
+  input.type = isHidden ? 'text' : 'password';
+  button.setAttribute(
+    'aria-label',
+    `${isHidden ? 'Hide' : 'Show'} ${
+      input.id === 'password' ? 'new' : 'confirmed'
+    } password`,
+  );
+}
+
+function setupPasswordToggles() {
+  const passwordToggle =
+    getElement('togglePassword') ||
+    document.querySelector('[data-target="password"]');
+  const confirmToggle =
+    getElement('toggleConfirmPassword') ||
+    document.querySelector('[data-target="confirm-password"]');
+
+  if (passwordToggle) {
+    passwordToggle.addEventListener('click', () => {
+      peekPassword(passwordToggle, elements.password);
     });
-  });
+  }
+
+  if (confirmToggle) {
+    confirmToggle.addEventListener('click', () => {
+      peekPassword(confirmToggle, elements.confirmPassword);
+    });
+  }
 }
 
 function setupRealtimeValidation() {
   elements.password.addEventListener('input', () => {
+    updateStrengthMeter();
     validatePasswordField();
 
     if (elements.confirmPassword.value) {
@@ -376,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
   cacheElements();
   setupPasswordToggles();
   setupRealtimeValidation();
-  updateStrength();
+  updateStrengthMeter();
 
   const params = paramsFromUrl();
 
@@ -388,5 +409,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setMissingTokenMessage();
   }
 
-  elements.form.addEventListener('submit', handleSubmit);
+  elements.form.addEventListener('submit', submitNewPassword);
 });
