@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/auth/reset-password/styles.css">
   <!-- 1. Safe storage override -->
   <script>
-    // Force safe storage BEFORE Supabase loads
     window.localStorage = {
       getItem: () => null,
       setItem: () => {},
@@ -102,7 +101,10 @@
     </section>
   </main>
 
-  <script type="module" src="/auth/reset-password/supabase-js-v2.js"></script>
+  <!-- 2. Local Supabase module -->
+  <script type="module" src="/auth/reset-password/vendor/supabase-js-v2.js"></script>
+
+  <!-- 3. My modules -->
   <script type="module" src="/auth/reset-password/supabaseClient.js"></script>
   <script type="module" src="/auth/reset-password/reset-password.js"></script>
 </body>
