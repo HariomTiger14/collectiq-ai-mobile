@@ -15,24 +15,10 @@
 
       <form id="reset-form" novalidate>
         <label for="password">New password</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          minlength="6"
-          autocomplete="new-password"
-          required
-        >
+        <input id="password" name="password" type="password" minlength="6" autocomplete="new-password" required>
 
         <label for="confirm-password">Confirm password</label>
-        <input
-          id="confirm-password"
-          name="confirm-password"
-          type="password"
-          minlength="6"
-          autocomplete="new-password"
-          required
-        >
+        <input id="confirm-password" name="confirm-password" type="password" minlength="6" autocomplete="new-password" required>
 
         <button id="submit" type="submit">Update Password</button>
       </form>
@@ -41,7 +27,13 @@
     </section>
   </main>
 
+  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- REQUIRED: Supabase client -->
+  <script type="module" src="./supabaseClient.js"></script>
+
+  <!-- Your reset logic -->
   <script type="module" src="./reset-password.js"></script>
 </body>
 </html>
