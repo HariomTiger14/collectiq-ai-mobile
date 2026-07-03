@@ -3,37 +3,95 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reset Packlox Password</title>
-  <link rel="stylesheet" href="../styles.css">
+  <title>Reset Your Packlox Password</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <main class="shell">
-    <section class="panel">
-      <p class="eyebrow">Packlox</p>
-      <h1>Reset password</h1>
-      <p class="lede">Enter a new password for your Packlox account.</p>
+  <main class="page-shell">
+    <section class="reset-card" aria-labelledby="page-title">
+      <div class="brand-mark" aria-hidden="true">P</div>
+      <p class="brand-name">Packlox</p>
+      <h1 id="page-title">Reset your password</h1>
+      <p class="subtitle">Create a new password to secure your account</p>
 
-      <form id="reset-form" novalidate>
-        <label for="password">New password</label>
-        <input id="password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+      <div
+        id="message"
+        class="message"
+        role="alert"
+        aria-live="polite"
+        hidden
+      ></div>
 
-        <label for="confirm-password">Confirm password</label>
-        <input id="confirm-password" name="confirm-password" type="password" minlength="6" autocomplete="new-password" required>
+      <form id="reset-form" class="reset-form" novalidate>
+        <div class="field-group">
+          <label for="password">New password</label>
+          <div class="password-control">
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              aria-describedby="password-error password-help strength-label"
+              aria-invalid="false"
+              required
+            >
+            <button
+              class="toggle-password"
+              type="button"
+              data-target="password"
+              aria-label="Show new password"
+            >
+              <span aria-hidden="true">👁</span>
+            </button>
+          </div>
+          <p id="password-help" class="field-help">
+            Use 8+ characters with uppercase, lowercase, number, and symbol.
+          </p>
+          <p id="password-error" class="field-message" aria-live="polite"></p>
+        </div>
 
-        <button id="submit" type="submit">Update Password</button>
+        <div class="strength" aria-hidden="true">
+          <div id="strength-bar" class="strength-bar"></div>
+        </div>
+        <p id="strength-label" class="strength-label" aria-live="polite">
+          Password strength: empty
+        </p>
+
+        <div class="field-group">
+          <label for="confirm-password">Confirm password</label>
+          <div class="password-control">
+            <input
+              id="confirm-password"
+              name="confirm-password"
+              type="password"
+              autocomplete="new-password"
+              aria-describedby="confirm-error"
+              aria-invalid="false"
+              required
+            >
+            <button
+              class="toggle-password"
+              type="button"
+              data-target="confirm-password"
+              aria-label="Show confirmed password"
+            >
+              <span aria-hidden="true">👁</span>
+            </button>
+          </div>
+          <p id="confirm-error" class="field-message" aria-live="polite"></p>
+        </div>
+
+        <button id="submit" class="submit-button" type="submit">
+          <span class="button-label">Update password</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
       </form>
 
-      <p id="message" class="message" hidden></p>
+      <p id="redirect-status" class="redirect-status" aria-live="polite"></p>
     </section>
   </main>
 
-  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- REQUIRED: Supabase client -->
-  <script type="module" src="supabaseClient.js"></script>
-
-  <!-- Your reset logic -->
-  <script type="module" src="reset-password.js"></script>
+  <script type="module" src="./reset-password.js"></script>
 </body>
 </html>
