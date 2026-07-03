@@ -14,7 +14,6 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export { supabase };
 
 // LIVE VERIFICATION SNIPPET
-// Paste this in browser console to confirm Cloudflare is serving the new file:
 // fetch('/auth/reset-password/supabaseClient.v2.js')
 //   .then(r => r.text())
 //   .then(t => console.log(t));
