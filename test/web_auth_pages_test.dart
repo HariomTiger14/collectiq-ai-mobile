@@ -8,7 +8,12 @@ void main() {
       final html = File(
         'web/auth/reset-password/index.html',
       ).readAsStringSync();
-      final script = File('web/auth/auth-page.js').readAsStringSync();
+      final script = File(
+        'web/auth/reset-password/reset-password.js',
+      ).readAsStringSync();
+      final supabaseClient = File(
+        'web/auth/reset-password/supabaseClient.js',
+      ).readAsStringSync();
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
@@ -44,15 +49,21 @@ void main() {
         ),
       );
       expect(html, contains('Reset password'));
-      expect(script, contains('updateUser({ password })'));
+      expect(html, contains('@supabase/supabase-js@2'));
+      expect(html, contains('./reset-password.js'));
+      expect(supabaseClient, contains('SUPABASE_URL'));
+      expect(supabaseClient, contains('SUPABASE_ANON_KEY'));
+      expect(supabaseClient, contains('createClient'));
+      expect(supabaseClient, contains('detectSessionInUrl: false'));
+      expect(script, contains('params.get(\'token\')'));
+      expect(script, contains('verifyOtp'));
+      expect(script, contains('setSession'));
+      expect(script, contains('updateUser({'));
+      expect(script, contains('password,'));
       expect(script, contains('Password updated successfully.'));
-      expect(
-        script,
-        contains(
-          'Return to the Packlox app and sign in with your new password.',
-        ),
-      );
+      expect(script, contains('Please return to the app and log in.'));
       expect(script, contains('Passwords do not match.'));
+      expect(script, contains('Password reset token is missing.'));
     });
 
     test('callback page handles email confirmation', () {
