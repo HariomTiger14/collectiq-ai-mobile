@@ -11,6 +11,9 @@ void main() {
       final script = File(
         'web/auth/reset-password/reset-password.js',
       ).readAsStringSync();
+      final styles = File(
+        'web/auth/reset-password/styles.css',
+      ).readAsStringSync();
       final supabaseClient = File(
         'web/auth/reset-password/supabaseClient.js',
       ).readAsStringSync();
@@ -48,22 +51,29 @@ void main() {
           ),
         ),
       );
-      expect(html, contains('Reset password'));
+      expect(html, contains('Reset your password'));
       expect(html, contains('@supabase/supabase-js@2'));
+      expect(html, contains('./styles.css'));
       expect(html, contains('./reset-password.js'));
-      expect(supabaseClient, contains('SUPABASE_URL'));
-      expect(supabaseClient, contains('SUPABASE_ANON_KEY'));
+      expect(html, contains('toggle-password'));
+      expect(html, contains('strength-bar'));
+      expect(styles, contains('prefers-color-scheme: dark'));
+      expect(styles, contains('@keyframes shake'));
+      expect(styles, contains('@keyframes card-fade-in'));
       expect(supabaseClient, contains('createClient'));
       expect(supabaseClient, contains('detectSessionInUrl: false'));
       expect(script, contains('params.get(\'token\')'));
       expect(script, contains('verifyOtp'));
       expect(script, contains('setSession'));
       expect(script, contains('updateUser({'));
-      expect(script, contains('password,'));
+      expect(script, contains('password: elements.password.value'));
       expect(script, contains('Password updated successfully.'));
-      expect(script, contains('Please return to the app and log in.'));
+      expect(script, contains('Redirecting you to sign in.'));
+      expect(script, contains("window.location.assign(loginPath)"));
       expect(script, contains('Passwords do not match.'));
-      expect(script, contains('Password reset token is missing.'));
+      expect(script, contains('Request a new password reset email.'));
+      expect(script, contains('passwordScore'));
+      expect(script, contains('clearRecoverySession'));
     });
 
     test('callback page handles email confirmation', () {
