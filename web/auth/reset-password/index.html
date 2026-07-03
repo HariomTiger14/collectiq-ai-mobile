@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reset Your Packlox Password</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/reset-password/styles.css">
-  <!-- 1. Safe storage override -->
   <script>
     window.localStorage = {
       getItem: () => null,
@@ -16,95 +18,101 @@
 </head>
 <body>
   <main class="page-shell">
-    <section class="reset-card" aria-labelledby="page-title">
-      <div class="brand-mark" aria-hidden="true">P</div>
-      <p class="brand-name">Packlox</p>
-      <h1 id="page-title">Reset your password</h1>
-      <p class="subtitle">Create a new password to secure your account</p>
+    <section class="reset-card fade-in" aria-labelledby="page-title">
+      <div id="form-panel" class="form-panel">
+        <div class="brand-mark" aria-hidden="true">P</div>
+        <p class="brand-name">Packlox</p>
+        <div class="gradient-header">
+          <h1 id="page-title">Reset your password</h1>
+          <p class="subtitle">Enter a new password for your account.</p>
+        </div>
 
-      <div
-        id="message"
-        class="message"
-        role="alert"
-        aria-live="polite"
-        hidden
-      ></div>
+        <div
+          id="message"
+          class="message"
+          role="alert"
+          aria-live="polite"
+          hidden
+        ></div>
 
-      <form id="reset-form" class="reset-form" novalidate>
-        <div class="field-group">
-          <label for="password">New password</label>
-          <div class="password-control">
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autocomplete="new-password"
-              aria-describedby="password-error password-help strength-label"
-              aria-invalid="false"
-              required
-            >
-            <button
-              id="togglePassword"
-              class="toggle-password"
-              type="button"
-              data-target="password"
-              aria-label="Show new password"
-            >
-              <span aria-hidden="true">👁</span>
-            </button>
+        <form id="reset-form" class="reset-form" novalidate>
+          <div class="field-group">
+            <label for="password">New password</label>
+            <div class="password-control">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                aria-describedby="password-error password-help strength-label"
+                aria-invalid="false"
+                required
+              >
+              <button
+                id="togglePassword"
+                class="toggle-password"
+                type="button"
+                data-target="password"
+                aria-label="Show new password"
+              >
+                <span aria-hidden="true">Show</span>
+              </button>
+            </div>
+            <p id="password-help" class="field-help">
+              Use at least 8 characters with uppercase, lowercase, number, and symbol.
+            </p>
+            <p id="password-error" class="field-message" aria-live="polite"></p>
           </div>
-          <p id="password-help" class="field-help">
-            Use 8+ characters with uppercase, lowercase, number, and symbol.
+
+          <div class="strength" aria-hidden="true">
+            <div id="strength-bar" class="strength-bar"></div>
+          </div>
+          <p id="strength-label" class="strength-label" aria-live="polite">
+            Password strength: empty
           </p>
-          <p id="password-error" class="field-message" aria-live="polite"></p>
-        </div>
 
-        <div class="strength" aria-hidden="true">
-          <div id="strength-bar" class="strength-bar"></div>
-        </div>
-        <p id="strength-label" class="strength-label" aria-live="polite">
-          Password strength: empty
-        </p>
-
-        <div class="field-group">
-          <label for="confirm-password">Confirm password</label>
-          <div class="password-control">
-            <input
-              id="confirm-password"
-              name="confirm-password"
-              type="password"
-              autocomplete="new-password"
-              aria-describedby="confirm-error"
-              aria-invalid="false"
-              required
-            >
-            <button
-              id="toggleConfirmPassword"
-              class="toggle-password"
-              type="button"
-              data-target="confirm-password"
-              aria-label="Show confirmed password"
-            >
-              <span aria-hidden="true">👁</span>
-            </button>
+          <div class="field-group">
+            <label for="confirm-password">Confirm password</label>
+            <div class="password-control">
+              <input
+                id="confirm-password"
+                name="confirm-password"
+                type="password"
+                autocomplete="new-password"
+                aria-describedby="confirm-error"
+                aria-invalid="false"
+                required
+              >
+              <button
+                id="toggleConfirmPassword"
+                class="toggle-password"
+                type="button"
+                data-target="confirm-password"
+                aria-label="Show confirmed password"
+              >
+                <span aria-hidden="true">Show</span>
+              </button>
+            </div>
+            <p id="confirm-error" class="field-message" aria-live="polite"></p>
           </div>
-          <p id="confirm-error" class="field-message" aria-live="polite"></p>
-        </div>
 
-        <button id="submit" class="submit-button" type="submit">
-          <span class="button-label">Update password</span>
-          <span class="spinner" aria-hidden="true"></span>
-        </button>
-      </form>
+          <button id="submit" class="submit-button" type="submit" disabled>
+            <span class="button-label">Update password</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </div>
 
-      <p id="redirect-status" class="redirect-status" aria-live="polite"></p>
+      <section id="success-panel" class="success-panel" hidden aria-live="polite">
+        <div class="success-icon" aria-hidden="true">&#10003;</div>
+        <h2>Password updated successfully</h2>
+        <p>You can now log in with your new credentials.</p>
+        <a class="return-button" href="/auth/login">Return to Login</a>
+      </section>
     </section>
   </main>
 
-  <!-- 2. Local Supabase module -->
   <script type="module" src="/auth/reset-password/vendor/supabase-js-v2.js"></script>
-
-  <!-- 3. My modules -->
   <script type="module" src="/auth/reset-password/supabaseClient.v2.js"></script>
   <script type="module" src="/auth/reset-password/reset-password.js"></script>
 </body>

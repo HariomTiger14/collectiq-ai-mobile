@@ -1,10 +1,5 @@
 import { supabase } from './supabaseClient.v2.js';
 
-const redirectSeconds = 5;
-const loginPath = '/auth/login';
-const successMessage =
-  'Password updated successfully. Redirecting you to sign in.';
-
 const elements = {};
 
 function getElement(id) {
@@ -12,6 +7,8 @@ function getElement(id) {
 }
 
 function cacheElements() {
+  elements.formPanel = getElement('form-panel');
+  elements.successPanel = getElement('success-panel');
   elements.form = getElement('reset-form');
   elements.password = getElement('password');
   elements.confirmPassword = getElement('confirm-password');
@@ -22,11 +19,9 @@ function cacheElements() {
   elements.message = getElement('message');
   elements.submit = getElement('submit');
   elements.buttonLabel = elements.submit.querySelector('.button-label');
-  elements.redirectStatus = getElement('redirect-status');
-  elements.toggleButtons = document.querySelectorAll('.toggle-password');
 }
 
-function setMessage(text, type = 'error') {
+function showMessage(text, type = 'error') {
   elements.message.textContent = text;
   elements.message.className = `message ${type}`;
   elements.message.hidden = false;
@@ -59,11 +54,11 @@ function setFieldMessage(element, message, type = 'error') {
 }
 
 function setBusy(isBusy) {
-  elements.submit.disabled = isBusy;
   elements.password.disabled = isBusy;
   elements.confirmPassword.disabled = isBusy;
   elements.submit.classList.toggle('loading', isBusy);
   elements.buttonLabel.textContent = isBusy ? 'Updating password' : 'Update password';
+  updateSubmitState(isBusy);
 }
 
 function hashParamsFromUrl() {
@@ -179,24 +174,16 @@ function strengthDetails(score) {
     return { label: 'weak', className: 'weak' };
   }
 
-  if (score === 2) {
+  if (score <= 3) {
     return { label: 'medium', className: 'medium' };
   }
 
-  if (score === 3) {
-    return { label: 'strong', className: 'strong' };
-  }
-
-  return { label: 'very strong', className: 'very-strong' };
+  return { label: 'strong', className: 'strong' };
 }
 
 function passwordValidationMessage(password) {
   if (!password) return 'Please enter a new password.';
   if (password.length < 8) return 'Password must be at least 8 characters.';
-  if (!/[a-z]/.test(password)) return 'Add at least one lowercase letter.';
-  if (!/[A-Z]/.test(password)) return 'Add at least one uppercase letter.';
-  if (!/\d/.test(password)) return 'Add at least one number.';
-  if (!/[^A-Za-z0-9]/.test(password)) return 'Add at least one symbol.';
 
   return '';
 }
@@ -214,45 +201,84 @@ function updateStrengthMeter() {
     : 'Password strength: empty';
 }
 
-function validatePasswordField() {
+function validatePasswordField({ showErrors = true } = {}) {
   const message = passwordValidationMessage(elements.password.value);
   elements.password.setAttribute('aria-invalid', String(Boolean(message)));
-  setFieldMessage(elements.passwordError, message);
-  updateStrengthMeter();
 
+  if (showErrors) {
+    setFieldMessage(elements.passwordError, message);
+  }
+
+  updateStrengthMeter();
   return !message;
 }
 
-function validateConfirmField() {
+function validateConfirmField({ showErrors = true } = {}) {
   const password = elements.password.value;
   const confirmPassword = elements.confirmPassword.value;
 
   if (!confirmPassword) {
     elements.confirmPassword.setAttribute('aria-invalid', 'true');
-    setFieldMessage(elements.confirmError, 'Please confirm your new password.');
+
+    if (showErrors) {
+      setFieldMessage(elements.confirmError, 'Please confirm your new password.');
+    }
+
     return false;
   }
 
   if (password !== confirmPassword) {
     elements.confirmPassword.setAttribute('aria-invalid', 'true');
-    setFieldMessage(elements.confirmError, 'Passwords do not match.');
+
+    if (showErrors) {
+      setFieldMessage(elements.confirmError, 'Passwords do not match.');
+    }
+
     return false;
   }
 
   elements.confirmPassword.setAttribute('aria-invalid', 'false');
-  setFieldMessage(elements.confirmError, 'Passwords match.', 'success');
+
+  if (showErrors) {
+    setFieldMessage(elements.confirmError, 'Passwords match.', 'success');
+  }
+
   return true;
 }
 
-function validateForm() {
-  const isPasswordValid = validatePasswordField();
-  const isConfirmValid = validateConfirmField();
+function validateForm({ showErrors = true } = {}) {
+  const isPasswordValid = validatePasswordField({ showErrors });
+  const isConfirmValid = validateConfirmField({ showErrors });
 
   return isPasswordValid && isConfirmValid;
 }
 
+function updateSubmitState(forceDisabled = false) {
+  elements.submit.disabled = forceDisabled || !validateForm({ showErrors: false });
+}
+
+function isSamePasswordResult(error, updateData, beforeUpdatedAt) {
+  const message = (error?.message || '').toLowerCase();
+
+  if (
+    message.includes('same password') ||
+    message.includes('different from the old password') ||
+    message.includes('new password should be different')
+  ) {
+    return true;
+  }
+
+  const afterUpdatedAt = updateData?.user?.updated_at;
+
+  return Boolean(beforeUpdatedAt && afterUpdatedAt && beforeUpdatedAt === afterUpdatedAt);
+}
+
 function friendlyError(error) {
   const message = (error?.message || '').toLowerCase();
+
+  if (isSamePasswordResult(error)) {
+    return 'Your new password cannot be the same as your old password.';
+  }
 
   if (message.includes('expired')) {
     return 'This reset link has expired. Please request a new password reset email.';
@@ -281,28 +307,22 @@ function friendlyError(error) {
   return error?.message || 'Unable to update password. Please try again.';
 }
 
-function startRedirectCountdown() {
-  let secondsRemaining = redirectSeconds;
-
-  elements.redirectStatus.textContent = `Redirecting to sign in in ${secondsRemaining}s.`;
-
-  const timer = window.setInterval(() => {
-    secondsRemaining -= 1;
-    elements.redirectStatus.textContent = `Redirecting to sign in in ${secondsRemaining}s.`;
-
-    if (secondsRemaining <= 0) {
-      window.clearInterval(timer);
-      window.location.assign(loginPath);
-    }
-  }, 1000);
-}
-
 async function clearRecoverySession() {
   try {
     await supabase.auth.signOut();
   } catch (_) {
     // The password has already been updated; sign-out cleanup is best effort.
   }
+}
+
+function showSuccessScreen() {
+  elements.formPanel.classList.add('fade-out');
+
+  window.setTimeout(() => {
+    elements.formPanel.hidden = true;
+    elements.successPanel.hidden = false;
+    elements.successPanel.classList.add('fade-in');
+  }, 380);
 }
 
 async function submitNewPassword(event) {
@@ -315,7 +335,7 @@ async function submitNewPassword(event) {
   }
 
   if (!validateForm()) {
-    setMessage('Please fix the highlighted fields before continuing.');
+    showMessage('Please fix the highlighted fields before continuing.');
     return;
   }
 
@@ -328,20 +348,24 @@ async function submitNewPassword(event) {
       throw new Error('Password reset token is missing or expired.');
     }
 
-    const { error } = await supabase.auth.updateUser({
+    const beforeUpdatedAt = session.user?.updated_at;
+    const { data, error } = await supabase.auth.updateUser({
       password: elements.password.value,
     });
+
+    if (isSamePasswordResult(error, data, beforeUpdatedAt)) {
+      showMessage('Your new password cannot be the same as your old password.', 'error');
+      return;
+    }
 
     if (error) {
       throw error;
     }
 
     await clearRecoverySession();
-    elements.form.hidden = true;
-    setMessage(successMessage, 'success');
-    startRedirectCountdown();
+    showSuccessScreen();
   } catch (error) {
-    setMessage(friendlyError(error));
+    showMessage(friendlyError(error));
   } finally {
     setBusy(false);
   }
@@ -351,9 +375,16 @@ function peekPassword(button, input) {
   const isHidden = input.type === 'password';
 
   input.type = isHidden ? 'text' : 'password';
+  const label = isHidden ? 'Hide' : 'Show';
+  const visibleText = button.querySelector('span');
+
+  if (visibleText) {
+    visibleText.textContent = label;
+  }
+
   button.setAttribute(
     'aria-label',
-    `${isHidden ? 'Hide' : 'Show'} ${
+    `${label} ${
       input.id === 'password' ? 'new' : 'confirmed'
     } password`,
   );
@@ -382,15 +413,21 @@ function attachPeekHandlers() {
 
 function attachStrengthHandlers() {
   elements.password.addEventListener('input', () => {
-    updateStrengthMeter();
+    clearMessage();
     validatePasswordField();
 
     if (elements.confirmPassword.value) {
       validateConfirmField();
     }
+
+    updateSubmitState();
   });
 
-  elements.confirmPassword.addEventListener('input', validateConfirmField);
+  elements.confirmPassword.addEventListener('input', () => {
+    clearMessage();
+    validateConfirmField();
+    updateSubmitState();
+  });
 }
 
 function attachSubmitHandler() {
@@ -399,7 +436,7 @@ function attachSubmitHandler() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!supabase) {
-    console.error('Supabase not ready — handlers not attached');
+    console.error('Supabase not ready - handlers not attached');
     return;
   }
 
@@ -408,13 +445,14 @@ document.addEventListener('DOMContentLoaded', () => {
   attachStrengthHandlers();
   attachSubmitHandler();
   updateStrengthMeter();
+  updateSubmitState();
 
   const params = paramsFromUrl();
 
   if (params.get('error_description')) {
-    setMessage(params.get('error_description'));
+    showMessage(params.get('error_description'));
   } else if (params.get('error')) {
-    setMessage(params.get('error'));
+    showMessage(params.get('error'));
   } else if (!hasRecoveryToken()) {
     setMissingTokenMessage();
   }

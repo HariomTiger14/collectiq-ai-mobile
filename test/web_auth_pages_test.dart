@@ -15,7 +15,10 @@ void main() {
         'web/auth/reset-password/styles.css',
       ).readAsStringSync();
       final supabaseClient = File(
-        'web/auth/reset-password/supabaseClient.js',
+        'web/auth/reset-password/supabaseClient.v2.js',
+      ).readAsStringSync();
+      final supabaseBundle = File(
+        'web/auth/reset-password/supabase-js-v2.js',
       ).readAsStringSync();
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
@@ -52,16 +55,41 @@ void main() {
         ),
       );
       expect(html, contains('Reset your password'));
-      expect(html, contains('@supabase/supabase-js@2'));
-      expect(html, contains('./styles.css'));
-      expect(html, contains('./reset-password.js'));
+      expect(html, isNot(contains('@supabase/supabase-js@2')));
+      expect(html, contains('/auth/reset-password/styles.css'));
+      expect(html, contains('/auth/reset-password/supabase-js-v2.js'));
+      expect(html, contains('/auth/reset-password/supabaseClient.v2.js'));
+      expect(html, contains('/auth/reset-password/reset-password.js'));
       expect(html, contains('toggle-password'));
+      expect(html, contains('togglePassword'));
+      expect(html, contains('toggleConfirmPassword'));
       expect(html, contains('strength-bar'));
       expect(styles, contains('prefers-color-scheme: dark'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes card-fade-in'));
+      expect(supabaseBundle, contains('createClient'));
+      expect(
+        supabaseClient,
+        contains(
+          "import { createClient } from '/auth/reset-password/supabase-js-v2.js'",
+        ),
+      );
+      expect(supabaseClient, contains('safeStorage'));
+      expect(supabaseClient, contains('try {'));
+      expect(
+        supabaseClient,
+        contains('console.error(\'Supabase init failed:\''),
+      );
+      expect(supabaseClient, contains('export { supabase }'));
       expect(supabaseClient, contains('createClient'));
-      expect(supabaseClient, contains('detectSessionInUrl: false'));
+      expect(supabaseClient, contains('autoRefreshToken: false'));
+      expect(supabaseClient, contains('storage: safeStorage'));
+      expect(
+        script,
+        contains(
+          "import { supabase } from './supabaseClient.v2.js'",
+        ),
+      );
       expect(script, contains('params.get(\'token\')'));
       expect(script, contains('verifyOtp'));
       expect(script, contains('setSession'));
@@ -73,6 +101,14 @@ void main() {
       expect(script, contains('Passwords do not match.'));
       expect(script, contains('Request a new password reset email.'));
       expect(script, contains('passwordScore'));
+      expect(script, contains('peekPassword'));
+      expect(script, contains('updateStrengthMeter'));
+      expect(script, contains('extractTokenFromHash'));
+      expect(script, contains('submitNewPassword'));
+      expect(script, contains('attachPeekHandlers'));
+      expect(script, contains('attachStrengthHandlers'));
+      expect(script, contains('attachSubmitHandler'));
+      expect(script, contains('Supabase not ready — handlers not attached'));
       expect(script, contains('clearRecoverySession'));
     });
 
