@@ -1,4 +1,4 @@
-import { supabase } from '/auth/reset-password/supabaseClient.js';
+import { supabase } from './supabaseClient.js';
 
 const redirectSeconds = 5;
 const loginPath = '/auth/login';
