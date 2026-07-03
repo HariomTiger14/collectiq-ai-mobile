@@ -1,0 +1,1 @@
+/auth/reset-password/*   /auth/reset-password/:splat   200
