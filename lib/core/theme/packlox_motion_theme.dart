@@ -52,9 +52,10 @@ class PackLoxMotionTheme {
   static bool get isTestMode {
     var isWidgetTest = false;
     assert(() {
-      isWidgetTest = WidgetsBinding.instance.runtimeType.toString().contains(
-        'TestWidgetsFlutterBinding',
-      );
+      isWidgetTest = WidgetsBinding.instance.runtimeType
+          .toString()
+          .toLowerCase()
+          .contains('test');
       return true;
     }());
     return isWidgetTest;

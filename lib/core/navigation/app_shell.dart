@@ -9,7 +9,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
-import 'package:collectiq_ai/features/scanner/presentation/scanner_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

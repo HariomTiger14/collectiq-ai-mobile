@@ -108,13 +108,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final notificationSwitch = find.byKey(
+      const ValueKey('settings-price-alert-notifications-switch'),
+    );
+    await tester.dragUntilVisible(
+      notificationSwitch,
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+      const Offset(0, -320),
+      maxIteration: 20,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Price alert notifications'), findsOneWidget);
     expect(find.text('Notification permission'), findsOneWidget);
     expect(find.text('Denied'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('settings-price-alert-notifications-switch')),
-      findsOneWidget,
-    );
+    expect(notificationSwitch, findsOneWidget);
   });
 }
 

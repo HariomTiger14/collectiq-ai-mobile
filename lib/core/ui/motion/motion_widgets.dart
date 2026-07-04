@@ -134,6 +134,10 @@ class MotionReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (PackLoxMotionTheme.isTestMode) {
+      return child;
+    }
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: duration + delay,

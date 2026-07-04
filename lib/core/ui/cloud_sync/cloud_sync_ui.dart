@@ -26,28 +26,33 @@ class CloudSyncHeroHeader extends StatelessWidget {
     final colors = _cloudSyncGradientColors(context, gradientStyle);
 
     return MotionElasticHero(
-      baseHeight: 164,
+      baseHeight: 184,
       scrollOffset: scrollOffset,
       child: MotionParallax(
         scrollOffset: scrollOffset,
         child: ClipRRect(
           borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(28),
+            bottom: Radius.circular(AppRadius.xxl),
           ),
           child: MotionAmbientGradient(
             gradientBuilder: _ambientGradientFor(gradientStyle),
             child: Container(
-              height: 164,
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+              height: 184,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xxl,
+                AppSpacing.xxl,
+                AppSpacing.xxl,
+                AppSpacing.xl,
+              ),
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(28),
+                  bottom: Radius.circular(AppRadius.xxl),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: colors.last.withValues(alpha: isDark ? 0.20 : 0.26),
-                    blurRadius: isDark ? 18 : 32,
-                    offset: const Offset(0, 16),
+                    color: colors.last.withValues(alpha: isDark ? 0.26 : 0.32),
+                    blurRadius: isDark ? 32 : 46,
+                    offset: const Offset(0, 24),
                   ),
                 ],
               ),
@@ -56,11 +61,11 @@ class CloudSyncHeroHeader extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 58,
-                      height: 58,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.28),
                         ),
@@ -71,7 +76,7 @@ class CloudSyncHeroHeader extends StatelessWidget {
                         size: 30,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.lg),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -194,31 +199,31 @@ class _CloudSyncStatusCardState extends State<CloudSyncStatusCard>
     return MotionReveal(
       offset: 18,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         child: MotionAmbientGradient(
           gradientBuilder: PackLoxMotionTheme.ambientPurpleDeepBlue,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               decoration: BoxDecoration(
                 color: isDark
                     ? colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.35,
+                        alpha: 0.42,
                       )
-                    : colorScheme.surface.withValues(alpha: 0.64),
-                borderRadius: BorderRadius.circular(22),
+                    : colorScheme.surface.withValues(alpha: 0.74),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
                 border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.26),
+                  color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: colorScheme.shadow.withValues(
-                      alpha: isDark ? 0.18 : 0.08,
+                      alpha: isDark ? 0.20 : 0.10,
                     ),
-                    blurRadius: isDark ? 18 : 30,
-                    offset: const Offset(0, 16),
+                    blurRadius: isDark ? 28 : 40,
+                    offset: const Offset(0, 22),
                   ),
                 ],
               ),
@@ -330,7 +335,7 @@ class _CloudSyncDiagnosticTileState extends State<CloudSyncDiagnosticTile> {
         child: AnimatedContainer(
           duration: PackLoxMotionTheme.medium,
           curve: PackLoxMotionTheme.hoverCurve,
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
             color: _hovered
                 ? colorScheme.primary.withValues(
@@ -339,7 +344,7 @@ class _CloudSyncDiagnosticTileState extends State<CloudSyncDiagnosticTile> {
                 : isDark
                 ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
                 : colorScheme.surfaceContainerHighest.withValues(alpha: 0.44),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: colorScheme.outlineVariant.withValues(alpha: 0.24),
             ),
@@ -358,7 +363,7 @@ class _CloudSyncDiagnosticTileState extends State<CloudSyncDiagnosticTile> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: Icon(widget.icon, color: colorScheme.primary),
               ),
@@ -579,20 +584,20 @@ class CloudSyncSectionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: isDark
-            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-            : colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+            : colorScheme.surface.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.28),
+          color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: isDark ? 0.14 : 0.06),
-            blurRadius: isDark ? 16 : 24,
-            offset: const Offset(0, 12),
+            color: colorScheme.shadow.withValues(alpha: isDark ? 0.16 : 0.10),
+            blurRadius: isDark ? 28 : 38,
+            offset: const Offset(0, 22),
           ),
         ],
       ),
@@ -605,7 +610,7 @@ class CloudSyncSectionCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
           child,
         ],
       ),
@@ -725,16 +730,16 @@ List<Color> _cloudSyncGradientColors(
   return switch (style) {
     GradientStyle.blueIndigo =>
       isDark
-          ? const [Color(0xFF1E40AF), Color(0xFF3730A3)]
-          : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+          ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
+          : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
     GradientStyle.purpleDeepBlue =>
       isDark
-          ? const [Color(0xFF6D28D9), Color(0xFF1E3A8A)]
-          : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
+          ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
+          : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
     GradientStyle.tealEmerald =>
       isDark
-          ? const [Color(0xFF0F766E), Color(0xFF047857)]
-          : const [Color(0xFF14B8A6), Color(0xFF10B981)],
+          ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
+          : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
   };
 }
 

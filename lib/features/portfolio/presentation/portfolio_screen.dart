@@ -1,6 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/portfolio/portfolio_ui.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -50,7 +50,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('[PortfolioScreen] init');
+  }
+
+  @override
   void dispose() {
+    debugPrint('[PortfolioScreen] dispose');
     _scrollController.dispose();
     super.dispose();
   }
@@ -62,7 +69,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     final orderedItems = portfolioState.orderedItems;
     final visibleItems = _visibleItems(orderedItems);
-    final categories = _groupByCategory(visibleItems);
     final wishlistStatusByItemId = ref
         .watch(wishlistEntriesProvider)
         .maybeWhen<Map<String, WishlistStatus>>(
@@ -71,7 +77,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
           },
           orElse: () => const {},
         );
-    _logPortfolioOrder(visibleItems);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -152,84 +157,103 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       const SizedBox(height: 32),
                       if (portfolioState.isLoading &&
                           portfolioState.items.isEmpty)
-                        const Center(child: CircularProgressIndicator())
+                        const SizedBox.shrink()
                       else if (portfolioState.errorMessage != null)
-                        PortfolioErrorState(
-                          message: portfolioState.errorMessage!,
-                        )
+                        const SizedBox.shrink()
                       else if (portfolioState.items.isEmpty)
-                        PortfolioEmptyState(onScanPressed: widget.onScanPressed)
-                      else ...[
-                        if (visibleItems.isEmpty)
-                          PortfolioNoSearchResultsState(
-                            onResetFilters: () {
-                              setState(() {
-                                _searchQuery = '';
-                                _categoryFilter = _PortfolioCategoryFilter.all;
-                              });
-                            },
-                          )
-                        else
-                          for (final category in categories) ...[
-                            CategoryHeader(
-                              title: category.name,
-                              subtitle:
-                                  '${category.items.length} ${category.items.length == 1 ? 'item' : 'items'}',
-                              gradientStyle: GradientStyle.tealEmerald,
-                            ),
-                            const SizedBox(height: 12),
-                            Column(
-                              children: [
-                                for (
-                                  var i = 0;
-                                  i < category.items.length;
-                                  i++
-                                ) ...[
-                                  Transform.translate(
-                                    offset: Offset(0, i * 8.0),
-                                    child: PortfolioGlassItemCard(
-                                      key: ValueKey(
-                                        'portfolio-item-${category.items[i].id}',
-                                      ),
-                                      item: category.items[i],
-                                      index: i,
-                                      wishlistStatusLabel: _wishlistStatusLabel(
-                                        wishlistStatusByItemId[category
-                                            .items[i]
-                                            .id],
-                                      ),
-                                      onTap: () => _openItem(
-                                        context,
-                                        category.items[i],
-                                        portfolioController,
-                                      ),
-                                      onEdit: () => _openItem(
-                                        context,
-                                        category.items[i],
-                                        portfolioController,
-                                      ),
-                                      onShare: () => _showShareMessage(
-                                        context,
-                                        category.items[i],
-                                      ),
-                                      onDelete: () => _confirmDelete(
-                                        context,
-                                        category.items[i].id,
-                                        portfolioController,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 36),
-                          ],
-                      ],
+                        const SizedBox.shrink(),
                     ],
                   ),
                 ),
               ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                if (portfolioState.isLoading && portfolioState.items.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: _PortfolioSliverBox(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+
+                if (portfolioState.errorMessage != null) {
+                  return SliverToBoxAdapter(
+                    child: _PortfolioSliverBox(
+                      child: PortfolioErrorState(
+                        message: portfolioState.errorMessage!,
+                      ),
+                    ),
+                  );
+                }
+
+                if (portfolioState.items.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: _PortfolioSliverBox(
+                      child: PortfolioEmptyState(
+                        onScanPressed: widget.onScanPressed,
+                      ),
+                    ),
+                  );
+                }
+
+                if (visibleItems.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: _PortfolioSliverBox(
+                      child: PortfolioNoSearchResultsState(
+                        onResetFilters: () {
+                          setState(() {
+                            _searchQuery = '';
+                            _categoryFilter = _PortfolioCategoryFilter.all;
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                }
+
+                final crossAxisCount = constraints.crossAxisExtent >= 720
+                    ? 3
+                    : 2;
+
+                return SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: crossAxisCount == 3 ? 0.60 : 0.48,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = visibleItems[index];
+
+                    return MotionReveal(
+                      key: ValueKey('portfolio-grid-motion-${item.id}'),
+                      offset: 12,
+                      delay: Duration(milliseconds: 24 * (index % 8)),
+                      child: PortfolioGridTile(
+                        key: ValueKey('portfolio-grid-item-${item.id}'),
+                        item: item,
+                        wishlistStatusLabel: _wishlistStatusLabel(
+                          wishlistStatusByItemId[item.id],
+                        ),
+                        onTap: () =>
+                            _openItem(context, item, portfolioController),
+                        onEdit: () =>
+                            _openItem(context, item, portfolioController),
+                        onShare: () => _showShareMessage(context, item),
+                        onDelete: () => _confirmDelete(
+                          context,
+                          item.id,
+                          portfolioController,
+                        ),
+                      ),
+                    );
+                  }, childCount: visibleItems.length),
+                );
+              },
             ),
           ),
         ],
@@ -264,23 +288,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       };
     });
     return filteredItems;
-  }
-
-  List<_PortfolioCategorySection> _groupByCategory(
-    List<CollectibleItem> items,
-  ) {
-    final sections = <String, List<CollectibleItem>>{};
-    for (final item in items) {
-      final name = item.category.trim().isEmpty
-          ? 'Other'
-          : item.category.trim();
-      sections.putIfAbsent(name, () => []).add(item);
-    }
-
-    return [
-      for (final entry in sections.entries)
-        _PortfolioCategorySection(name: entry.key, items: entry.value),
-    ];
   }
 
   bool _matchesCategoryFilter(
@@ -424,13 +431,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   }
 }
 
-class _PortfolioCategorySection {
-  const _PortfolioCategorySection({required this.name, required this.items});
-
-  final String name;
-  final List<CollectibleItem> items;
-}
-
 class _PortfolioPickerSheet<T> extends StatelessWidget {
   const _PortfolioPickerSheet({
     required this.title,
@@ -481,6 +481,22 @@ class _PortfolioPickerSheet<T> extends StatelessWidget {
   }
 }
 
+class _PortfolioSliverBox extends StatelessWidget {
+  const _PortfolioSliverBox({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960, minHeight: 160),
+        child: SizedBox(width: double.infinity, child: child),
+      ),
+    );
+  }
+}
+
 String? _wishlistStatusLabel(WishlistStatus? status) {
   return switch (status) {
     WishlistStatus.owned => 'Owned',
@@ -488,45 +504,6 @@ String? _wishlistStatusLabel(WishlistStatus? status) {
     WishlistStatus.missing => 'Missing',
     null => null,
   };
-}
-
-void _logPortfolioOrder(List<CollectibleItem> items) {
-  debugPrint(
-    '[PortfolioScreen] final render order: '
-    '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
-  );
-  for (final item in items) {
-    debugPrint(
-      '[PortfolioScreen] render item '
-      'id=${item.id} '
-      'title="${item.title}" '
-      'imageSource=${_imageSourceFor(item.imagePath)} '
-      'createdAt=${item.createdAt.toIso8601String()} '
-      'savedAt=${item.createdAt.toIso8601String()} '
-      'updatedAt=not-tracked '
-      'displayTimestamp='
-      '${collectibleDisplayTimestamp(item).toIso8601String()}',
-    );
-  }
-}
-
-String _imageSourceFor(String imagePath) {
-  final normalizedPath = imagePath.trim();
-  if (normalizedPath.startsWith('sample://')) {
-    return 'sample';
-  }
-  if (normalizedPath.startsWith('http://') ||
-      normalizedPath.startsWith('https://')) {
-    return 'network';
-  }
-  if (normalizedPath.startsWith('assets/')) {
-    return 'asset';
-  }
-  if (normalizedPath.isEmpty) {
-    return 'missing';
-  }
-
-  return 'local';
 }
 
 class _PortfolioControls extends StatelessWidget {

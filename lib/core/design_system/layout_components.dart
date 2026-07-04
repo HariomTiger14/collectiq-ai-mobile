@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:flutter/material.dart';
 
@@ -132,25 +134,47 @@ class AppInfoSection extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppTwoLineTitle(
-            title,
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          width: double.infinity,
+          padding: padding,
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+                : colorScheme.surface.withValues(alpha: 0.74),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
+            ),
+            boxShadow: AppElevation.level2,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: isDark ? 0.05 : 0.28),
+                colorScheme.primary.withValues(alpha: 0.025),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          child,
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTwoLineTitle(
+                title,
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              child,
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -213,14 +237,29 @@ class _MetricCell extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surface.withValues(alpha: 0.70),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.58),
+        ),
+        boxShadow: AppElevation.level1,
       ),
       child: Row(
         children: [
           if (metric.icon != null) ...[
-            Icon(metric.icon, color: colorScheme.primary, size: 22),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(
+                metric.icon,
+                color: colorScheme.primary,
+                size: AppIconSizes.md,
+              ),
+            ),
             const SizedBox(width: AppSpacing.md),
           ],
           Expanded(
@@ -322,9 +361,10 @@ class AppPriceHero extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        gradient: AppGradients.primary,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppElevation.accentGlow,
+        gradient: AppGradients.premium,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppElevation.level3,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,12 +423,14 @@ class AppProfileSection extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+        ),
+        boxShadow: AppElevation.level2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

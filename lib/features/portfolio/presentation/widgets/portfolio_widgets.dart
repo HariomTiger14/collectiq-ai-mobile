@@ -271,6 +271,184 @@ class PortfolioItemsGrid extends StatelessWidget {
   }
 }
 
+class PortfolioGridTile extends StatelessWidget {
+  const PortfolioGridTile({
+    required this.item,
+    required this.onTap,
+    this.onEdit,
+    this.onShare,
+    this.onDelete,
+    this.wishlistStatusLabel,
+    super.key,
+  });
+
+  final CollectibleItem item;
+  final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onShare;
+  final VoidCallback? onDelete;
+  final String? wishlistStatusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: colorScheme.outlineVariant),
+            boxShadow: AppElevation.level1,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PortfolioGridThumbnail(category: item.category),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.12,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  item.category,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatAud(item.estimatedValue),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    _PortfolioBadge(
+                      label: '${(item.confidence * 100).toStringAsFixed(0)}%',
+                      icon: Icons.verified_outlined,
+                      color: colorScheme.primary,
+                    ),
+                    _PortfolioBadge(
+                      label: item.marketSummary?.trendLabel ?? 'Stable',
+                      icon: Icons.trending_up_outlined,
+                      color: AppColors.secondaryAccent,
+                    ),
+                    if (wishlistStatusLabel != null &&
+                        wishlistStatusLabel!.trim().isNotEmpty)
+                      _PortfolioBadge(
+                        label: wishlistStatusLabel!,
+                        icon: Icons.bookmark_border_outlined,
+                        color: AppColors.success,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _GridTileIconButton(
+                      icon: Icons.edit_outlined,
+                      tooltip: 'Edit item',
+                      onTap: onEdit,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _GridTileIconButton(
+                      icon: Icons.ios_share_outlined,
+                      tooltip: 'Share item',
+                      onTap: onShare,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _GridTileIconButton(
+                      icon: Icons.delete_outline,
+                      tooltip: 'Remove item',
+                      onTap: onDelete,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioGridThumbnail extends StatelessWidget {
+  const _PortfolioGridThumbnail({required this.category});
+
+  final String category;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AspectRatio(
+      aspectRatio: 1.42,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Icon(
+          _categoryIcon(category),
+          color: colorScheme.primary,
+          size: AppIconSizes.lg,
+        ),
+      ),
+    );
+  }
+}
+
+class _GridTileIconButton extends StatelessWidget {
+  const _GridTileIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 20,
+        child: SizedBox.square(dimension: 34, child: Icon(icon, size: 18)),
+      ),
+    );
+  }
+}
+
 class _PortfolioItemCard extends StatelessWidget {
   const _PortfolioItemCard({
     required this.item,
@@ -583,6 +761,30 @@ Color _wishlistStatusColor(BuildContext context, WishlistStatus status) {
     WishlistStatus.wanted => Theme.of(context).colorScheme.primary,
     WishlistStatus.missing => const Color(0xFFD97706),
   };
+}
+
+IconData _categoryIcon(String category) {
+  final normalized = category.toLowerCase();
+  if (normalized.contains('coin')) {
+    return Icons.monetization_on_outlined;
+  }
+  if (normalized.contains('comic')) {
+    return Icons.menu_book_outlined;
+  }
+  if (normalized.contains('toy') || normalized.contains('figure')) {
+    return Icons.toys_outlined;
+  }
+  if (normalized.contains('sports')) {
+    return Icons.sports_basketball_outlined;
+  }
+  if (normalized.contains('watch')) {
+    return Icons.watch_outlined;
+  }
+  if (normalized.contains('sneaker')) {
+    return Icons.directions_run_outlined;
+  }
+
+  return Icons.style_outlined;
 }
 
 String _formatDate(DateTime date) {

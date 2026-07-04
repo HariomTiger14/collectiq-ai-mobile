@@ -1,143 +1,144 @@
 import 'dart:ui';
 
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
+import 'package:collectiq_ai/core/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 
 class ScanHeroHeader extends StatelessWidget {
-  const ScanHeroHeader({
-    super.key,
-    required this.scrollController,
-    this.gradientStyle = GradientStyle.tealEmerald,
-  });
-
-  final ScrollController scrollController;
-  final GradientStyle gradientStyle;
+  const ScanHeroHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = _colorsFor(context, gradientStyle);
 
-    return AnimatedBuilder(
-      animation: scrollController,
-      builder: (context, child) {
-        final scrollOffset = scrollController.hasClients
-            ? scrollController.offset
-            : 0.0;
-        final parallax = scrollOffset.clamp(0, 120).toDouble();
-
-        return MotionElasticHero(
-          baseHeight: 168,
-          scrollOffset: scrollOffset,
-          child: MotionParallax(
-            scrollOffset: scrollOffset,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(28),
-              ),
-              child: MotionAmbientGradient(
-                gradientBuilder: _ambientGradientFor(gradientStyle),
-                child: Container(
-                  height: 168,
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        bottom: Radius.circular(AppRadius.xl),
+      ),
+      child: MotionAmbientGradient(
+        gradientBuilder: PackLoxMotionTheme.ambientBlueIndigo,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: AppGradients.premium,
+            boxShadow: AppElevation.level2,
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(28),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.16),
+                        Colors.transparent,
+                        colorScheme.secondary.withValues(alpha: 0.22),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.last.withValues(
-                          alpha: isDark ? 0.18 : 0.26,
-                        ),
-                        blurRadius: isDark ? 24 : 34,
-                        offset: const Offset(0, 16),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        right: -18 + parallax * 0.08,
-                        top: -34,
-                        child: _HeaderOrb(color: colorScheme.onPrimary),
-                      ),
-                      Positioned(
-                        right: 62 - parallax * 0.04,
-                        bottom: -52,
-                        child: _HeaderOrb(
-                          color: colorScheme.onPrimary,
-                          size: 120,
-                          opacity: 0.06,
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Transform.translate(
-                          offset: Offset(0, parallax * 0.04),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'AI Scan',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.headlineMedium?.copyWith(
-                                  color: colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.04,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Powered by PackLox Intelligence',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodyLarge?.copyWith(
-                                  color: colorScheme.onPrimary.withValues(
-                                    alpha: 0.82,
-                                  ),
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
-            ),
+              Positioned(
+                right: -34,
+                top: -52,
+                child: _GlowDisk(
+                  size: 176,
+                  color: Colors.white.withValues(alpha: 0.10),
+                ),
+              ),
+              Positioned(
+                left: -48,
+                bottom: -80,
+                child: _GlowDisk(
+                  size: 188,
+                  color: colorScheme.secondary.withValues(alpha: 0.18),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xxl,
+                  AppSpacing.lg,
+                  AppSpacing.xxl,
+                  AppSpacing.lg,
+                ),
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: MotionReveal(
+                    offset: AppSpacing.lg,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _HeroIconChip(icon: Icons.auto_awesome_outlined),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              'PackLox Intelligence',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                color: Colors.white.withValues(alpha: 0.82),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'AI Scanner',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.h1.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Instantly identify and value collectibles.',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class ScanPreviewGlassFrame extends StatefulWidget {
-  const ScanPreviewGlassFrame({
-    super.key,
+class ScanPreviewFrame extends StatefulWidget {
+  const ScanPreviewFrame({
     required this.child,
+    super.key,
     this.isAnalyzing = false,
+    this.scrollOffset = 0,
   });
 
   final Widget child;
   final bool isAnalyzing;
+  final double scrollOffset;
 
   @override
-  State<ScanPreviewGlassFrame> createState() => _ScanPreviewGlassFrameState();
+  State<ScanPreviewFrame> createState() => _ScanPreviewFrameState();
 }
 
-class _ScanPreviewGlassFrameState extends State<ScanPreviewGlassFrame>
+class _ScanPreviewFrameState extends State<ScanPreviewFrame>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
@@ -146,10 +147,10 @@ class _ScanPreviewGlassFrameState extends State<ScanPreviewGlassFrame>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: PackLoxMotionTheme.pulseDuration * 2,
+      duration: PackLoxMotionTheme.waveDuration * 2,
     );
     if (_scanMotionEnabled) {
-      _controller.repeat(reverse: true);
+      _controller.repeat();
     } else {
       _controller.value = 0.5;
     }
@@ -166,85 +167,114 @@ class _ScanPreviewGlassFrameState extends State<ScanPreviewGlassFrame>
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return _FadeSlideUp(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          final pulse = Curves.easeInOut.transform(_controller.value);
-          final glowAlpha = widget.isAnalyzing ? 0.22 : 0.10 + pulse * 0.06;
+    return MotionReveal(
+      child: MotionParallax(
+        scrollOffset: widget.scrollOffset,
+        depth: 10,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final pulse = Curves.easeInOut.transform(_controller.value);
+            final glowAlpha = widget.isAnalyzing ? 0.24 : 0.12 + pulse * 0.06;
 
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(
-                    alpha: isDark ? 0.18 : 0.10,
-                  ),
-                  blurRadius: isDark ? 22 : 34,
-                  offset: const Offset(0, 18),
-                ),
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: glowAlpha),
-                  blurRadius: 24 + pulse * 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? colorScheme.surfaceContainerHighest.withValues(
-                            alpha: 0.35,
-                          )
-                        : colorScheme.surface.withValues(alpha: 0.58),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: colorScheme.primary.withValues(
-                        alpha: 0.14 + pulse * 0.08,
-                      ),
-                      width: 1.2,
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.shadow.withValues(
+                      alpha: isDark ? 0.26 : 0.12,
                     ),
+                    blurRadius: 44,
+                    offset: const Offset(0, 24),
                   ),
-                  child: Stack(
-                    children: [
-                      child!,
-                      if (widget.isAnalyzing)
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: glowAlpha),
+                    blurRadius: 34 + pulse * 14,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.36,
+                            )
+                          : Colors.white.withValues(alpha: 0.64),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(
+                          alpha: 0.18 + pulse * 0.08,
+                        ),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
                         Positioned.fill(
-                          child: IgnorePointer(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    colorScheme.primary.withValues(alpha: 0.10),
-                                    Colors.transparent,
-                                    colorScheme.tertiary.withValues(
-                                      alpha: 0.08,
-                                    ),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withValues(
+                                    alpha: isDark ? 0.04 : 0.32,
+                                  ),
+                                  colorScheme.primary.withValues(alpha: 0.03),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
                             ),
                           ),
                         ),
-                    ],
+                        child!,
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _ScanWavePainter(
+                                progress: _controller.value,
+                                color: colorScheme.primary,
+                                opacity: widget.isAnalyzing ? 0.30 : 0.18,
+                                scannerLine: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
-        child: widget.child,
+            );
+          },
+          child: widget.child,
+        ),
       ),
     );
+  }
+}
+
+class ScanPreviewGlassFrame extends StatelessWidget {
+  const ScanPreviewGlassFrame({
+    required this.child,
+    super.key,
+    this.isAnalyzing = false,
+  });
+
+  final Widget child;
+  final bool isAnalyzing;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScanPreviewFrame(isAnalyzing: isAnalyzing, child: child);
   }
 }
 
@@ -284,24 +314,21 @@ class _ScanWaveAnimationState extends State<ScanWaveAnimation>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return _FadeSlideUp(
-      child: SizedBox(
-        height: widget.height,
-        width: double.infinity,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return CustomPaint(
-              painter: _ScanWavePainter(
-                progress: _controller.value,
-                color: colorScheme.primary,
-                opacity: isDark ? 0.16 : 0.22,
-              ),
-            );
-          },
-        ),
+    return SizedBox(
+      height: widget.height,
+      width: double.infinity,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _ScanWavePainter(
+              progress: _controller.value,
+              color: colorScheme.primary,
+              opacity: 0.18,
+            ),
+          );
+        },
       ),
     );
   }
@@ -309,135 +336,106 @@ class _ScanWaveAnimationState extends State<ScanWaveAnimation>
 
 class ScanStatusBar extends StatelessWidget {
   const ScanStatusBar({
-    super.key,
     required this.status,
+    super.key,
     this.confidence,
+    this.category,
     this.detectedCategory,
+    this.modelStatus,
   });
 
   final String status;
   final double? confidence;
+  final String? category;
   final String? detectedCategory;
+  final String? modelStatus;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final confidenceLabel = confidence == null
-        ? null
-        : 'AI Confidence: ${(confidence! * 100).toStringAsFixed(0)}%';
-    final categoryLabel =
-        detectedCategory == null || detectedCategory!.trim().isEmpty
-        ? null
-        : 'Detected Category: $detectedCategory';
+    final confidenceValue = (confidence ?? 0).clamp(0.0, 1.0);
+    final categoryLabel = _emptyToFallback(
+      category ?? detectedCategory,
+      'Awaiting image',
+    );
+    final modelLabel = _emptyToFallback(modelStatus, status);
 
-    return _FadeSlideUp(
+    return MotionReveal(
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               color: isDark
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-                  : colorScheme.surface.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(22),
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.38)
+                  : Colors.white.withValues(alpha: 0.68),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+                color: colorScheme.outlineVariant.withValues(alpha: 0.38),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(
-                    alpha: isDark ? 0.12 : 0.07,
-                  ),
-                  blurRadius: isDark ? 20 : 28,
-                  offset: const Offset(0, 14),
-                ),
-              ],
+              boxShadow: AppElevation.level1,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AnimatedSwitcher(
-                  duration: PackLoxMotionTheme.medium,
-                  switchInCurve: PackLoxMotionTheme.revealCurve,
-                  switchOutCurve: PackLoxMotionTheme.transitionCurve,
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.18),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: Column(
-                    key: ValueKey('$status-$confidenceLabel-$categoryLabel'),
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MotionStagger(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom:
-                                  confidenceLabel != null ||
-                                      categoryLabel != null
-                                  ? 8
-                                  : 0,
-                            ),
-                            child: Text(
-                              status,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ),
-                          if (confidenceLabel != null)
-                            Padding(
-                              padding: EdgeInsets.only(
-                                bottom: categoryLabel != null ? 4 : 0,
-                              ),
-                              child: Text(
-                                confidenceLabel,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                            ),
-                          if (categoryLabel != null)
-                            Text(
-                              categoryLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  height: 3,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primary,
-                        colorScheme.tertiary.withValues(alpha: 0.78),
-                      ],
+                Row(
+                  children: [
+                    _StatusPill(
+                      icon: Icons.memory_outlined,
+                      label: modelLabel,
+                      color: colorScheme.primary,
                     ),
-                    borderRadius: BorderRadius.circular(999),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        status,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: AppTextStyles.h3.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MetricLabel(
+                        icon: Icons.category_outlined,
+                        label: 'Category',
+                        value: categoryLabel,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    _MetricLabel(
+                      icon: Icons.query_stats_outlined,
+                      label: 'Confidence',
+                      value: confidence == null
+                          ? '--'
+                          : '${(confidenceValue * 100).toStringAsFixed(0)}%',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: LinearProgressIndicator(
+                    minHeight: AppSpacing.xs,
+                    value: confidence == null ? 0 : confidenceValue,
+                    backgroundColor: colorScheme.primary.withValues(
+                      alpha: 0.10,
+                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.primary,
+                    ),
                   ),
                 ),
               ],
@@ -449,12 +447,185 @@ class ScanStatusBar extends StatelessWidget {
   }
 }
 
+class ScanActionRow extends StatelessWidget {
+  const ScanActionRow({
+    required this.onCapture,
+    required this.onGallery,
+    required this.onSample,
+    required this.onReset,
+    super.key,
+    this.isBusy = false,
+    this.canReset = false,
+    this.captureLabel = 'Capture',
+    this.galleryLabel = 'Gallery',
+    this.sampleLabel = 'Sample',
+    this.resetLabel = 'Reset',
+    this.captureIcon = Icons.photo_camera_outlined,
+  });
+
+  final VoidCallback? onCapture;
+  final VoidCallback? onGallery;
+  final VoidCallback? onSample;
+  final VoidCallback? onReset;
+  final bool isBusy;
+  final bool canReset;
+  final String captureLabel;
+  final String galleryLabel;
+  final String sampleLabel;
+  final String resetLabel;
+  final IconData captureIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _ScanAction(
+        label: isBusy ? 'Scanning' : captureLabel,
+        icon: isBusy ? Icons.hourglass_top_outlined : captureIcon,
+        onTap: isBusy ? null : onCapture,
+        emphasized: true,
+      ),
+      _ScanAction(
+        label: galleryLabel,
+        icon: Icons.photo_library_outlined,
+        onTap: isBusy ? null : onGallery,
+      ),
+      _ScanAction(
+        label: sampleLabel,
+        icon: Icons.science_outlined,
+        onTap: isBusy ? null : onSample,
+      ),
+      _ScanAction(
+        label: resetLabel,
+        icon: Icons.refresh_outlined,
+        onTap: canReset && !isBusy ? onReset : null,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 640;
+        final children = [
+          for (final action in actions)
+            isWide
+                ? Expanded(child: _ScanActionTile(action: action))
+                : _ScanActionTile(action: action),
+        ];
+
+        return MotionStagger(
+          children: [
+            if (isWide)
+              Row(
+                children: [
+                  for (var index = 0; index < children.length; index++) ...[
+                    children[index],
+                    if (index != children.length - 1)
+                      const SizedBox(width: AppSpacing.md),
+                  ],
+                ],
+              )
+            else
+              Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.md,
+                children: [
+                  for (final child in children)
+                    SizedBox(
+                      width: (constraints.maxWidth - AppSpacing.md) / 2,
+                      child: child,
+                    ),
+                ],
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ScanSectionHeader extends StatelessWidget {
+  const ScanSectionHeader(this.title, {super.key, this.trailing});
+
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.h2.copyWith(color: colorScheme.onSurface),
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.md),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class ScanCardGroup extends StatelessWidget {
+  const ScanCardGroup({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (children.isEmpty) {
+      return GlassCard(
+        child: Row(
+          children: [
+            Icon(
+              Icons.history_outlined,
+              color: colorScheme.primary,
+              size: AppIconSizes.md,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                'Recent scans will appear here after you save an item.',
+                style: AppTextStyles.body.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return MotionStagger(
+      children: [
+        for (var index = 0; index < children.length; index++)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: index == children.length - 1 ? 0 : AppSpacing.md,
+            ),
+            child: GlassCard(child: children[index]),
+          ),
+      ],
+    );
+  }
+}
+
 class ScanActionButtons extends StatelessWidget {
   const ScanActionButtons({
-    super.key,
     required this.onStart,
     required this.onRetake,
     required this.onSave,
+    super.key,
     this.onCamera,
     this.onGallery,
     this.onSample,
@@ -477,228 +648,88 @@ class ScanActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _FadeSlideUp(
-      child: Column(
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 680;
-              final startLabel = canRetake && !canSave && !isSaved
-                  ? 'Analyze with AI'
-                  : 'Start Scan';
-              final buttons = [
-                _ScanGradientButton(
-                  label: isBusy ? 'Analyzing...' : startLabel,
-                  icon: isBusy
-                      ? Icons.hourglass_top_outlined
-                      : Icons.document_scanner_outlined,
-                  onPressed: isBusy ? null : onStart,
-                ),
-                _ScanGradientButton(
-                  label: 'Retake',
-                  icon: Icons.replay_outlined,
-                  onPressed: canRetake && !isBusy ? onRetake : null,
-                  muted: true,
-                ),
-                _ScanGradientButton(
-                  label: 'Save Item',
-                  icon: isSaved
-                      ? Icons.check_circle_outline
-                      : Icons.add_circle_outline,
-                  onPressed: canSave && !isBusy && !isSaved ? onSave : null,
-                  muted: true,
-                ),
-              ];
-
-              if (isWide) {
-                return Row(
-                  children: [
-                    for (var index = 0; index < buttons.length; index++) ...[
-                      Expanded(child: buttons[index]),
-                      if (index != buttons.length - 1)
-                        const SizedBox(width: 16),
-                    ],
-                  ],
-                );
-              }
-
-              return Column(
-                children: [
-                  for (var index = 0; index < buttons.length; index++) ...[
-                    buttons[index],
-                    if (index != buttons.length - 1) const SizedBox(height: 16),
-                  ],
-                ],
-              );
-            },
-          ),
-          if (onCamera != null || onGallery != null || onSample != null) ...[
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
-              children: [
-                if (onCamera != null)
-                  _ScanSecondaryButton(
-                    icon: Icons.photo_camera_outlined,
-                    label: 'Scan with Camera',
-                    onPressed: isBusy ? null : onCamera,
-                  ),
-                if (onGallery != null)
-                  _ScanSecondaryButton(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Choose from Gallery',
-                    onPressed: isBusy ? null : onGallery,
-                  ),
-                if (onSample != null)
-                  _ScanSecondaryButton(
-                    icon: Icons.science_outlined,
-                    label: 'Use Sample Scan',
-                    onPressed: isBusy ? null : onSample,
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
+    return ScanActionRow(
+      onCapture: onStart,
+      onGallery: onGallery,
+      onSample: onSample,
+      onReset: onRetake,
+      isBusy: isBusy,
+      canReset: canRetake,
+      captureLabel: canRetake && !canSave && !isSaved ? 'Analyze' : 'Capture',
+      captureIcon: canRetake && !canSave && !isSaved
+          ? Icons.auto_awesome_outlined
+          : Icons.photo_camera_outlined,
     );
   }
 }
 
-class _HeaderOrb extends StatelessWidget {
-  const _HeaderOrb({required this.color, this.size = 148, this.opacity = 0.08});
+class _ScanActionTile extends StatelessWidget {
+  const _ScanActionTile({required this.action});
 
-  final Color color;
-  final double size;
-  final double opacity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withValues(alpha: opacity),
-      ),
-    );
-  }
-}
-
-class _ScanGradientButton extends StatefulWidget {
-  const _ScanGradientButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    this.muted = false,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final bool muted;
-
-  @override
-  State<_ScanGradientButton> createState() => _ScanGradientButtonState();
-}
-
-class _ScanGradientButtonState extends State<_ScanGradientButton> {
-  bool _hovered = false;
+  final _ScanAction action;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final enabled = widget.onPressed != null;
+    final enabled = action.onTap != null;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: MotionTapScale(
-        onTap: widget.onPressed,
-        enabled: enabled,
-        scale: 0.97,
-        child: AnimatedContainer(
-          duration: PackLoxMotionTheme.medium,
-          curve: PackLoxMotionTheme.hoverCurve,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: widget.muted
-                  ? [
-                      colorScheme.primary.withValues(
-                        alpha: enabled ? 0.18 : 0.08,
-                      ),
-                      colorScheme.tertiary.withValues(
-                        alpha: enabled ? 0.14 : 0.06,
-                      ),
-                    ]
-                  : [
-                      colorScheme.primary.withValues(
-                        alpha: enabled ? 0.96 : 0.30,
-                      ),
-                      colorScheme.tertiary.withValues(
-                        alpha: enabled ? 0.86 : 0.22,
-                      ),
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: colorScheme.primary.withValues(
-                alpha: _hovered && enabled ? 0.28 : 0.12,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(
-                  alpha: _hovered && enabled
-                      ? PackLoxMotionTheme.hoverOpacity
-                      : 0.04,
-                ),
-                blurRadius: _hovered && enabled
-                    ? PackLoxMotionTheme.hoverBlurRadius
-                    : 22,
-                offset: const Offset(0, 12),
-              ),
-            ],
+    return MotionTapScale(
+      onTap: action.onTap,
+      enabled: enabled,
+      scale: 0.97,
+      child: TextButton(
+        onPressed: enabled ? action.onTap : null,
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: colorScheme.onSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  widget.icon,
-                  size: 20,
-                  color: widget.muted
-                      ? colorScheme.primary.withValues(
-                          alpha: enabled ? 1 : 0.42,
-                        )
-                      : colorScheme.onPrimary.withValues(
-                          alpha: enabled ? 1 : 0.56,
-                        ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: widget.muted
-                          ? colorScheme.onSurface.withValues(
-                              alpha: enabled ? 1 : 0.44,
-                            )
-                          : colorScheme.onPrimary.withValues(
-                              alpha: enabled ? 1 : 0.56,
-                            ),
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
+        ),
+        child: GlassCard(
+          enablePress: false,
+          child: AnimatedOpacity(
+            opacity: enabled ? 1 : 0.46,
+            duration: PackLoxMotionTheme.fast,
+            child: SizedBox(
+              height: 76,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: action.emphasized ? AppGradients.primary : null,
+                      color: action.emphasized
+                          ? null
+                          : colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                      action.icon,
+                      color: action.emphasized
+                          ? Colors.white
+                          : colorScheme.primary,
+                      size: AppIconSizes.md,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.sm),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: enabled ? action.onTap : null,
+                    child: Text(
+                      action.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -707,43 +738,145 @@ class _ScanGradientButtonState extends State<_ScanGradientButton> {
   }
 }
 
-class _ScanSecondaryButton extends StatelessWidget {
-  const _ScanSecondaryButton({
+class _ScanAction {
+  const _ScanAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool emphasized;
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
     required this.icon,
     required this.label,
-    required this.onPressed,
+    required this.color,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback? onPressed;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: colorScheme.primary,
-        minimumSize: const Size(128, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.18)),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: AppIconSizes.sm),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FadeSlideUp extends StatelessWidget {
-  const _FadeSlideUp({required this.child});
+class _MetricLabel extends StatelessWidget {
+  const _MetricLabel({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
-  final Widget child;
+  final IconData icon;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return MotionReveal(child: child);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: colorScheme.primary, size: AppIconSizes.sm),
+        const SizedBox(width: AppSpacing.sm),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.h3.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroIconChip extends StatelessWidget {
+  const _HeroIconChip({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Icon(icon, color: Colors.white, size: AppIconSizes.sm),
+    );
+  }
+}
+
+class _GlowDisk extends StatelessWidget {
+  const _GlowDisk({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
   }
 }
 
@@ -752,31 +885,33 @@ class _ScanWavePainter extends CustomPainter {
     required this.progress,
     required this.color,
     required this.opacity,
+    this.scannerLine = false,
   });
 
   final double progress;
   final Color color;
   final double opacity;
+  final bool scannerLine;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final wavePaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          color.withValues(alpha: opacity * 0.55),
+          color.withValues(alpha: opacity * 0.35),
           color.withValues(alpha: opacity),
-          color.withValues(alpha: opacity * 0.45),
+          color.withValues(alpha: opacity * 0.35),
         ],
       ).createShader(Offset.zero & size)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.4;
+      ..strokeWidth = scannerLine ? 1.4 : 2.2;
 
     for (var wave = 0; wave < 3; wave++) {
       final path = Path();
-      final vertical = size.height * (0.30 + wave * 0.22);
-      final amplitude = 10.0 + wave * 3;
-      final phase = progress * size.width * 1.4 + wave * 52;
+      final vertical = size.height * (0.26 + wave * 0.22);
+      final amplitude = scannerLine ? 5.0 + wave : 10.0 + wave * 3;
+      final phase = progress * size.width * 1.5 + wave * 52;
       path.moveTo(0, vertical);
 
       for (var x = 0.0; x <= size.width; x += 8) {
@@ -785,52 +920,42 @@ class _ScanWavePainter extends CustomPainter {
         path.lineTo(x, y);
       }
 
-      canvas.drawPath(path, paint);
+      canvas.drawPath(path, wavePaint);
     }
+
+    if (!scannerLine) {
+      return;
+    }
+
+    final scanY = size.height * ((progress + 0.08) % 1);
+    final linePaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          Colors.transparent,
+          color.withValues(alpha: opacity * 2.2),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, scanY - 12, size.width, 24));
+    canvas.drawRect(Rect.fromLTWH(0, scanY - 12, size.width, 24), linePaint);
   }
 
   @override
   bool shouldRepaint(covariant _ScanWavePainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.color != color ||
-        oldDelegate.opacity != opacity;
+        oldDelegate.opacity != opacity ||
+        oldDelegate.scannerLine != scannerLine;
   }
 }
 
-List<Color> _colorsFor(BuildContext context, GradientStyle style) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return switch (style) {
-    GradientStyle.blueIndigo =>
-      isDark
-          ? const [Color(0xFF1E40AF), Color(0xFF3730A3)]
-          : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
-    GradientStyle.purpleDeepBlue =>
-      isDark
-          ? const [Color(0xFF5B21B6), Color(0xFF1E3A8A)]
-          : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
-    GradientStyle.tealEmerald =>
-      isDark
-          ? const [Color(0xFF0F766E), Color(0xFF047857)]
-          : const [Color(0xFF14B8A6), Color(0xFF10B981)],
-  };
-}
-
-Gradient Function(double) _ambientGradientFor(GradientStyle style) {
-  return switch (style) {
-    GradientStyle.purpleDeepBlue => PackLoxMotionTheme.ambientPurpleDeepBlue,
-    GradientStyle.blueIndigo ||
-    GradientStyle.tealEmerald => PackLoxMotionTheme.ambientBlueIndigo,
-  };
+String _emptyToFallback(String? value, String fallback) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return fallback;
+  }
+  return trimmed;
 }
 
 bool get _scanMotionEnabled {
-  var isWidgetTest = false;
-  assert(() {
-    isWidgetTest = WidgetsBinding.instance.runtimeType.toString().contains(
-      'TestWidgetsFlutterBinding',
-    );
-    return true;
-  }());
-
-  return !isWidgetTest && PackLoxMotionTheme.ambientMotionEnabled;
+  return PackLoxMotionTheme.ambientMotionEnabled;
 }

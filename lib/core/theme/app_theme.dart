@@ -17,7 +17,7 @@ class AppTheme {
       onSecondary: Colors.white,
       secondaryContainer: Color(0xFFE6FFFB),
       onSecondaryContainer: AppColors.ink,
-      tertiary: Color(0xFF7C3AED),
+      tertiary: AppColors.violet,
       onTertiary: Colors.white,
       tertiaryContainer: Color(0xFFF3E8FF),
       onTertiaryContainer: AppColors.ink,
@@ -60,15 +60,16 @@ class AppTheme {
           color: colorScheme.onSurface,
           fontSize: 30,
         ),
-        titleLarge: AppTextStyles.h2.copyWith(color: colorScheme.onSurface),
-        titleMedium: AppTextStyles.body.copyWith(
+        headlineSmall: AppTextStyles.h2.copyWith(color: colorScheme.onSurface),
+        displaySmall: AppTextStyles.h1.copyWith(
           color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          fontSize: 30,
         ),
-        titleSmall: AppTextStyles.caption.copyWith(
+        titleLarge: AppTextStyles.h2.copyWith(color: colorScheme.onSurface),
+        titleMedium: AppTextStyles.h3.copyWith(color: colorScheme.onSurface),
+        titleSmall: AppTextStyles.h3.copyWith(
           color: colorScheme.onSurface,
           fontSize: 14,
-          fontWeight: FontWeight.w600,
         ),
         bodyLarge: AppTextStyles.body.copyWith(color: colorScheme.onSurface),
         bodyMedium: AppTextStyles.body.copyWith(
@@ -80,8 +81,22 @@ class AppTheme {
         ),
         labelLarge: AppTextStyles.caption.copyWith(
           color: colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
         ),
+        labelMedium: AppTextStyles.caption.copyWith(
+          color: colorScheme.onSurface,
+        ),
+        labelSmall: AppTextStyles.caption.copyWith(
+          color: colorScheme.onSurfaceVariant,
+          fontSize: 11,
+        ),
+      ),
+      iconTheme: IconThemeData(
+        color: colorScheme.onSurface,
+        size: AppIconSizes.md,
+        opticalSize: 24,
+        weight: 500,
       ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
@@ -100,7 +115,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           textStyle: AppTextStyles.caption.copyWith(
             fontWeight: FontWeight.w700,
@@ -112,7 +127,7 @@ class AppTheme {
           minimumSize: const Size(0, 48),
           side: BorderSide(color: colorScheme.outlineVariant),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           textStyle: AppTextStyles.caption.copyWith(
             fontWeight: FontWeight.w700,

@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
@@ -29,7 +30,7 @@ class PortfolioHeroHeader extends StatelessWidget {
             : 0.0;
 
         return MotionElasticHero(
-          baseHeight: 164,
+          baseHeight: 184,
           scrollOffset: offset,
           child: MotionParallax(scrollOffset: offset, child: child!),
         );
@@ -52,22 +53,29 @@ class _HeroSurface extends StatelessWidget {
     final colors = _colorsFor(context, gradientStyle);
 
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      borderRadius: const BorderRadius.vertical(
+        bottom: Radius.circular(AppRadius.xxl),
+      ),
       child: MotionAmbientGradient(
         gradientBuilder: _ambientGradientFor(gradientStyle),
         child: Container(
-          height: 164,
+          height: 184,
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xxl,
+            AppSpacing.xxl,
+            AppSpacing.xxl,
+            AppSpacing.xl,
+          ),
           decoration: BoxDecoration(
             borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(28),
+              bottom: Radius.circular(AppRadius.xxl),
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.last.withValues(alpha: isDark ? 0.18 : 0.26),
-                blurRadius: 34,
-                offset: const Offset(0, 18),
+                color: colors.last.withValues(alpha: isDark ? 0.24 : 0.32),
+                blurRadius: 46,
+                offset: const Offset(0, 24),
               ),
             ],
           ),
@@ -81,7 +89,10 @@ class _HeroSurface extends StatelessWidget {
                   height: 138,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: colorScheme.onPrimary.withValues(alpha: 0.08),
+                    border: Border.all(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.14),
+                      width: 22,
+                    ),
                   ),
                 ),
               ),
@@ -163,44 +174,42 @@ class _PortfolioActionTileState extends State<PortfolioActionTile> {
         child: MotionTapScale(
           onTap: widget.onTap,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
               child: AnimatedContainer(
                 duration: PackLoxMotionTheme.medium,
                 curve: PackLoxMotionTheme.hoverCurve,
-                height: 78,
-                padding: const EdgeInsets.all(12),
+                height: 82,
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: isDark
                       ? colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.34,
+                          alpha: 0.42,
                         )
-                      : colorScheme.surface.withValues(alpha: 0.58),
-                  borderRadius: BorderRadius.circular(20),
+                      : colorScheme.surface.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
                   border: Border.all(
-                    color: colorScheme.primary.withValues(
-                      alpha: _hovered ? 0.24 : 0.12,
-                    ),
+                    color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: colorScheme.primary.withValues(
-                        alpha: _hovered
-                            ? PackLoxMotionTheme.hoverOpacity
-                            : (isDark ? 0.04 : 0.06),
+                        alpha: _hovered ? 0.14 : (isDark ? 0.06 : 0.08),
                       ),
-                      blurRadius: _hovered
-                          ? PackLoxMotionTheme.hoverBlurRadius
-                          : 18,
-                      offset: const Offset(0, 12),
+                      blurRadius: _hovered ? 30 : 22,
+                      offset: const Offset(0, 14),
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(widget.icon, color: colorScheme.onSurface, size: 24),
+                    Icon(
+                      widget.icon,
+                      color: colorScheme.primary,
+                      size: AppIconSizes.md,
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       widget.title,
@@ -353,29 +362,37 @@ class PortfolioSectionCard extends StatelessWidget {
         );
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
               color: isDark
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-                  : colorScheme.surface.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(22),
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+                  : colorScheme.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
               border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withValues(
-                    alpha: isDark ? 0.12 : 0.08,
+                    alpha: isDark ? 0.16 : 0.10,
                   ),
-                  blurRadius: 28,
-                  offset: const Offset(0, 16),
+                  blurRadius: 38,
+                  offset: const Offset(0, 22),
                 ),
               ],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: isDark ? 0.05 : 0.28),
+                  colorScheme.primary.withValues(alpha: 0.03),
+                ],
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +412,7 @@ class PortfolioSectionCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg),
                 child,
               ],
             ),
@@ -446,29 +463,29 @@ class _PortfolioGlassItemCardState extends State<PortfolioGlassItemCard> {
       child: MotionTapScale(
         onTap: widget.onTap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               decoration: BoxDecoration(
                 color: isDark
                     ? colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.34,
+                        alpha: 0.42,
                       )
-                    : colorScheme.surface.withValues(alpha: 0.60),
-                borderRadius: BorderRadius.circular(22),
+                    : colorScheme.surface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
                 border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+                  color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: colorScheme.shadow.withValues(
-                      alpha: isDark ? 0.12 : 0.08,
+                      alpha: isDark ? 0.16 : 0.10,
                     ),
-                    blurRadius: 30,
-                    offset: const Offset(0, 18),
+                    blurRadius: 40,
+                    offset: const Offset(0, 22),
                   ),
                 ],
               ),
@@ -781,16 +798,16 @@ List<Color> _colorsFor(BuildContext context, GradientStyle style) {
   return switch (style) {
     GradientStyle.blueIndigo =>
       isDark
-          ? const [Color(0xFF1E3A8A), Color(0xFF312E81)]
-          : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+          ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
+          : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
     GradientStyle.purpleDeepBlue =>
       isDark
-          ? const [Color(0xFF5B21B6), Color(0xFF1E3A8A)]
-          : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
+          ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
+          : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
     GradientStyle.tealEmerald =>
       isDark
-          ? const [Color(0xFF115E59), Color(0xFF065F46)]
-          : const [Color(0xFF14B8A6), Color(0xFF10B981)],
+          ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
+          : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
   };
 }
 

@@ -1,3 +1,6 @@
+import 'dart:ui';
+
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:flutter/material.dart';
 
 /// Available gradient treatments for settings section headers.
@@ -64,56 +67,91 @@ class _GradientHeaderState extends State<GradientHeader>
       animation: _controller,
       builder: (context, child) {
         final shift = _controller.value;
-        return Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 72, maxHeight: 88),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color.lerp(colors.first, colors.last, shift * 0.16)!,
-                Color.lerp(colors.last, colors.first, shift * 0.10)!,
-              ],
-              begin: Alignment(-1 + shift * 0.26, -1),
-              end: Alignment(1 - shift * 0.20, 1),
-            ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: colors.last.withValues(alpha: 0.22 + shift * 0.06),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 92),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.xl,
+                AppSpacing.lg,
               ),
-            ],
-          ),
-          child: DefaultTextStyle(
-            style: TextStyle(color: colorScheme.onPrimary),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color.lerp(colors.first, colors[1], shift * 0.16)!,
+                    Color.lerp(colors[1], colors.last, shift * 0.10)!,
+                    colors.last,
+                  ],
+                  begin: Alignment(-1 + shift * 0.26, -1),
+                  end: Alignment(1 - shift * 0.20, 1),
                 ),
-                if (widget.subtitle != null &&
-                    widget.subtitle!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.last.withValues(alpha: 0.24 + shift * 0.06),
+                    blurRadius: 38,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    right: -28,
+                    top: -44,
+                    child: Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          width: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                  DefaultTextStyle(
+                    style: TextStyle(color: colorScheme.onPrimary),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleLarge?.copyWith(
+                            color: colorScheme.onPrimary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (widget.subtitle != null &&
+                            widget.subtitle!.trim().isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            widget.subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.80,
+                              ),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
         );
@@ -126,16 +164,16 @@ class _GradientHeaderState extends State<GradientHeader>
     return switch (style) {
       GradientStyle.blueIndigo =>
         isDark
-            ? const [Color(0xFF1E40AF), Color(0xFF3730A3)]
-            : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+            ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
+            : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
       GradientStyle.purpleDeepBlue =>
         isDark
-            ? const [Color(0xFF6D28D9), Color(0xFF1E3A8A)]
-            : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
+            ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
+            : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
       GradientStyle.tealEmerald =>
         isDark
-            ? const [Color(0xFF0F766E), Color(0xFF047857)]
-            : const [Color(0xFF14B8A6), Color(0xFF10B981)],
+            ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
+            : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
     };
   }
 }

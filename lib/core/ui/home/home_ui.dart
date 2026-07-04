@@ -1,110 +1,193 @@
-import 'dart:ui';
-
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:flutter/material.dart';
 
 class HomeHeroHeader extends StatelessWidget {
   const HomeHeroHeader({
     super.key,
-    required this.scrollController,
-    this.gradientStyle = GradientStyle.blueIndigo,
+    this.itemCount = 0,
+    this.estimatedValue = 'AUD 0',
+    this.lastScanStatus = 'No scans yet',
   });
 
-  final ScrollController scrollController;
-  final GradientStyle gradientStyle;
+  final int itemCount;
+  final String estimatedValue;
+  final String lastScanStatus;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = _colorsFor(context, gradientStyle);
 
-    return AnimatedBuilder(
-      animation: scrollController,
-      builder: (context, child) {
-        final scrollOffset = scrollController.hasClients
-            ? scrollController.offset
-            : 0.0;
-        final parallax = scrollOffset.clamp(0, 96).toDouble();
-        final overscroll = scrollOffset < 0 ? (-scrollOffset / 700) : 0.0;
-
-        return Transform.translate(
-          offset: Offset(0, -parallax * 0.10),
-          child: Transform.scale(
-            scale: 1 + overscroll.clamp(0, 0.05),
-            alignment: Alignment.topCenter,
-            child: Container(
-              height: 184,
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(28, 28, 28, 26),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: colors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: AppGradients.premium,
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(
+                  alpha: isDark ? 0.22 : 0.30,
                 ),
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(28),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.last.withValues(alpha: isDark ? 0.22 : 0.28),
-                    blurRadius: 34,
-                    offset: const Offset(0, 18),
-                  ),
-                ],
+                blurRadius: AppSpacing.xxl,
+                offset: const Offset(0, AppSpacing.lg),
               ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -18 + parallax * 0.10,
-                    top: -24,
-                    child: Container(
-                      width: 130,
-                      height: 130,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: colorScheme.onPrimary.withValues(alpha: 0.08),
-                      ),
+            ],
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: isDark ? 0.05 : 0.18),
+                        Colors.transparent,
+                        colorScheme.secondary.withValues(alpha: 0.16),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Transform.translate(
-                      offset: Offset(0, parallax * 0.04),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'PackLox',
-                            style: textTheme.headlineMedium?.copyWith(
-                              color: colorScheme.onPrimary,
-                              fontWeight: FontWeight.w900,
-                              height: 1.05,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Your smart collection hub',
-                            style: textTheme.bodyLarge?.copyWith(
-                              color: colorScheme.onPrimary.withValues(
-                                alpha: 0.82,
-                              ),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+              ),
+              Positioned(
+                right: -AppSpacing.xxl,
+                top: -AppSpacing.xl,
+                child: Container(
+                  width: 148,
+                  height: 148,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      width: AppSpacing.xl,
                     ),
                   ),
-                ],
+                ),
               ),
+              Positioned(
+                right: AppSpacing.xl,
+                top: AppSpacing.lg,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.20),
+                    ),
+                  ),
+                  child: Text(
+                    'PackLox',
+                    style: AppTextStyles.caption.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your collection hub',
+                      style: AppTextStyles.h1.copyWith(
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Your smart collection hub for scans, value, and portfolio momentum.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body.copyWith(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.84),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        _HeroMetric(
+                          label: 'Collectibles',
+                          value: itemCount.toString(),
+                        ),
+                        _HeroMetric(label: 'Value', value: estimatedValue),
+                        _HeroMetric(label: 'Last scan', value: lastScanStatus),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 104),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+              color: colorScheme.onPrimary.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
             ),
           ),
-        );
-      },
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body.copyWith(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -155,72 +238,70 @@ class _HomeGlassTileState extends State<HomeGlassTile> {
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOutCubic,
           scale: _pressed ? 0.96 : 1,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 148,
-                height: 126,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.35,
-                        )
-                      : colorScheme.surface.withValues(alpha: 0.56),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(
-                      alpha: _hovered ? 0.22 : 0.12,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 148,
+            height: 132,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+                  : colorScheme.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(
+                    alpha: _hovered ? 0.14 : 0.07,
+                  ),
+                  blurRadius: _hovered ? 32 : 24,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: isDark ? 0.05 : 0.30),
+                  colorScheme.primary.withValues(alpha: 0.04),
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primaryContainer.withValues(alpha: 0.52),
+                        colorScheme.secondaryContainer.withValues(alpha: 0.30),
+                      ],
                     ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(
-                        alpha: _hovered ? 0.08 : 0.04,
-                      ),
-                      blurRadius: 22,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
+                  child: Icon(
+                    widget.icon,
+                    color: colorScheme.primary,
+                    size: AppIconSizes.lg,
+                  ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primaryContainer.withValues(
-                              alpha: 0.52,
-                            ),
-                            colorScheme.secondaryContainer.withValues(
-                              alpha: 0.30,
-                            ),
-                          ],
-                        ),
-                      ),
-                      child: Icon(widget.icon, color: colorScheme.primary),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -260,54 +341,54 @@ class SectionCard extends StatelessWidget {
           ),
         );
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-                  : colorScheme.surface.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.24),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(
-                    alpha: isDark ? 0.14 : 0.08,
-                  ),
-                  blurRadius: 28,
-                  offset: const Offset(0, 16),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                child,
-              ],
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          color: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+              : colorScheme.surface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: isDark ? 0.16 : 0.10),
+              blurRadius: 38,
+              offset: const Offset(0, 22),
+            ),
+          ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: isDark ? 0.05 : 0.28),
+              colorScheme.primary.withValues(alpha: 0.03),
+            ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            child,
+          ],
         ),
       ),
     );
@@ -382,22 +463,23 @@ class _AnimatedIconTileState extends State<AnimatedIconTile>
               final pulse = _controller.value;
               return Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(22),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
+                      const Color(0xFF07111F),
                       colorScheme.primary.withValues(alpha: 0.92),
-                      colorScheme.tertiary.withValues(alpha: 0.78),
+                      colorScheme.tertiary.withValues(alpha: 0.84),
                     ],
                     begin: Alignment(-1 + pulse * 0.4, -1),
                     end: const Alignment(1, 1),
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.22),
-                      blurRadius: 28,
-                      offset: const Offset(0, 14),
+                      color: colorScheme.primary.withValues(alpha: 0.28),
+                      blurRadius: 40,
+                      offset: const Offset(0, 18),
                     ),
                   ],
                 ),
@@ -407,19 +489,22 @@ class _AnimatedIconTileState extends State<AnimatedIconTile>
             child: Row(
               children: [
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                     color: colorScheme.onPrimary.withValues(alpha: 0.14),
+                    border: Border.all(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.18),
+                    ),
                   ),
                   child: Icon(
                     widget.icon,
                     color: colorScheme.onPrimary,
-                    size: 30,
+                    size: AppIconSizes.lg,
                   ),
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: AppSpacing.lg),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,22 +539,4 @@ class _AnimatedIconTileState extends State<AnimatedIconTile>
       ),
     );
   }
-}
-
-List<Color> _colorsFor(BuildContext context, GradientStyle style) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return switch (style) {
-    GradientStyle.blueIndigo =>
-      isDark
-          ? const [Color(0xFF1E40AF), Color(0xFF3730A3)]
-          : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
-    GradientStyle.purpleDeepBlue =>
-      isDark
-          ? const [Color(0xFF6D28D9), Color(0xFF1E3A8A)]
-          : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
-    GradientStyle.tealEmerald =>
-      isDark
-          ? const [Color(0xFF0F766E), Color(0xFF047857)]
-          : const [Color(0xFF14B8A6), Color(0xFF10B981)],
-  };
 }

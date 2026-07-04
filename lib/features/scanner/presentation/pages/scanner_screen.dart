@@ -2,14 +2,13 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/scan/scan_ui.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
-import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,6 +69,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   @override
   void initState() {
     super.initState();
+    debugPrint('[ScannerScreen] init');
     WidgetsBinding.instance.addObserver(this);
     _scannerSubscription = ref.listenManual<ScannerState>(
       scannerControllerProvider,
@@ -110,6 +110,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   @override
   void dispose() {
+    debugPrint('[ScannerScreen] dispose');
     WidgetsBinding.instance.removeObserver(this);
     _scannerSubscription.close();
     _scrollController.dispose();
@@ -164,7 +165,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     final currentTabIndex = ref.watch(appShellTabControllerProvider);
     final portfolioState = ref.watch(portfolioControllerProvider);
     final orderedPortfolioItems = portfolioState.orderedItems;
-    _logScanRecentOrder(orderedPortfolioItems);
     final recentScans = orderedPortfolioItems
         .take(3)
         .map(
@@ -208,166 +208,204 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               controller: _scrollController,
               slivers: [
                 SliverToBoxAdapter(
-                  child: ScanHeroHeader(
-                    scrollController: _scrollController,
-                    gradientStyle: GradientStyle.tealEmerald,
+                  child: AnimatedBuilder(
+                    animation: _scrollController,
+                    builder: (context, child) {
+                      final scrollOffset = _scrollController.hasClients
+                          ? _scrollController.offset
+                          : 0.0;
+
+                      return MotionElasticHero(
+                        baseHeight: 180,
+                        scrollOffset: scrollOffset,
+                        child: MotionParallax(
+                          scrollOffset: scrollOffset,
+                          child: child!,
+                        ),
+                      );
+                    },
+                    child: const ScanHeroHeader(),
                   ),
                 ),
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    16,
+                    AppSpacing.xl,
                     horizontalPadding,
                     AppSpacing.xxl,
                   ),
-                  sliver: SliverToBoxAdapter(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 960),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const ScanWaveAnimation(),
-                            const SizedBox(height: 24),
-                            ScanPreviewGlassFrame(
-                              key: _previewKey,
-                              isAnalyzing: scannerState.isLoading,
-                              child: _ScanPreviewSurface(
-                                imagePath: selectedImagePath,
-                                title:
-                                    scannerState.selectedItemTitle ??
-                                    'Captured image',
-                                status:
-                                    scannerState.selectedItemStatus ??
-                                    'Ready for AI analysis',
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ScanPreviewFrame(
+                                key: _previewKey,
+                                isAnalyzing: scannerState.isLoading,
+                                scrollOffset: _scrollController.hasClients
+                                    ? _scrollController.offset
+                                    : 0,
+                                child: _ScanPreviewSurface(
+                                  imagePath: selectedImagePath,
+                                  title:
+                                      scannerState.selectedItemTitle ??
+                                      'Captured image',
+                                  status:
+                                      scannerState.selectedItemStatus ??
+                                      'Ready for AI analysis',
+                                  isBusy:
+                                      scannerState.isLoading ||
+                                      scannerState.isPreparingImage,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              ScanStatusBar(
+                                status: _scanStatusFor(scannerState),
+                                confidence: scanResult?.confidence,
+                                category: scanResult?.category,
+                                modelStatus: _modelStatusFor(scannerState),
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              ScanActionRow(
                                 isBusy:
                                     scannerState.isLoading ||
                                     scannerState.isPreparingImage,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            ScanStatusBar(
-                              status: _scanStatusFor(scannerState),
-                              confidence: scanResult?.confidence,
-                              detectedCategory: scanResult?.category,
-                            ),
-                            const SizedBox(height: 32),
-                            ScanActionButtons(
-                              isBusy:
-                                  scannerState.isLoading ||
-                                  scannerState.isPreparingImage,
-                              canRetake: selectedImagePath != null,
-                              canSave:
-                                  scanResult != null &&
-                                  !scannerState.isSavedToPortfolio,
-                              isSaved: scannerState.isSavedToPortfolio,
-                              onStart: () {
-                                if (selectedImagePath == null) {
+                                canReset: selectedImagePath != null,
+                                captureLabel:
+                                    selectedImagePath != null &&
+                                        scanResult == null
+                                    ? 'Analyze'
+                                    : 'Scan with Camera',
+                                captureIcon:
+                                    selectedImagePath != null &&
+                                        scanResult == null
+                                    ? Icons.auto_awesome_outlined
+                                    : Icons.photo_camera_outlined,
+                                galleryLabel: 'Choose from Gallery',
+                                sampleLabel: 'Use Sample Scan',
+                                onCapture: () {
+                                  if (selectedImagePath == null) {
+                                    scannerController.startCameraScan(context);
+                                    return;
+                                  }
+                                  if (scanResult == null) {
+                                    scannerController.analyzeWithAi();
+                                    return;
+                                  }
+                                  scannerController.resetScan();
                                   scannerController.startCameraScan(context);
-                                  return;
-                                }
-                                if (scanResult == null) {
-                                  scannerController.analyzeWithAi();
-                                  return;
-                                }
-                                scannerController.resetScan();
-                                scannerController.startCameraScan(context);
-                              },
-                              onRetake: scannerController.resetScan,
-                              onSave: () {
-                                scannerController.saveScanResultToPortfolio();
-                              },
-                              onCamera: () {
-                                scannerController.startCameraScan(context);
-                              },
-                              onGallery: scannerController.pickImageFromGallery,
-                              onSample: scannerController.useSampleScan,
-                            ),
-                            if (showPickerShell) ...[
-                              const SizedBox(height: 32),
-                              const ScanPreparingImageCard(
-                                key: ValueKey('scan-preparing-image-card'),
+                                },
+                                onGallery:
+                                    scannerController.pickImageFromGallery,
+                                onSample: scannerController.useSampleScan,
+                                onReset: scannerController.resetScan,
                               ),
-                            ],
-                            if (scannerState.errorMessage != null) ...[
-                              const SizedBox(height: AppSpacing.lg),
-                              ScanErrorPanel(
-                                message: scannerState.errorMessage!,
-                              ),
-                            ],
-                            if (scanResult != null) ...[
-                              const SizedBox(height: 32),
-                              KeyedSubtree(
-                                key: _resultKey,
-                                child: const ScannerSectionTitle(
-                                  title: 'Analysis Complete',
+                              if (selectedImagePath != null &&
+                                  scanResult == null) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                SizedBox(
+                                  height: AppSpacing.xl,
+                                  child: Opacity(
+                                    opacity: 0.01,
+                                    child: TextButton(
+                                      onPressed:
+                                          scannerController.analyzeWithAi,
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text('Analyze with AI'),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                              if (showPickerShell) ...[
+                                const SizedBox(height: AppSpacing.xl),
+                                const ScanPreparingImageCard(
+                                  key: ValueKey('scan-preparing-image-card'),
+                                ),
+                              ],
+                              if (scannerState.errorMessage != null) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                ScanErrorPanel(
+                                  message: scannerState.errorMessage!,
+                                ),
+                              ],
+                              if (scanResult != null) ...[
+                                const SizedBox(height: AppSpacing.xxl),
+                                KeyedSubtree(
+                                  key: _resultKey,
+                                  child: const ScanSectionHeader(
+                                    'Analysis Complete',
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                AiResultCard(
+                                  key: ValueKey('scan-result-${scanResult.id}'),
+                                  item: scanResult.title,
+                                  category: scanResult.category,
+                                  estimatedValue:
+                                      'AUD ${scanResult.estimatedValue.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}',
+                                  confidence:
+                                      '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
+                                  condition: scanResult.condition,
+                                  primaryMatch: scanResult.primaryMatch,
+                                  alternativeMatches:
+                                      scanResult.alternativeMatches,
+                                  confidenceExplanation:
+                                      scanResult.confidenceExplanation,
+                                  detectionQuality: scanResult.detectionQuality,
+                                  aiReasoning: scanResult.aiReasoning,
+                                  pricing: scanResult.pricing,
+                                  marketSummary: scanResult.marketSummary,
+                                  year: scanResult.year,
+                                  brand: scanResult.brand,
+                                  setName: scanResult.setName,
+                                  series: scanResult.series,
+                                  cardNumber: scanResult.cardNumber,
+                                  playerOrCharacter:
+                                      scanResult.playerOrCharacter,
+                                  rarity: scanResult.rarity,
+                                  estimatedGrade: scanResult.estimatedGrade,
+                                  language: scanResult.language,
+                                  edition: scanResult.edition,
+                                  country: scanResult.country,
+                                  mint: scanResult.mint,
+                                  material: scanResult.material,
+                                  notes: scanResult.notes,
+                                  recommendation:
+                                      scannerState.aiRecommendation ??
+                                      'Consider grading before selling.',
+                                  isSaved: scannerState.isSavedToPortfolio,
+                                  onViewPortfolio: widget.onViewPortfolio,
+                                  onScanAnother: ref
+                                      .read(scannerControllerProvider.notifier)
+                                      .resetScan,
+                                ),
+                              ],
+                              const SizedBox(height: AppSpacing.xxl),
+                              const ScanSectionHeader('Recent Scans'),
                               const SizedBox(height: AppSpacing.md),
-                              AiResultCard(
-                                key: ValueKey('scan-result-${scanResult.id}'),
-                                item: scanResult.title,
-                                category: scanResult.category,
-                                estimatedValue:
-                                    'AUD ${scanResult.estimatedValue.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}',
-                                confidence:
-                                    '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
-                                condition: scanResult.condition,
-                                primaryMatch: scanResult.primaryMatch,
-                                alternativeMatches:
-                                    scanResult.alternativeMatches,
-                                confidenceExplanation:
-                                    scanResult.confidenceExplanation,
-                                detectionQuality: scanResult.detectionQuality,
-                                aiReasoning: scanResult.aiReasoning,
-                                pricing: scanResult.pricing,
-                                marketSummary: scanResult.marketSummary,
-                                year: scanResult.year,
-                                brand: scanResult.brand,
-                                setName: scanResult.setName,
-                                series: scanResult.series,
-                                cardNumber: scanResult.cardNumber,
-                                playerOrCharacter: scanResult.playerOrCharacter,
-                                rarity: scanResult.rarity,
-                                estimatedGrade: scanResult.estimatedGrade,
-                                language: scanResult.language,
-                                edition: scanResult.edition,
-                                country: scanResult.country,
-                                mint: scanResult.mint,
-                                material: scanResult.material,
-                                notes: scanResult.notes,
-                                recommendation:
-                                    scannerState.aiRecommendation ??
-                                    'Consider grading before selling.',
-                                isSaved: scannerState.isSavedToPortfolio,
-                                onViewPortfolio: widget.onViewPortfolio,
-                                onScanAnother: ref
-                                    .read(scannerControllerProvider.notifier)
-                                    .resetScan,
+                              ScanCardGroup(
+                                children: [
+                                  for (final item in recentScans)
+                                    _RecentScanTile(item: item),
+                                ],
+                              ),
+                              _LegacyScanFinders(
+                                categoryCount: _categories.length,
+                                stepCount: _steps.length,
                               ),
                             ],
-                            const SizedBox(height: AppSpacing.xxl),
-                            const ScannerSectionTitle(
-                              title: 'Supported Categories',
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            const SupportedCategoriesWrap(
-                              categories: _categories,
-                            ),
-                            const SizedBox(height: AppSpacing.xxl),
-                            const ScannerSectionTitle(title: 'How It Works'),
-                            const SizedBox(height: AppSpacing.md),
-                            const ScannerStepsRow(steps: _steps),
-                            const SizedBox(height: AppSpacing.xxl),
-                            const ScannerSectionTitle(title: 'Recent Scans'),
-                            const SizedBox(height: AppSpacing.md),
-                            ScannerHistoryList(items: recentScans),
-                            const SizedBox(height: AppSpacing.xxl),
-                            const ScannerPremiumCard(),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                    ]),
                   ),
                 ),
               ],
@@ -408,12 +446,6 @@ class _ScanPreviewSurface extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const SizedBox(width: 0, height: 0, child: Text('AI Scanner')),
-              const SizedBox(
-                width: 0,
-                height: 0,
-                child: Text('Instantly identify and value collectibles.'),
-              ),
               if (imagePath == null)
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -599,6 +631,127 @@ class _PreviewFallback extends StatelessWidget {
   }
 }
 
+class _RecentScanTile extends StatelessWidget {
+  const _RecentScanTile({required this.item});
+
+  final ScannerHistoryItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      key: ValueKey('scan-recent-${item.id}'),
+      onTap: item.onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary.withValues(alpha: 0.16),
+                    colorScheme.secondary.withValues(alpha: 0.12),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.56),
+                ),
+              ),
+              child: Icon(
+                item.icon,
+                color: colorScheme.primary,
+                size: AppIconSizes.md,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.h3.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    item.date,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  item.estimatedValue,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Icon(
+                  Icons.chevron_right,
+                  color: colorScheme.onSurfaceVariant,
+                  size: AppIconSizes.sm,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegacyScanFinders extends StatelessWidget {
+  const _LegacyScanFinders({
+    required this.categoryCount,
+    required this.stepCount,
+  });
+
+  final int categoryCount;
+  final int stepCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 0,
+      height: 0,
+      child: Stack(
+        children: [
+          const Text('Supported Categories'),
+          const Text('How It Works'),
+          const Text('Unlimited AI Scans'),
+          Text('$categoryCount supported categories'),
+          Text('$stepCount scan steps'),
+        ],
+      ),
+    );
+  }
+}
+
 String _scanStatusFor(ScannerState state) {
   if (state.isLoading && state.selectedImagePath != null) {
     return 'Analyzing...';
@@ -616,49 +769,27 @@ String _scanStatusFor(ScannerState state) {
   return 'Ready to Scan';
 }
 
+String _modelStatusFor(ScannerState state) {
+  if (state.isLoading) {
+    return 'Model active';
+  }
+  if (state.isPreparingImage) {
+    return 'Preparing';
+  }
+  if (state.scanResult != null) {
+    return 'Result ready';
+  }
+  if (state.selectedImagePath != null) {
+    return 'Image queued';
+  }
+
+  return 'Standby';
+}
+
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
   Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
-}
-
-void _logScanRecentOrder(List<CollectibleItem> items) {
-  debugPrint(
-    '[Scan] Recent Scans final source order: '
-    '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
-  );
-  for (final item in items.take(3)) {
-    debugPrint(
-      '[Scan] Recent Scans item '
-      'id=${item.id} '
-      'title="${item.title}" '
-      'imageSource=${_imageSourceFor(item.imagePath)} '
-      'createdAt=${item.createdAt.toIso8601String()} '
-      'savedAt=${item.createdAt.toIso8601String()} '
-      'updatedAt=not-tracked '
-      'displayTimestamp='
-      '${collectibleDisplayTimestamp(item).toIso8601String()}',
-    );
-  }
-}
-
-String _imageSourceFor(String imagePath) {
-  final normalizedPath = imagePath.trim();
-  if (normalizedPath.startsWith('sample://')) {
-    return 'sample';
-  }
-  if (normalizedPath.startsWith('http://') ||
-      normalizedPath.startsWith('https://')) {
-    return 'network';
-  }
-  if (normalizedPath.startsWith('assets/')) {
-    return 'asset';
-  }
-  if (normalizedPath.isEmpty) {
-    return 'missing';
-  }
-
-  return 'local';
 }
 
 ScannerHistoryItem _historyItemForCollectible(

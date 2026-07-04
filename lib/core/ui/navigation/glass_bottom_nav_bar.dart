@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
@@ -26,59 +25,67 @@ class GlassBottomNavBar extends StatelessWidget {
       offset: 16,
       child: SafeArea(
         top: false,
-        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        minimum: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.sm,
+        ),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             boxShadow: [
               BoxShadow(
                 color: colorScheme.shadow.withValues(
-                  alpha: isDark ? 0.18 : 0.12,
+                  alpha: isDark ? 0.24 : 0.16,
                 ),
-                blurRadius: isDark ? 22 : 34,
-                offset: const Offset(0, -10),
+                blurRadius: isDark ? 28 : 42,
+                offset: const Offset(0, -14),
+              ),
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                blurRadius: 34,
+                offset: const Offset(0, -8),
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: Container(
-                height: 74,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.48,
-                        )
-                      : colorScheme.surface.withValues(alpha: 0.72),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-                  border: Border(
-                    top: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(
-                        alpha: isDark ? 0.20 : 0.36,
-                      ),
-                    ),
-                  ),
+          child: RepaintBoundary(
+            child: Container(
+              height: 78,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.86,
+                      )
+                    : colorScheme.surface.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.58),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  children: [
-                    for (var index = 0; index < items.length; index++)
-                      Expanded(
-                        child: NavBarItem(
-                          key: items[index].key,
-                          icon: items[index].icon,
-                          label: items[index].label,
-                          isActive: currentIndex == index,
-                          gradientStyle: items[index].gradientStyle,
-                          onTap: () => onTap(index),
-                        ),
-                      ),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: isDark ? 0.06 : 0.24),
+                    colorScheme.primary.withValues(alpha: 0.04),
                   ],
                 ),
+              ),
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
+                children: [
+                  for (var index = 0; index < items.length; index++)
+                    Expanded(
+                      child: NavBarItem(
+                        key: items[index].key,
+                        icon: items[index].icon,
+                        label: items[index].label,
+                        isActive: currentIndex == index,
+                        gradientStyle: items[index].gradientStyle,
+                        onTap: () => onTap(index),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -142,9 +149,9 @@ class _NavBarItemState extends State<NavBarItem> {
           curve: PackLoxMotionTheme.hoverCurve,
           height: double.infinity,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             color: _hovered
-                ? colors.last.withValues(alpha: isDark ? 0.10 : 0.08)
+                ? colors.last.withValues(alpha: isDark ? 0.14 : 0.10)
                 : Colors.transparent,
           ),
           child: Stack(
@@ -170,31 +177,40 @@ class _NavBarItemState extends State<NavBarItem> {
                           duration: navSpringDuration,
                           curve: PackLoxMotionTheme.navSpringCurve,
                           child: AnimatedContainer(
-                            width: widget.isActive ? 48 : 0,
-                            height: 32,
+                            width: widget.isActive ? 50 : 0,
+                            height: 34,
                             duration: navSpringDuration,
                             curve: PackLoxMotionTheme.navSpringCurve,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                              gradient: LinearGradient(
+                                colors: colors,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: widget.isActive
+                                  ? Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                    )
+                                  : null,
                               boxShadow: widget.isActive
                                   ? [
                                       BoxShadow(
                                         color: colors.last.withValues(
                                           alpha: isDark ? 0.22 : 0.28,
                                         ),
-                                        blurRadius: 18,
-                                        offset: const Offset(0, 8),
+                                        blurRadius: 22,
+                                        offset: const Offset(0, 10),
                                       ),
                                     ]
                                   : const [],
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: MotionAmbientGradient(
-                              gradientBuilder: _ambientGradientFor(
-                                widget.gradientStyle,
-                              ),
-                              child: const SizedBox.expand(),
-                            ),
+                            child: const SizedBox.expand(),
                           ),
                         ),
                         AnimatedSwitcher(
@@ -220,14 +236,16 @@ class _NavBarItemState extends State<NavBarItem> {
                           child: Icon(
                             widget.icon,
                             key: ValueKey('${widget.label}-${widget.isActive}'),
-                            size: widget.isActive ? 20 : 22,
+                            size: widget.isActive
+                                ? AppIconSizes.md
+                                : AppIconSizes.md,
                             color: foreground,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   AnimatedDefaultTextStyle(
                     duration: PackLoxMotionTheme.medium,
                     curve: PackLoxMotionTheme.hoverCurve,
@@ -237,7 +255,7 @@ class _NavBarItemState extends State<NavBarItem> {
                               ? colorScheme.onSurface
                               : colorScheme.onSurfaceVariant,
                           fontWeight: widget.isActive
-                              ? FontWeight.w700
+                              ? FontWeight.w800
                               : FontWeight.w600,
                           letterSpacing: 0,
                         ) ??
@@ -283,8 +301,8 @@ class NavBarBackgroundGlow extends StatelessWidget {
         duration: PackLoxMotionTheme.slow,
         curve: PackLoxMotionTheme.revealCurve,
         child: Container(
-          width: 64,
-          height: 44,
+          width: 72,
+          height: 48,
           decoration: BoxDecoration(
             gradient: RadialGradient(
               colors: [
@@ -292,7 +310,7 @@ class NavBarBackgroundGlow extends StatelessWidget {
                 colors.first.withValues(alpha: 0),
               ],
             ),
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
         ),
       ),
@@ -305,23 +323,15 @@ List<Color> _colorsFor(BuildContext context, GradientStyle style) {
   return switch (style) {
     GradientStyle.blueIndigo =>
       isDark
-          ? const [Color(0xFF1E40AF), Color(0xFF3730A3)]
-          : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+          ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
+          : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
     GradientStyle.purpleDeepBlue =>
       isDark
-          ? const [Color(0xFF6D28D9), Color(0xFF1E3A8A)]
-          : const [Color(0xFF8B5CF6), Color(0xFF1D4ED8)],
+          ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
+          : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
     GradientStyle.tealEmerald =>
       isDark
-          ? const [Color(0xFF0F766E), Color(0xFF047857)]
-          : const [Color(0xFF14B8A6), Color(0xFF10B981)],
-  };
-}
-
-Gradient Function(double) _ambientGradientFor(GradientStyle style) {
-  return switch (style) {
-    GradientStyle.purpleDeepBlue => PackLoxMotionTheme.ambientPurpleDeepBlue,
-    GradientStyle.blueIndigo ||
-    GradientStyle.tealEmerald => PackLoxMotionTheme.ambientBlueIndigo,
+          ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
+          : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
   };
 }

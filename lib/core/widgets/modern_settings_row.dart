@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:flutter/material.dart';
 
 /// Modern, divider-free settings row with soft micro-interactions.
@@ -111,12 +112,12 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
               curve: Curves.easeOutCubic,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: _hovered
                       ? colorScheme.primary.withValues(alpha: 0.08)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: Row(
                   children: [
@@ -125,8 +126,8 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       builder: (context, child) {
                         final pulse = _pulseController.value;
                         return Container(
-                          width: 54,
-                          height: 54,
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -140,7 +141,7 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                               begin: Alignment(-1 + pulse * 0.8, -1),
                               end: const Alignment(1, 1),
                             ),
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             border: Border.all(
                               color: colorScheme.outlineVariant.withValues(
                                 alpha: 0.22,
@@ -157,11 +158,15 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                                 ),
                             ],
                           ),
-                          child: Icon(widget.icon, color: colorScheme.primary),
+                          child: Icon(
+                            widget.icon,
+                            color: colorScheme.primary,
+                            size: AppIconSizes.md,
+                          ),
                         );
                       },
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSpacing.lg),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +179,7 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 5),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             widget.subtitle,
                             maxLines: 2,
@@ -187,7 +192,7 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       ),
                     ),
                     if (trailing != null) ...[
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       trailing,
                     ],
                   ],
