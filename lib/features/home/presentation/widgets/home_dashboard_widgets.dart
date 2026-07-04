@@ -64,7 +64,7 @@ class HomeDashboardAppBar extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Text(
-            'CI',
+            'PL',
             style: textTheme.titleMedium?.copyWith(
               color: colorScheme.onPrimary,
               fontWeight: FontWeight.w700,
@@ -74,7 +74,7 @@ class HomeDashboardAppBar extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'CollectIQ AI',
+            'PackLox',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),

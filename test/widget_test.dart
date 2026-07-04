@@ -30,6 +30,7 @@ import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -58,8 +59,8 @@ void main() {
     await tester.pumpCollectIqApp(onboardingCompleted: false);
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to CollectIQ AI'), findsOneWidget);
-    expect(find.text('How CollectIQ AI works'), findsOneWidget);
+    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('How PackLox works'), findsOneWidget);
     expect(find.text('Local-first by default'), findsOneWidget);
     expect(find.text('Start Scanning'), findsOneWidget);
     expect(find.text('Explore Dashboard'), findsOneWidget);
@@ -104,7 +105,7 @@ void main() {
     expect(repository.completed, isTrue);
     expect(find.text('Good Evening, Harry'), findsOneWidget);
     expect(find.text('Build your collection dashboard'), findsOneWidget);
-    expect(find.text('Welcome to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome to PackLox'), findsNothing);
   });
 
   testWidgets('onboarding does not reappear after completion', (
@@ -113,7 +114,7 @@ void main() {
     await tester.pumpCollectIqApp(onboardingCompleted: true);
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome to PackLox'), findsNothing);
     expect(find.text('Good Evening, Harry'), findsOneWidget);
   });
 
@@ -206,7 +207,7 @@ void main() {
     await tester.pumpCollectIqApp();
 
     expect(find.text('Good Evening, Harry'), findsOneWidget);
-    expect(find.text('Welcome back to CollectIQ AI'), findsOneWidget);
+    expect(find.text('Welcome back to PackLox'), findsOneWidget);
     expect(find.text('Scan Collectible'), findsOneWidget);
     expect(find.text('Build your collection dashboard'), findsOneWidget);
     expect(find.textContaining('price alerts, wishlist goals'), findsOneWidget);
@@ -631,7 +632,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isFalse);
-    expect(find.text('Welcome to CollectIQ AI'), findsOneWidget);
+    expect(find.text('Welcome to PackLox'), findsOneWidget);
   });
 
   testWidgets('settings signs in with mocked email auth repository', (
@@ -656,10 +657,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    final navigation = tester.widget<NavigationBar>(
+    final navigation = tester.widget<GlassBottomNavBar>(
       find.byKey(const ValueKey('bottom-navigation')),
     );
-    expect(navigation.selectedIndex, 0);
+    expect(navigation.currentIndex, 0);
     expect(find.text(AuthMessages.signedIn), findsOneWidget);
 
     await tester.tap(find.text('Settings'));
@@ -1086,7 +1087,7 @@ void main() {
       );
 
       await tester.tap(find.text('Settings'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(
         find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
@@ -1205,7 +1206,7 @@ void main() {
       find.text('Copying your photo into CollectIQ storage.'),
       findsOneWidget,
     );
-    expect(find.text('Welcome back to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome back to PackLox'), findsNothing);
 
     cameraService.complete();
     await tester.pumpUntilFound(find.text('Captured image'));
@@ -1229,7 +1230,7 @@ void main() {
     expect(find.text('AI Scanner'), findsOneWidget);
     expect(find.text('Captured image'), findsOneWidget);
     expect(find.text('Analyze with AI'), findsOneWidget);
-    expect(find.text('Welcome back to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
   testWidgets('lost Android camera data recovers to Scan tab', (
@@ -1245,7 +1246,7 @@ void main() {
     expect(find.text('AI Scanner'), findsOneWidget);
     expect(find.text('Recovered image'), findsOneWidget);
     expect(find.text('Analyze with AI'), findsOneWidget);
-    expect(find.text('Welcome back to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
   testWidgets('gallery completion from Home CTA remains on Scan tab', (
@@ -1263,7 +1264,7 @@ void main() {
     expect(find.text('AI Scanner'), findsOneWidget);
     expect(find.text('Gallery image'), findsOneWidget);
     expect(find.text('Analyze with AI'), findsOneWidget);
-    expect(find.text('Welcome back to CollectIQ AI'), findsNothing);
+    expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
   testWidgets('scanner camera cancellation shows friendly message', (

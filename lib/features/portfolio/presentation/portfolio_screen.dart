@@ -1,4 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/portfolio/portfolio_ui.dart';
+import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -42,9 +44,16 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 }
 
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +62,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     final orderedItems = portfolioState.orderedItems;
     final visibleItems = _visibleItems(orderedItems);
+    final categories = _groupByCategory(visibleItems);
     final wishlistStatusByItemId = ref
         .watch(wishlistEntriesProvider)
         .maybeWhen<Map<String, WishlistStatus>>(
@@ -65,46 +75,81 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth >= 700
-                ? AppSpacing.xxl
-                : AppSpacing.lg;
-
-            return SingleChildScrollView(
-              key: const PageStorageKey<String>('portfolio-scroll-position'),
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.xl,
-                horizontalPadding,
-                AppSpacing.xxl,
-              ),
+      body: CustomScrollView(
+        key: const PageStorageKey<String>('portfolio-scroll-position'),
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: PortfolioHeroHeader(scrollController: _scrollController),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            sliver: SliverToBoxAdapter(
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 960),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Portfolio',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                      Row(
+                        children: [
+                          PortfolioActionTile(
+                            icon: Icons.sort,
+                            title: 'Sort',
+                            onTap: () => _showSortSheet(context),
+                          ),
+                          const SizedBox(width: 12),
+                          PortfolioActionTile(
+                            icon: Icons.filter_alt,
+                            title: 'Filter',
+                            onTap: () => _showFilterSheet(context),
+                          ),
+                          const SizedBox(width: 12),
+                          PortfolioActionTile(
+                            icon: Icons.add,
+                            title: 'Add Item',
+                            onTap: widget.onScanPressed,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Your collectible library',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 16),
+                      if (portfolioState.items.isNotEmpty) ...[
+                        PortfolioSectionCard(
+                          title: 'Find Items',
+                          subtitle: 'Search and refine your saved collectibles',
+                          child: _PortfolioControls(
+                            searchQuery: _searchQuery,
+                            sortMode: _sortMode,
+                            categoryFilter: _categoryFilter,
+                            onSearchChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                            onSortChanged: (value) {
+                              setState(() {
+                                _sortMode = value;
+                              });
+                            },
+                            onCategoryFilterChanged: (value) {
+                              setState(() {
+                                _categoryFilter = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                      PortfolioSectionCard(
+                        title: 'Portfolio Snapshot',
+                        subtitle: 'PackLox collection value and confidence',
+                        child: PortfolioSummaryCard(
+                          totalValue: portfolioState.totalValue,
+                          itemCount: portfolioState.itemCount,
+                          averageConfidence: _averageConfidence(orderedItems),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      PortfolioSummaryCard(
-                        totalValue: portfolioState.totalValue,
-                        itemCount: portfolioState.itemCount,
-                        averageConfidence: _averageConfidence(orderedItems),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
+                      const SizedBox(height: 32),
                       if (portfolioState.isLoading &&
                           portfolioState.items.isEmpty)
                         const Center(child: CircularProgressIndicator())
@@ -115,27 +160,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       else if (portfolioState.items.isEmpty)
                         PortfolioEmptyState(onScanPressed: widget.onScanPressed)
                       else ...[
-                        _PortfolioControls(
-                          searchQuery: _searchQuery,
-                          sortMode: _sortMode,
-                          categoryFilter: _categoryFilter,
-                          onSearchChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                          onSortChanged: (value) {
-                            setState(() {
-                              _sortMode = value;
-                            });
-                          },
-                          onCategoryFilterChanged: (value) {
-                            setState(() {
-                              _categoryFilter = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
                         if (visibleItems.isEmpty)
                           PortfolioNoSearchResultsState(
                             onResetFilters: () {
@@ -146,43 +170,69 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             },
                           )
                         else
-                          PortfolioItemsGrid(
-                            items: visibleItems,
-                            wishlistStatusByItemId: wishlistStatusByItemId,
-                            onRemoveItem: (id) => _confirmDelete(
-                              context,
-                              id,
-                              portfolioController,
+                          for (final category in categories) ...[
+                            CategoryHeader(
+                              title: category.name,
+                              subtitle:
+                                  '${category.items.length} ${category.items.length == 1 ? 'item' : 'items'}',
+                              gradientStyle: GradientStyle.tealEmerald,
                             ),
-                            onOpenItem: (item) {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CollectibleDetailPage(
-                                    item: item,
-                                    onDelete: (id) async {
-                                      final deleted = await _confirmDelete(
+                            const SizedBox(height: 12),
+                            Column(
+                              children: [
+                                for (
+                                  var i = 0;
+                                  i < category.items.length;
+                                  i++
+                                ) ...[
+                                  Transform.translate(
+                                    offset: Offset(0, i * 8.0),
+                                    child: PortfolioGlassItemCard(
+                                      key: ValueKey(
+                                        'portfolio-item-${category.items[i].id}',
+                                      ),
+                                      item: category.items[i],
+                                      index: i,
+                                      wishlistStatusLabel: _wishlistStatusLabel(
+                                        wishlistStatusByItemId[category
+                                            .items[i]
+                                            .id],
+                                      ),
+                                      onTap: () => _openItem(
                                         context,
-                                        id,
+                                        category.items[i],
                                         portfolioController,
-                                      );
-                                      if (deleted && context.mounted) {
-                                        Navigator.of(context).pop();
-                                      }
-                                      return deleted;
-                                    },
+                                      ),
+                                      onEdit: () => _openItem(
+                                        context,
+                                        category.items[i],
+                                        portfolioController,
+                                      ),
+                                      onShare: () => _showShareMessage(
+                                        context,
+                                        category.items[i],
+                                      ),
+                                      onDelete: () => _confirmDelete(
+                                        context,
+                                        category.items[i].id,
+                                        portfolioController,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                  const SizedBox(height: 16),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 36),
+                          ],
                       ],
                     ],
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -214,6 +264,23 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       };
     });
     return filteredItems;
+  }
+
+  List<_PortfolioCategorySection> _groupByCategory(
+    List<CollectibleItem> items,
+  ) {
+    final sections = <String, List<CollectibleItem>>{};
+    for (final item in items) {
+      final name = item.category.trim().isEmpty
+          ? 'Other'
+          : item.category.trim();
+      sections.putIfAbsent(name, () => []).add(item);
+    }
+
+    return [
+      for (final entry in sections.entries)
+        _PortfolioCategorySection(name: entry.key, items: entry.value),
+    ];
   }
 
   bool _matchesCategoryFilter(
@@ -286,6 +353,141 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     await portfolioController.removeItem(itemId);
     return true;
   }
+
+  void _openItem(
+    BuildContext context,
+    CollectibleItem item,
+    PortfolioController portfolioController,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CollectibleDetailPage(
+          item: item,
+          onDelete: (id) async {
+            final deleted = await _confirmDelete(
+              context,
+              id,
+              portfolioController,
+            );
+            if (deleted && context.mounted) {
+              Navigator.of(context).pop();
+            }
+            return deleted;
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showShareMessage(BuildContext context, CollectibleItem item) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Share ready for ${item.title}')));
+  }
+
+  Future<void> _showSortSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<_PortfolioSortMode>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => _PortfolioPickerSheet<_PortfolioSortMode>(
+        title: 'Sort Collections',
+        selectedValue: _sortMode,
+        values: _PortfolioSortMode.values,
+        labelFor: (value) => value.label,
+      ),
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() => _sortMode = selected);
+  }
+
+  Future<void> _showFilterSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<_PortfolioCategoryFilter>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => _PortfolioPickerSheet<_PortfolioCategoryFilter>(
+        title: 'Filter Collections',
+        selectedValue: _categoryFilter,
+        values: _PortfolioCategoryFilter.values,
+        labelFor: (value) => value.label,
+      ),
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() => _categoryFilter = selected);
+  }
+}
+
+class _PortfolioCategorySection {
+  const _PortfolioCategorySection({required this.name, required this.items});
+
+  final String name;
+  final List<CollectibleItem> items;
+}
+
+class _PortfolioPickerSheet<T> extends StatelessWidget {
+  const _PortfolioPickerSheet({
+    required this.title,
+    required this.selectedValue,
+    required this.values,
+    required this.labelFor,
+  });
+
+  final String title;
+  final T selectedValue;
+  final List<T> values;
+  final String Function(T value) labelFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final value in values)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(labelFor(value)),
+                trailing: selectedValue == value
+                    ? Icon(
+                        Icons.check_circle,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.of(context).pop(value),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String? _wishlistStatusLabel(WishlistStatus? status) {
+  return switch (status) {
+    WishlistStatus.owned => 'Owned',
+    WishlistStatus.wanted => 'Wanted',
+    WishlistStatus.missing => 'Missing',
+    null => null,
+  };
 }
 
 void _logPortfolioOrder(List<CollectibleItem> items) {

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
+import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
@@ -123,6 +125,10 @@ class _AppShellState extends ConsumerState<AppShell>
         child: HomeScreen(onScanPressed: _startNewScan),
       ),
       KeyedSubtree(
+        key: const ValueKey('screen-portfolio'),
+        child: PortfolioScreen(onScanPressed: _startNewScan),
+      ),
+      KeyedSubtree(
         key: const ValueKey('screen-scan'),
         child: ScannerScreen(
           onViewPortfolio: () => _selectTab(
@@ -130,10 +136,6 @@ class _AppShellState extends ConsumerState<AppShell>
             reason: 'scan-view-portfolio',
           ),
         ),
-      ),
-      KeyedSubtree(
-        key: const ValueKey('screen-portfolio'),
-        child: PortfolioScreen(onScanPressed: _startNewScan),
       ),
       const KeyedSubtree(
         key: ValueKey('screen-settings'),
@@ -148,35 +150,35 @@ class _AppShellState extends ConsumerState<AppShell>
         index: selectedIndex,
         children: tabs,
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: GlassBottomNavBar(
         key: const ValueKey('bottom-navigation'),
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (index) =>
-            _selectTab(index, reason: 'bottom-navigation'),
-        destinations: const [
-          NavigationDestination(
+        currentIndex: selectedIndex,
+        onTap: (index) => _selectTab(index, reason: 'bottom-navigation'),
+        items: const [
+          NavBarItem(
             key: ValueKey('nav-home'),
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon: Icons.home_rounded,
             label: 'Home',
+            isActive: false,
           ),
-          NavigationDestination(
-            key: ValueKey('nav-scan'),
-            icon: Icon(Icons.document_scanner_outlined),
-            selectedIcon: Icon(Icons.document_scanner),
-            label: 'Scan',
-          ),
-          NavigationDestination(
+          NavBarItem(
             key: ValueKey('nav-portfolio'),
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
+            icon: Icons.inventory_2_rounded,
             label: 'Portfolio',
+            isActive: false,
           ),
-          NavigationDestination(
+          NavBarItem(
+            key: ValueKey('nav-scan'),
+            icon: Icons.camera_alt_rounded,
+            label: 'Scan',
+            isActive: false,
+            gradientStyle: GradientStyle.purpleDeepBlue,
+          ),
+          NavBarItem(
             key: ValueKey('nav-settings'),
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+            icon: Icons.settings_rounded,
             label: 'Settings',
+            isActive: false,
           ),
         ],
       ),

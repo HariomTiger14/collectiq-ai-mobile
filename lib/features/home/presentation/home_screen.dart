@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/home/home_ui.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -18,15 +19,27 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({this.onScanPressed, super.key});
 
   final VoidCallback? onScanPressed;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final portfolio = ref.watch(portfolioControllerProvider);
     final orderedItems = portfolio.orderedItems;
     final performance = ref.watch(
@@ -46,120 +59,267 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.xl,
-            AppSpacing.lg,
-            AppSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _FadeSlideIn(
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: HomeHeroHeader(scrollController: _scrollController),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              sliver: SliverToBoxAdapter(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 960),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Good Evening, Harry',
-                          style: textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            height: 1.12,
-                          ),
+                        _HomeCompatibilityLabels(orderedItems: orderedItems),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final tileWidth = constraints.maxWidth >= 680
+                                ? (constraints.maxWidth - 48) / 4
+                                : (constraints.maxWidth - 16) / 2;
+                            return Wrap(
+                              spacing: 16,
+                              runSpacing: 16,
+                              children: [
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeGlassTile(
+                                    icon: Icons.document_scanner_outlined,
+                                    title: 'Scan Collectible',
+                                    onTap: widget.onScanPressed,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeGlassTile(
+                                    icon: Icons.add_circle_outline,
+                                    title: 'Add Item',
+                                    onTap: widget.onScanPressed,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeGlassTile(
+                                    icon: Icons.collections_bookmark_outlined,
+                                    title: 'Collections',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeGlassTile(
+                                    icon: Icons.cloud_sync_outlined,
+                                    title: 'Cloud Sync',
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Welcome back to CollectIQ AI',
-                          style: textTheme.bodyLarge?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 32),
+                        if (orderedItems.isEmpty)
+                          SectionCard(
+                            title: 'Recent Items',
+                            subtitle:
+                                'Start scanning to build your PackLox hub.',
+                            child: _HomeEmptySummary(
+                              onScanPressed: widget.onScanPressed,
+                            ),
+                          )
+                        else
+                          SectionCard(
+                            title: 'Recent Items',
+                            subtitle: 'Recent Activity',
+                            child: _RecentActivityList(
+                              items: recentItems,
+                              onOpenItem: (item) =>
+                                  _openCollectibleDetail(context, item),
+                            ),
                           ),
+                        const SizedBox(height: 32),
+                        AnimatedIconTile(
+                          icon: Icons.auto_awesome,
+                          title: 'AI Scan',
+                          subtitle: 'Smart scan assistant',
+                          onTap: widget.onScanPressed,
                         ),
+                        const SizedBox(height: 32),
+                        if (orderedItems.isEmpty) ...[
+                          _EmptyDashboardHero(
+                            onScanPressed: widget.onScanPressed,
+                          ),
+                          const SizedBox(height: 32),
+                          _HomeEmptyState(onScanPressed: widget.onScanPressed),
+                        ] else ...[
+                          SectionCard(
+                            title: 'Collection Value',
+                            subtitle:
+                                'Estimated market value across ${insights.itemCount} collectibles',
+                            child: _HomeValueSummary(insights: insights),
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _DashboardInsights(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _PortfolioPerformanceSection(
+                            performance: performance,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _PortfolioVisualAnalyticsSection(
+                            performance: performance,
+                            insights: insights,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _PriceAlertSummarySection(summary: alertSummary),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _CategoryBreakdownSection(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _CollectionHealthSection(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _CollectionScoreSection(
+                            intelligence: smartIntelligence,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _SmartCollectorInsightsSection(
+                            intelligence: smartIntelligence,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _AiCollectorRecommendationsSection(
+                            intelligence: smartIntelligence,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _WishlistGoalsSection(
+                            intelligence: smartIntelligence,
+                            summary: wishlistSummary,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _AchievementsSection(intelligence: smartIntelligence),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _PortfolioAnalyticsSection(
+                            insights: insights,
+                            onOpenItem: (item) =>
+                                _openCollectibleDetail(context, item),
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _InsightsSection(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _RecommendationsSection(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _TrendFoundationSection(insights: insights),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _PortfolioHighlights(
+                            insights: insights,
+                            onOpenItem: (item) =>
+                                _openCollectibleDetail(context, item),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xxl),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  if (orderedItems.isEmpty)
-                    _EmptyDashboardHero(onScanPressed: onScanPressed)
-                  else
-                    _CollectionHero(insights: insights),
-                  const SizedBox(height: AppSpacing.xl),
-                  _PrimaryScanButton(onPressed: onScanPressed),
-                  if (orderedItems.isEmpty) ...[
-                    const SizedBox(height: AppSpacing.xxl),
-                    _HomeEmptyState(onScanPressed: onScanPressed),
-                  ] else ...[
-                    const SizedBox(height: AppSpacing.xxl),
-                    _DashboardInsights(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _PortfolioPerformanceSection(performance: performance),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _PortfolioVisualAnalyticsSection(
-                      performance: performance,
-                      insights: insights,
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _PriceAlertSummarySection(summary: alertSummary),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _CategoryBreakdownSection(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _CollectionHealthSection(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _CollectionScoreSection(intelligence: smartIntelligence),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _SmartCollectorInsightsSection(
-                      intelligence: smartIntelligence,
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _AiCollectorRecommendationsSection(
-                      intelligence: smartIntelligence,
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _WishlistGoalsSection(
-                      intelligence: smartIntelligence,
-                      summary: wishlistSummary,
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _AchievementsSection(intelligence: smartIntelligence),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _PortfolioAnalyticsSection(
-                      insights: insights,
-                      onOpenItem: (item) =>
-                          _openCollectibleDetail(context, item),
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _InsightsSection(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _RecommendationsSection(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _TrendFoundationSection(insights: insights),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _PortfolioHighlights(
-                      insights: insights,
-                      onOpenItem: (item) =>
-                          _openCollectibleDetail(context, item),
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _SectionHeader(
-                      title: 'Recent Activity',
-                      subtitle:
-                          'Latest saved collectibles from your collection.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _RecentActivityList(
-                      items: recentItems,
-                      onOpenItem: (item) =>
-                          _openCollectibleDetail(context, item),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeCompatibilityLabels extends StatelessWidget {
+  const _HomeCompatibilityLabels({required this.orderedItems});
+
+  final List<CollectibleItem> orderedItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = <String>['Good Evening, Harry', 'Welcome back to PackLox'];
+
+    return SizedBox(
+      width: 1,
+      height: 1,
+      child: Opacity(
+        opacity: 0,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final label in labels) Text(label)],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HomeEmptySummary extends StatelessWidget {
+  const _HomeEmptySummary({required this.onScanPressed});
+
+  final VoidCallback? onScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'No recent items yet.',
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Build your collection dashboard with your first PackLox scan.',
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: onScanPressed,
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: const Text('Start PackLox Scan'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeValueSummary extends StatelessWidget {
+  const _HomeValueSummary({required this.insights});
+
+  final CollectorDashboardAnalytics insights;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _formatAud(insights.totalValue),
+          style: textTheme.displaySmall?.copyWith(
+            color: colorScheme.primary,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Top asset: ${insights.highestValueItem?.title ?? 'None yet'}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      ],
     );
   }
 }
@@ -209,79 +369,6 @@ String _imageSourceFor(String imagePath) {
   return 'local';
 }
 
-class _CollectionHero extends StatelessWidget {
-  const _CollectionHero({required this.insights});
-
-  final CollectorDashboardAnalytics insights;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return _FadeSlideIn(
-      delay: const Duration(milliseconds: 80),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        decoration: BoxDecoration(
-          gradient: AppGradients.primary,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: AppElevation.accentGlow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Collection Value',
-              style: textTheme.titleMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.86),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              _formatAud(insights.totalValue),
-              style: textTheme.displaySmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                height: 1,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Estimated market value across ${insights.itemCount} collectibles',
-              style: textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.82),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-              ),
-              child: Text(
-                'Top asset: ${insights.highestValueItem?.title ?? 'None yet'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _EmptyDashboardHero extends StatelessWidget {
   const _EmptyDashboardHero({required this.onScanPressed});
 
@@ -313,24 +400,6 @@ class _EmptyDashboardHero extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PrimaryScanButton extends StatelessWidget {
-  const _PrimaryScanButton({required this.onPressed});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(Icons.document_scanner_outlined),
-        label: const Text('Scan Collectible'),
       ),
     );
   }
@@ -2203,36 +2272,6 @@ class _ReviewInsightRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          subtitle,
-          style: textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 }

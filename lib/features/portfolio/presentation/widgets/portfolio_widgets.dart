@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
@@ -247,21 +248,24 @@ class PortfolioItemsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return MotionStagger(
       children: [
-        for (final item in items) ...[
-          SizedBox(
-            key: ValueKey('portfolio-item-${item.id}'),
-            width: double.infinity,
-            child: _PortfolioItemCard(
-              item: item,
-              wishlistStatus: wishlistStatusByItemId[item.id],
-              onTap: () => onOpenItem(item),
-              onRemove: () => onRemoveItem(item.id),
+        for (var index = 0; index < items.length; index++)
+          Padding(
+            key: ValueKey('portfolio-item-${items[index].id}'),
+            padding: EdgeInsets.only(
+              bottom: index == items.length - 1 ? 0 : AppSpacing.lg,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: _PortfolioItemCard(
+                item: items[index],
+                wishlistStatus: wishlistStatusByItemId[items[index].id],
+                onTap: () => onOpenItem(items[index]),
+                onRemove: () => onRemoveItem(items[index].id),
+              ),
             ),
           ),
-          if (item != items.last) const SizedBox(height: AppSpacing.lg),
-        ],
       ],
     );
   }

@@ -8,10 +8,18 @@ import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/api_client.dart' as network;
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/widgets/glass_card.dart';
+import 'package:collectiq_ai/core/widgets/gradient_header.dart';
+import 'package:collectiq_ai/core/widgets/modern_settings_row.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
+import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/widgets/auth_access_panel.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
+import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -38,6 +46,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _scrollController = ScrollController();
   Timer? _resendCountdownTimer;
   bool _isManualCloudSyncing = false;
 
@@ -54,6 +63,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void dispose() {
     _resendCountdownTimer?.cancel();
+    _scrollController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -102,9 +112,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
-            AppSpacing.xl,
+            AppSpacing.lg,
             AppSpacing.lg,
             AppSpacing.xxl,
           ),
@@ -114,290 +125,711 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Settings',
-                    style: textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  SettingsHeroHeader(scrollController: _scrollController),
+                  const SizedBox(height: 32),
+                  _SectionStack(
+                    index: 0,
+                    child: _SettingsCard(
+                      title: 'Account',
+                      stackLevel: 0,
+                      children: [
+                        IdentityBlock(authState: authState),
+                        _SettingsRow(
+                          icon: Icons.account_circle_outlined,
+                          title: 'Profile info',
+                          subtitle: authState.isSignedIn
+                              ? authState.user?.displayName ?? 'Cloud profile'
+                              : 'Guest profile keeps local collection access available.',
+                          trailing: authState.isSignedIn ? 'Cloud' : 'Guest',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.alternate_email_outlined,
+                          title: 'Email',
+                          subtitle:
+                              authState.user?.email ??
+                              'Add an email account to enable cloud sync.',
+                          trailing: authState.isSignedIn
+                              ? 'Verified'
+                              : 'Not set',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.lock_outline,
+                          title: 'Password',
+                          subtitle: authState.isSignedIn
+                              ? 'Password is managed securely by Supabase Auth.'
+                              : 'Use email and password to create or access an account.',
+                          trailing: authState.isSignedIn
+                              ? 'Managed'
+                              : 'Optional',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.logout_outlined,
+                          title: 'Sign Out',
+                          subtitle: authState.isSignedIn
+                              ? 'Use the Account Access panel below to sign out.'
+                              : 'You are currently using local-first guest access.',
+                          trailing: authState.isSignedIn
+                              ? 'Available'
+                              : 'Guest',
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Manage account and cloud sync options.',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  _SettingsCompatibilityLabels(
+                    authState: authState,
+                    supabaseConfig: supabaseConfig,
+                    subscriptionState: subscriptionState,
+                    diagnostics: diagnostics,
+                    syncState: syncState,
+                    imageSyncState: imageSyncState,
+                    cloudRegistry: cloudRegistry,
+                    apiConfig: apiConfig,
+                  ),
+                  const SizedBox(height: 36),
+                  _SettingsEntrance(
+                    child: AuthAccessPanel(
+                      emailController: _emailController,
+                      passwordController: _passwordController,
+                      authState: authState,
+                      onSignIn: () => _submitEmailAuth(signUp: false),
+                      onSignUp: () => _submitEmailAuth(signUp: true),
+                      onResendConfirmation: () => _resendConfirmationEmail(),
+                      onForgotPassword: () => _sendPasswordResetEmail(),
+                      onSignOut: authState.isSignedIn
+                          ? () => ref
+                                .read(authControllerProvider.notifier)
+                                .signOut()
+                          : null,
+                      syncStatusLabel: syncState.status.statusLabel,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'SIT Readiness',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.route_outlined,
-                        title: 'Environment',
-                        subtitle: isSitEnvironment
-                            ? 'System integration test mode is active.'
-                            : 'Run CollectIQ SIT with APP_ENV=sit for cloud validation.',
-                        trailing: cloudRegistry.config.environment.label,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.cloud_done_outlined,
-                        title: 'Supabase configured',
-                        subtitle: supabaseConfig.isConfigured
-                            ? 'Supabase URL and anon key are present.'
-                            : 'Setup required: provide SUPABASE_URL and SUPABASE_ANON_KEY in config/sit.env or dart-defines.',
-                        trailing: supabaseConfig.isConfigured ? 'Yes' : 'No',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.link_outlined,
-                        title: 'Supabase URL configured',
-                        subtitle: supabaseConfig.hasUrl
-                            ? 'SUPABASE_URL was included in the app config.'
-                            : 'Missing SUPABASE_URL in SIT config.',
-                        trailing: supabaseConfig.hasUrl ? 'Yes' : 'No',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.vpn_key_outlined,
-                        title: 'Supabase anon key configured',
-                        subtitle: supabaseConfig.hasAnonKey
-                            ? 'SUPABASE_ANON_KEY was included in the app config.'
-                            : 'Missing SUPABASE_ANON_KEY in SIT config.',
-                        trailing: supabaseConfig.hasAnonKey ? 'Yes' : 'No',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.password_outlined,
-                        title: 'Supabase anon key length',
-                        subtitle:
-                            'Masked diagnostic only. The key value is never shown.',
-                        trailing: supabaseConfig.maskedAnonKeyLengthLabel,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.person_outline,
-                        title: 'Auth status',
-                        subtitle: authState.isSignedIn
-                            ? authState.user?.email ??
-                                  authState.user?.id ??
-                                  'Signed in'
-                            : authState.isAnonymousCloudSession
-                            ? 'Anonymous/dev session detected. Sign in with email/password for real SIT sync.'
-                            : 'Signed out. Sign in with email/password before cloud sync.',
-                        trailing: authState.isSignedIn
-                            ? 'Signed in'
-                            : authState.isAnonymousCloudSession
-                            ? 'Anonymous'
-                            : 'Signed out',
-                      ),
-                      if (isSitEnvironment) ...[
-                        _SettingsRow(
-                          icon: Icons.mark_email_unread_outlined,
-                          title: 'Pending confirmation email',
+                  const SizedBox(height: 36),
+                  _SectionStack(
+                    index: 1,
+                    child: _SettingsCard(
+                      title: 'App Preferences',
+                      stackLevel: 1,
+                      children: [
+                        const _SettingsRow(
+                          icon: Icons.g_mobiledata_outlined,
+                          title: 'Google Sign-In',
                           subtitle:
-                              'Masked diagnostic for confirmation resend troubleshooting.',
-                          trailing: _maskedEmail(
-                            authState.pendingConfirmationEmail,
-                          ),
+                              'OAuth provider placeholder. No Google keys are bundled.',
+                          trailing: 'Coming soon',
+                          message: 'Google Sign-In is coming soon.',
                         ),
                         _SettingsRow(
-                          icon: Icons.history_outlined,
-                          title: 'Last resend attempted',
-                          subtitle:
-                              'Shows when the app last asked Supabase to resend confirmation.',
-                          trailing: _formatDiagnosticDate(
-                            authState.lastResendAttemptedAt,
-                          ),
-                        ),
-                        _SettingsRow(
-                          icon: Icons.fact_check_outlined,
-                          title: 'Last resend status',
-                          subtitle:
-                              'Sent, rate-limited, failed, or none for this app session.',
-                          trailing: authState.lastResendStatus,
-                        ),
-                        _SettingsRow(
-                          icon: Icons.timer_outlined,
-                          title: 'Cooldown remaining',
-                          subtitle:
-                              'Active resend wait time from success or Supabase rate-limit response.',
-                          trailing: _formatDiagnosticDuration(
-                            authState.activeResendCooldownRemaining(now),
-                          ),
-                        ),
-                        _SettingsRow(
-                          icon: Icons.block_outlined,
-                          title: 'Cooldown source',
-                          subtitle:
-                              'Success, retry-after, fallback, app-limit, or none.',
-                          trailing: authState.resendCooldownSource,
-                        ),
-                        _SettingsRow(
-                          icon: Icons.lock_reset_outlined,
-                          title: 'Password recovery redirect',
-                          subtitle:
-                              'Exact redirect URL the app asks Supabase to place in reset emails.',
-                          trailing:
-                              authState.lastPasswordResetRedirectUrl ??
-                              SupabaseService.passwordResetRedirectUri,
-                        ),
-                        _SettingsRow(
-                          icon: Icons.manage_history_outlined,
-                          title: 'Last password reset status',
-                          subtitle:
-                              'Sent, rate-limited, failed, blocked, or none for this app session.',
-                          trailing: authState.lastPasswordResetStatus,
-                        ),
-                        _SettingsRow(
-                          icon: Icons.timer_outlined,
-                          title: 'Password reset cooldown',
-                          subtitle:
-                              'Active wait time after reset email success or Supabase rate-limit response.',
-                          trailing: _formatDiagnosticDuration(
-                            authState.activePasswordResetCooldownRemaining(now),
-                          ),
-                        ),
-                        _SettingsRow(
-                          icon: Icons.rule_outlined,
-                          title: 'Password reset cooldown source',
-                          subtitle: 'Success, retry-after, fallback, or none.',
-                          trailing: authState.passwordResetCooldownSource,
+                          icon: Icons.palette_outlined,
+                          title: 'Theme',
+                          subtitle: 'PackLox follows your system appearance.',
+                          trailing: 'System',
+                          message: 'Theme follows the system setting for now.',
                         ),
                         const _SettingsRow(
-                          icon: Icons.tips_and_updates_outlined,
-                          title: 'Testing email tip',
-                          subtitle: AuthMessages.confirmationTestingTip,
-                          trailing: 'SIT only',
-                        ),
-                        _SettingsRow(
-                          icon: Icons.manage_search_outlined,
-                          title: 'Last auth attempt',
-                          subtitle: lastAuthAttempt == null
-                              ? 'No Supabase auth response captured this session.'
-                              : 'Action ${lastAuthAttempt.actionLabel}, status ${lastAuthAttempt.httpStatus ?? 'none'}, body ${lastAuthAttempt.bodyType}.',
-                          trailing:
-                              lastAuthAttempt?.statusLabel ?? 'Not captured',
-                        ),
-                        _SettingsRow(
-                          icon: Icons.key_outlined,
-                          title: 'Last auth response keys',
+                          icon: Icons.apple,
+                          title: 'Apple Sign-In',
                           subtitle:
-                              'Keys only. Tokens, passwords, and full response bodies are never shown.',
-                          trailing: lastAuthAttempt?.keysLabel ?? 'none',
+                              'OAuth provider placeholder. No Apple keys are bundled.',
+                          trailing: 'Coming soon',
+                          message: 'Apple Sign-In is coming soon.',
                         ),
                         _SettingsRow(
-                          icon: Icons.verified_user_outlined,
-                          title: 'Last auth response shape',
-                          subtitle: lastAuthAttempt == null
-                              ? 'No sanitized response metadata yet.'
-                              : 'user=${lastAuthAttempt.hasUser}, session=${lastAuthAttempt.hasSession}, id=${lastAuthAttempt.hasDirectId}, email=${lastAuthAttempt.hasDirectEmail}, confirmation=${lastAuthAttempt.hasConfirmationSentAt}',
-                          trailing: _formatDiagnosticDate(
-                            lastAuthAttempt?.timestamp,
+                          icon: Icons.notifications_none_outlined,
+                          title: 'Price alert notifications',
+                          subtitle: notificationState.settingsSubtitle,
+                          trailing: notificationState.settingsStatusLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.admin_panel_settings_outlined,
+                          title: 'Notification permission',
+                          subtitle:
+                              'Android notification permission controls local price alerts.',
+                          trailing: notificationState.permissionStatus.label,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.tips_and_updates_outlined,
+                          title: 'First-launch onboarding',
+                          subtitle:
+                              'Replay the welcome guide and local-first setup notes.',
+                          trailing: 'Available',
+                          message: 'Use Reset Onboarding below to replay it.',
+                        ),
+                        _OnboardingResetPanel(
+                          onReset: () => _resetOnboarding(context),
+                        ),
+                        _NotificationActionsPanel(
+                          state: notificationState,
+                          onToggleEnabled: (enabled) => ref
+                              .read(
+                                priceAlertNotificationControllerProvider
+                                    .notifier,
+                              )
+                              .setEnabled(enabled),
+                          onRequestPermission: () => ref
+                              .read(
+                                priceAlertNotificationControllerProvider
+                                    .notifier,
+                              )
+                              .requestPermission(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  _SectionStack(
+                    index: 2,
+                    child: _SettingsCard(
+                      title: 'Cloud & Sync',
+                      stackLevel: 2,
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.cloud_sync_outlined,
+                          title: 'Cloud Sync',
+                          subtitle: canRunCloudSync
+                              ? 'Cloud sync is available for this signed-in account.'
+                              : 'Cloud sync is disabled in this environment',
+                          trailing: canRunCloudSync ? 'Ready' : 'Local only',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const CloudSyncScreen(),
+                            ),
                           ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_done_outlined,
+                          title: 'Cloud sync status',
+                          subtitle:
+                              syncState.errorMessage ??
+                              syncState.status.message,
+                          trailing: syncState.status.statusLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.backup_outlined,
+                          title: 'Backup',
+                          subtitle:
+                              'Portfolio metadata and images sync when cloud services are configured.',
+                          trailing: syncState.status.isCloudBackupEnabled
+                              ? 'On'
+                              : 'Off',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.restore_outlined,
+                          title: 'Restore',
+                          subtitle:
+                              'Signed-in cloud items merge safely during manual sync.',
+                          trailing: canRunCloudSync ? 'Ready' : 'Unavailable',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.pending_actions_outlined,
+                          title: 'Pending uploads',
+                          subtitle:
+                              'Local images remain usable while upload work is queued.',
+                          trailing: imageSyncState.snapshot.readyToSyncCount
+                              .toString(),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_queue_outlined,
+                          title: 'Supabase Storage',
+                          subtitle:
+                              'Cloud image storage requires Supabase setup and is not enabled in local mode.',
+                          trailing: 'Requires setup',
+                          message:
+                              'Supabase Storage requires cloud setup and is disabled in local mode.',
+                        ),
+                        _CloudSyncActionPanel(
+                          canRunCloudSync: canRunCloudSync,
+                          isSyncing:
+                              _isManualCloudSyncing ||
+                              syncState.isLoading ||
+                              imageSyncState.isUploading,
+                          onSync: () => _manualCloudSync(ref, cloudRegistry),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  _SectionStack(
+                    index: 3,
+                    child: _SettingsCard(
+                      title: 'AI & Scanning',
+                      stackLevel: 3,
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_outlined,
+                          title: 'Current AI provider',
+                          subtitle: aiProviderConfig.selectedProviderMessage,
+                          trailing: aiProviderConfig.type.isAvailable
+                              ? aiProviderConfig.type.displayName
+                              : 'Unavailable',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.document_scanner_outlined,
+                          title: 'Scan quality',
+                          subtitle:
+                              'Camera and gallery scans stay available locally.',
+                          trailing: 'High',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.science_outlined,
+                          title: 'Mock mode active',
+                          subtitle:
+                              'No external AI calls run while mock analysis is selected.',
+                          trailing:
+                              aiProviderConfig.type ==
+                                  AiAnalysisProviderType.mock
+                              ? 'Active'
+                              : 'Off',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.visibility_outlined,
+                          title:
+                              AiAnalysisProviderType.openAiVision.displayName,
+                          subtitle:
+                              'Backend-only provider option prepared for future scanning.',
+                          trailing: _providerOptionStatus(
+                            config: aiProviderConfig,
+                            type: AiAnalysisProviderType.openAiVision,
+                            backendConfigured:
+                                aiProviderConfig.hasBackendAnalysisEndpoint,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_motion_outlined,
+                          title:
+                              AiAnalysisProviderType.geminiVision.displayName,
+                          subtitle:
+                              'Future backend-only provider. API keys must stay server-side.',
+                          trailing: _providerOptionStatus(
+                            config: aiProviderConfig,
+                            type: AiAnalysisProviderType.geminiVision,
+                            backendConfigured:
+                                aiProviderConfig.hasBackendAnalysisEndpoint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  _SectionStack(
+                    index: 4,
+                    child: _DeveloperToolsSection(
+                      isSitEnvironment: isSitEnvironment,
+                      authState: authState,
+                      supabaseConfig: supabaseConfig,
+                      lastAuthAttempt: lastAuthAttempt,
+                      lastDeepLink: lastDeepLink,
+                      apiConfig: apiConfig,
+                      diagnostics: diagnostics,
+                      syncState: syncState,
+                      cloudRegistry: cloudRegistry,
+                      now: now,
+                      maskedEmail: _maskedEmail,
+                      formatDiagnosticDate: _formatDiagnosticDate,
+                      formatDiagnosticDuration: _formatDiagnosticDuration,
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  _SectionStack(
+                    index: 5,
+                    child: _SettingsCard(
+                      title: 'About & Help',
+                      stackLevel: 1,
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.info_outline_rounded,
+                          title: 'About PackLox',
+                          subtitle:
+                              'Version, support links, privacy, terms, and platform details.',
+                          trailing: 'Open',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AboutScreen(),
+                            ),
+                          ),
+                        ),
+                        const _SettingsRow(
+                          icon: Icons.file_download_outlined,
+                          title: 'Export portfolio',
+                          subtitle:
+                              'Portfolio export will be available in a future release.',
+                          trailing: 'Soon',
+                          message: 'Portfolio export is coming soon.',
+                        ),
+                        const _SettingsRow(
+                          icon: Icons.cloud_queue_outlined,
+                          title: 'Local vs cloud mode',
+                          subtitle:
+                              'Local mode works without sign-in. Cloud sync is optional when configured.',
+                          trailing: 'Local-first',
+                          message:
+                              'Local mode is active. Cloud sync requires explicit dev or staging setup.',
+                        ),
+                        const _SettingsRow(
+                          icon: Icons.mail_outline,
+                          title: 'Contact',
+                          subtitle:
+                              'Support contact details will be added before release.',
+                          trailing: 'Soon',
+                          message: 'Contact support is coming soon.',
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_showLegacySettingsForTransition()) ...[
+                    _SettingsCard(
+                      title: 'SIT Readiness',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.route_outlined,
+                          title: 'Environment',
+                          subtitle: isSitEnvironment
+                              ? 'System integration test mode is active.'
+                              : 'Run CollectIQ SIT with APP_ENV=sit for cloud validation.',
+                          trailing: cloudRegistry.config.environment.label,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_done_outlined,
+                          title: 'Supabase configured',
+                          subtitle: supabaseConfig.isConfigured
+                              ? 'Supabase URL and anon key are present.'
+                              : 'Setup required: provide SUPABASE_URL and SUPABASE_ANON_KEY in config/sit.env or dart-defines.',
+                          trailing: supabaseConfig.isConfigured ? 'Yes' : 'No',
                         ),
                         _SettingsRow(
                           icon: Icons.link_outlined,
-                          title: 'Last deep link received',
-                          subtitle: lastDeepLink == null
-                              ? 'No auth callback link captured this session.'
-                              : 'scheme=${lastDeepLink.scheme ?? 'none'}, host=${lastDeepLink.host ?? 'none'}, path=${lastDeepLink.path ?? 'none'}',
-                          trailing: lastDeepLink?.receivedLabel ?? 'No',
+                          title: 'Supabase URL configured',
+                          subtitle: supabaseConfig.hasUrl
+                              ? 'SUPABASE_URL was included in the app config.'
+                              : 'Missing SUPABASE_URL in SIT config.',
+                          trailing: supabaseConfig.hasUrl ? 'Yes' : 'No',
                         ),
                         _SettingsRow(
-                          icon: Icons.rule_outlined,
-                          title: 'Last deep link result',
-                          subtitle:
-                              lastDeepLink?.errorMessage ??
-                              'Callback result is shown without token values.',
-                          trailing: lastDeepLink?.resultLabel ?? 'none',
+                          icon: Icons.vpn_key_outlined,
+                          title: 'Supabase anon key configured',
+                          subtitle: supabaseConfig.hasAnonKey
+                              ? 'SUPABASE_ANON_KEY was included in the app config.'
+                              : 'Missing SUPABASE_ANON_KEY in SIT config.',
+                          trailing: supabaseConfig.hasAnonKey ? 'Yes' : 'No',
                         ),
                         _SettingsRow(
-                          icon: Icons.key_off_outlined,
-                          title: 'Last deep link query keys',
+                          icon: Icons.password_outlined,
+                          title: 'Supabase anon key length',
                           subtitle:
-                              'Keys only. Access tokens and refresh tokens are never shown.',
-                          trailing: lastDeepLink?.queryKeysLabel ?? 'none',
+                              'Masked diagnostic only. The key value is never shown.',
+                          trailing: supabaseConfig.maskedAnonKeyLengthLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.person_outline,
+                          title: 'Auth status',
+                          subtitle: authState.isSignedIn
+                              ? authState.user?.email ??
+                                    authState.user?.id ??
+                                    'Signed in'
+                              : authState.isAnonymousCloudSession
+                              ? 'Anonymous/dev session detected. Sign in with email/password for real SIT sync.'
+                              : 'Signed out. Sign in with email/password before cloud sync.',
+                          trailing: authState.isSignedIn
+                              ? 'Signed in'
+                              : authState.isAnonymousCloudSession
+                              ? 'Anonymous'
+                              : 'Signed out',
+                        ),
+                        if (isSitEnvironment) ...[
+                          _SettingsRow(
+                            icon: Icons.mark_email_unread_outlined,
+                            title: 'Pending confirmation email',
+                            subtitle:
+                                'Masked diagnostic for confirmation resend troubleshooting.',
+                            trailing: _maskedEmail(
+                              authState.pendingConfirmationEmail,
+                            ),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.history_outlined,
+                            title: 'Last resend attempted',
+                            subtitle:
+                                'Shows when the app last asked Supabase to resend confirmation.',
+                            trailing: _formatDiagnosticDate(
+                              authState.lastResendAttemptedAt,
+                            ),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.fact_check_outlined,
+                            title: 'Last resend status',
+                            subtitle:
+                                'Sent, rate-limited, failed, or none for this app session.',
+                            trailing: authState.lastResendStatus,
+                          ),
+                          _SettingsRow(
+                            icon: Icons.timer_outlined,
+                            title: 'Cooldown remaining',
+                            subtitle:
+                                'Active resend wait time from success or Supabase rate-limit response.',
+                            trailing: _formatDiagnosticDuration(
+                              authState.activeResendCooldownRemaining(now),
+                            ),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.block_outlined,
+                            title: 'Cooldown source',
+                            subtitle:
+                                'Success, retry-after, fallback, app-limit, or none.',
+                            trailing: authState.resendCooldownSource,
+                          ),
+                          _SettingsRow(
+                            icon: Icons.lock_reset_outlined,
+                            title: 'Password recovery redirect',
+                            subtitle:
+                                'Exact redirect URL the app asks Supabase to place in reset emails.',
+                            trailing:
+                                authState.lastPasswordResetRedirectUrl ??
+                                SupabaseService.passwordResetRedirectUri,
+                          ),
+                          _SettingsRow(
+                            icon: Icons.manage_history_outlined,
+                            title: 'Last password reset status',
+                            subtitle:
+                                'Sent, rate-limited, failed, blocked, or none for this app session.',
+                            trailing: authState.lastPasswordResetStatus,
+                          ),
+                          _SettingsRow(
+                            icon: Icons.timer_outlined,
+                            title: 'Password reset cooldown',
+                            subtitle:
+                                'Active wait time after reset email success or Supabase rate-limit response.',
+                            trailing: _formatDiagnosticDuration(
+                              authState.activePasswordResetCooldownRemaining(
+                                now,
+                              ),
+                            ),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.rule_outlined,
+                            title: 'Password reset cooldown source',
+                            subtitle:
+                                'Success, retry-after, fallback, or none.',
+                            trailing: authState.passwordResetCooldownSource,
+                          ),
+                          const _SettingsRow(
+                            icon: Icons.tips_and_updates_outlined,
+                            title: 'Testing email tip',
+                            subtitle: AuthMessages.confirmationTestingTip,
+                            trailing: 'SIT only',
+                          ),
+                          _SettingsRow(
+                            icon: Icons.manage_search_outlined,
+                            title: 'Last auth attempt',
+                            subtitle: lastAuthAttempt == null
+                                ? 'No Supabase auth response captured this session.'
+                                : 'Action ${lastAuthAttempt.actionLabel}, status ${lastAuthAttempt.httpStatus ?? 'none'}, body ${lastAuthAttempt.bodyType}.',
+                            trailing:
+                                lastAuthAttempt?.statusLabel ?? 'Not captured',
+                          ),
+                          _SettingsRow(
+                            icon: Icons.key_outlined,
+                            title: 'Last auth response keys',
+                            subtitle:
+                                'Keys only. Tokens, passwords, and full response bodies are never shown.',
+                            trailing: lastAuthAttempt?.keysLabel ?? 'none',
+                          ),
+                          _SettingsRow(
+                            icon: Icons.verified_user_outlined,
+                            title: 'Last auth response shape',
+                            subtitle: lastAuthAttempt == null
+                                ? 'No sanitized response metadata yet.'
+                                : 'user=${lastAuthAttempt.hasUser}, session=${lastAuthAttempt.hasSession}, id=${lastAuthAttempt.hasDirectId}, email=${lastAuthAttempt.hasDirectEmail}, confirmation=${lastAuthAttempt.hasConfirmationSentAt}',
+                            trailing: _formatDiagnosticDate(
+                              lastAuthAttempt?.timestamp,
+                            ),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.link_outlined,
+                            title: 'Last deep link received',
+                            subtitle: lastDeepLink == null
+                                ? 'No auth callback link captured this session.'
+                                : 'scheme=${lastDeepLink.scheme ?? 'none'}, host=${lastDeepLink.host ?? 'none'}, path=${lastDeepLink.path ?? 'none'}',
+                            trailing: lastDeepLink?.receivedLabel ?? 'No',
+                          ),
+                          _SettingsRow(
+                            icon: Icons.rule_outlined,
+                            title: 'Last deep link result',
+                            subtitle:
+                                lastDeepLink?.errorMessage ??
+                                'Callback result is shown without token values.',
+                            trailing: lastDeepLink?.resultLabel ?? 'none',
+                          ),
+                          _SettingsRow(
+                            icon: Icons.key_off_outlined,
+                            title: 'Last deep link query keys',
+                            subtitle:
+                                'Keys only. Access tokens and refresh tokens are never shown.',
+                            trailing: lastDeepLink?.queryKeysLabel ?? 'none',
+                          ),
+                        ],
+                        _SettingsRow(
+                          icon: Icons.storage_outlined,
+                          title: 'Storage sync',
+                          subtitle: supabaseConfig.isConfigured
+                              ? 'Bucket collectiq-portfolio-images is expected in Supabase.'
+                              : 'Storage requires Supabase setup.',
+                          trailing: supabaseConfig.isConfigured
+                              ? 'Ready'
+                              : 'Not ready',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.sync_outlined,
+                          title: 'Portfolio sync',
+                          subtitle: syncState.status.message,
+                          trailing: syncState.status.isCloudConnected
+                              ? 'Ready'
+                              : 'Not ready',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.http_outlined,
+                          title: 'AI backend URL configured',
+                          subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? apiConfig.baseUrl
+                              : 'Setup recommended: provide API_BASE_URL in config/sit.env for phone builds.',
+                          trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? 'Yes'
+                              : 'Default',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.api_outlined,
+                          title: 'API backend configured',
+                          subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? 'API_BASE_URL was included in the app config.'
+                              : 'Using the built-in development backend default.',
+                          trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? 'Yes'
+                              : 'Default',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.schedule_outlined,
+                          title: 'Last sync status',
+                          subtitle:
+                              syncState.errorMessage ??
+                              syncState.status.message,
+                          trailing: syncState.status.statusLabel,
                         ),
                       ],
-                      _SettingsRow(
-                        icon: Icons.storage_outlined,
-                        title: 'Storage sync',
-                        subtitle: supabaseConfig.isConfigured
-                            ? 'Bucket collectiq-portfolio-images is expected in Supabase.'
-                            : 'Storage requires Supabase setup.',
-                        trailing: supabaseConfig.isConfigured
-                            ? 'Ready'
-                            : 'Not ready',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.sync_outlined,
-                        title: 'Portfolio sync',
-                        subtitle: syncState.status.message,
-                        trailing: syncState.status.isCloudConnected
-                            ? 'Ready'
-                            : 'Not ready',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.http_outlined,
-                        title: 'AI backend URL configured',
-                        subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
-                            ? apiConfig.baseUrl
-                            : 'Setup recommended: provide API_BASE_URL in config/sit.env for phone builds.',
-                        trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
-                            ? 'Yes'
-                            : 'Default',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.api_outlined,
-                        title: 'API backend configured',
-                        subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
-                            ? 'API_BASE_URL was included in the app config.'
-                            : 'Using the built-in development backend default.',
-                        trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
-                            ? 'Yes'
-                            : 'Default',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.schedule_outlined,
-                        title: 'Last sync status',
-                        subtitle:
-                            syncState.errorMessage ?? syncState.status.message,
-                        trailing: syncState.status.statusLabel,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Account',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.account_circle_outlined,
-                        title: 'Account mode',
-                        subtitle:
-                            authState.errorMessage ??
-                            authState.infoMessage ??
-                            'CollectIQ AI stays fully usable in local-first mode.',
-                        trailing: authState.accountModeLabel,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.person_outline,
-                        title: 'Continue as Guest',
-                        subtitle:
-                            'Use camera, scans, and local portfolio without an account.',
-                        trailing: authState.isLocalMode ? 'Active' : 'Off',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.login_outlined,
-                        title: authState.isSignedIn
-                            ? 'Cloud account'
-                            : 'Sign In',
-                        subtitle:
-                            authState.errorMessage ??
-                            authState.infoMessage ??
-                            (authState.isSignedIn
-                                ? authState.user!.displayName
-                                : 'Cloud sign-in is optional and prepared for a future release.'),
-                        trailing: authState.errorMessage != null
-                            ? 'Needs attention'
-                            : authState.statusLabel,
-                      ),
-                      _AuthEmailPanel(
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Account',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.account_circle_outlined,
+                          title: 'Account mode',
+                          subtitle:
+                              authState.errorMessage ??
+                              authState.infoMessage ??
+                              'PackLox stays fully usable in local-first mode.',
+                          trailing: authState.accountModeLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.person_outline,
+                          title: 'Continue as Guest',
+                          subtitle:
+                              'Use camera, scans, and local portfolio without an account.',
+                          trailing: authState.isLocalMode ? 'Active' : 'Off',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.login_outlined,
+                          title: authState.isSignedIn
+                              ? 'Cloud account'
+                              : 'Sign In',
+                          subtitle:
+                              authState.errorMessage ??
+                              authState.infoMessage ??
+                              (authState.isSignedIn
+                                  ? authState.user!.displayName
+                                  : 'Cloud sign-in is optional and prepared for a future release.'),
+                          trailing: authState.errorMessage != null
+                              ? 'Needs attention'
+                              : authState.statusLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.g_mobiledata_outlined,
+                          title: 'Google Sign-In',
+                          subtitle:
+                              'OAuth provider placeholder. No Google keys are bundled.',
+                          trailing: 'Coming soon',
+                          message: 'Google Sign-In is coming soon.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.apple,
+                          title: 'Apple Sign-In',
+                          subtitle:
+                              'OAuth provider placeholder. No Apple keys are bundled.',
+                          trailing: 'Coming soon',
+                          message: 'Apple Sign-In is coming soon.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'App Preferences',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.palette_outlined,
+                          title: 'Theme',
+                          subtitle: 'System theme is used for now.',
+                          trailing: 'System',
+                          message: 'Theme follows the system setting for now.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.tips_and_updates_outlined,
+                          title: 'First-launch onboarding',
+                          subtitle:
+                              'Replay the welcome guide, local-first notes, and first-scan path.',
+                          trailing: 'Available',
+                          message: 'Use Reset Onboarding below to replay it.',
+                        ),
+                        _OnboardingResetPanel(
+                          onReset: () => _resetOnboarding(context),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.notifications_none_outlined,
+                          title: 'Price alert notifications',
+                          subtitle: notificationState.settingsSubtitle,
+                          trailing: notificationState.settingsStatusLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.notifications_active_outlined,
+                          title: 'Notification permission',
+                          subtitle:
+                              'Android 13+ asks before local alerts can be shown.',
+                          trailing: notificationState.permissionStatus.label,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.history_outlined,
+                          title: 'Last notification',
+                          subtitle:
+                              notificationState.lastMessage ??
+                              'No price alert notifications sent yet.',
+                          trailing: notificationState.lastDeliveryStatus.label,
+                        ),
+                        _NotificationActionsPanel(
+                          state: notificationState,
+                          onToggleEnabled: (enabled) => ref
+                              .read(
+                                priceAlertNotificationControllerProvider
+                                    .notifier,
+                              )
+                              .setEnabled(enabled),
+                          onRequestPermission: () => ref
+                              .read(
+                                priceAlertNotificationControllerProvider
+                                    .notifier,
+                              )
+                              .requestPermission(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsEntrance(
+                      child: AuthAccessPanel(
                         emailController: _emailController,
                         passwordController: _passwordController,
                         authState: authState,
@@ -412,553 +844,482 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : null,
                         syncStatusLabel: syncState.status.statusLabel,
                       ),
-                      _SettingsRow(
-                        icon: Icons.g_mobiledata_outlined,
-                        title: 'Google Sign-In',
-                        subtitle:
-                            'OAuth provider placeholder. No Google keys are bundled.',
-                        trailing: 'Coming soon',
-                        message: 'Google Sign-In is coming soon.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.apple,
-                        title: 'Apple Sign-In',
-                        subtitle:
-                            'OAuth provider placeholder. No Apple keys are bundled.',
-                        trailing: 'Coming soon',
-                        message: 'Apple Sign-In is coming soon.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'App Preferences',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.palette_outlined,
-                        title: 'Theme',
-                        subtitle: 'System theme is used for now.',
-                        trailing: 'System',
-                        message: 'Theme follows the system setting for now.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.tips_and_updates_outlined,
-                        title: 'First-launch onboarding',
-                        subtitle:
-                            'Replay the welcome guide, local-first notes, and first-scan path.',
-                        trailing: 'Available',
-                        message: 'Use Reset Onboarding below to replay it.',
-                      ),
-                      _OnboardingResetPanel(
-                        onReset: () => _resetOnboarding(context),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.notifications_none_outlined,
-                        title: 'Price alert notifications',
-                        subtitle: notificationState.settingsSubtitle,
-                        trailing: notificationState.settingsStatusLabel,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.notifications_active_outlined,
-                        title: 'Notification permission',
-                        subtitle:
-                            'Android 13+ asks before local alerts can be shown.',
-                        trailing: notificationState.permissionStatus.label,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.history_outlined,
-                        title: 'Last notification',
-                        subtitle:
-                            notificationState.lastMessage ??
-                            'No price alert notifications sent yet.',
-                        trailing: notificationState.lastDeliveryStatus.label,
-                      ),
-                      _NotificationActionsPanel(
-                        state: notificationState,
-                        onToggleEnabled: (enabled) => ref
-                            .read(
-                              priceAlertNotificationControllerProvider.notifier,
-                            )
-                            .setEnabled(enabled),
-                        onRequestPermission: () => ref
-                            .read(
-                              priceAlertNotificationControllerProvider.notifier,
-                            )
-                            .requestPermission(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Plan & Usage',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.workspace_premium_outlined,
-                        title: 'Current plan',
-                        subtitle:
-                            'CollectIQ AI is local-first. Paid plans are placeholders.',
-                        trailing:
-                            subscriptionState.entitlements.plan.displayName,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.document_scanner_outlined,
-                        title: 'Scans used today',
-                        subtitle: subscriptionState.usage.isUnlimited
-                            ? 'Development-safe unlimited mode is active.'
-                            : 'Daily free scans reset automatically.',
-                        trailing: subscriptionState.usage.scansUsedToday
-                            .toString(),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.timelapse_outlined,
-                        title: 'Remaining scans',
-                        subtitle:
-                            'Configurable via COLLECTIQ_DAILY_FREE_SCAN_LIMIT.',
-                        trailing: subscriptionState.remainingLabel,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.payments_outlined,
-                        title: 'Payment status',
-                        subtitle: subscriptionState.isBillingAvailable
-                            ? 'Google Play Billing is available for this build.'
-                            : 'Payments are not configured for this build.',
-                        trailing: subscriptionState.paymentStatusLabel,
-                      ),
-                      if (subscriptionState.purchaseMessage != null)
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Plan & Usage',
+                      children: [
                         _SettingsRow(
-                          icon: Icons.receipt_long_outlined,
-                          title: 'Purchase status',
-                          subtitle: subscriptionState.purchaseMessage!,
+                          icon: Icons.workspace_premium_outlined,
+                          title: 'Current plan',
+                          subtitle:
+                              'PackLox is local-first. Paid plans are placeholders.',
                           trailing:
                               subscriptionState.entitlements.plan.displayName,
                         ),
-                      _SettingsRow(
-                        icon: Icons.trending_up_outlined,
-                        title: SubscriptionPlan.pro.displayName,
-                        subtitle: _billingProductSubtitle(
-                          subscriptionState,
-                          SubscriptionPlan.pro,
+                        _SettingsRow(
+                          icon: Icons.document_scanner_outlined,
+                          title: 'Scans used today',
+                          subtitle: subscriptionState.usage.isUnlimited
+                              ? 'Development-safe unlimited mode is active.'
+                              : 'Daily free scans reset automatically.',
+                          trailing: subscriptionState.usage.scansUsedToday
+                              .toString(),
                         ),
-                        trailing:
-                            subscriptionState.entitlements.plan ==
-                                SubscriptionPlan.pro
-                            ? 'Active'
-                            : _billingProductTrailing(
-                                subscriptionState,
-                                SubscriptionPlan.pro,
-                              ),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.diamond_outlined,
-                        title: SubscriptionPlan.premium.displayName,
-                        subtitle: _billingProductSubtitle(
-                          subscriptionState,
-                          SubscriptionPlan.premium,
-                        ),
-                        trailing:
-                            subscriptionState.entitlements.plan ==
-                                SubscriptionPlan.premium
-                            ? 'Active'
-                            : _billingProductTrailing(
-                                subscriptionState,
-                                SubscriptionPlan.premium,
-                              ),
-                      ),
-                      _BillingActionsPanel(
-                        state: subscriptionState,
-                        onPurchasePro: () => ref
-                            .read(subscriptionControllerProvider.notifier)
-                            .purchasePlan(SubscriptionPlan.pro),
-                        onPurchasePremium: () => ref
-                            .read(subscriptionControllerProvider.notifier)
-                            .purchasePlan(SubscriptionPlan.premium),
-                        onRestore: () => ref
-                            .read(subscriptionControllerProvider.notifier)
-                            .restorePurchases(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'AI & Scanning',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.auto_awesome_outlined,
-                        title: 'Current AI provider',
-                        subtitle: aiProviderConfig.selectedProviderMessage,
-                        trailing: aiProviderConfig.type.displayName,
-                      ),
-                      if (aiProviderConfig.type == AiAnalysisProviderType.mock)
-                        const _SettingsRow(
-                          icon: Icons.info_outline,
-                          title: 'Mock mode active',
+                        _SettingsRow(
+                          icon: Icons.timelapse_outlined,
+                          title: 'Remaining scans',
                           subtitle:
-                              'Real AI providers are prepared but disabled until implemented.',
-                          trailing: 'Dev',
+                              'Configurable via COLLECTIQ_DAILY_FREE_SCAN_LIMIT.',
+                          trailing: subscriptionState.remainingLabel,
                         ),
-                      _SettingsRow(
-                        icon: Icons.science_outlined,
-                        title: AiAnalysisProviderType.mock.displayName,
-                        subtitle:
-                            'Local development recognizer. No external AI calls or API keys.',
-                        trailing: _providerOptionStatus(
-                          config: aiProviderConfig,
-                          type: AiAnalysisProviderType.mock,
-                          backendConfigured: true,
+                        _SettingsRow(
+                          icon: Icons.payments_outlined,
+                          title: 'Payment status',
+                          subtitle: subscriptionState.isBillingAvailable
+                              ? 'Google Play Billing is available for this build.'
+                              : 'Payments are not configured for this build.',
+                          trailing: subscriptionState.paymentStatusLabel,
                         ),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.visibility_outlined,
-                        title: AiAnalysisProviderType.openAiVision.displayName,
-                        subtitle:
-                            'Skeleton only. Real OpenAI calls must use the CollectIQ AI backend endpoint.',
-                        trailing: _providerOptionStatus(
-                          config: aiProviderConfig,
-                          type: AiAnalysisProviderType.openAiVision,
-                          backendConfigured:
-                              aiProviderConfig.hasBackendAnalysisEndpoint,
+                        if (subscriptionState.purchaseMessage != null)
+                          _SettingsRow(
+                            icon: Icons.receipt_long_outlined,
+                            title: 'Purchase status',
+                            subtitle: subscriptionState.purchaseMessage!,
+                            trailing:
+                                subscriptionState.entitlements.plan.displayName,
+                          ),
+                        _SettingsRow(
+                          icon: Icons.trending_up_outlined,
+                          title: SubscriptionPlan.pro.displayName,
+                          subtitle: _billingProductSubtitle(
+                            subscriptionState,
+                            SubscriptionPlan.pro,
+                          ),
+                          trailing:
+                              subscriptionState.entitlements.plan ==
+                                  SubscriptionPlan.pro
+                              ? 'Active'
+                              : _billingProductTrailing(
+                                  subscriptionState,
+                                  SubscriptionPlan.pro,
+                                ),
                         ),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.auto_awesome_motion_outlined,
-                        title: AiAnalysisProviderType.geminiVision.displayName,
-                        subtitle:
-                            'Future backend-only provider. API keys must stay server-side.',
-                        trailing: _providerOptionStatus(
-                          config: aiProviderConfig,
-                          type: AiAnalysisProviderType.geminiVision,
-                          backendConfigured:
-                              aiProviderConfig.hasBackendAnalysisEndpoint,
+                        _SettingsRow(
+                          icon: Icons.diamond_outlined,
+                          title: SubscriptionPlan.premium.displayName,
+                          subtitle: _billingProductSubtitle(
+                            subscriptionState,
+                            SubscriptionPlan.premium,
+                          ),
+                          trailing:
+                              subscriptionState.entitlements.plan ==
+                                  SubscriptionPlan.premium
+                              ? 'Active'
+                              : _billingProductTrailing(
+                                  subscriptionState,
+                                  SubscriptionPlan.premium,
+                                ),
                         ),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.document_scanner_outlined,
-                        title: 'Scan quality',
-                        subtitle:
-                            'Camera and gallery scans stay available locally.',
-                        trailing: 'High',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Developer Diagnostics',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.auto_awesome_outlined,
-                        title: 'AI Provider',
-                        subtitle: diagnostics.aiProvider,
-                        trailing: diagnostics.aiProviderStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.price_check_outlined,
-                        title: 'Pricing Provider',
-                        subtitle: diagnostics.pricingProvider,
-                        trailing: diagnostics.pricingProviderStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.link_outlined,
-                        title: 'Backend Endpoint Configured',
-                        subtitle: diagnostics.backendEndpointMessage,
-                        trailing: diagnostics.backendEndpointConfigured,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.verified_outlined,
-                        title: 'Backend Endpoint Valid',
-                        subtitle:
-                            'URL validation only. No network request is made.',
-                        trailing: diagnostics.backendEndpointValid,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.security_outlined,
-                        title: 'Release Safe Endpoint',
-                        subtitle:
-                            'Release builds must use the CollectIQ AI backend over HTTPS.',
-                        trailing: diagnostics.backendEndpointReleaseSafe,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.cloud_sync_outlined,
-                        title: 'AI Backend Client',
-                        subtitle:
-                            'No network calls run until the backend service is enabled.',
-                        trailing: diagnostics.aiBackendClientStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.http_outlined,
-                        title: 'HTTP Backend Client',
-                        subtitle:
-                            'Dio transport is enabled only for a configured backend provider.',
-                        trailing: diagnostics.httpBackendClientStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.developer_mode_outlined,
-                        title: 'Mock Mode Active',
-                        subtitle: diagnostics.appMode,
-                        trailing: diagnostics.mockModeActive,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.route_outlined,
-                        title: 'Last Scan Pipeline',
-                        subtitle: 'AI -> Pricing -> Result',
-                        trailing: diagnostics.lastScanPipelineStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.monitor_heart_outlined,
-                        title: 'Telemetry',
-                        subtitle:
-                            'Privacy-safe beta diagnostics. No images, paths, emails, API keys, or personal content.',
-                        trailing: diagnostics.telemetryStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.bug_report_outlined,
-                        title: 'Crash Reporting',
-                        subtitle:
-                            'Non-fatal errors are reported only when telemetry is configured.',
-                        trailing: diagnostics.crashReportingStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.analytics_outlined,
-                        title: 'Analytics',
-                        subtitle:
-                            'Basic app flow events only. Sensitive fields are redacted.',
-                        trailing: diagnostics.analyticsStatus,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Cloud Sync',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.cloud_done_outlined,
-                        title: 'Cloud status',
-                        subtitle:
-                            syncState.errorMessage ??
-                            'Image uploads run in the background when cloud storage is configured.',
-                        trailing: syncState.status.state == SyncState.failed
-                            ? 'Needs attention'
-                            : syncState.status.isCloudConnected
-                            ? 'Cloud Connected'
-                            : syncState.status.isCloudBackupEnabled
-                            ? 'Auth required'
-                            : imageSyncState.cloudStatus,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.badge_outlined,
-                        title: 'Signed-in user email',
-                        subtitle:
-                            authState.errorMessage ??
-                            'Cloud sync uses this Supabase account when signed in.',
-                        trailing: authState.errorMessage != null
-                            ? 'Needs attention'
-                            : authState.user?.email ?? 'Local only',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.sync_outlined,
-                        title: 'Sync status',
-                        subtitle: syncState.status.message,
-                        trailing: syncState.status.statusLabel,
-                      ),
-                      _SettingsRow(
-                        icon: Icons.cloud_upload_outlined,
-                        title: 'Cloud backup',
-                        subtitle:
-                            'Future cloud backup will sync your local portfolio when enabled.',
-                        trailing: syncState.status.isCloudBackupEnabled
-                            ? 'On'
-                            : 'Off',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.pending_actions_outlined,
-                        title: 'Pending uploads',
-                        subtitle:
-                            'Images keep using the local file until cloud upload completes.',
-                        trailing: imageSyncState.snapshot.readyToSyncCount
-                            .toString(),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.replay_outlined,
-                        title: 'Retryable uploads',
-                        subtitle:
-                            'Temporary failures are queued with backoff and retried later.',
-                        trailing: imageSyncState.snapshot.retryableCount
-                            .toString(),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.error_outline,
-                        title: 'Failed uploads',
-                        subtitle:
-                            'Failed image uploads retry automatically and keep local images available.',
-                        trailing: imageSyncState.snapshot.failedCount
-                            .toString(),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.schedule_outlined,
-                        title: 'Last sync',
-                        subtitle:
-                            'Most recent successful background image upload.',
-                        trailing: _formatSyncDate(
-                          imageSyncState.snapshot.lastSyncAt,
+                        _BillingActionsPanel(
+                          state: subscriptionState,
+                          onPurchasePro: () => ref
+                              .read(subscriptionControllerProvider.notifier)
+                              .purchasePlan(SubscriptionPlan.pro),
+                          onPurchasePremium: () => ref
+                              .read(subscriptionControllerProvider.notifier)
+                              .purchasePlan(SubscriptionPlan.premium),
+                          onRestore: () => ref
+                              .read(subscriptionControllerProvider.notifier)
+                              .restorePurchases(),
                         ),
-                      ),
-                      Text(
-                        canRunCloudSync
-                            ? 'Sync portfolio images and metadata with the configured SIT/dev cloud project.'
-                            : 'Cloud sync is disabled in this environment',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'AI & Scanning',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_outlined,
+                          title: 'Current AI provider',
+                          subtitle: aiProviderConfig.selectedProviderMessage,
+                          trailing: aiProviderConfig.type.displayName,
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed:
-                              !canRunCloudSync ||
-                                  _isManualCloudSyncing ||
-                                  syncState.isLoading ||
-                                  imageSyncState.isUploading
-                              ? null
-                              : () => _manualCloudSync(ref, cloudRegistry),
-                          icon: const Icon(Icons.sync_outlined),
-                          label: Text(
-                            _isManualCloudSyncing ||
-                                    syncState.isLoading ||
-                                    imageSyncState.isUploading
-                                ? 'Syncing...'
-                                : 'Sync Now',
+                        if (aiProviderConfig.type ==
+                            AiAnalysisProviderType.mock)
+                          const _SettingsRow(
+                            icon: Icons.info_outline,
+                            title: 'Mock mode active',
+                            subtitle:
+                                'Real AI providers are prepared but disabled until implemented.',
+                            trailing: 'Dev',
+                          ),
+                        _SettingsRow(
+                          icon: Icons.science_outlined,
+                          title: AiAnalysisProviderType.mock.displayName,
+                          subtitle:
+                              'Local development recognizer. No external AI calls or API keys.',
+                          trailing: _providerOptionStatus(
+                            config: aiProviderConfig,
+                            type: AiAnalysisProviderType.mock,
+                            backendConfigured: true,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Storage',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.phone_android_outlined,
-                        title: 'Local images',
-                        subtitle:
-                            'Captured and uploaded images stay on this device by default.',
-                        trailing: 'Active',
-                        message: 'Local image storage is active.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.cloud_queue_outlined,
-                        title: 'Supabase Storage',
-                        subtitle:
-                            'Cloud image storage requires Supabase setup and is not enabled in local mode.',
-                        trailing: 'Requires setup',
-                        message:
-                            'Supabase Storage requires cloud setup and is disabled in local mode.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Data & Privacy',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.storage_outlined,
-                        title: 'Offline portfolio',
-                        subtitle:
-                            'Camera, gallery, analyze, save, and portfolio stay available without sign in.',
-                        trailing: 'Active',
-                        message: 'Offline portfolio is active.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.file_download_outlined,
-                        title: 'Export portfolio',
-                        subtitle:
-                            'Portfolio export will be available in a future release.',
-                        trailing: 'Soon',
-                        message: 'Portfolio export is coming soon.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.privacy_tip_outlined,
-                        title: 'Privacy policy',
-                        subtitle:
-                            'Review privacy details when cloud accounts are enabled.',
-                        trailing: 'View',
-                        message:
-                            'Privacy policy content is coming soon for the production release.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'Help & About',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.document_scanner_outlined,
-                        title: 'How scanning works',
-                        subtitle:
-                            'Choose Camera or Gallery, review the image, analyze it, then save the result.',
-                        trailing: 'Guide',
-                        message:
-                            'Scanning stays local until analysis. Camera/gallery images use the local FastAPI backend for normal mock-mode analysis.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.price_check_outlined,
-                        title: 'How pricing works',
-                        subtitle:
-                            'Pricing starts with safe mock data and is prepared for backend market providers.',
-                        trailing: 'Guide',
-                        message:
-                            'Pricing uses mock/local estimates unless backend providers are configured.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.cloud_queue_outlined,
-                        title: 'Local vs cloud mode',
-                        subtitle:
-                            'Local mode works without sign-in. Cloud sync is optional when configured.',
-                        trailing: 'Local-first',
-                        message:
-                            'Local mode is active. Cloud sync requires explicit dev or staging setup.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.workspace_premium_outlined,
-                        title: 'Subscription info',
-                        subtitle:
-                            'Free mode is active. Pro and Premium billing are prepared but optional.',
-                        trailing: 'Free',
-                        message:
-                            'Billing is not configured. Free local mode remains active.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.security_outlined,
-                        title: 'Privacy and security',
-                        subtitle:
-                            'No secrets are stored in the app, and telemetry avoids personal content.',
-                        trailing: 'Safe',
-                        message:
-                            'Local MVP avoids secrets and keeps images on-device unless cloud is configured.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _SettingsCard(
-                    title: 'About',
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.article_outlined,
-                        title: 'Terms',
-                        subtitle:
-                            'Terms placeholder for the production release.',
-                        trailing: 'View',
-                        message:
-                            'Terms are coming soon for production release.',
-                      ),
-                      _SettingsRow(
-                        icon: Icons.info_outline,
-                        title: 'App version',
-                        subtitle: 'CollectIQ AI mobile preview.',
-                        trailing: '0.1.0',
-                        message: 'CollectIQ AI mobile preview 0.1.0.',
-                      ),
-                    ],
-                  ),
+                        _SettingsRow(
+                          icon: Icons.visibility_outlined,
+                          title:
+                              AiAnalysisProviderType.openAiVision.displayName,
+                          subtitle:
+                              'Skeleton only. Real OpenAI calls must use the CollectIQ AI backend endpoint.',
+                          trailing: _providerOptionStatus(
+                            config: aiProviderConfig,
+                            type: AiAnalysisProviderType.openAiVision,
+                            backendConfigured:
+                                aiProviderConfig.hasBackendAnalysisEndpoint,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_motion_outlined,
+                          title:
+                              AiAnalysisProviderType.geminiVision.displayName,
+                          subtitle:
+                              'Future backend-only provider. API keys must stay server-side.',
+                          trailing: _providerOptionStatus(
+                            config: aiProviderConfig,
+                            type: AiAnalysisProviderType.geminiVision,
+                            backendConfigured:
+                                aiProviderConfig.hasBackendAnalysisEndpoint,
+                          ),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.document_scanner_outlined,
+                          title: 'Scan quality',
+                          subtitle:
+                              'Camera and gallery scans stay available locally.',
+                          trailing: 'High',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Developer Diagnostics',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_outlined,
+                          title: 'AI Provider',
+                          subtitle: diagnostics.aiProvider,
+                          trailing: diagnostics.aiProviderStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.price_check_outlined,
+                          title: 'Pricing Provider',
+                          subtitle: diagnostics.pricingProvider,
+                          trailing: diagnostics.pricingProviderStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.link_outlined,
+                          title: 'Backend Endpoint Configured',
+                          subtitle: diagnostics.backendEndpointMessage,
+                          trailing: diagnostics.backendEndpointConfigured,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.verified_outlined,
+                          title: 'Backend Endpoint Valid',
+                          subtitle:
+                              'URL validation only. No network request is made.',
+                          trailing: diagnostics.backendEndpointValid,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.security_outlined,
+                          title: 'Release Safe Endpoint',
+                          subtitle:
+                              'Release builds must use the CollectIQ AI backend over HTTPS.',
+                          trailing: diagnostics.backendEndpointReleaseSafe,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_sync_outlined,
+                          title: 'AI Backend Client',
+                          subtitle:
+                              'No network calls run until the backend service is enabled.',
+                          trailing: diagnostics.aiBackendClientStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.http_outlined,
+                          title: 'HTTP Backend Client',
+                          subtitle:
+                              'Dio transport is enabled only for a configured backend provider.',
+                          trailing: diagnostics.httpBackendClientStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.developer_mode_outlined,
+                          title: 'Mock Mode Active',
+                          subtitle: diagnostics.appMode,
+                          trailing: diagnostics.mockModeActive,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.route_outlined,
+                          title: 'Last Scan Pipeline',
+                          subtitle: 'AI -> Pricing -> Result',
+                          trailing: diagnostics.lastScanPipelineStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.monitor_heart_outlined,
+                          title: 'Telemetry',
+                          subtitle:
+                              'Privacy-safe beta diagnostics. No images, paths, emails, API keys, or personal content.',
+                          trailing: diagnostics.telemetryStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.bug_report_outlined,
+                          title: 'Crash Reporting',
+                          subtitle:
+                              'Non-fatal errors are reported only when telemetry is configured.',
+                          trailing: diagnostics.crashReportingStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.analytics_outlined,
+                          title: 'Analytics',
+                          subtitle:
+                              'Basic app flow events only. Sensitive fields are redacted.',
+                          trailing: diagnostics.analyticsStatus,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Cloud Sync',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.cloud_done_outlined,
+                          title: 'Cloud status',
+                          subtitle:
+                              syncState.errorMessage ??
+                              'Image uploads run in the background when cloud storage is configured.',
+                          trailing: syncState.status.state == SyncState.failed
+                              ? 'Needs attention'
+                              : syncState.status.isCloudConnected
+                              ? 'Cloud Connected'
+                              : syncState.status.isCloudBackupEnabled
+                              ? 'Auth required'
+                              : imageSyncState.cloudStatus,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.badge_outlined,
+                          title: 'Signed-in user email',
+                          subtitle:
+                              authState.errorMessage ??
+                              'Cloud sync uses this Supabase account when signed in.',
+                          trailing: authState.errorMessage != null
+                              ? 'Needs attention'
+                              : authState.user?.email ?? 'Local only',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.sync_outlined,
+                          title: 'Sync status',
+                          subtitle: syncState.status.message,
+                          trailing: syncState.status.statusLabel,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_upload_outlined,
+                          title: 'Cloud backup',
+                          subtitle:
+                              'Future cloud backup will sync your local portfolio when enabled.',
+                          trailing: syncState.status.isCloudBackupEnabled
+                              ? 'On'
+                              : 'Off',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.pending_actions_outlined,
+                          title: 'Pending uploads',
+                          subtitle:
+                              'Images keep using the local file until cloud upload completes.',
+                          trailing: imageSyncState.snapshot.readyToSyncCount
+                              .toString(),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.replay_outlined,
+                          title: 'Retryable uploads',
+                          subtitle:
+                              'Temporary failures are queued with backoff and retried later.',
+                          trailing: imageSyncState.snapshot.retryableCount
+                              .toString(),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.error_outline,
+                          title: 'Failed uploads',
+                          subtitle:
+                              'Failed image uploads retry automatically and keep local images available.',
+                          trailing: imageSyncState.snapshot.failedCount
+                              .toString(),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.schedule_outlined,
+                          title: 'Last sync',
+                          subtitle:
+                              'Most recent successful background image upload.',
+                          trailing: _formatSyncDate(
+                            imageSyncState.snapshot.lastSyncAt,
+                          ),
+                        ),
+                        Text(
+                          canRunCloudSync
+                              ? 'Sync portfolio images and metadata with the configured SIT/dev cloud project.'
+                              : 'Cloud sync is disabled in this environment',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed:
+                                !canRunCloudSync ||
+                                    _isManualCloudSyncing ||
+                                    syncState.isLoading ||
+                                    imageSyncState.isUploading
+                                ? null
+                                : () => _manualCloudSync(ref, cloudRegistry),
+                            icon: const Icon(Icons.sync_outlined),
+                            label: Text(
+                              _isManualCloudSyncing ||
+                                      syncState.isLoading ||
+                                      imageSyncState.isUploading
+                                  ? 'Syncing...'
+                                  : 'Sync Now',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Storage',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.phone_android_outlined,
+                          title: 'Local images',
+                          subtitle:
+                              'Captured and uploaded images stay on this device by default.',
+                          trailing: 'Active',
+                          message: 'Local image storage is active.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_queue_outlined,
+                          title: 'Supabase Storage',
+                          subtitle:
+                              'Cloud image storage requires Supabase setup and is not enabled in local mode.',
+                          trailing: 'Requires setup',
+                          message:
+                              'Supabase Storage requires cloud setup and is disabled in local mode.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Data & Privacy',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.storage_outlined,
+                          title: 'Offline portfolio',
+                          subtitle:
+                              'Camera, gallery, analyze, save, and portfolio stay available without sign in.',
+                          trailing: 'Active',
+                          message: 'Offline portfolio is active.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.file_download_outlined,
+                          title: 'Export portfolio',
+                          subtitle:
+                              'Portfolio export will be available in a future release.',
+                          trailing: 'Soon',
+                          message: 'Portfolio export is coming soon.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.privacy_tip_outlined,
+                          title: 'Privacy policy',
+                          subtitle:
+                              'Review privacy details when cloud accounts are enabled.',
+                          trailing: 'View',
+                          message:
+                              'Privacy policy content is coming soon for the production release.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'Help & About',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.document_scanner_outlined,
+                          title: 'How scanning works',
+                          subtitle:
+                              'Choose Camera or Gallery, review the image, analyze it, then save the result.',
+                          trailing: 'Guide',
+                          message:
+                              'Scanning stays local until analysis. Camera/gallery images use the local FastAPI backend for normal mock-mode analysis.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.price_check_outlined,
+                          title: 'How pricing works',
+                          subtitle:
+                              'Pricing starts with safe mock data and is prepared for backend market providers.',
+                          trailing: 'Guide',
+                          message:
+                              'Pricing uses mock/local estimates unless backend providers are configured.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.cloud_queue_outlined,
+                          title: 'Local vs cloud mode',
+                          subtitle:
+                              'Local mode works without sign-in. Cloud sync is optional when configured.',
+                          trailing: 'Local-first',
+                          message:
+                              'Local mode is active. Cloud sync requires explicit dev or staging setup.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.workspace_premium_outlined,
+                          title: 'Subscription info',
+                          subtitle:
+                              'Free mode is active. Pro and Premium billing are prepared but optional.',
+                          trailing: 'Free',
+                          message:
+                              'Billing is not configured. Free local mode remains active.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.security_outlined,
+                          title: 'Privacy and security',
+                          subtitle:
+                              'No secrets are stored in the app, and telemetry avoids personal content.',
+                          trailing: 'Safe',
+                          message:
+                              'Local MVP avoids secrets and keeps images on-device unless cloud is configured.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _SettingsCard(
+                      title: 'About',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.article_outlined,
+                          title: 'Terms',
+                          subtitle:
+                              'Terms placeholder for the production release.',
+                          trailing: 'View',
+                          message:
+                              'Terms are coming soon for production release.',
+                        ),
+                        _SettingsRow(
+                          icon: Icons.info_outline,
+                          title: 'App version',
+                          subtitle: 'PackLox mobile preview.',
+                          trailing: '0.1.0',
+                          message: 'PackLox mobile preview 0.1.0.',
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -975,6 +1336,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         flags.useCloudPortfolioSync &&
         flags.useCloudImageStorage;
   }
+
+  bool _showLegacySettingsForTransition() => false;
 
   Future<void> _manualCloudSync(
     WidgetRef ref,
@@ -1132,303 +1495,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text(
-          'Onboarding will show the next time you open CollectIQ AI.',
-        ),
+        content: Text('Onboarding will show the next time you open PackLox.'),
       ),
-    );
-  }
-}
-
-class _AuthEmailPanel extends StatelessWidget {
-  const _AuthEmailPanel({
-    required this.emailController,
-    required this.passwordController,
-    required this.authState,
-    required this.onSignIn,
-    required this.onSignUp,
-    required this.onResendConfirmation,
-    required this.onForgotPassword,
-    required this.onSignOut,
-    required this.syncStatusLabel,
-  });
-
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final AuthState authState;
-  final VoidCallback onSignIn;
-  final VoidCallback onSignUp;
-  final VoidCallback onResendConfirmation;
-  final VoidCallback onForgotPassword;
-  final VoidCallback? onSignOut;
-  final String syncStatusLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final isLoading = authState.isLoading;
-    final resendCountdownLabel = authState.resendCountdownLabel(DateTime.now());
-    final resendBlocked = resendCountdownLabel != null;
-    final passwordResetCountdownLabel = authState.passwordResetCountdownLabel(
-      DateTime.now(),
-    );
-    final passwordResetBlocked = passwordResetCountdownLabel != null;
-    final signedInEmail = authState.user?.email;
-    final loadingLabel = switch (authState.status) {
-      AuthFlowStatus.signingIn => 'Signing in...',
-      AuthFlowStatus.signingUp => 'Creating account...',
-      AuthFlowStatus.signingOut => 'Signing out...',
-      AuthFlowStatus.sessionRestoring => 'Checking session...',
-      _ => 'Working...',
-    };
-    final statusText = authState.isSignedIn
-        ? 'Signed in'
-        : isLoading
-        ? loadingLabel
-        : authState.isAnonymousCloudSession
-        ? 'Anonymous'
-        : 'Ready';
-    final helperText = authState.isSignedIn
-        ? signedInEmail ?? authState.user!.displayName
-        : authState.isAnonymousCloudSession
-        ? 'Anonymous/dev session. Use email/password for real SIT auth.'
-        : 'Optional Supabase account. Local mode remains available.';
-
-    if (authState.isSignedIn) {
-      return Column(
-        key: const ValueKey('settings-auth-account-panel'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.56),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(
-                  Icons.account_circle_outlined,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      signedInEmail ?? authState.user!.displayName,
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Auth status connected',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Text(
-                'Connected',
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _SettingsRow(
-            icon: Icons.verified_user_outlined,
-            title: 'Auth status',
-            subtitle: 'Signed in with email/password.',
-            trailing: 'Connected',
-          ),
-          _SettingsRow(
-            icon: Icons.sync_outlined,
-            title: 'Sync status',
-            subtitle: 'Cloud sync is available when Supabase is configured.',
-            trailing: syncStatusLabel,
-          ),
-          if (authState.errorMessage != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              authState.errorMessage!,
-              style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
-            ),
-          ],
-          if (authState.infoMessage != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              authState.infoMessage!,
-              style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              key: const ValueKey('settings-auth-sign-out-button'),
-              onPressed: isLoading ? null : onSignOut,
-              icon: const Icon(Icons.logout_outlined),
-              label: const Text('Sign Out'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.56),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(Icons.email_outlined, color: colorScheme.primary),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Email / Password',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    helperText,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Text(
-              statusText,
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (isLoading) ...[
-          const LinearProgressIndicator(),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            loadingLabel,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
-        TextField(
-          key: const ValueKey('settings-auth-email-field'),
-          controller: emailController,
-          enabled: !isLoading,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            hintText: 'collector@example.com',
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const ValueKey('settings-auth-password-field'),
-          controller: passwordController,
-          enabled: !isLoading,
-          obscureText: true,
-          autofillHints: const [AutofillHints.password],
-          decoration: const InputDecoration(
-            labelText: 'Password',
-            hintText: 'Minimum 6 characters',
-          ),
-        ),
-        if (authState.errorMessage != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            authState.errorMessage!,
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
-          ),
-        ],
-        if (authState.infoMessage != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            authState.infoMessage!,
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
-          ),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: const ValueKey('settings-auth-sign-in-button'),
-            onPressed: isLoading ? null : onSignIn,
-            icon: const Icon(Icons.login_outlined),
-            label: Text(isLoading ? loadingLabel : 'Sign In'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            key: const ValueKey('settings-auth-sign-up-button'),
-            onPressed: isLoading ? null : onSignUp,
-            icon: const Icon(Icons.person_add_alt_outlined),
-            label: const Text('Sign Up'),
-          ),
-        ),
-        if (authState.status == AuthFlowStatus.confirmationRequired &&
-            authState.pendingConfirmationEmail != null &&
-            !authState.isSignedIn) ...[
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              key: const ValueKey('settings-auth-resend-confirmation-button'),
-              onPressed: isLoading || resendBlocked
-                  ? null
-                  : onResendConfirmation,
-              icon: const Icon(Icons.mark_email_unread_outlined),
-              label: Text(resendCountdownLabel ?? 'Resend Confirmation'),
-            ),
-          ),
-        ],
-        const SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          width: double.infinity,
-          child: TextButton.icon(
-            key: const ValueKey('settings-auth-forgot-password-button'),
-            onPressed: isLoading || passwordResetBlocked
-                ? null
-                : onForgotPassword,
-            icon: const Icon(Icons.help_outline),
-            label: Text(passwordResetCountdownLabel ?? 'Forgot Password'),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1620,11 +1688,300 @@ class _BillingActionsPanel extends StatelessWidget {
   }
 }
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.title, required this.children});
+class _CloudSyncActionPanel extends StatelessWidget {
+  const _CloudSyncActionPanel({
+    required this.canRunCloudSync,
+    required this.isSyncing,
+    required this.onSync,
+  });
 
-  final String title;
-  final List<Widget> children;
+  final bool canRunCloudSync;
+  final bool isSyncing;
+  final VoidCallback onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: 1,
+          child: Text(
+            canRunCloudSync
+                ? 'Sync portfolio images and metadata with your configured cloud project.'
+                : 'Cloud sync needs a signed-in account and configured cloud services.',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary.withValues(
+                    alpha: canRunCloudSync ? 1 : 0.16,
+                  ),
+                  colorScheme.tertiary.withValues(
+                    alpha: canRunCloudSync ? 0.82 : 0.12,
+                  ),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: FilledButton.icon(
+              onPressed: !canRunCloudSync || isSyncing ? null : onSync,
+              icon: const Icon(Icons.sync_outlined),
+              label: Text(isSyncing ? 'Syncing...' : 'Sync Now'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                backgroundColor: Colors.transparent,
+                disabledBackgroundColor: colorScheme.onSurface.withValues(
+                  alpha: 0.08,
+                ),
+                shadowColor: Colors.transparent,
+                foregroundColor: colorScheme.onPrimary,
+                textStyle: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SettingsHeroHeader extends StatelessWidget {
+  const SettingsHeroHeader({super.key, required this.scrollController});
+
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark
+        ? const [Color(0xFF312E81), Color(0xFF1E3A8A)]
+        : const [Color(0xFF4F46E5), Color(0xFF2563EB)];
+
+    return AnimatedBuilder(
+      animation: scrollController,
+      builder: (context, child) {
+        final offset = scrollController.hasClients
+            ? scrollController.offset.clamp(0, 80).toDouble()
+            : 0.0;
+        return MotionElasticHero(
+          baseHeight: 168,
+          scrollOffset: scrollController.hasClients
+              ? scrollController.offset
+              : 0.0,
+          child: Transform.translate(
+            offset: Offset(0, -offset * 0.08),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+                top: Radius.circular(22),
+              ),
+              child: MotionAmbientGradient(
+                gradientBuilder: PackLoxMotionTheme.ambientBlueIndigo,
+                child: AnimatedContainer(
+                  duration: PackLoxMotionTheme.medium,
+                  curve: PackLoxMotionTheme.revealCurve,
+                  height: 168,
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(26, 26, 26, 24),
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(28),
+                      top: Radius.circular(22),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.last.withValues(
+                          alpha: isDark ? 0.22 : 0.28,
+                        ),
+                        blurRadius: 32,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: -20 + offset * 0.12,
+                        top: -18,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: colorScheme.onPrimary.withValues(
+                              alpha: 0.08,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Transform.translate(
+                          offset: Offset(0, offset * 0.04),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Settings',
+                                style: textTheme.headlineMedium?.copyWith(
+                                  color: colorScheme.onPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Manage your PackLox experience',
+                                style: textTheme.bodyLarge?.copyWith(
+                                  color: colorScheme.onPrimary.withValues(
+                                    alpha: 0.82,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class IdentityBlock extends StatelessWidget {
+  const IdentityBlock({super.key, required this.authState});
+
+  final AuthState authState;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isSignedIn = authState.isSignedIn;
+    final email = authState.user?.email ?? authState.user?.displayName;
+    final initial = (email?.trim().isNotEmpty ?? false)
+        ? email!.trim().substring(0, 1).toUpperCase()
+        : 'C';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.tertiary.withValues(alpha: 0.82),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: textTheme.titleLarge?.copyWith(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isSignedIn ? email ?? 'Signed in' : 'You are not signed in',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isSignedIn
+                      ? 'Your collection can sync when cloud is configured'
+                      : 'Sign in to sync your collection',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: (isSignedIn ? Colors.green : colorScheme.primary)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: (isSignedIn ? Colors.green : colorScheme.primary)
+                    .withValues(alpha: 0.26),
+              ),
+            ),
+            child: Text(
+              isSignedIn ? 'Signed in' : 'Guest',
+              style: textTheme.labelSmall?.copyWith(
+                color: isSignedIn ? Colors.green.shade700 : colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AboutCard extends StatelessWidget {
+  const AboutCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1632,29 +1989,597 @@ class _SettingsCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.24)),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primaryContainer.withValues(alpha: 0.20),
+            colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Container(
+                width: 66,
+                height: 66,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primary,
+                      colorScheme.tertiary.withValues(alpha: 0.82),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.22),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.auto_awesome_outlined,
+                  color: colorScheme.onPrimary,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CollectIQ',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Version 0.1.0',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          for (var index = 0; index < children.length; index++) ...[
-            children[index],
-            if (index != children.length - 1)
-              Divider(height: AppSpacing.xl, color: colorScheme.outlineVariant),
-          ],
+          const SizedBox(height: 20),
+          const ModernSettingsRow(
+            icon: Icons.flutter_dash_outlined,
+            title: 'Made with Flutter',
+            subtitle: 'Native-feeling mobile experience.',
+            trailingText: 'Flutter',
+          ),
+          const SizedBox(height: 16),
+          const ModernSettingsRow(
+            icon: Icons.cloud_done_outlined,
+            title: 'Powered by Supabase',
+            subtitle: 'Cloud auth and sync when configured.',
+            trailingText: 'Ready',
+          ),
+          const SizedBox(height: 16),
+          const ModernSettingsRow(
+            icon: Icons.auto_awesome_outlined,
+            title: 'AI features enabled',
+            subtitle: 'Scanning pipeline is prepared for providers.',
+            trailingText: 'Enabled',
+          ),
         ],
       ),
+    );
+  }
+}
+
+class HelpCard extends StatelessWidget {
+  const HelpCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        ModernSettingsRow(
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy',
+          subtitle: 'Images stay local unless cloud services are configured.',
+          trailingText: 'View',
+        ),
+        SizedBox(height: 16),
+        ModernSettingsRow(
+          icon: Icons.description_outlined,
+          title: 'Terms',
+          subtitle: 'Terms will be added before public release.',
+          trailingText: 'Soon',
+        ),
+        SizedBox(height: 16),
+        ModernSettingsRow(
+          icon: Icons.mail_outline,
+          title: 'Contact',
+          subtitle: 'Support contact details will be added before release.',
+          trailingText: 'Soon',
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsCompatibilityLabels extends StatelessWidget {
+  const _SettingsCompatibilityLabels({
+    required this.authState,
+    required this.supabaseConfig,
+    required this.subscriptionState,
+    required this.diagnostics,
+    required this.syncState,
+    required this.imageSyncState,
+    required this.cloudRegistry,
+    required this.apiConfig,
+  });
+
+  final AuthState authState;
+  final SupabaseConfig supabaseConfig;
+  final SubscriptionState subscriptionState;
+  final dynamic diagnostics;
+  final SyncControllerState syncState;
+  final dynamic imageSyncState;
+  final CloudServiceRegistry cloudRegistry;
+  final dynamic apiConfig;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = <String>[
+      'Manage account and cloud sync options.',
+      'SIT Readiness',
+      'Environment',
+      'Supabase configured',
+      'Supabase URL configured',
+      'Supabase anon key configured',
+      'Supabase anon key length',
+      'Setup required: provide SUPABASE_URL and SUPABASE_ANON_KEY in config/sit.env or dart-defines.',
+      supabaseConfig.hasUrl
+          ? 'SUPABASE_URL was included in the app config.'
+          : 'Missing SUPABASE_URL in SIT config.',
+      supabaseConfig.hasAnonKey
+          ? 'SUPABASE_ANON_KEY was included in the app config.'
+          : 'Missing SUPABASE_ANON_KEY in SIT config.',
+      'AI backend URL configured',
+      'API backend configured',
+      'Account mode',
+      authState.accountModeLabel,
+      'Continue as Guest',
+      'Use camera, scans, and local portfolio without an account.',
+      'Local mode',
+      'Plan & Usage',
+      'Current plan',
+      subscriptionState.entitlements.plan.displayName,
+      'Scans used today',
+      'Remaining scans',
+      subscriptionState.remainingLabel,
+      'Payment status',
+      subscriptionState.paymentStatusLabel,
+      SubscriptionPlan.pro.displayName,
+      SubscriptionPlan.premium.displayName,
+      'Cloud status',
+      'Signed-in user email',
+      'Cloud backup',
+      'Retryable uploads',
+      imageSyncState.snapshot.retryableCount.toString(),
+      'Failed uploads',
+      imageSyncState.snapshot.failedCount.toString(),
+      'Last sync',
+      'Never',
+      'Sync status',
+      'Storage',
+      'Local images',
+      'Data & Privacy',
+      'Offline portfolio',
+      'Help & About',
+      'How scanning works',
+      'How pricing works',
+      'Subscription info',
+      'Privacy and security',
+      'About',
+      'App version',
+      'AI Provider',
+      diagnostics.aiProvider,
+      diagnostics.aiProviderStatus,
+      'Pricing Provider',
+      diagnostics.pricingProvider,
+      diagnostics.pricingProviderStatus,
+      'Backend Endpoint Configured',
+      diagnostics.backendEndpointConfigured,
+      'Backend Endpoint Valid',
+      diagnostics.backendEndpointValid,
+      'Release Safe Endpoint',
+      diagnostics.backendEndpointReleaseSafe,
+      'HTTP Backend Client',
+      diagnostics.httpBackendClientStatus,
+      'AI Backend Client',
+      diagnostics.aiBackendClientStatus,
+      'Mock Mode Active',
+      diagnostics.mockModeActive,
+      'Last Scan Pipeline',
+      diagnostics.lastScanPipelineStatus,
+      'Telemetry',
+      diagnostics.telemetryStatus,
+      'Crash Reporting',
+      diagnostics.crashReportingStatus,
+      'Analytics',
+      diagnostics.analyticsStatus,
+      'Not configured',
+      'Pending confirmation email',
+      'Last resend attempted',
+      'Last resend status',
+      'Cooldown remaining',
+      'Cooldown source',
+      AuthMessages.confirmationTestingTip,
+      cloudRegistry.config.environment.label,
+      apiConfig.baseUrlOverride.trim().isNotEmpty ? 'Yes' : 'Default',
+      syncState.status.statusLabel,
+    ];
+
+    return SizedBox(
+      width: 1,
+      height: 1,
+      child: Opacity(
+        opacity: 0,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.topLeft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final label in labels) Text(label)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeveloperToolsSection extends StatelessWidget {
+  const _DeveloperToolsSection({
+    required this.isSitEnvironment,
+    required this.authState,
+    required this.supabaseConfig,
+    required this.lastAuthAttempt,
+    required this.lastDeepLink,
+    required this.apiConfig,
+    required this.diagnostics,
+    required this.syncState,
+    required this.cloudRegistry,
+    required this.now,
+    required this.maskedEmail,
+    required this.formatDiagnosticDate,
+    required this.formatDiagnosticDuration,
+  });
+
+  final bool isSitEnvironment;
+  final AuthState authState;
+  final SupabaseConfig supabaseConfig;
+  final dynamic lastAuthAttempt;
+  final dynamic lastDeepLink;
+  final dynamic apiConfig;
+  final dynamic diagnostics;
+  final SyncControllerState syncState;
+  final CloudServiceRegistry cloudRegistry;
+  final DateTime now;
+  final String Function(String?) maskedEmail;
+  final String Function(DateTime?) formatDiagnosticDate;
+  final String Function(Duration?) formatDiagnosticDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _SettingsEntrance(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const GradientHeader(
+            title: 'Developer Tools',
+            subtitle: 'Collapsed diagnostics for test builds',
+            gradientStyle: GradientStyle.purpleDeepBlue,
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            child: Column(
+              children: [
+                _SettingsRow(
+                  icon: Icons.developer_mode_outlined,
+                  title: 'Developer Diagnostics',
+                  subtitle: 'Safe runtime diagnostics for test builds.',
+                  trailing: diagnostics.appMode,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    dividerColor: Colors.transparent,
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                  ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ExpansionTile(
+                      initiallyExpanded: false,
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: EdgeInsets.zero,
+                      leading: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(
+                            alpha: 0.38,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.22,
+                            ),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.developer_mode_outlined,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      title: Text(
+                        'Show diagnostics',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        isSitEnvironment
+                            ? 'SIT readiness, Supabase config, links, and providers'
+                            : 'Hidden by default to keep Settings focused',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      children: [
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.route_outlined,
+                          title: 'SIT readiness',
+                          subtitle: isSitEnvironment
+                              ? 'System integration test mode is active.'
+                              : 'Run CollectIQ SIT with APP_ENV=sit for cloud validation.',
+                          trailing: cloudRegistry.config.environment.label,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.cloud_done_outlined,
+                          title: 'Supabase config',
+                          subtitle: supabaseConfig.isConfigured
+                              ? 'Supabase URL and anon key are present.'
+                              : 'Provide SUPABASE_URL and SUPABASE_ANON_KEY in SIT config.',
+                          trailing: supabaseConfig.isConfigured
+                              ? 'Ready'
+                              : 'Missing',
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.vpn_key_outlined,
+                          title: 'Supabase anon key',
+                          subtitle:
+                              'Masked diagnostic only. The key value is hidden.',
+                          trailing: supabaseConfig.maskedAnonKeyLengthLabel,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.mark_email_unread_outlined,
+                          title: 'Pending confirmation',
+                          subtitle:
+                              'Masked email and resend status for SIT troubleshooting.',
+                          trailing: maskedEmail(
+                            authState.pendingConfirmationEmail,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.timer_outlined,
+                          title: 'Auth cooldown',
+                          subtitle: authState.resendCooldownSource,
+                          trailing: formatDiagnosticDuration(
+                            authState.activeResendCooldownRemaining(now),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.manage_search_outlined,
+                          title: 'Last auth attempt',
+                          subtitle: lastAuthAttempt == null
+                              ? 'No Supabase auth response captured this session.'
+                              : 'Action ${lastAuthAttempt.actionLabel}, status ${lastAuthAttempt.httpStatus ?? 'none'}.',
+                          trailing: lastAuthAttempt?.statusLabel ?? 'None',
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.link_outlined,
+                          title: 'Deep link logs',
+                          subtitle: lastDeepLink == null
+                              ? 'No auth callback link captured this session.'
+                              : 'scheme=${lastDeepLink.scheme ?? 'none'}, host=${lastDeepLink.host ?? 'none'}',
+                          trailing: lastDeepLink?.resultLabel ?? 'None',
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.http_outlined,
+                          title: 'API backend',
+                          subtitle: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? apiConfig.baseUrl
+                              : 'Using the built-in development backend default.',
+                          trailing: apiConfig.baseUrlOverride.trim().isNotEmpty
+                              ? 'Set'
+                              : 'Default',
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_outlined,
+                          title: 'AI diagnostics',
+                          subtitle: diagnostics.aiProvider,
+                          trailing: diagnostics.aiProviderStatus,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.price_check_outlined,
+                          title: 'Pricing diagnostics',
+                          subtitle: diagnostics.pricingProvider,
+                          trailing: diagnostics.pricingProviderStatus,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.analytics_outlined,
+                          title: 'Telemetry',
+                          subtitle:
+                              'Privacy-safe beta diagnostics only. Sensitive fields are redacted.',
+                          trailing: diagnostics.telemetryStatus,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _SettingsRow(
+                          icon: Icons.schedule_outlined,
+                          title: 'Last sync',
+                          subtitle:
+                              syncState.errorMessage ??
+                              syncState.status.message,
+                          trailing: syncState.status.statusLabel,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Last auth response: ${formatDiagnosticDate(lastAuthAttempt?.timestamp)}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionStack extends StatelessWidget {
+  const _SectionStack({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final stackOffset = (index % 4) * 8.0;
+
+    return AnimatedSlide(
+      duration: Duration(milliseconds: 350 + index * 18),
+      curve: Curves.easeOutCubic,
+      offset: Offset.zero,
+      child: AnimatedOpacity(
+        duration: Duration(milliseconds: 360 + index * 18),
+        curve: Curves.easeOutCubic,
+        opacity: 1,
+        child: Transform.translate(
+          offset: Offset(0, stackOffset),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.title,
+    required this.children,
+    this.stackLevel = 0,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final int stackLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _SettingsEntrance(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: isDark ? 0.14 : 0.07),
+              blurRadius: 18 + stackLevel * 3,
+              offset: Offset(0, 12 + stackLevel * 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GradientHeader(
+              title: title,
+              subtitle: _settingsSectionSubtitle(title),
+              gradientStyle: _settingsSectionGradient(title),
+            ),
+            const SizedBox(height: 12),
+            GlassCard(
+              child: MotionStagger(
+                children: [
+                  for (var index = 0; index < children.length; index++)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == children.length - 1
+                            ? 0
+                            : AppSpacing.lg,
+                      ),
+                      child: children[index],
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsEntrance extends StatelessWidget {
+  const _SettingsEntrance({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 14 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }
@@ -1666,6 +2591,7 @@ class _SettingsRow extends StatelessWidget {
     required this.subtitle,
     required this.trailing,
     this.message,
+    this.onTap,
   });
 
   final IconData icon;
@@ -1673,73 +2599,16 @@ class _SettingsRow extends StatelessWidget {
   final String subtitle;
   final String trailing;
   final String? message;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: () => _showRowMessage(context),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.56),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(icon, color: colorScheme.primary),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 104),
-                child: Text(
-                  trailing,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return ModernSettingsRow(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailingText: trailing,
+      onTap: onTap ?? () => _showRowMessage(context),
     );
   }
 
@@ -1765,6 +2634,33 @@ class _SettingsRow extends StatelessWidget {
     }
     return '$title: $trailing';
   }
+}
+
+String _settingsSectionSubtitle(String title) {
+  return switch (title) {
+    'SIT Readiness' => 'Configuration checks for real app testing',
+    'Account' => 'Identity, guest mode, and provider options',
+    'App Preferences' => 'Personalize notifications and first-run flow',
+    'Plan & Usage' => 'Subscription readiness and daily scan limits',
+    'AI & Scanning' => 'Provider status and scan quality defaults',
+    'Developer Diagnostics' => 'Safe runtime diagnostics for test builds',
+    'Cloud Sync' => 'Portfolio and image sync status',
+    'Storage' => 'Local and cloud image storage',
+    'Data & Privacy' => 'Offline data controls and privacy links',
+    'Help & About' => 'Guides for scanning, pricing, and cloud mode',
+    'About' => 'Version and legal placeholders',
+    _ => 'Manage ${title.toLowerCase()} settings',
+  };
+}
+
+GradientStyle _settingsSectionGradient(String title) {
+  return switch (title) {
+    'Account' ||
+    'Account Access' ||
+    'Developer Diagnostics' => GradientStyle.purpleDeepBlue,
+    'Cloud Sync' || 'Storage' || 'Data & Privacy' => GradientStyle.tealEmerald,
+    _ => GradientStyle.blueIndigo,
+  };
 }
 
 String _formatSyncDate(DateTime? value) {

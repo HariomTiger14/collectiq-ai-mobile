@@ -6,8 +6,8 @@ final appShellTabControllerProvider =
 
 class AppShellTabController extends Notifier<int> {
   static const homeTab = 0;
-  static const scanTab = 1;
-  static const portfolioTab = 2;
+  static const portfolioTab = 1;
+  static const scanTab = 2;
   static const settingsTab = 3;
 
   @override

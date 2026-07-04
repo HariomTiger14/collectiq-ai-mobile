@@ -60,7 +60,7 @@ class OnboardingScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.xl),
                         Text(
-                          'Welcome to CollectIQ AI',
+                          'Welcome to PackLox',
                           style: textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -79,7 +79,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   AppInfoSection(
-                    title: 'How CollectIQ AI works',
+                    title: 'How PackLox works',
                     child: Column(
                       children: const [
                         _OnboardingStep(
@@ -119,7 +119,7 @@ class OnboardingScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'You can use CollectIQ AI without signing in. Camera, gallery, mock analysis, portfolio saves, alerts, wishlist, and goals all work locally on this device.',
+                          'You can use PackLox without signing in. Camera, gallery, mock analysis, portfolio saves, alerts, wishlist, and goals all work locally on this device.',
                           style: textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),

@@ -137,7 +137,7 @@ class _CollectIqAppState extends ConsumerState<CollectIqApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CollectIQ AI',
+      title: 'PackLox',
       debugShowCheckedModeBanner: false,
       restorationScopeId: 'collectiq_ai',
       theme: AppTheme.light,

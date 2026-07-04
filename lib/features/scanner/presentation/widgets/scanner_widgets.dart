@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
@@ -1175,8 +1176,7 @@ class AiResultCard extends ConsumerWidget {
             _ResultSectionCard(
               title: 'Market Pricing',
               icon: Icons.paid_outlined,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: MotionStagger(
                 children: [
                   _AiResultRow(
                     label: 'Market Value',
@@ -1554,29 +1554,39 @@ class _MarketSummarySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        _AiResultRow(
-          label: 'Average Price',
-          value: _formatMoney(summary.averagePrice, _marketCurrency(summary)),
+        MotionStagger(
+          children: [
+            _AiResultRow(
+              label: 'Average Price',
+              value: _formatMoney(
+                summary.averagePrice,
+                _marketCurrency(summary),
+              ),
+            ),
+            _AiResultRow(
+              label: 'Median Price',
+              value: _formatMoney(
+                summary.medianPrice,
+                _marketCurrency(summary),
+              ),
+            ),
+            _AiResultRow(
+              label: 'Market Range',
+              value:
+                  '${_formatMoney(summary.lowPrice, _marketCurrency(summary))} - ${_formatMoney(summary.highPrice, _marketCurrency(summary))}',
+            ),
+            _AiResultRow(
+              label: 'Sales Count',
+              value: '${summary.salesCount} comps',
+            ),
+            _AiResultRow(label: 'Trend', value: summary.trendLabel),
+            _AiResultRow(
+              label: 'Market Confidence',
+              value: '${(summary.confidence * 100).toStringAsFixed(0)}%',
+            ),
+            _AiResultRow(label: 'Sources', value: summary.sources.join(', ')),
+          ],
         ),
-        _AiResultRow(
-          label: 'Median Price',
-          value: _formatMoney(summary.medianPrice, _marketCurrency(summary)),
-        ),
-        _AiResultRow(
-          label: 'Market Range',
-          value:
-              '${_formatMoney(summary.lowPrice, _marketCurrency(summary))} - ${_formatMoney(summary.highPrice, _marketCurrency(summary))}',
-        ),
-        _AiResultRow(
-          label: 'Sales Count',
-          value: '${summary.salesCount} comps',
-        ),
-        _AiResultRow(label: 'Trend', value: summary.trendLabel),
-        _AiResultRow(
-          label: 'Market Confidence',
-          value: '${(summary.confidence * 100).toStringAsFixed(0)}%',
-        ),
-        _AiResultRow(label: 'Sources', value: summary.sources.join(', ')),
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Recent comparable sales',

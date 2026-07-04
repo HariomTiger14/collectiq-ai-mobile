@@ -1,6 +1,7 @@
-import 'dart:io';
-
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/home/home_ui.dart';
+import 'package:collectiq_ai/core/ui/item_details/item_details_ui.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
@@ -15,7 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Detail page for a saved portfolio collectible.
-class CollectibleDetailPage extends ConsumerWidget {
+class CollectibleDetailPage extends ConsumerStatefulWidget {
   /// Creates a collectible detail page.
   const CollectibleDetailPage({required this.item, this.onDelete, super.key});
 
@@ -26,14 +27,41 @@ class CollectibleDetailPage extends ConsumerWidget {
   final Future<bool> Function(String itemId)? onDelete;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CollectibleDetailPage> createState() =>
+      _CollectibleDetailPageState();
+}
+
+class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final portfolioItems = ref.watch(portfolioControllerProvider).items;
+    final wishlistStatus = ref.watch(
+      wishlistStatusForItemProvider(widget.item.id),
+    );
     final currentItem =
         portfolioItems
-            .where((portfolioItem) => portfolioItem.id == item.id)
+            .where((portfolioItem) => portfolioItem.id == widget.item.id)
             .firstOrNull ??
-        item;
+        widget.item;
     final colorScheme = Theme.of(context).colorScheme;
+    final wishlistStatusLabel = wishlistStatus.maybeWhen(
+      data: (status) => status.label,
+      orElse: () => null,
+    );
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -54,46 +82,197 @@ class CollectibleDetailPage extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.xl,
-            AppSpacing.lg,
-            AppSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ImagePreview(item: currentItem),
-                  const SizedBox(height: AppSpacing.xl),
-                  _DetailHeader(item: currentItem),
-                  const SizedBox(height: AppSpacing.xl),
-                  AppPriceHero(
-                    label: 'Estimated market value',
-                    value: _formatAud(currentItem.estimatedValue),
-                    subtitle: currentItem.pricing == null
-                        ? 'Based on the saved AI estimate'
-                        : 'Value range: ${_formatMoney(currentItem.pricing!.lowEstimate, currentItem.pricing!.currency)} - ${_formatMoney(currentItem.pricing!.highEstimate, currentItem.pricing!.currency)}',
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _WishlistStatusSection(item: currentItem),
-                  const SizedBox(height: AppSpacing.xl),
-                  _DetailSections(item: currentItem),
-                  const SizedBox(height: AppSpacing.xl),
-                  _PriceAlertSection(item: currentItem),
-                  const SizedBox(height: AppSpacing.xl),
-                  _ActionButtons(onDelete: onDelete, itemId: currentItem.id),
-                ],
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: ItemHeroImage(
+                imageUrl: currentItem.cloudImageUrl ?? currentItem.imagePath,
+                scrollController: _scrollController,
+                title: currentItem.title,
+                category: currentItem.category,
               ),
             ),
-          ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              sliver: SliverToBoxAdapter(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 960),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ItemCategoryHeader(
+                          title: currentItem.category,
+                          subtitle: 'PackLox Item',
+                        ),
+                        const SizedBox(height: 24),
+                        ItemGlassMetadataCard(
+                          item: currentItem,
+                          wishlistStatusLabel: wishlistStatusLabel,
+                        ),
+                        const SizedBox(height: 32),
+                        SectionCard(
+                          title: 'Attributes',
+                          child: MotionStagger(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: ItemAttributeRow(
+                                  title: 'Name',
+                                  subtitle: currentItem.title,
+                                  trailingIcon: Icons.badge_outlined,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: ItemAttributeRow(
+                                  title: 'Brand',
+                                  subtitle: currentItem.brand ?? '',
+                                  trailingIcon: Icons.business_outlined,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: ItemAttributeRow(
+                                  title: 'Model',
+                                  subtitle: '',
+                                  trailingIcon: Icons.view_in_ar_outlined,
+                                ),
+                              ),
+                              ItemAttributeRow(
+                                title: 'Notes',
+                                subtitle: currentItem.notes ?? '',
+                                trailingIcon: Icons.notes_outlined,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        if (_hasAiInsights(currentItem)) ...[
+                          SectionCard(
+                            title: 'AI Insights',
+                            child: MotionStagger(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: ItemAttributeRow(
+                                    title: 'Confidence',
+                                    subtitle:
+                                        '${(currentItem.confidence * 100).toStringAsFixed(0)}%',
+                                    trailingIcon: Icons.verified_outlined,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        (currentItem.aiReasoning ?? '')
+                                            .trim()
+                                            .isNotEmpty
+                                        ? 16
+                                        : 0,
+                                  ),
+                                  child: ItemAttributeRow(
+                                    title: 'Detected Category',
+                                    subtitle:
+                                        currentItem.primaryMatch ??
+                                        currentItem.category,
+                                    trailingIcon: Icons.auto_awesome_outlined,
+                                  ),
+                                ),
+                                if ((currentItem.aiReasoning ?? '')
+                                    .trim()
+                                    .isNotEmpty)
+                                  ItemAttributeRow(
+                                    title: 'Reasoning',
+                                    subtitle: currentItem.aiReasoning!,
+                                    trailingIcon: Icons.psychology_outlined,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                        AppPriceHero(
+                          label: 'Estimated market value',
+                          value: _formatAud(currentItem.estimatedValue),
+                          subtitle: currentItem.pricing == null
+                              ? 'Based on the saved AI estimate'
+                              : 'Value range: ${_formatMoney(currentItem.pricing!.lowEstimate, currentItem.pricing!.currency)} - ${_formatMoney(currentItem.pricing!.highEstimate, currentItem.pricing!.currency)}',
+                        ),
+                        const SizedBox(height: 32),
+                        _WishlistStatusSection(item: currentItem),
+                        const SizedBox(height: 32),
+                        _DetailSections(item: currentItem),
+                        const SizedBox(height: 32),
+                        _PriceAlertSection(item: currentItem),
+                        const SizedBox(height: 32),
+                        SectionCard(
+                          title: 'Quick Actions',
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: () {
+                                    _showDetailSnackBar(
+                                      context,
+                                      'Re-analysis coming next',
+                                    );
+                                  },
+                                  child: const Text('Re-analyze'),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    _showDetailSnackBar(
+                                      context,
+                                      'Marketplace listing coming next',
+                                    );
+                                  },
+                                  child: const Text('Sell Item'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        ItemActionBar(
+                          onEdit: () => _showEditCollectibleDialog(
+                            context: context,
+                            ref: ref,
+                            item: currentItem,
+                          ),
+                          onShare: () => _shareItem(context, currentItem),
+                          onDelete: widget.onDelete == null
+                              ? null
+                              : () => widget.onDelete!(currentItem.id),
+                        ),
+                        const SizedBox(height: AppSpacing.xxl),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+bool _hasAiInsights(CollectibleItem item) {
+  return item.confidence > 0 ||
+      (item.primaryMatch ?? '').trim().isNotEmpty ||
+      (item.aiReasoning ?? '').trim().isNotEmpty;
+}
+
+void _shareItem(BuildContext context, CollectibleItem item) {
+  _showDetailSnackBar(context, 'Share summary ready for ${item.title}');
 }
 
 Future<void> _showEditCollectibleDialog({
@@ -337,69 +516,6 @@ class _EditTextField extends StatelessWidget {
   }
 }
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      height: 220,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: _imageForPath(colorScheme),
-    );
-  }
-
-  Widget _imageForPath(ColorScheme colorScheme) {
-    final normalizedPath = item.imagePath.trim();
-    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
-      return _placeholder(colorScheme);
-    }
-
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return Image.network(
-        normalizedPath,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => _placeholder(colorScheme),
-      );
-    }
-
-    if (normalizedPath.startsWith('assets/')) {
-      return Image.asset(
-        normalizedPath,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => _placeholder(colorScheme),
-      );
-    }
-
-    return Image.file(
-      File(normalizedPath),
-      fit: BoxFit.contain,
-      gaplessPlayback: true,
-      errorBuilder: (_, _, _) => _placeholder(colorScheme),
-    );
-  }
-
-  Widget _placeholder(ColorScheme colorScheme) {
-    return Center(
-      child: Icon(Icons.style_outlined, size: 56, color: colorScheme.primary),
-    );
-  }
-}
-
 class _WishlistStatusSection extends ConsumerWidget {
   const _WishlistStatusSection({required this.item});
 
@@ -527,75 +643,6 @@ class _WishlistStatusOption extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _DetailHeader extends StatelessWidget {
-  const _DetailHeader({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppTwoLineTitle(
-            item.title,
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              height: 1.12,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            item.category,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              _StatusBadge(
-                label:
-                    '${(item.confidence * 100).toStringAsFixed(0)}% confidence',
-                icon: Icons.verified_outlined,
-              ),
-              _StatusBadge(
-                label: item.condition,
-                icon: Icons.auto_awesome_outlined,
-              ),
-              _StatusBadge(
-                label:
-                    'Market trend: ${item.marketSummary?.trendLabel ?? 'Stable'}',
-                icon: Icons.trending_up_outlined,
-              ),
-              _StatusBadge(
-                label: 'Saved ${_formatDate(item.createdAt)}',
-                icon: Icons.calendar_today_outlined,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -757,7 +804,6 @@ class _DetailSections extends StatelessWidget {
   List<AppMetadataItem> _metadataRows(CollectibleItem item) {
     return [
       _metadataItem('Year', item.year),
-      _metadataItem('Brand', item.brand),
       _metadataItem('Set', item.setName),
       _metadataItem('Series', item.series),
       _metadataItem('Card #', item.cardNumber),
@@ -769,7 +815,6 @@ class _DetailSections extends StatelessWidget {
       _metadataItem('Country', item.country),
       _metadataItem('Mint', item.mint),
       _metadataItem('Material', item.material),
-      _metadataItem('Profile Notes', item.notes),
     ].where((detail) => detail.value.trim().isNotEmpty).toList();
   }
 
@@ -944,49 +989,6 @@ class _ComparableSaleVisualRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.xs),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.labelMedium?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
             ),
           ),
         ],
@@ -1652,60 +1654,6 @@ class _PriceAlertRow extends ConsumerWidget {
     if (context.mounted) {
       _showDetailSnackBar(context, 'Price alert deleted');
     }
-  }
-}
-
-class _ActionButtons extends StatelessWidget {
-  const _ActionButtons({required this.itemId, this.onDelete});
-
-  final String itemId;
-  final Future<bool> Function(String itemId)? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return AppProfileSection(
-      title: 'Actions',
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () {
-              _showDetailSnackBar(context, 'Re-analysis coming next');
-            },
-            child: const Text('Re-analyze'),
-          ),
-        ),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              _showDetailSnackBar(context, 'Marketplace listing coming next');
-            },
-            child: const Text('Sell Item'),
-          ),
-        ),
-        if (onDelete != null) ...[
-          const SizedBox(height: AppSpacing.lg),
-          Divider(color: colorScheme.outlineVariant),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Danger zone',
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.error,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppDangerAction(
-            label: 'Delete Item',
-            onPressed: () => onDelete!(itemId),
-          ),
-        ],
-      ],
-    );
   }
 }
 
