@@ -8,7 +8,8 @@ import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
-import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_service.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
@@ -132,8 +133,8 @@ class ScannerController extends Notifier<ScannerState> {
   /// Gallery service dependency.
   late final GalleryService _galleryService;
 
-  /// AI analysis provider dependency.
-  late final AiAnalysisProvider _aiAnalysisProvider;
+  /// Analyzer service dependency.
+  late final AnalyzerService _analyzerService;
 
   /// Scan enrichment service dependency.
   late final ScanResultEnrichmentService _enrichmentService;
@@ -152,7 +153,7 @@ class ScannerController extends Notifier<ScannerState> {
     _isDisposed = false;
     _cameraService = ref.watch(cameraServiceProvider);
     _galleryService = ref.watch(galleryServiceProvider);
-    _aiAnalysisProvider = ref.watch(aiAnalysisProviderProvider);
+    _analyzerService = ref.watch(analyzerServiceProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     ref.onDispose(() {
@@ -746,8 +747,8 @@ class ScannerController extends Notifier<ScannerState> {
     );
     try {
       final aiStopwatch = Stopwatch()..start();
-      final analysis = await _aiAnalysisProvider.analyze(
-        AiAnalysisRequest(
+      final analyzerResponse = await _analyzerService.analyze(
+        AnalyzerRequest(
           imagePath: selectedImagePath,
           image: state.selectedImage,
           metadata: {
@@ -756,6 +757,7 @@ class ScannerController extends Notifier<ScannerState> {
           },
         ),
       );
+      final analysis = analyzerResponse.toAiAnalysisResult();
       aiStopwatch.stop();
       debugPrint(
         '[Scanner] AI analysis latencyMs=${aiStopwatch.elapsedMilliseconds}',
@@ -796,11 +798,11 @@ class ScannerController extends Notifier<ScannerState> {
         '[Scanner] scan-to-result latencyMs='
         '${scanToResultStopwatch.elapsedMilliseconds}',
       );
-    } on AiAnalysisException catch (error) {
+    } on AnalyzerException catch (error) {
       ref.read(scanPipelineStatusProvider.notifier).markError();
       _trackTelemetry(
         TelemetryEventNames.analyzeFailed,
-        properties: const {'reason': 'ai_provider'},
+        properties: {'reason': 'analyzer', 'type': error.type.name},
       );
       _recordTelemetryError(error, reason: 'scan_error');
       _setState(

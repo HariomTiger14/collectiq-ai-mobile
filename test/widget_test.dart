@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/ai/services/ai_recognition_service.dart';
@@ -2383,6 +2384,14 @@ extension on WidgetTester {
             effectiveOnboardingRepository,
           ),
           aiRecognitionServiceProvider.overrideWithValue(aiRecognitionService),
+          analyzerConfigProvider.overrideWithValue(
+            const AnalyzerConfig(
+              retryPolicy: AnalyzerRetryPolicy(
+                maxAttempts: 1,
+                retryDelay: Duration.zero,
+              ),
+            ),
+          ),
           if (aiAnalysisProviderConfig != null)
             aiAnalysisProviderConfigProvider.overrideWithValue(
               aiAnalysisProviderConfig,

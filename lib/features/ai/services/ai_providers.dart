@@ -1,8 +1,12 @@
 import 'package:collectiq_ai/core/network/api_client.dart';
+import 'package:collectiq_ai/features/ai/data/analyzer/analyzer_provider_factory.dart';
 import 'package:collectiq_ai/features/ai/data/clients/http_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/data/providers/ai_analysis_provider_factory.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_provider.dart';
+import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_service.dart';
 import 'package:collectiq_ai/features/ai/data/repositories/recognition_repository_impl.dart';
 import 'package:collectiq_ai/features/ai/data/services/dio_ai_backend_api_service.dart';
 import 'package:collectiq_ai/features/ai/data/services/noop_ai_backend_api_service.dart';
@@ -85,5 +89,26 @@ final aiAnalysisProviderProvider = Provider<AiAnalysisProvider>((ref) {
     recognitionRepository: ref.watch(recognitionRepositoryProvider),
     marketProvider: ref.watch(marketProviderProvider),
     backendClient: ref.watch(aiBackendClientProvider),
+  );
+});
+
+/// Provides the production analyzer configuration.
+final analyzerConfigProvider = Provider<AnalyzerConfig>((ref) {
+  return AnalyzerConfig.fromEnvironment();
+});
+
+/// Provides the configured analyzer provider.
+final analyzerProviderProvider = Provider<AnalyzerProvider>((ref) {
+  return const AnalyzerProviderFactory().create(
+    config: ref.watch(analyzerConfigProvider),
+    legacyAnalysisProvider: ref.watch(aiAnalysisProviderProvider),
+  );
+});
+
+/// Provides the only analyzer boundary used by app workflow code.
+final analyzerServiceProvider = Provider<AnalyzerService>((ref) {
+  return AnalyzerService(
+    provider: ref.watch(analyzerProviderProvider),
+    config: ref.watch(analyzerConfigProvider),
   );
 });
