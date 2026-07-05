@@ -24,6 +24,9 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
       _initializeCamera();
     });
   }

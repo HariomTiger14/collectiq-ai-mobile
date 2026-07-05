@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final appShellTabControllerProvider =
@@ -11,17 +10,13 @@ class AppShellTabController extends Notifier<int> {
   static const settingsTab = 3;
 
   @override
-  int build() {
-    return homeTab;
-  }
+  int build() => homeTab;
 
   void selectTab(int index, {String reason = 'user'}) {
     if (state == index) {
-      debugPrint('[AppShell] selected tab unchanged: $index ($reason)');
       return;
     }
 
-    debugPrint('[AppShell] selected tab $state -> $index ($reason)');
     state = index;
   }
 

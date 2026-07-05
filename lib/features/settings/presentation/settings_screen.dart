@@ -73,7 +73,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           previous?.isSignedIn != next.isSignedIn) {
         ref.read(syncControllerProvider.notifier).loadStatus();
       }
-      if (previous?.isSignedIn == false && next.isSignedIn) {
+      if (previous?.status == AuthFlowStatus.signingIn &&
+          next.status == AuthFlowStatus.signedIn) {
         ref
             .read(appShellTabControllerProvider.notifier)
             .selectTab(AppShellTabController.homeTab, reason: 'auth-sign-in');

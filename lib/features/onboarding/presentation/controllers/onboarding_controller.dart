@@ -19,12 +19,12 @@ class OnboardingController extends AsyncNotifier<bool> {
   }
 
   Future<void> complete() async {
-    state = const AsyncValue.data(true);
     await _repository.setOnboardingCompleted(true);
+    state = const AsyncValue.data(true);
   }
 
   Future<void> reset() async {
-    state = const AsyncValue.data(false);
     await _repository.setOnboardingCompleted(false);
+    state = const AsyncValue.data(false);
   }
 }

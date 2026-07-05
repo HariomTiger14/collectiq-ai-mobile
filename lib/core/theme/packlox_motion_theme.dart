@@ -12,6 +12,7 @@ class PackLoxMotionTheme {
   static const Curve revealCurve = Curves.easeOutCubic;
   static const Curve transitionCurve = Curves.easeInOutCubic;
   static const Curve hoverCurve = Curves.easeOutQuad;
+  static const Curve navStateCurve = Curves.easeOutCubic;
   static Curve get navSpringCurve => Curves.easeOutBack;
 
   static const double tapScale = 0.96;

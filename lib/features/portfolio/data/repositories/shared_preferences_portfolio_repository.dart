@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local portfolio repository backed by shared preferences.
@@ -18,12 +17,10 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
     final items = await getItems();
     final savedAt = _nextSavedAt(items);
     final savedItem = item.copyWithSavedAt(savedAt);
-    _logItemTimestamp('saving', savedItem);
     final updatedItems = [
       savedItem,
       ...items.where((existingItem) => existingItem.id != savedItem.id),
     ]..sort(compareCollectiblesNewestFirst);
-    _logFinalOrder('addItem-before-persist', updatedItems);
     await _saveItems(updatedItems);
     return savedItem;
   }
@@ -35,7 +32,6 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
       item,
       ...items.where((existingItem) => existingItem.id != item.id),
     ]..sort(compareCollectiblesNewestFirst);
-    _logFinalOrder('upsertSyncedItem-before-persist', updatedItems);
     await _saveItems(updatedItems);
   }
 
@@ -46,7 +42,6 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
       for (final existingItem in items)
         if (existingItem.id == item.id) item else existingItem,
     ]..sort(compareCollectiblesNewestFirst);
-    _logFinalOrder('updateItem-before-persist', updatedItems);
     await _saveItems(updatedItems);
   }
 
@@ -62,12 +57,7 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
     final items = decodedItems
         .map((item) => CollectibleItem.fromJson(item as Map<String, dynamic>))
         .toList();
-    final sortedItems = collectiblesNewestFirst(items);
-    _logFinalOrder('loaded', sortedItems);
-    for (final item in sortedItems) {
-      _logItemTimestamp('loaded', item);
-    }
-    return sortedItems;
+    return collectiblesNewestFirst(items);
   }
 
   @override
@@ -106,10 +96,6 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
   Future<void> _saveItems(List<CollectibleItem> items) async {
     final preferences = await SharedPreferences.getInstance();
     final sortedItems = collectiblesNewestFirst(items);
-    _logFinalOrder('persisting', sortedItems);
-    for (final item in sortedItems) {
-      _logItemTimestamp('persisting', item);
-    }
     final encodedItems = jsonEncode(
       sortedItems.map((item) => item.toJson()).toList(growable: false),
     );
@@ -127,53 +113,6 @@ class SharedPreferencesPortfolioRepository implements PortfolioRepository {
       return now;
     }
 
-    final adjusted = newestExisting.add(const Duration(microseconds: 1));
-    debugPrint(
-      '[PortfolioRepository] adjusted savedAt above existing max '
-      'now=${now.toIso8601String()} '
-      'newestExisting=${newestExisting.toIso8601String()} '
-      'adjusted=${adjusted.toIso8601String()}',
-    );
-    return adjusted;
-  }
-
-  void _logItemTimestamp(String action, CollectibleItem item) {
-    debugPrint(
-      '[PortfolioRepository] $action item '
-      'id=${item.id} '
-      'title="${item.title}" '
-      'imageSource=${_imageSourceFor(item.imagePath)} '
-      'createdAt=${item.createdAt.toIso8601String()} '
-      'savedAt=${item.createdAt.toIso8601String()} '
-      'updatedAt=not-tracked '
-      'displayTimestamp='
-      '${collectibleDisplayTimestamp(item).toIso8601String()}',
-    );
-  }
-
-  void _logFinalOrder(String action, List<CollectibleItem> items) {
-    debugPrint(
-      '[PortfolioRepository] $action final order: '
-      '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
-    );
-  }
-
-  String _imageSourceFor(String imagePath) {
-    final normalizedPath = imagePath.trim();
-    if (normalizedPath.startsWith('sample://')) {
-      return 'sample';
-    }
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return 'network';
-    }
-    if (normalizedPath.startsWith('assets/')) {
-      return 'asset';
-    }
-    if (normalizedPath.isEmpty) {
-      return 'missing';
-    }
-
-    return 'local';
+    return newestExisting.add(const Duration(microseconds: 1));
   }
 }

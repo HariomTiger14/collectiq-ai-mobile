@@ -4,7 +4,6 @@ import 'package:collectiq_ai/features/portfolio/data/repositories/shared_prefere
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the local portfolio repository.
@@ -65,12 +64,21 @@ class PortfolioState {
 class PortfolioController extends Notifier<PortfolioState> {
   /// Portfolio repository dependency.
   late final PortfolioRepository _repository;
+  bool _hasLoaded = false;
 
   @override
   PortfolioState build() {
     _repository = ref.watch(portfolioRepositoryProvider);
-    Future.microtask(loadItems);
+    ensureLoaded();
     return const PortfolioState();
+  }
+
+  void ensureLoaded() {
+    if (_hasLoaded) {
+      return;
+    }
+    _hasLoaded = true;
+    Future.microtask(loadItems);
   }
 
   /// Loads all portfolio items from the repository.
@@ -78,9 +86,10 @@ class PortfolioController extends Notifier<PortfolioState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final items = await _repository.getItems();
-      final sortedItems = collectiblesNewestFirst(items);
-      _logFinalOrder('loadItems', sortedItems);
-      state = state.copyWith(items: sortedItems, isLoading: false);
+      state = state.copyWith(
+        items: collectiblesNewestFirst(items),
+        isLoading: false,
+      );
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -94,27 +103,17 @@ class PortfolioController extends Notifier<PortfolioState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final savedItem = await _repository.addItem(item);
-      debugPrint(
-        '[PortfolioController] saveItem returned saved item '
-        'id=${savedItem.id} '
-        'title="${savedItem.title}" '
-        'createdAt=${savedItem.createdAt.toIso8601String()} '
-        'savedAt=${savedItem.createdAt.toIso8601String()} '
-        'updatedAt=not-tracked '
-        'displayTimestamp='
-        '${collectibleDisplayTimestamp(savedItem).toIso8601String()}',
-      );
       final immediateItems = collectiblesNewestFirst([
         savedItem,
         ...state.items.where((existingItem) => existingItem.id != savedItem.id),
       ]);
-      _logFinalOrder('saveItem-immediate', immediateItems);
       state = state.copyWith(items: immediateItems, isLoading: false);
 
       final persistedItems = await _repository.getItems();
-      final sortedItems = collectiblesNewestFirst(persistedItems);
-      _logFinalOrder('saveItem-reload', sortedItems);
-      state = state.copyWith(items: sortedItems, isLoading: false);
+      state = state.copyWith(
+        items: collectiblesNewestFirst(persistedItems),
+        isLoading: false,
+      );
       await _syncPendingCloudItems();
     } catch (_) {
       state = state.copyWith(
@@ -130,9 +129,10 @@ class PortfolioController extends Notifier<PortfolioState> {
     try {
       await _repository.upsertSyncedItem(item);
       final items = await _repository.getItems();
-      final sortedItems = collectiblesNewestFirst(items);
-      _logFinalOrder('upsertSyncedItem', sortedItems);
-      state = state.copyWith(items: sortedItems, isLoading: false);
+      state = state.copyWith(
+        items: collectiblesNewestFirst(items),
+        isLoading: false,
+      );
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -150,13 +150,13 @@ class PortfolioController extends Notifier<PortfolioState> {
         item,
         ...state.items.where((existingItem) => existingItem.id != item.id),
       ]);
-      _logFinalOrder('updateItem-immediate', immediateItems);
       state = state.copyWith(items: immediateItems, isLoading: false);
 
       final persistedItems = await _repository.getItems();
-      final sortedItems = collectiblesNewestFirst(persistedItems);
-      _logFinalOrder('updateItem-reload', sortedItems);
-      state = state.copyWith(items: sortedItems, isLoading: false);
+      state = state.copyWith(
+        items: collectiblesNewestFirst(persistedItems),
+        isLoading: false,
+      );
       await _syncUpdatedCloudItem(item);
     } catch (_) {
       state = state.copyWith(
@@ -172,9 +172,10 @@ class PortfolioController extends Notifier<PortfolioState> {
     try {
       await _repository.removeItem(id);
       final items = await _repository.getItems();
-      final sortedItems = collectiblesNewestFirst(items);
-      _logFinalOrder('removeItem', sortedItems);
-      state = state.copyWith(items: sortedItems, isLoading: false);
+      state = state.copyWith(
+        items: collectiblesNewestFirst(items),
+        isLoading: false,
+      );
       await _deleteCloudItem(id);
     } catch (_) {
       state = state.copyWith(
@@ -198,26 +199,6 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
-  void _logFinalOrder(String source, List<CollectibleItem> items) {
-    debugPrint(
-      '[PortfolioController] $source final order: '
-      '${items.map((item) => '${item.id}@${collectibleDisplayTimestamp(item).toIso8601String()}').join(' > ')}',
-    );
-    for (final item in items) {
-      debugPrint(
-        '[PortfolioController] $source item '
-        'id=${item.id} '
-        'title="${item.title}" '
-        'imagePath=${item.imagePath} '
-        'createdAt=${item.createdAt.toIso8601String()} '
-        'savedAt=${item.createdAt.toIso8601String()} '
-        'updatedAt=not-tracked '
-        'displayTimestamp='
-        '${collectibleDisplayTimestamp(item).toIso8601String()}',
-      );
-    }
-  }
-
   Future<void> _syncPendingCloudItems() async {
     try {
       await CloudPortfolioSyncCoordinator(
@@ -226,9 +207,7 @@ class PortfolioController extends Notifier<PortfolioState> {
       ).syncPendingItems();
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
-    } on Object catch (error) {
-      debugPrint('[PortfolioController] cloud save sync skipped: $error');
-    }
+    } catch (_) {}
   }
 
   Future<void> _syncUpdatedCloudItem(CollectibleItem item) async {
@@ -239,9 +218,7 @@ class PortfolioController extends Notifier<PortfolioState> {
       ).syncUpdatedItem(item);
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
-    } on Object catch (error) {
-      debugPrint('[PortfolioController] cloud update sync skipped: $error');
-    }
+    } catch (_) {}
   }
 
   Future<void> _deleteCloudItem(String id) async {
@@ -250,9 +227,7 @@ class PortfolioController extends Notifier<PortfolioState> {
         registry: ref.read(cloudServiceRegistryProvider),
         portfolioRepository: _repository,
       ).deleteCloudItem(id);
-    } on Object catch (error) {
-      debugPrint('[PortfolioController] cloud delete sync skipped: $error');
-    }
+    } catch (_) {}
   }
 }
 

@@ -20,82 +20,61 @@ class GlassBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return MotionReveal(
-      offset: 16,
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(
-                  alpha: isDark ? 0.24 : 0.16,
-                ),
-                blurRadius: isDark ? 28 : 42,
-                offset: const Offset(0, -14),
-              ),
-              BoxShadow(
-                color: colorScheme.primary.withValues(alpha: 0.08),
-                blurRadius: 34,
-                offset: const Offset(0, -8),
-              ),
-            ],
-          ),
-          child: RepaintBoundary(
-            child: Container(
-              height: 78,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.86,
-                      )
-                    : colorScheme.surface.withValues(alpha: 0.94),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.58),
-                ),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: isDark ? 0.06 : 0.24),
-                    colorScheme.primary.withValues(alpha: 0.04),
-                  ],
-                ),
-              ),
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              child: Row(
-                children: [
-                  for (var index = 0; index < items.length; index++)
-                    Expanded(
-                      child: NavBarItem(
-                        key: items[index].key,
-                        icon: items[index].icon,
-                        label: items[index].label,
-                        isActive: currentIndex == index,
-                        gradientStyle: items[index].gradientStyle,
-                        onTap: () => onTap(index),
-                      ),
-                    ),
-                ],
-              ),
+    final navChild = Row(
+      children: [
+        for (var index = 0; index < items.length; index++)
+          Expanded(
+            child: NavBarItem(
+              key: ValueKey('${items[index].label}-${currentIndex == index}'),
+              icon: items[index].icon,
+              label: items[index].label,
+              isActive: currentIndex == index,
+              gradientStyle: items[index].gradientStyle,
+              onTap: () => onTap(index),
             ),
           ),
+      ],
+    );
+
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: isDark ? 0.18 : 0.12),
+              blurRadius: isDark ? 22 : 32,
+              offset: const Offset(0, -10),
+            ),
+          ],
+        ),
+        child: Container(
+          height: 78,
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.92)
+                : colorScheme.surface.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.56),
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: navChild,
         ),
       ),
     );
   }
 }
 
-class NavBarItem extends StatefulWidget {
+class NavBarItem extends StatelessWidget {
   const NavBarItem({
     super.key,
     required this.icon,
@@ -112,206 +91,81 @@ class NavBarItem extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<NavBarItem> createState() => _NavBarItemState();
-}
-
-class _NavBarItemState extends State<NavBarItem> {
-  bool _hovered = false;
-
-  void _setHovered(bool value) {
-    if (_hovered == value) {
-      return;
-    }
-    setState(() => _hovered = value);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = _colorsFor(context, widget.gradientStyle);
-    final foreground = widget.isActive
+    final colors = _colorsFor(context, gradientStyle);
+    final foreground = isActive
         ? colorScheme.onPrimary
         : colorScheme.onSurface.withValues(alpha: 0.68);
-    final navSpringDuration = PackLoxMotionTheme.isTestMode
-        ? Duration.zero
-        : PackLoxMotionTheme.navSpringDuration;
-
-    return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: MotionTapScale(
-        onTap: widget.onTap,
-        scale: 0.94,
-        child: AnimatedContainer(
-          duration: PackLoxMotionTheme.medium,
-          curve: PackLoxMotionTheme.hoverCurve,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            color: _hovered
-                ? colors.last.withValues(alpha: isDark ? 0.14 : 0.10)
-                : Colors.transparent,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              NavBarBackgroundGlow(
-                isActive: widget.isActive,
-                colors: colors,
-                isDark: isDark,
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 52,
-                    height: 32,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AnimatedScale(
-                          scale: widget.isActive ? 1.04 : 1,
-                          duration: navSpringDuration,
-                          curve: PackLoxMotionTheme.navSpringCurve,
-                          child: AnimatedContainer(
-                            width: widget.isActive ? 50 : 0,
-                            height: 34,
-                            duration: navSpringDuration,
-                            curve: PackLoxMotionTheme.navSpringCurve,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.pill,
-                              ),
-                              gradient: LinearGradient(
-                                colors: colors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              border: widget.isActive
-                                  ? Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                    )
-                                  : null,
-                              boxShadow: widget.isActive
-                                  ? [
-                                      BoxShadow(
-                                        color: colors.last.withValues(
-                                          alpha: isDark ? 0.22 : 0.28,
-                                        ),
-                                        blurRadius: 22,
-                                        offset: const Offset(0, 10),
-                                      ),
-                                    ]
-                                  : const [],
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
-                        AnimatedSwitcher(
-                          duration: navSpringDuration,
-                          switchInCurve: PackLoxMotionTheme.navSpringCurve,
-                          switchOutCurve: PackLoxMotionTheme.navSpringCurve,
-                          transitionBuilder: (child, animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.82, end: 1)
-                                    .animate(
-                                      CurvedAnimation(
-                                        parent: animation,
-                                        curve:
-                                            PackLoxMotionTheme.navSpringCurve,
-                                      ),
-                                    ),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: Icon(
-                            widget.icon,
-                            key: ValueKey('${widget.label}-${widget.isActive}'),
-                            size: widget.isActive
-                                ? AppIconSizes.md
-                                : AppIconSizes.md,
-                            color: foreground,
-                          ),
-                        ),
-                      ],
+    final content = Container(
+      height: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: isActive
+            ? colors.last.withValues(alpha: isDark ? 0.18 : 0.10)
+            : Colors.transparent,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 50,
+            height: 34,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              gradient: isActive
+                  ? LinearGradient(
+                      colors: colors,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isActive
+                  ? null
+                  : colorScheme.surfaceContainerHighest.withValues(
+                      alpha: isDark ? 0.34 : 0.0,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  AnimatedDefaultTextStyle(
-                    duration: PackLoxMotionTheme.medium,
-                    curve: PackLoxMotionTheme.hoverCurve,
-                    style:
-                        textTheme.labelSmall?.copyWith(
-                          color: widget.isActive
-                              ? colorScheme.onSurface
-                              : colorScheme.onSurfaceVariant,
-                          fontWeight: widget.isActive
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                          letterSpacing: 0,
-                        ) ??
-                        TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                        ),
-                    child: Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
+            child: Icon(icon, color: foreground, size: AppIconSizes.md),
           ),
-        ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                textTheme.labelSmall?.copyWith(
+                  color: isActive
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  letterSpacing: 0,
+                ) ??
+                TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+          ),
+        ],
       ),
     );
-  }
-}
 
-class NavBarBackgroundGlow extends StatelessWidget {
-  const NavBarBackgroundGlow({
-    super.key,
-    required this.isActive,
-    required this.colors,
-    required this.isDark,
-  });
-
-  final bool isActive;
-  final List<Color> colors;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: AnimatedOpacity(
-        opacity: isActive ? (isDark ? 0.18 : 0.12) : 0,
-        duration: PackLoxMotionTheme.slow,
-        curve: PackLoxMotionTheme.revealCurve,
-        child: Container(
-          width: 72,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              colors: [
-                colors.last.withValues(alpha: 0.85),
-                colors.first.withValues(alpha: 0),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
+    return MotionTapScale(
+      onTap: onTap,
+      scale: 0.97,
+      child: AnimatedContainer(
+        duration: PackLoxMotionTheme.fast,
+        curve: PackLoxMotionTheme.navStateCurve,
+        child: AnimatedSwitcher(
+          duration: PackLoxMotionTheme.fast,
+          switchInCurve: PackLoxMotionTheme.navStateCurve,
+          switchOutCurve: PackLoxMotionTheme.navStateCurve,
+          child: KeyedSubtree(key: ValueKey<bool>(isActive), child: content),
         ),
       ),
     );

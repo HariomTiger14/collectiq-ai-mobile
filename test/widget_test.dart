@@ -103,8 +103,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isTrue);
-    expect(find.text('Good Evening, Harry'), findsOneWidget);
-    expect(find.text('Your collection hub'), findsOneWidget);
+    expect(find.text('Your Collection Hub'), findsOneWidget);
     expect(find.text('Quick Actions'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
@@ -116,7 +115,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome to PackLox'), findsNothing);
-    expect(find.text('Good Evening, Harry'), findsOneWidget);
+    expect(find.text('Your Collection Hub'), findsOneWidget);
   });
 
   testWidgets('portfolio value trend widget renders with snapshot data', (
@@ -207,14 +206,44 @@ void main() {
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Good Evening, Harry'), findsOneWidget);
-    expect(find.text('Welcome back to PackLox'), findsOneWidget);
+    expect(find.text('PackLox'), findsOneWidget);
+    expect(find.text('Your Collection Hub'), findsOneWidget);
+    expect(find.text('0 items'), findsOneWidget);
+    expect(find.text('AUD 0'), findsWidgets);
+    expect(find.text('Ready to scan'), findsOneWidget);
     expect(find.text('Scan Item'), findsOneWidget);
-    expect(find.text('Your collection hub'), findsOneWidget);
+    expect(find.text('Add Manually'), findsOneWidget);
+    expect(find.text('Search Database'), findsOneWidget);
+    expect(find.text('Import Collection'), findsOneWidget);
+    expect(find.text('Soon'), findsWidgets);
     expect(find.text('Quick Actions'), findsOneWidget);
+    await tester.reveal(find.text('Portfolio Snapshot'));
     expect(find.text('Portfolio Snapshot'), findsWidgets);
-    await tester.reveal(find.text('AI Insights'));
-    expect(find.text('AI Insights'), findsWidgets);
+    expect(
+      find.text('Your collection starts with your first scan.'),
+      findsWidgets,
+    );
+    await tester.reveal(find.text('Recent Activity'));
+    expect(
+      find.text('Your latest discoveries will appear here.'),
+      findsWidgets,
+    );
+    await tester.reveal(find.text('Starter Categories'));
+    expect(find.text('Starter Categories'), findsWidgets);
+    expect(find.text('Cards'), findsOneWidget);
+    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('Comics'), findsOneWidget);
+    expect(find.text('Figures'), findsOneWidget);
+    expect(find.text('Watches'), findsOneWidget);
+    expect(find.text('Stamps'), findsOneWidget);
+    await tester.reveal(find.text('AI Insight'));
+    expect(find.text('AI Insight'), findsWidgets);
+    expect(
+      find.text(
+        'Scan one collectible to unlock valuation, rarity clues, and collection recommendations.',
+      ),
+      findsOneWidget,
+    );
     await tester.reveal(find.text('System Status'));
     expect(find.text('System Status'), findsWidgets);
     expect(find.text('Start PackLox Scan'), findsNothing);
@@ -263,11 +292,14 @@ void main() {
     expect(find.text('Portfolio Snapshot'), findsWidgets);
     expect(find.text('Dashboard Charizard'), findsWidgets);
     expect(find.text('Dashboard Silver Eagle'), findsWidgets);
-    await tester.reveal(find.text('AI Insights'));
-    expect(find.text('AI Insights'), findsWidgets);
+    expect(find.text('Categories'), findsWidgets);
+    expect(find.text('Top asset'), findsWidgets);
+    await tester.reveal(find.text('AI Insight'));
+    expect(find.text('AI Insight'), findsWidgets);
     await tester.reveal(find.text('Collection Value'));
     expect(find.text('Collection Value'), findsWidgets);
     expect(find.text('AUD 2,750'), findsWidgets);
+    expect(find.text('Top asset: Dashboard Charizard'), findsOneWidget);
     await tester.reveal(find.text('System Status'));
     expect(find.text('System Status'), findsWidgets);
   });
@@ -318,7 +350,7 @@ void main() {
     expect(find.text('Scan with Camera'), findsOneWidget);
   });
 
-  testWidgets('restores Scan tab after shell recreation', (
+  testWidgets('shell recreation returns to Home and Scan still works', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp();
@@ -327,7 +359,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsOneWidget);
 
-    await tester.restartAndRestore();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpCollectIqApp();
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Scanner'), findsNothing);
+    expect(find.text('Quick Actions'), findsOneWidget);
+
+    await tester.tap(find.text('Scan'));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsOneWidget);
@@ -549,7 +589,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final navigation = tester.widget<GlassBottomNavBar>(
-      find.byKey(const ValueKey('bottom-navigation')),
+      find.byType(GlassBottomNavBar),
     );
     expect(navigation.currentIndex, 0);
     expect(find.text(AuthMessages.signedIn), findsOneWidget);
@@ -926,19 +966,24 @@ void main() {
       );
 
       await tester.openSettings();
-      await tester.reveal(
-        find.byKey(const ValueKey('settings-auth-account-panel')),
+      final accountPanel = find.byKey(
+        const ValueKey('settings-auth-account-panel'),
       );
+      final settingsScrollView = find.byType(Scrollable).last;
+      for (var attempt = 0; attempt < 12; attempt += 1) {
+        if (accountPanel.evaluate().isNotEmpty) {
+          break;
+        }
+        await tester.drag(settingsScrollView, const Offset(0, -320));
+        await tester.pump();
+      }
       await tester.pump();
 
       expect(
         find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
         findsNothing,
       );
-      expect(
-        find.byKey(const ValueKey('settings-auth-account-panel')),
-        findsOneWidget,
-      );
+      expect(accountPanel, findsOneWidget);
       expect(
         find.byKey(const ValueKey('settings-auth-email-field')),
         findsNothing,
@@ -1083,6 +1128,8 @@ void main() {
       galleryService: _SelectedGalleryService(),
     );
 
+    await tester.tap(find.text('Scan'));
+    await tester.pump();
     await tester.pumpUntilFound(find.text('Recovered image'));
 
     expect(find.text('AI Scanner'), findsOneWidget);
@@ -2361,6 +2408,8 @@ extension on WidgetTester {
       ),
     );
     await pump();
+    await pump(const Duration(milliseconds: 50));
+    await pump(const Duration(milliseconds: 50));
   }
 
   Future<void> pumpVisualAnalytics(Widget child) {
@@ -2416,6 +2465,7 @@ extension on WidgetTester {
 
   Future<void> reveal(Finder finder) async {
     for (var attempt = 0; attempt < 20; attempt += 1) {
+      await pump(const Duration(milliseconds: 50));
       if (finder.evaluate().isNotEmpty) {
         await ensureVisible(finder.first);
         await pump();

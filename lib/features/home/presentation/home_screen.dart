@@ -1,11 +1,9 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
-import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/ui/home/home_ui.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/widgets/glass_card.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
-import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -24,18 +22,47 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scrollController = ScrollController();
+  final ValueNotifier<double> _heroScrollOffset = ValueNotifier<double>(0);
 
   @override
   void initState() {
     super.initState();
-    debugPrint('[HomeScreen] init');
+    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
-    debugPrint('[HomeScreen] dispose');
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    _heroScrollOffset.dispose();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    _updateHeroScrollOffset();
+  }
+
+  void _updateHeroScrollOffset() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final offset = _scrollController.offset;
+    final quantizedOffset = _quantizeHeroScrollOffset(offset);
+    if ((_heroScrollOffset.value - quantizedOffset).abs() < 0.1) {
+      return;
+    }
+    _heroScrollOffset.value = quantizedOffset;
+  }
+
+  double _quantizeHeroScrollOffset(double offset) {
+    if (offset < 0) {
+      return offset;
+    }
+    const bucketSize = 24.0;
+    return (offset / bucketSize).roundToDouble() * bucketSize;
   }
 
   @override
@@ -48,10 +75,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final insights = const CollectorDashboardAnalyticsService().build(
       orderedItems,
     );
-    final smartIntelligence = const SmartCollectorInsightsService().build(
-      insights,
-    );
-
     Widget framed(Widget child, {EdgeInsetsGeometry? padding}) {
       return Padding(
         padding:
@@ -92,25 +115,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       HomeQuickAction(
         icon: Icons.document_scanner_outlined,
         title: 'Scan Item',
-        subtitle: 'Open camera',
+        subtitle: 'Identify a collectible',
         onTap: widget.onScanPressed,
       ),
       HomeQuickAction(
-        icon: Icons.add_circle_outline,
-        title: 'Add Item',
-        subtitle: 'Start capture',
-        onTap: widget.onScanPressed,
+        icon: Icons.add_box_outlined,
+        title: 'Add Manually',
+        subtitle: 'Soon',
       ),
       HomeQuickAction(
-        icon: Icons.collections_bookmark_outlined,
-        title: 'View Portfolio',
-        subtitle: '${orderedItems.length} saved',
-        onTap: () => ref
-            .read(appShellTabControllerProvider.notifier)
-            .selectTab(
-              AppShellTabController.portfolioTab,
-              reason: 'home-quick-action',
-            ),
+        icon: Icons.manage_search_outlined,
+        title: 'Search Database',
+        subtitle: 'Soon',
+      ),
+      HomeQuickAction(
+        icon: Icons.upload_file_outlined,
+        title: 'Import Collection',
+        subtitle: 'Soon',
       ),
     ];
 
@@ -119,15 +140,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         icon: Icons.inventory_2_outlined,
         title: 'Portfolio Snapshot',
         subtitle: isPortfolioEmpty
-            ? 'Build your starter collection'
+            ? 'Your collection starts with your first scan.'
             : '${insights.itemCount} saved collectibles',
         child: _PortfolioSnapshotCompact(insights: insights),
-      ),
-      _HomeDashboardTile(
-        icon: Icons.category_outlined,
-        title: 'Suggested Collections',
-        subtitle: 'Cards, coins, comics, and figures',
-        child: const _CollectibleCategoryChips(),
       ),
     ];
 
@@ -136,11 +151,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         icon: Icons.history_outlined,
         title: 'Recent Activity',
         subtitle: isPortfolioEmpty
-            ? 'Your latest scans will appear here.'
+            ? 'Your latest discoveries will appear here.'
             : '${recentItems.length} latest saved',
         child: isPortfolioEmpty
             ? const _HomePlaceholderText(
-                'Scan your first collectible to begin.',
+                'Your latest discoveries will appear here.',
               )
             : _RecentActivityList(
                 items: recentItems,
@@ -152,17 +167,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final aiInsightTiles = [
       _HomeDashboardTile(
         icon: Icons.auto_awesome_outlined,
-        title: 'AI Insights',
-        subtitle: smartIntelligence.collectionScore.label,
+        title: 'AI Insight',
+        subtitle: isPortfolioEmpty
+            ? 'Valuation and rarity guidance'
+            : insights.collectionHealth.label,
         child: _HomeInsightLine(
           icon: Icons.psychology_alt_outlined,
-          title: smartIntelligence.recommendations.isEmpty
-              ? 'Scan assistant ready'
-              : smartIntelligence.recommendations.first.title,
-          value: _formatPercent(insights.averageConfidence),
-          subtitle: smartIntelligence.recommendations.isEmpty
-              ? 'Build your starter collection with cards, coins, comics, or figures.'
-              : smartIntelligence.recommendations.first.message,
+          title: 'AI Insight',
+          value: isPortfolioEmpty
+              ? 'Ready'
+              : _formatPercent(insights.averageConfidence),
+          subtitle: isPortfolioEmpty
+              ? 'Scan one collectible to unlock valuation, rarity clues, and collection recommendations.'
+              : insights.insights.first.message,
         ),
       ),
     ];
@@ -171,8 +188,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _HomeDashboardTile(
         icon: Icons.account_balance_wallet_outlined,
         title: 'Collection Value',
-        subtitle:
-            'Estimated market value across ${insights.itemCount} collectibles',
+        subtitle: 'Estimated value and top asset',
         child: _HomeValueSummary(insights: insights),
       ),
     ];
@@ -181,8 +197,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _HomeDashboardTile(
         icon: Icons.cloud_done_outlined,
         title: 'System Status',
-        subtitle: 'Compact local-first summary',
+        subtitle: 'Local-first essentials',
         child: _SystemStatusCompact(itemCount: orderedItems.length),
+      ),
+    ];
+
+    final starterCategoryTiles = [
+      const _HomeDashboardTile(
+        icon: Icons.category_outlined,
+        title: 'Starter Categories',
+        subtitle: 'Collector lanes PackLox understands',
+        child: _CollectibleCategoryChips(),
       ),
     ];
 
@@ -190,16 +215,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: CustomScrollView(
+          key: const PageStorageKey<String>('home-scroll-position'),
           controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(
               child: framed(
-                AnimatedBuilder(
-                  animation: _scrollController,
-                  builder: (context, child) {
-                    final scrollOffset = _scrollController.hasClients
-                        ? _scrollController.offset
-                        : 0.0;
+                ValueListenableBuilder<double>(
+                  valueListenable: _heroScrollOffset,
+                  builder: (context, scrollOffset, child) {
                     return MotionElasticHero(
                       baseHeight: 216,
                       scrollOffset: scrollOffset,
@@ -209,7 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           itemCount: insights.itemCount,
                           estimatedValue: _formatAud(insights.totalValue),
                           lastScanStatus: insights.mostRecentItem == null
-                              ? 'No scans yet'
+                              ? 'Ready to scan'
                               : _formatDate(insights.mostRecentItem!.createdAt),
                         ),
                       ),
@@ -225,10 +248,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             sliverBox(
-              _HomeCompatibilityLabels(orderedItems: orderedItems),
-              padding: EdgeInsets.zero,
-            ),
-            sliverBox(
               const HomeSectionHeader('Quick Actions'),
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
@@ -240,37 +259,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             sliverBox(HomeQuickActionsRow(actions: quickActions)),
             ...sectionSlivers('Portfolio Snapshot', portfolioTiles),
             ...sectionSlivers('Recent Activity', recentActivityTiles),
-            ...sectionSlivers('AI Insights', aiInsightTiles),
+            ...sectionSlivers('Starter Categories', starterCategoryTiles),
+            ...sectionSlivers('AI Insight', aiInsightTiles),
             ...sectionSlivers('Collection Value', valueTiles),
             ...sectionSlivers('System Status', systemTiles),
             const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeCompatibilityLabels extends StatelessWidget {
-  const _HomeCompatibilityLabels({required this.orderedItems});
-
-  final List<CollectibleItem> orderedItems;
-
-  @override
-  Widget build(BuildContext context) {
-    final labels = <String>['Good Evening, Harry', 'Welcome back to PackLox'];
-
-    return SizedBox(
-      width: 1,
-      height: 1,
-      child: Opacity(
-        opacity: 0,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [for (final label in labels) Text(label)],
-          ),
         ),
       ),
     );
@@ -316,7 +310,8 @@ class HomeQuickActionsRow extends StatelessWidget {
                   for (var index = 0; index < actions.length; index++) ...[
                     SizedBox(
                       width: isWide ? tileWidth : 260,
-                      child: GlassCard(
+                      child: _homeSurface(
+                        context,
                         child: _HomeQuickActionTile(actions[index]),
                       ),
                     ),
@@ -340,66 +335,91 @@ class _HomeQuickActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isEnabled = action.onTap != null;
 
     return InkWell(
       onTap: action.onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primaryContainer.withValues(alpha: 0.56),
-                    colorScheme.secondaryContainer.withValues(alpha: 0.34),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Icon(
-                action.icon,
-                color: colorScheme.primary,
-                size: AppIconSizes.md,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: isEnabled ? 1 : 0.72,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    action.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.h3.copyWith(
-                      color: colorScheme.onSurface,
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      gradient: LinearGradient(
+                        colors: [
+                          colorScheme.primaryContainer.withValues(alpha: 0.56),
+                          colorScheme.secondaryContainer.withValues(
+                            alpha: 0.34,
+                          ),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Icon(
+                      action.icon,
+                      color: colorScheme.primary,
+                      size: AppIconSizes.sm,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    action.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption.copyWith(
+                  const Spacer(),
+                  if (isEnabled)
+                    Icon(
+                      Icons.chevron_right,
                       color: colorScheme.onSurfaceVariant,
+                      size: AppIconSizes.sm,
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.14),
+                        ),
+                      ),
+                      child: Text(
+                        'Soon',
+                        style: AppTextStyles.caption.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
                 ],
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Icon(
-              Icons.chevron_right,
-              color: colorScheme.onSurfaceVariant,
-              size: AppIconSizes.sm,
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                action.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.h3.copyWith(color: colorScheme.onSurface),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                action.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -452,11 +472,15 @@ class HomeCardGroup extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: index == children.length - 1 ? 0 : AppSpacing.md,
             ),
-            child: GlassCard(child: children[index]),
+            child: _homeSurface(context, child: children[index]),
           ),
       ],
     );
   }
+}
+
+Widget _homeSurface(BuildContext context, {required Widget child}) {
+  return GlassCard(child: child);
 }
 
 class _HomeDashboardTile extends StatelessWidget {
@@ -620,24 +644,32 @@ class _PortfolioSnapshotCompact extends StatelessWidget {
               width: width,
               child: _CompactMetricTile(
                 icon: Icons.inventory_2_outlined,
-                label: 'Items',
+                label: 'Total items',
                 value: insights.itemCount.toString(),
               ),
             ),
             SizedBox(
               width: width,
               child: _CompactMetricTile(
-                icon: Icons.payments_outlined,
-                label: 'Average',
-                value: _formatAud(insights.averageItemValue),
+                icon: Icons.category_outlined,
+                label: 'Categories',
+                value: _categoryCount(insights).toString(),
               ),
             ),
             SizedBox(
               width: width,
               child: _CompactMetricTile(
-                icon: Icons.verified_outlined,
-                label: 'Confidence',
-                value: _formatPercent(insights.averageConfidence),
+                icon: Icons.payments_outlined,
+                label: 'Estimated value',
+                value: _formatAud(insights.totalValue),
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: _CompactMetricTile(
+                icon: Icons.workspace_premium_outlined,
+                label: 'Top asset',
+                value: insights.highestValueItem?.title ?? 'None yet',
               ),
             ),
           ],
@@ -716,6 +748,8 @@ class _CollectibleCategoryChips extends StatelessWidget {
       (Icons.monetization_on_outlined, 'Coins'),
       (Icons.menu_book_outlined, 'Comics'),
       (Icons.toys_outlined, 'Figures'),
+      (Icons.watch_outlined, 'Watches'),
+      (Icons.mark_email_unread_outlined, 'Stamps'),
     ];
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -763,23 +797,81 @@ class _SystemStatusCompact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _CompactStatusList(
+      rows: [
+        _StatusRowData(
+          icon: Icons.lock_outline,
+          label: 'Portfolio',
+          value: 'Local',
+        ),
+        _StatusRowData(
+          icon: Icons.storage_outlined,
+          label: 'Storage',
+          value: itemCount == 0 ? 'Ready' : '$itemCount items',
+        ),
+        const _StatusRowData(
+          icon: Icons.sync_outlined,
+          label: 'Sync',
+          value: 'Local-first',
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusRowData {
+  const _StatusRowData({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+}
+
+class _CompactStatusList extends StatelessWidget {
+  const _CompactStatusList({required this.rows});
+
+  final List<_StatusRowData> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Column(
       children: [
-        _HomeInsightLine(
-          icon: Icons.lock_outline,
-          title: 'Local portfolio active',
-          value: 'Ready',
-          subtitle: 'Cloud sync stays optional in Settings.',
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _HomeInsightLine(
-          icon: Icons.storage_outlined,
-          title: 'Storage',
-          value: itemCount.toString(),
-          subtitle: itemCount == 0
-              ? 'Scans will appear here after saving.'
-              : 'Saved collectibles remain available on this device.',
-        ),
+        for (var index = 0; index < rows.length; index++) ...[
+          Row(
+            children: [
+              Icon(rows[index].icon, color: colorScheme.primary, size: 18),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  rows[index].label,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                rows[index].value,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          if (index != rows.length - 1)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Divider(height: 1),
+            ),
+        ],
       ],
     );
   }
@@ -823,6 +915,16 @@ class _HomeValueSummary extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        Text(
+          'Month change: ${_formatMonthlyChange(insights)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleSmall?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           'Top asset: ${insights.highestValueItem?.title ?? 'None yet'}',
           maxLines: 1,
@@ -1049,6 +1151,25 @@ String _formatAud(double value) {
 
 String _formatPercent(double value) {
   return '${(value * 100).toStringAsFixed(0)}%';
+}
+
+int _categoryCount(CollectorDashboardAnalytics insights) {
+  return insights.categoryDistribution.values
+      .where((count) => count > 0)
+      .length;
+}
+
+String _formatMonthlyChange(CollectorDashboardAnalytics insights) {
+  final snapshots = insights.monthlySnapshots;
+  if (snapshots.length < 2) {
+    return 'No trend yet';
+  }
+
+  final previous = snapshots[snapshots.length - 2].totalValue;
+  final current = snapshots.last.totalValue;
+  final change = current - previous;
+  final sign = change >= 0 ? '+' : '-';
+  return '$sign${_formatAud(change.abs())}';
 }
 
 String _formatDate(DateTime date) {

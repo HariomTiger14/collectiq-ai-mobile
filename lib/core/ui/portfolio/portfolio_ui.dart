@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -20,23 +18,7 @@ class PortfolioHeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final listenable = scrollController ?? ScrollController();
-
-    return AnimatedBuilder(
-      animation: listenable,
-      builder: (context, child) {
-        final offset = scrollController?.hasClients ?? false
-            ? scrollController!.offset
-            : 0.0;
-
-        return MotionElasticHero(
-          baseHeight: 184,
-          scrollOffset: offset,
-          child: MotionParallax(scrollOffset: offset, child: child!),
-        );
-      },
-      child: _HeroSurface(gradientStyle: gradientStyle),
-    );
+    return _HeroSurface(gradientStyle: gradientStyle);
   }
 }
 
@@ -56,87 +38,89 @@ class _HeroSurface extends StatelessWidget {
       borderRadius: const BorderRadius.vertical(
         bottom: Radius.circular(AppRadius.xxl),
       ),
-      child: MotionAmbientGradient(
-        gradientBuilder: _ambientGradientFor(gradientStyle),
-        child: Container(
-          height: 184,
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xxl,
-            AppSpacing.xxl,
-            AppSpacing.xxl,
-            AppSpacing.xl,
+      child: Container(
+        height: 184,
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxl,
+          AppSpacing.xxl,
+          AppSpacing.xxl,
+          AppSpacing.xl,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppRadius.xxl),
           ),
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(AppRadius.xxl),
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colors.last.withValues(alpha: isDark ? 0.20 : 0.26),
+              blurRadius: 36,
+              offset: const Offset(0, 20),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.last.withValues(alpha: isDark ? 0.24 : 0.32),
-                blurRadius: 46,
-                offset: const Offset(0, 24),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -22,
-                top: -34,
-                child: Container(
-                  width: 138,
-                  height: 138,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.14),
-                      width: 22,
-                    ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -22,
+              top: -34,
+              child: Container(
+                width: 138,
+                height: 138,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.14),
+                    width: 22,
                   ),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your Collections',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.headlineMedium?.copyWith(
-                        color: colorScheme.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        height: 1.05,
-                      ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Collections',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.headlineMedium?.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.w900,
+                      height: 1.05,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'PackLox Portfolio Overview',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.82),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'PackLox Portfolio Overview',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.82),
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Your collectible library',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.68),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Your collectible library',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.68),
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -173,55 +157,47 @@ class _PortfolioActionTileState extends State<PortfolioActionTile> {
         onExit: (_) => setState(() => _hovered = false),
         child: MotionTapScale(
           onTap: widget.onTap,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-              child: AnimatedContainer(
-                duration: PackLoxMotionTheme.medium,
-                curve: PackLoxMotionTheme.hoverCurve,
-                height: 82,
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.42,
-                        )
-                      : colorScheme.surface.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(
-                        alpha: _hovered ? 0.14 : (isDark ? 0.06 : 0.08),
-                      ),
-                      blurRadius: _hovered ? 30 : 22,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      widget.icon,
-                      color: colorScheme.primary,
-                      size: AppIconSizes.md,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
+          child: AnimatedContainer(
+            duration: PackLoxMotionTheme.medium,
+            curve: PackLoxMotionTheme.hoverCurve,
+            height: 82,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+                  : colorScheme.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(
+                    alpha: _hovered ? 0.14 : (isDark ? 0.06 : 0.08),
+                  ),
+                  blurRadius: _hovered ? 30 : 22,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.icon,
+                  color: colorScheme.primary,
+                  size: AppIconSizes.md,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
           ),
         ),
@@ -361,62 +337,54 @@ class PortfolioSectionCard extends StatelessWidget {
           ),
         );
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
-                  : colorScheme.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withValues(
-                    alpha: isDark ? 0.16 : 0.10,
-                  ),
-                  blurRadius: 38,
-                  offset: const Offset(0, 22),
-                ),
-              ],
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: isDark ? 0.05 : 0.28),
-                  colorScheme.primary.withValues(alpha: 0.03),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-                child,
-              ],
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          color: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+              : colorScheme.surface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: isDark ? 0.16 : 0.10),
+              blurRadius: 38,
+              offset: const Offset(0, 22),
+            ),
+          ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: isDark ? 0.05 : 0.28),
+              colorScheme.primary.withValues(alpha: 0.03),
+            ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            child,
+          ],
         ),
       ),
     );
@@ -462,53 +430,45 @@ class _PortfolioGlassItemCardState extends State<PortfolioGlassItemCard> {
       ),
       child: MotionTapScale(
         onTap: widget.onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.42,
-                      )
-                    : colorScheme.surface.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.shadow.withValues(
-                      alpha: isDark ? 0.16 : 0.10,
-                    ),
-                    blurRadius: 40,
-                    offset: const Offset(0, 22),
-                  ),
-                ],
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 560;
-                  final content = _PortfolioItemContent(
-                    item: widget.item,
-                    isCompact: isCompact,
-                    wishlistStatusLabel: widget.wishlistStatusLabel,
-                    onEdit: widget.onEdit,
-                    onShare: widget.onShare,
-                    onDelete: widget.onDelete,
-                  );
-
-                  if (isCompact) {
-                    return content;
-                  }
-
-                  return content;
-                },
-              ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
+                : colorScheme.surface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(
+                  alpha: isDark ? 0.16 : 0.10,
+                ),
+                blurRadius: 40,
+                offset: const Offset(0, 22),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 560;
+              final content = _PortfolioItemContent(
+                item: widget.item,
+                isCompact: isCompact,
+                wishlistStatusLabel: widget.wishlistStatusLabel,
+                onEdit: widget.onEdit,
+                onShare: widget.onShare,
+                onDelete: widget.onDelete,
+              );
+
+              if (isCompact) {
+                return content;
+              }
+
+              return content;
+            },
           ),
         ),
       ),
@@ -808,14 +768,6 @@ List<Color> _colorsFor(BuildContext context, GradientStyle style) {
       isDark
           ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
           : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
-  };
-}
-
-Gradient Function(double) _ambientGradientFor(GradientStyle style) {
-  return switch (style) {
-    GradientStyle.purpleDeepBlue => PackLoxMotionTheme.ambientPurpleDeepBlue,
-    GradientStyle.blueIndigo ||
-    GradientStyle.tealEmerald => PackLoxMotionTheme.ambientBlueIndigo,
   };
 }
 

@@ -52,12 +52,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[PortfolioScreen] init');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(portfolioControllerProvider.notifier).ensureLoaded();
+    });
   }
 
   @override
   void dispose() {
-    debugPrint('[PortfolioScreen] dispose');
     _scrollController.dispose();
     super.dispose();
   }
@@ -69,14 +73,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
     final orderedItems = portfolioState.orderedItems;
     final visibleItems = _visibleItems(orderedItems);
-    final wishlistStatusByItemId = ref
-        .watch(wishlistEntriesProvider)
-        .maybeWhen<Map<String, WishlistStatus>>(
-          data: (entries) => {
-            for (final entry in entries) entry.itemId: entry.status,
-          },
-          orElse: () => const {},
-        );
+    final wishlistStatusByItemId = portfolioState.items.isEmpty
+        ? const <String, WishlistStatus>{}
+        : ref
+              .watch(wishlistEntriesProvider)
+              .maybeWhen<Map<String, WishlistStatus>>(
+                data: (entries) => {
+                  for (final entry in entries) entry.itemId: entry.status,
+                },
+                orElse: () => const {},
+              );
 
     return Scaffold(
       backgroundColor: colorScheme.surface,

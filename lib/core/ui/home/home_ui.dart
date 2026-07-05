@@ -6,7 +6,7 @@ class HomeHeroHeader extends StatelessWidget {
     super.key,
     this.itemCount = 0,
     this.estimatedValue = 'AUD 0',
-    this.lastScanStatus = 'No scans yet',
+    this.lastScanStatus = 'Ready to scan',
   });
 
   final int itemCount;
@@ -17,6 +17,7 @@ class HomeHeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
 
     return RepaintBoundary(
       child: ClipRRect(
@@ -91,47 +92,108 @@ class HomeHeroHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.xl,
-                  AppSpacing.xl,
-                  AppSpacing.lg,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your collection hub',
-                      style: AppTextStyles.h1.copyWith(
-                        color: colorScheme.onPrimary,
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompactWidth = constraints.maxWidth < 340;
+                    final isCompactHeight = constraints.maxHeight < 184;
+                    final isCompactText = textScale > 1.1;
+                    final useCompactLayout =
+                        isCompactWidth || isCompactHeight || isCompactText;
+                    final horizontalPadding = useCompactLayout
+                        ? AppSpacing.lg
+                        : AppSpacing.xl;
+                    final topPadding = useCompactLayout
+                        ? AppSpacing.lg
+                        : AppSpacing.xl;
+                    final bottomPadding = useCompactLayout
+                        ? AppSpacing.md
+                        : AppSpacing.lg;
+                    final titleStyle =
+                        (useCompactLayout
+                                ? Theme.of(context).textTheme.headlineSmall
+                                : Theme.of(context).textTheme.headlineMedium)
+                            ?.copyWith(
+                              color: colorScheme.onPrimary,
+                              fontWeight: FontWeight.w800,
+                            );
+                    final bodyStyle =
+                        (useCompactLayout
+                                ? Theme.of(context).textTheme.bodyMedium
+                                : Theme.of(context).textTheme.bodyLarge)
+                            ?.copyWith(
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.84,
+                              ),
+                              fontWeight: FontWeight.w500,
+                            );
+
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        topPadding,
+                        horizontalPadding,
+                        bottomPadding,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Your smart collection hub for scans, value, and portfolio momentum.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body.copyWith(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.84),
-                        fontWeight: FontWeight.w500,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your Collection Hub',
+                            maxLines: useCompactLayout ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: titleStyle,
+                          ),
+                          SizedBox(
+                            height: useCompactLayout
+                                ? AppSpacing.xs
+                                : AppSpacing.sm,
+                          ),
+                          Text(
+                            'Your smart collection hub for scans, value, and portfolio momentum.',
+                            maxLines: useCompactLayout ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: bodyStyle,
+                          ),
+                          SizedBox(
+                            height: useCompactLayout
+                                ? AppSpacing.md
+                                : AppSpacing.lg,
+                          ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _HeroMetric(
+                                  label: 'Items',
+                                  value:
+                                      '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                                  compact: useCompactLayout,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: _HeroMetric(
+                                  label: 'Value',
+                                  value: estimatedValue,
+                                  compact: useCompactLayout,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: _HeroMetric(
+                                  label: 'Last scan',
+                                  value: lastScanStatus,
+                                  compact: useCompactLayout,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        _HeroMetric(
-                          label: 'Collectibles',
-                          value: itemCount.toString(),
-                        ),
-                        _HeroMetric(label: 'Value', value: estimatedValue),
-                        _HeroMetric(label: 'Last scan', value: lastScanStatus),
-                      ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -143,20 +205,25 @@ class HomeHeroHeader extends StatelessWidget {
 }
 
 class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({required this.label, required this.value});
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    this.compact = false,
+  });
 
   final String label;
   final String value;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 104),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+      constraints: BoxConstraints(minHeight: compact ? 54 : 64),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? AppSpacing.sm : AppSpacing.md,
+        vertical: compact ? 6 : AppSpacing.sm,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
@@ -169,7 +236,7 @@ class _HeroMetric extends StatelessWidget {
         children: [
           Text(
             label,
-            maxLines: 1,
+            maxLines: compact ? 2 : 1,
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.caption.copyWith(
               color: colorScheme.onPrimary.withValues(alpha: 0.72),
@@ -179,12 +246,13 @@ class _HeroMetric extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            maxLines: 1,
+            maxLines: compact ? 2 : 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.body.copyWith(
-              color: colorScheme.onPrimary,
-              fontWeight: FontWeight.w900,
-            ),
+            style: (compact ? AppTextStyles.caption : AppTextStyles.body)
+                .copyWith(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
           ),
         ],
       ),

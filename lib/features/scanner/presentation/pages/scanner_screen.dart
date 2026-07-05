@@ -88,6 +88,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         if (previous?.scanResult != null && next.scanResult == null) {
           _lastScrolledPreviewPath = null;
           _lastScrolledResultId = null;
+          if (!mounted) {
+            return;
+          }
           if (_scrollController.hasClients) {
             _scrollController.animateTo(
               0,
@@ -144,6 +147,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
   void _scrollTo(GlobalKey key) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
       final context = key.currentContext;
       if (context == null) {
         return;
@@ -162,7 +168,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final scannerState = ref.watch(scannerControllerProvider);
     final scannerController = ref.read(scannerControllerProvider.notifier);
-    final currentTabIndex = ref.watch(appShellTabControllerProvider);
+    final currentTabIndex = ref.read(appShellTabControllerProvider);
     final portfolioState = ref.watch(portfolioControllerProvider);
     final orderedPortfolioItems = portfolioState.orderedItems;
     final recentScans = orderedPortfolioItems
