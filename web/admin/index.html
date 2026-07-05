@@ -2,18 +2,215 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PackLox internal administration portal for the SIT environment.">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="refresh" content="0; url=/">
+  <meta name="theme-color" content="#1d4ed8">
   <title>PackLox Administration</title>
-  <link rel="canonical" href="/">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js" defer></script>
+  <script src="dashboard.js" defer></script>
 </head>
 <body>
-  <main>
-    <h1>PackLox Administration</h1>
-    <p>Redirecting to the PackLox Administration dashboard.</p>
-    <p><a href="/">Open dashboard</a></p>
-  </main>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div class="app-shell">
+    <header class="topbar" aria-label="Primary">
+      <a class="brand" href="/admin/" aria-label="PackLox administration home">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span>
+          <span class="brand-name">PackLox</span>
+          <span class="brand-label">Administration</span>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Admin sections">
+        <a href="/admin/" aria-current="page">Dashboard</a>
+        <a href="#users">Users</a>
+        <a href="#collectibles">Collectibles</a>
+        <a href="#validation">Validation</a>
+        <a href="#datasets">Datasets</a>
+        <a href="#ai">AI</a>
+        <a href="#reports">Reports</a>
+        <a href="#jobs">Jobs</a>
+        <a href="#settings">Settings</a>
+        <a href="#audit-logs">Audit Logs</a>
+      </nav>
+
+      <div class="topbar-actions" aria-label="Environment details">
+        <span class="env-badge" data-environment-badge>Loading</span>
+        <span class="version-pill" data-version-pill>Loading</span>
+        <span class="deploy-pill" data-deployment-timestamp>Loading deployment</span>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark and light mode">
+          <span aria-hidden="true">Theme</span>
+        </button>
+        <button class="user-menu" type="button" aria-label="User menu placeholder">
+          <span class="avatar" aria-hidden="true">AD</span>
+          <span>Admin</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero-section" aria-labelledby="dashboard-title">
+        <div class="hero-copy">
+          <p class="eyebrow">SIT Environment</p>
+          <h1 id="dashboard-title">PackLox Administration</h1>
+          <p class="hero-subtitle">Internal administration portal for the PackLox platform.</p>
+        </div>
+        <div class="hero-panel glass-card" aria-label="Deployment summary">
+          <span class="panel-kicker">Operational Snapshot</span>
+          <strong>Cloud foundation ready</strong>
+          <p>Admin modules are staged as future-ready controls for backend operations.</p>
+        </div>
+      </section>
+
+      <section class="status-grid" aria-label="Platform status">
+        <article class="status-card glass-card" data-service-card="api">
+          <div class="card-icon api-icon" aria-hidden="true">API</div>
+          <div>
+            <h2>API</h2>
+            <p>Backend request pipeline</p>
+          </div>
+          <span class="status-pill loading" data-service-status="api">Loading</span>
+          <span class="latency-label" data-service-latency="api">Latency pending</span>
+        </article>
+
+        <article class="status-card glass-card" data-service-card="supabase">
+          <div class="card-icon supabase-icon" aria-hidden="true">SB</div>
+          <div>
+            <h2>Supabase</h2>
+            <p>Auth, storage, portfolio sync</p>
+          </div>
+          <span class="status-pill loading" data-service-status="supabase">Loading</span>
+          <span class="latency-label" data-service-latency="supabase">Latency pending</span>
+        </article>
+
+        <article class="status-card glass-card" data-service-card="analyzer">
+          <div class="card-icon analyzer-icon" aria-hidden="true">AI</div>
+          <div>
+            <h2>Analyzer</h2>
+            <p>Provider-neutral analysis</p>
+          </div>
+          <span class="status-pill loading" data-service-status="analyzer">Loading</span>
+          <span class="latency-label" data-service-latency="analyzer">Latency pending</span>
+        </article>
+
+        <article class="status-card glass-card" data-service-card="cloudflare">
+          <div class="card-icon cloudflare-icon" aria-hidden="true">CF</div>
+          <div>
+            <h2>Cloudflare</h2>
+            <p>Pages deployment</p>
+          </div>
+          <span class="status-pill loading" data-service-status="cloudflare">Loading</span>
+          <span class="latency-label" data-service-latency="cloudflare">Build pending</span>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <section class="glass-card quick-actions" aria-labelledby="quick-actions-title">
+          <div class="section-heading">
+            <p class="eyebrow">Operations</p>
+            <h2 id="quick-actions-title">Quick Actions</h2>
+          </div>
+          <div class="action-grid">
+            <button class="action-button" type="button" data-module="Users">
+              <span>Users</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Collectibles">
+              <span>Collectibles</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Validation Queue">
+              <span>Validation Queue</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Dataset">
+              <span>Dataset</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Analytics">
+              <span>Analytics</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="AI Models">
+              <span>AI Models</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Jobs">
+              <span>Jobs</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="Logs">
+              <span>Logs</span>
+              <small>Coming Soon</small>
+            </button>
+            <button class="action-button" type="button" data-module="System Settings">
+              <span>System Settings</span>
+              <small>Coming Soon</small>
+            </button>
+          </div>
+        </section>
+
+        <aside class="glass-card environment-card" aria-labelledby="environment-title">
+          <div class="section-heading">
+            <p class="eyebrow">Runtime</p>
+            <h2 id="environment-title">Environment Information</h2>
+          </div>
+          <dl class="info-list">
+            <div>
+              <dt>Environment</dt>
+              <dd data-env-field="environment">Loading</dd>
+            </div>
+            <div>
+              <dt>API Endpoint</dt>
+              <dd data-env-field="apiUrl">Loading</dd>
+            </div>
+            <div>
+              <dt>Frontend</dt>
+              <dd data-env-field="frontendUrl">Loading</dd>
+            </div>
+            <div>
+              <dt>Deployment</dt>
+              <dd data-deployment-value data-env-field="buildTime">Loading</dd>
+            </div>
+            <div>
+              <dt>Git Commit</dt>
+              <dd data-env-field="commit">Loading</dd>
+            </div>
+            <div>
+              <dt>Build Version</dt>
+              <dd data-env-field="version">Loading</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="glass-card developer-tools" aria-labelledby="developer-tools-title">
+        <div class="section-heading">
+          <p class="eyebrow">Developer Tools</p>
+          <h2 id="developer-tools-title">Links</h2>
+        </div>
+        <div class="tool-grid">
+          <a href="/auth/reset-password/">Password Reset</a>
+          <a href="/auth/verify-email/" aria-disabled="true">Future Email Verify</a>
+          <a href="#swagger" aria-disabled="true">Swagger Placeholder</a>
+          <a href="https://api-sit.packlox.com/health" data-api-link="health">Health Endpoint</a>
+          <a href="https://api-sit.packlox.com/version" data-api-link="version">Version Endpoint</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <strong>PackLox Internal Administration</strong>
+      <span>Not for public use.</span>
+    </footer>
+  </div>
+
+  <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
 </body>
 </html>
