@@ -11,8 +11,10 @@ Required values:
 ```bat
 SUPABASE_URL=https://YOUR-SIT-PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
-API_BASE_URL=http://YOUR-PC-LAN-IP:8000
 ```
+
+`APP_ENV=sit` defaults backend analysis to `https://api-sit.packlox.com`.
+Set `API_BASE_URL` only when intentionally overriding SIT to a local backend.
 
 Do not commit `config/sit.env`. Do not place service-role keys or provider API
 secrets in Flutter config.
@@ -29,7 +31,15 @@ Get-Content config\sit.env | ForEach-Object {
 }
 ```
 
-## 2. Start Mock Analyzer API
+## 2. Optional Local Analyzer API Override
+
+Skip this section for the live SIT backend.
+
+Set this only when validating against a backend running on your PC:
+
+```bat
+API_BASE_URL=http://YOUR-PC-LAN-IP:8000
+```
 
 ```powershell
 cd backend
@@ -84,8 +94,13 @@ C:\Users\hario\Desktop\flutter\bin\flutter.bat run `
   --dart-define=SUPABASE_ENABLED=true `
   --dart-define=AI_ANALYSIS_PROVIDER=mock `
   --dart-define=SUPABASE_URL=YOUR_SUPABASE_URL `
-  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY `
-  --dart-define=API_BASE_URL=http://YOUR-PC-LAN-IP:8000
+  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+```
+
+With no `API_BASE_URL` override, scanner analysis calls:
+
+```text
+POST https://api-sit.packlox.com/analyze
 ```
 
 ## 5. Useful Logs

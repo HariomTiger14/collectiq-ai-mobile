@@ -17,6 +17,7 @@ import 'package:collectiq_ai/core/cloud/supabase/supabase_cloud_storage_service.
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/config/feature_flags.dart';
+import 'package:collectiq_ai/core/network/api_constants.dart' as network_config;
 import 'package:collectiq_ai/core/supabase/supabase_auth_response_normalizer.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
@@ -1634,6 +1635,55 @@ void main() {
       expect(config.hasBackendAnalysisEndpoint, isFalse);
       expect(config.isSelectedProviderAvailable, isTrue);
       expect(config.selectedProviderMessage, contains('Mock mode is active'));
+    });
+
+    test('SIT resolves live backend analyze endpoint by default', () {
+      final endpoint = resolveBackendAnalysisEndpointUrl(
+        environment: network_config.AppEnvironment.sit,
+        backendAnalysisEndpointUrl: '',
+        apiBaseUrl: '',
+      );
+
+      expect(endpoint, 'https://api-sit.packlox.com/analyze');
+    });
+
+    test('explicit analyzer endpoint takes precedence over SIT default', () {
+      final endpoint = resolveBackendAnalysisEndpointUrl(
+        environment: network_config.AppEnvironment.sit,
+        backendAnalysisEndpointUrl: 'https://override.example/analyze',
+        apiBaseUrl: 'https://api-sit.packlox.com',
+      );
+
+      expect(endpoint, 'https://override.example/analyze');
+    });
+
+    test('API base URL override appends analyze path', () {
+      final endpoint = resolveBackendAnalysisEndpointUrl(
+        environment: network_config.AppEnvironment.sit,
+        backendAnalysisEndpointUrl: '',
+        apiBaseUrl: 'https://api-sit.packlox.com/',
+      );
+
+      expect(endpoint, 'https://api-sit.packlox.com/analyze');
+    });
+
+    test('development keeps backend analyzer disabled unless configured', () {
+      final endpoint = resolveBackendAnalysisEndpointUrl(
+        environment: network_config.AppEnvironment.development,
+        backendAnalysisEndpointUrl: '',
+        apiBaseUrl: '',
+      );
+
+      expect(endpoint, isEmpty);
+    });
+
+    test('SIT API base URL uses live backend', () {
+      expect(
+        network_config.ApiConstants.baseUrlFor(
+          network_config.AppEnvironment.sit,
+        ),
+        'https://api-sit.packlox.com',
+      );
     });
 
     test('OpenAI Vision skeleton returns safe backend error', () async {

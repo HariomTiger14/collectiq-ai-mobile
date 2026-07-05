@@ -39,9 +39,9 @@ final aiAnalysisProviderConfigProvider = Provider<AiAnalysisProviderConfig>((
 
 /// Provides the future backend API service.
 ///
-/// Mock mode always uses the no-network implementation. The Dio-backed service
-/// is only enabled for the backend/OpenAI placeholder when the endpoint is
-/// configured and safe for the current build mode.
+/// The Dio-backed service is enabled only when a backend endpoint is configured
+/// and safe for the current build mode. SIT can use the mock analyzer adapter
+/// against the backend contract while local development can remain no-network.
 final aiBackendApiServiceProvider = Provider<AiBackendApiService>((ref) {
   final config = ref.watch(aiAnalysisProviderConfigProvider);
   final readiness = const AiBackendEndpointReadinessChecker().check(
@@ -60,9 +60,8 @@ final aiBackendApiServiceProvider = Provider<AiBackendApiService>((ref) {
 
 /// Provides the future backend AI client.
 ///
-/// Mock mode remains intentionally no-network. The HTTP client is selected only
-/// when a backend-only provider is configured, and it blocks unsafe endpoints
-/// before transport.
+/// The HTTP client is selected only when a backend endpoint is configured, and
+/// it blocks unsafe endpoints before transport.
 final aiBackendClientProvider = Provider<AiBackendClient>((ref) {
   final config = ref.watch(aiAnalysisProviderConfigProvider);
   final readiness = const AiBackendEndpointReadinessChecker().check(

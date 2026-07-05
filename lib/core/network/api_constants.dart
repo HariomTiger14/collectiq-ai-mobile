@@ -98,7 +98,7 @@ class ApiConstants {
   static String baseUrlFor(AppEnvironment environment) {
     return switch (environment) {
       AppEnvironment.development => _developmentBaseUrl,
-      AppEnvironment.sit => _developmentBaseUrl,
+      AppEnvironment.sit => 'https://api-sit.packlox.com',
       AppEnvironment.staging => 'https://staging-api.collectiq.ai',
       AppEnvironment.production => 'https://api.collectiq.ai',
     };

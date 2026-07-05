@@ -356,17 +356,12 @@ void main() {
   });
 
   group('network EnvironmentConfig', () {
-    test('SIT maps to safe development backend unless overridden', () {
+    test('SIT maps to live SIT backend unless overridden', () {
       const config = network_config.EnvironmentConfig(
         environment: network_config.AppEnvironment.sit,
       );
 
-      expect(
-        config.baseUrl,
-        network_config.ApiConstants.baseUrlFor(
-          network_config.AppEnvironment.development,
-        ),
-      );
+      expect(config.baseUrl, 'https://api-sit.packlox.com');
     });
 
     test('backend base URL override is used for phone SIT builds', () {

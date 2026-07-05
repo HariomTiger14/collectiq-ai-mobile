@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/network/api_constants.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -72,10 +73,12 @@ class AiAnalysisProviderConfig {
       'AI_BACKEND_ANALYSIS_ENDPOINT_URL',
     );
     const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+    final networkConfig = EnvironmentConfig.fromEnvironment();
 
     return AiAnalysisProviderConfig(
       type: AiAnalysisProviderType.fromConfig(configuredProvider),
-      backendAnalysisEndpointUrl: _resolveBackendAnalysisEndpointUrl(
+      backendAnalysisEndpointUrl: resolveBackendAnalysisEndpointUrl(
+        environment: networkConfig.environment,
         backendAnalysisEndpointUrl: backendAnalysisEndpointUrl,
         apiBaseUrl: apiBaseUrl,
       ),
@@ -113,7 +116,12 @@ class AiAnalysisProviderConfig {
   }
 }
 
-String _resolveBackendAnalysisEndpointUrl({
+/// Resolves the backend-only analyzer endpoint for configured environments.
+///
+/// SIT defaults to the live PackLox backend. Other environments keep the
+/// endpoint disabled unless an explicit endpoint or API base URL is supplied.
+String resolveBackendAnalysisEndpointUrl({
+  required AppEnvironment environment,
   required String backendAnalysisEndpointUrl,
   required String apiBaseUrl,
 }) {
@@ -124,7 +132,11 @@ String _resolveBackendAnalysisEndpointUrl({
 
   final baseUrl = apiBaseUrl.trim();
   if (baseUrl.isEmpty) {
-    return '';
+    if (environment != AppEnvironment.sit) {
+      return '';
+    }
+
+    return '${ApiConstants.baseUrlFor(environment)}/analyze';
   }
 
   return '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/analyze';

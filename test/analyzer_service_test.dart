@@ -268,6 +268,15 @@ void main() {
         ).type,
         AnalyzerErrorType.providerUnavailable,
       );
+      expect(
+        AnalyzerException.fromObject(
+          const AiBackendClientException(
+            type: AiBackendClientErrorType.networkUnavailable,
+            message: 'Backend AI endpoint is not reachable.',
+          ),
+        ).type,
+        AnalyzerErrorType.network,
+      );
     });
   });
 }

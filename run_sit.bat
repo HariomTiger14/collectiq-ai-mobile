@@ -27,7 +27,7 @@ if defined AI_BACKEND_ANALYSIS_ENDPOINT_URL set "AI_BACKEND_DEFINE=--dart-define
 
 if not defined SUPABASE_URL echo [CollectIQ SIT] SUPABASE_URL is not set. Cloud services will fall back safely.
 if not defined SUPABASE_ANON_KEY echo [CollectIQ SIT] SUPABASE_ANON_KEY is not set. Cloud services will fall back safely.
-if not defined API_BASE_URL echo [CollectIQ SIT] API_BASE_URL is not set. Backend AI will use the built-in development default.
+if not defined API_BASE_URL echo [CollectIQ SIT] API_BASE_URL is not set. Backend AI will use https://api-sit.packlox.com.
 
 call "%FLUTTER_BIN%" run ^
   --flavor sit ^
