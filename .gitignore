@@ -70,3 +70,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local diagnostic artifacts from Android/SIT debugging.
+/.codex/
+/.tmp_bugreport_packlox/
+/bugreport-*.zip
+/*.png
+/*logcat*.txt
+/traces.txt
+/test-output.txt
+/widget_test_full.txt
+/window*.xml
+/window_*.xml
+/*dumpstate*
+/*anr*
+/*tombstone*
+/*recovery*.txt

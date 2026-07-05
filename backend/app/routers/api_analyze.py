@@ -1,12 +1,12 @@
 import logging
+import base64
 import statistics
 import time
-from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
+from starlette.datastructures import UploadFile
 
-from app.core.config import ALLOWED_CONTENT_TYPES, ALLOWED_EXTENSIONS, MAX_IMAGE_BYTES
 from app.schemas.api_analysis import (
     ApiAlternativeMatchResponse,
     ApiAnalyzeDiagnosticsResponse,
@@ -22,8 +22,8 @@ from app.services.ai.openai_recognition_provider import (
     OpenAIProviderError,
     OpenAITimeoutError,
 )
-from app.services.ai.provider_factory import get_ai_recognition_provider
 from app.services.analyzer.backend_analyzer_service import BackendAnalyzerService
+from app.services.analyzer.errors import AnalyzerPipelineError
 from app.services.pricing.base_pricing_provider import (
     EmptyMarketDataError,
     PricingProviderError,
@@ -68,7 +68,8 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     response_model=ApiAnalyzeResponse,
     summary="Analyze a collectible image from the production Analyzer API contract",
 )
-async def analyze_collectible_root(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
+async def analyze_collectible_root(request: Request) -> ApiAnalyzeResponse:
+    payload = await _payload_from_request(request)
     return await _analyze_collectible(payload)
 
 
@@ -77,86 +78,94 @@ async def _analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse
     started_at = time.perf_counter()
 
     try:
-        provider, recognition = BackendAnalyzerService(
-            provider_factory=get_ai_recognition_provider,
-        ).analyze(payload)
+        pipeline_result = BackendAnalyzerService().analyze(payload)
+        provider = pipeline_result.provider
+        recognition = pipeline_result.recognition
         pricing = get_pricing_provider().price(recognition)
+    except AnalyzerPipelineError as exc:
+        raise _api_error(
+            exc.status_code,
+            exc.code,
+            exc.message,
+            retryable=exc.retryable,
+            details=exc.details,
+        ) from exc
     except AIProviderNotConfiguredError as exc:
         raise _api_error(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "ai_provider_not_configured",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "provider_unavailable",
             str(exc),
             retryable=False,
         ) from exc
     except OpenAITimeoutError as exc:
         raise _api_error(
             status.HTTP_504_GATEWAY_TIMEOUT,
-            "ai_provider_timeout",
+            "timeout",
             str(exc),
             retryable=True,
         ) from exc
     except OpenAIInvalidResponseError as exc:
         raise _api_error(
             status.HTTP_502_BAD_GATEWAY,
-            "ai_provider_invalid_response",
+            "provider_unavailable",
             str(exc),
             retryable=True,
         ) from exc
     except OpenAIProviderError as exc:
         raise _api_error(
             status.HTTP_502_BAD_GATEWAY,
-            "ai_provider_error",
+            "provider_unavailable",
             str(exc),
             retryable=True,
         ) from exc
     except PricingProviderTimeoutError as exc:
         raise _api_error(
             status.HTTP_504_GATEWAY_TIMEOUT,
-            "pricing_provider_timeout",
+            "timeout",
             str(exc),
             retryable=True,
         ) from exc
     except PricingProviderRateLimitError as exc:
         raise _api_error(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            "pricing_provider_rate_limited",
+            "quota_exceeded",
             str(exc),
             retryable=True,
         ) from exc
     except PricingProviderUnavailableError as exc:
         raise _api_error(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "pricing_provider_unavailable",
+            "provider_unavailable",
             str(exc),
             retryable=True,
         ) from exc
     except EmptyMarketDataError as exc:
         raise _api_error(
             status.HTTP_502_BAD_GATEWAY,
-            "pricing_provider_empty_market_data",
+            "provider_unavailable",
             str(exc),
             retryable=True,
         ) from exc
     except PricingProviderError as exc:
         raise _api_error(
             status.HTTP_502_BAD_GATEWAY,
-            "pricing_provider_error",
+            "provider_unavailable",
             str(exc),
             retryable=True,
         ) from exc
     except ValueError as exc:
         raise _api_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "unsupported_ai_provider",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "provider_unavailable",
             str(exc),
-            retryable=False,
+            retryable=True,
         ) from exc
     except HTTPException:
         raise
     except Exception as exc:
         raise _api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "server_error",
+            "unknown",
             "Unable to analyze collectible right now.",
             retryable=True,
         ) from exc
@@ -213,12 +222,16 @@ async def _analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse
         series=recognition.series,
         variant=recognition.edition,
         estimatedValue=pricing.estimatedMarketValue,
+        estimated_value=pricing.estimatedMarketValue,
         currency=pricing.currency,
         tags=recognition.detectedObjects,
         description=recognition.description,
         attributes=_provider_neutral_attributes(recognition),
         images=[],
-        rawProviderPayload={"provider": diagnostics.aiProvider},
+        rawProviderPayload={
+            "provider": diagnostics.aiProvider,
+            "pipelineStages": pipeline_result.stages,
+        },
         lowEstimate=pricing.lowEstimate,
         highEstimate=pricing.highEstimate,
         confidence=recognition.confidence,
@@ -263,6 +276,60 @@ async def _analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse
     )
 
 
+async def _payload_from_request(request: Request) -> ApiAnalyzeRequest:
+    content_type = request.headers.get("content-type", "").lower()
+    if "multipart/form-data" in content_type:
+        return await _payload_from_multipart_request(request)
+
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise _api_error(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_request",
+            "Analyze request body must be a JSON object.",
+            retryable=False,
+        )
+    return ApiAnalyzeRequest(**body)
+
+
+async def _payload_from_multipart_request(request: Request) -> ApiAnalyzeRequest:
+    form = await request.form()
+    upload = form.get("image")
+    if not isinstance(upload, UploadFile):
+        raise _api_error(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_image",
+            "Multipart request must include an image file field named 'image'.",
+            retryable=False,
+        )
+
+    image_bytes = await upload.read()
+    await upload.close()
+    file_name = upload.filename or "analyzer-upload.jpg"
+    mime_type = upload.content_type or "application/octet-stream"
+    image_source = str(form.get("imageSource") or "unknown")
+    local_file_path = str(form.get("imagePath") or file_name)
+
+    return ApiAnalyzeRequest(
+        request={
+            "imagePath": local_file_path,
+            "imageSource": image_source,
+            "requestedCategory": _optional_form_value(form.get("requestedCategory")),
+            "appVersion": _optional_form_value(form.get("appVersion")),
+            "deviceMetadata": {},
+            "timestamp": str(form.get("timestamp") or ""),
+        },
+        image={
+            "fileName": file_name,
+            "mimeType": mime_type,
+            "sizeBytes": len(image_bytes),
+            "imageSource": image_source,
+            "localFilePath": local_file_path,
+            "base64Image": base64.b64encode(image_bytes).decode("ascii"),
+        },
+    )
+
+
 def _validate_contract(payload: ApiAnalyzeRequest) -> None:
     request = payload.request
     image = payload.image
@@ -270,35 +337,16 @@ def _validate_contract(payload: ApiAnalyzeRequest) -> None:
     if not request.imagePath.strip() or not image.localFilePath.strip():
         raise _api_error(
             status.HTTP_400_BAD_REQUEST,
-            "missing_image",
+            "invalid_image",
             "Image metadata is required.",
             retryable=False,
-        )
-
-    extension = Path(image.fileName).suffix.lower()
-    if (
-        extension not in ALLOWED_EXTENSIONS
-        or image.mimeType not in ALLOWED_CONTENT_TYPES
-        or image.sizeBytes <= 0
-        or image.sizeBytes > MAX_IMAGE_BYTES
-    ):
-        raise _api_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "invalid_payload",
-            "Image payload is invalid or unsupported.",
-            retryable=False,
-            details={
-                "supportedExtensions": sorted(ALLOWED_EXTENSIONS),
-                "supportedMimeTypes": sorted(ALLOWED_CONTENT_TYPES),
-                "maxImageBytes": MAX_IMAGE_BYTES,
-            },
         )
 
     requested_category = (request.requestedCategory or "").strip().lower()
     if requested_category and requested_category not in SUPPORTED_CATEGORIES:
         raise _api_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "unsupported_category",
+            "invalid_image",
             "Requested category is not supported for v1 analysis.",
             retryable=False,
             details={"requestedCategory": request.requestedCategory},
@@ -322,6 +370,13 @@ def _api_error(
             "details": details or {},
         },
     )
+
+
+def _optional_form_value(value) -> str | None:
+    if value is None:
+        return None
+    parsed = str(value).strip()
+    return parsed or None
 
 
 def _key_attributes(recognition) -> dict[str, str]:

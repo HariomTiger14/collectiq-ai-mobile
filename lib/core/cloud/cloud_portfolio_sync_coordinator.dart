@@ -87,9 +87,8 @@ class CloudPortfolioSyncCoordinator {
   }
 
   Future<bool> _canSync() async {
-    final environment = registry.config.environment;
     final flags = registry.config.featureFlags;
-    if (!environment.allowsNonProductionCloud) {
+    if (!registry.config.allowsCloudServices) {
       return false;
     }
     if (!flags.useCloudPortfolioSync || !flags.useCloudImageStorage) {

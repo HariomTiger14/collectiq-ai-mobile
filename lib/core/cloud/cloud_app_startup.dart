@@ -12,7 +12,7 @@ class CloudAppStartup {
 
     final environment = registry.config.environment;
     final flags = registry.config.featureFlags;
-    if (!environment.allowsNonProductionCloud) {
+    if (!registry.config.allowsCloudServices) {
       return;
     }
     if (flags.anyCloudFeatureEnabled) {
@@ -41,7 +41,8 @@ class CloudAppStartup {
     if (!flags.useCloudAuth) {
       return;
     }
-    if (environment == AppEnvironment.sit) {
+    if (environment == AppEnvironment.sit ||
+        environment == AppEnvironment.prod) {
       await registry.analyticsService.trackEvent('sit_email_auth_required');
       return;
     }

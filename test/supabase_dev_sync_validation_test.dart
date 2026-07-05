@@ -64,26 +64,34 @@ void main() {
       expect(result.isInitialized, isFalse);
     });
 
-    test('production remains disabled even with Supabase flags', () async {
-      final bootstrap = SupabaseBootstrap(
-        config: const EnvironmentConfig(
-          environment: AppEnvironment.prod,
-          featureFlags: FeatureFlags(
-            useCloudAuth: true,
-            useCloudPortfolioSync: true,
-            useCloudImageStorage: true,
+    test(
+      'production with Supabase flags falls back safely when config is missing',
+      () async {
+        final bootstrap = SupabaseBootstrap(
+          config: const EnvironmentConfig(
+            environment: AppEnvironment.prod,
+            featureFlags: FeatureFlags(
+              useCloudAuth: true,
+              useCloudPortfolioSync: true,
+              useCloudImageStorage: true,
+            ),
           ),
-        ),
-        url: 'https://dev-project.supabase.co',
-        anonKey: 'public-anon-key',
-      );
+          url: '',
+          anonKey: '',
+        );
 
-      final result = await bootstrap.ensureInitialized();
-      final registry = CloudServiceRegistry.fromConfig(bootstrap.config);
+        final result = await bootstrap.ensureInitialized();
+        final registry = CloudServiceRegistry.fromConfig(bootstrap.config);
 
-      expect(result.status, SupabaseBootstrapStatus.disabled);
-      expect(registry.isUsingNoOpServices, isTrue);
-    });
+        expect(result.status, SupabaseBootstrapStatus.missingConfig);
+        expect(registry.authService.providerName, 'Supabase Auth');
+        expect(registry.cloudStorageService.providerName, 'Supabase Storage');
+        expect(
+          registry.cloudPortfolioSyncService.providerName,
+          'Supabase Portfolio Sync',
+        );
+      },
+    );
 
     test('storage path matches DEV bucket object convention', () {
       final path = CloudStoragePaths.portfolioImage(

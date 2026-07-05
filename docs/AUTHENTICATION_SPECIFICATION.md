@@ -257,4 +257,5 @@ The active implementation lives in:
 - `lib/features/auth/presentation/controllers/auth_controller.dart`
 - `lib/features/settings/presentation/settings_screen.dart`
 
-Local mode remains available without Supabase config. Production remains disabled until separately enabled by an explicit production readiness sprint.
+Local mode remains available without Supabase config. Production Supabase
+requires explicit cloud flags and public Supabase configuration.

@@ -1,6 +1,8 @@
 # Supabase Setup
 
-Status: production remains disabled. This document records the single Supabase architecture used for SIT preparation only.
+Status: Supabase is the single cloud architecture for SIT and production
+foundation work. Production traffic requires explicit flags and public Supabase
+config.
 
 For the canonical schema, bucket, RLS policies, and sync flow, see `docs/SUPABASE_ARCHITECTURE.md`.
 
@@ -13,9 +15,9 @@ For the canonical schema, bucket, RLS policies, and sync flow, see `docs/SUPABAS
 
 ## Required Flags
 
-SIT/dev builds may use Supabase only when non-production flags and config are supplied:
+SIT/dev/prod builds may use Supabase only when flags and config are supplied:
 
-- `APP_ENV=sit` or `APP_ENV=dev`
+- `APP_ENV=sit`, `APP_ENV=dev`, or `APP_ENV=prod`
 - `SUPABASE_ENABLED=true`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
@@ -23,7 +25,7 @@ SIT/dev builds may use Supabase only when non-production flags and config are su
 - `USE_CLOUD_PORTFOLIO_SYNC=true`
 - `USE_CLOUD_IMAGE_STORAGE=true`
 
-Production cloud services remain disabled until a later production-readiness pass explicitly enables them.
+Production falls back safely when these flags or Supabase values are missing.
 
 ## Safety Rules
 

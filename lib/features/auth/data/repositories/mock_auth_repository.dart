@@ -2,7 +2,7 @@ import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 
-/// Mock auth repository used until Firebase/Supabase is connected.
+/// Mock auth repository used when Supabase is not configured.
 class MockAuthRepository implements AuthRepository {
   /// Creates a mock auth repository.
   const MockAuthRepository();

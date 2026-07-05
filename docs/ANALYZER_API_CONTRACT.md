@@ -49,7 +49,10 @@ Analyzer endpoint as:
 
 ## POST /analyze
 
-Content type: `application/json`
+Content types:
+
+- `application/json`
+- `multipart/form-data`
 
 Request body:
 
@@ -96,6 +99,22 @@ Optional request fields:
 - `image.base64Image`
 - `image.base64Preview`
 
+Image validation:
+
+- Metadata is always validated.
+- If `image.base64Image` is supplied, backend validates decoded bytes.
+- Multipart uploads validate actual uploaded bytes.
+- Supported image content: JPEG and PNG.
+- Maximum image size: 10 MB.
+- Corrupt, empty, oversized, mismatched, or unreadable image payloads return a
+  normalized error.
+
+Multipart request fields:
+
+- File field: `image`
+- Optional fields: `imageSource`, `requestedCategory`, `appVersion`,
+  `timestamp`, `imagePath`
+
 Response body:
 
 ```json
@@ -111,6 +130,7 @@ Response body:
   "condition": "Near Mint",
   "confidence": 94,
   "estimatedValue": 1850,
+  "estimated_value": 1850,
   "currency": "AUD",
   "tags": ["card", "pokemon"],
   "description": "Likely a Base Set Charizard holographic card.",
@@ -178,31 +198,20 @@ All non-2xx errors use this envelope:
 }
 ```
 
-Canonical client error mapping:
+Canonical backend/client error mapping:
 
 - `timeout`: backend or provider timeout; retryable
 - `network`: backend unreachable from app; retryable
 - `invalid_image`: missing, empty, oversized, or unsupported image; not retryable
+- `image_too_large`: image exceeds 10 MB; not retryable
+- `unsupported_media_type`: image extension, MIME type, or byte signature is unsupported; not retryable
 - `provider_unavailable`: AI/pricing provider unavailable or not configured; retryable except configuration failures
 - `quota_exceeded`: provider quota/rate limit; not retried by mobile in the same request
 - `authentication`: backend auth failure; not retried by mobile in the same request
 - `unknown`: unexpected backend error; retryable when HTTP status is 5xx
 
-Current backend codes accepted by the app and mapped into the canonical set:
-
-- `missing_image`
-- `invalid_payload`
-- `unsupported_category`
-- `ai_provider_not_configured`
-- `ai_provider_timeout`
-- `ai_provider_invalid_response`
-- `ai_provider_error`
-- `pricing_provider_timeout`
-- `pricing_provider_rate_limited`
-- `pricing_provider_unavailable`
-- `pricing_provider_empty_market_data`
-- `pricing_provider_error`
-- `server_error`
+Legacy backend codes may still be accepted by older app builds, but new backend
+responses should use the canonical codes above.
 
 ## Timeout Behavior
 
@@ -265,4 +274,33 @@ Returns non-secret version metadata:
   "version": "0.1.0",
   "environment": "sit"
 }
+```
+
+## Local Backend Run
+
+From the repository root on Windows:
+
+```powershell
+cd backend
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+$env:APP_ENV="sit"
+$env:AI_PROVIDER="mock"
+$env:PRICING_PROVIDER="mock"
+py -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Health checks:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/version
+```
+
+Run backend endpoint tests:
+
+```powershell
+cd backend
+py -m unittest tests.test_api_endpoints
 ```

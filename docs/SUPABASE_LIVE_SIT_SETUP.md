@@ -3,7 +3,8 @@
 Audit date: 2026-07-01
 
 This guide prepares a real non-production Supabase project for **CollectIQ SIT**.
-Production remains disabled.
+Production Supabase uses the same foundation only when explicit production
+flags and public Supabase config are supplied.
 
 Use only the unified SIT architecture:
 

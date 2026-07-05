@@ -97,6 +97,7 @@ class ApiAnalyzeResponse(BaseModel):
     series: str | None = None
     variant: str | None = None
     estimatedValue: int
+    estimated_value: int | None = None
     currency: str | None = None
     tags: list[str] = Field(default_factory=list)
     description: str | None = None

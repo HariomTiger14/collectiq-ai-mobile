@@ -10,7 +10,10 @@ CollectIQ AI is a Flutter local-first collectible scanning and portfolio app wit
 
 The project is in an advanced MVP / pre-beta foundation stage. The UI and local persistence paths are substantial, and there are broad widget/domain tests. However, several production capabilities remain opt-in foundations, mock-only, or unverified on real devices.
 
-The app is local-first by default. Cloud service flags default to off, Supabase and Firebase are skipped in local mode, and production cloud wiring is explicitly disabled in the newer cloud registry. Supabase and Firebase code exists for non-production/dev-staging experiments, but the default runnable behavior is not production cloud-connected.
+The app is local-first by default. Cloud service flags default to off, Supabase
+is skipped in local mode, and production Supabase requires explicit cloud flags
+plus public Supabase config. Firebase cloud implementations have been retired;
+analytics and crash reporting remain no-op placeholders in this sprint.
 
 Important code finding: Flutter's `AI_ANALYSIS_PROVIDER=mock` path returns a built-in sample result for `sample://` scans, but for normal camera/gallery image paths it calls `BackendAIRecognitionService`, which posts to the local FastAPI `/scanner/analyze` endpoint through `ApiClient`. The separate `openai_vision` Flutter provider path calls only a configured backend endpoint and is disabled unless explicitly selected.
 
@@ -32,11 +35,11 @@ Important code finding: Flutter's `AI_ANALYSIS_PROVIDER=mock` path returns a bui
 | Cloud auth | Partially implemented | Supabase anonymous/email auth code exists and Settings UI exposes email auth; disabled unless configured. Google/Apple are placeholders. |
 | Cloud image storage | Partially implemented | Supabase storage upload implementations exist; default fallback/local mode does not upload. |
 | Cloud portfolio sync | Partially implemented | Supabase sync repositories/coordinator and manual sync UI exist; disabled by default and requires config/auth. |
-| Supabase integration | Partially implemented | Two Supabase paths exist: `core/cloud/supabase` registry services and older `core/supabase` Dio gateway. Requires dart defines and migrations. |
-| Firebase integration | Foundation only | Dependencies and wrappers for analytics/crash reporting exist. Default is no-op; native config not present in repo. |
-| Analytics | Foundation only | Telemetry abstraction and Firebase/no-op implementations exist; disabled by default. |
-| Crash reporting | Foundation only | Flutter error hooks and Firebase/no-op crash services exist; disabled by default. |
-| Remote config | Foundation only | Service interface and no-op implementation exist; no real Firebase Remote Config service is selected in registry. |
+| Supabase integration | Partially implemented | Supabase is the single cloud provider for auth, image storage, and portfolio sync. Requires dart defines and migrations. |
+| Firebase integration | Removed | Firebase auth/storage/sync/telemetry code and dependencies have been removed from the app foundation. |
+| Analytics | Placeholder | Telemetry abstraction exists; external analytics provider is disabled/no-op by default. |
+| Crash reporting | Placeholder | Flutter error hooks and no-op crash service exist; external crash provider is not wired in this sprint. |
+| Remote config | Placeholder | Service interface and no-op implementation exist; no real remote config provider is selected in registry. |
 | Settings screen | Partially implemented | Rich diagnostics, auth, sync, plan, notifications, AI status. Many controls are placeholders or config-gated. |
 | Manual sync | Partially implemented | Manual sync path exists in Settings for dev/staging cloud flags; default local mode cannot run cloud sync. |
 | Sync status display | Partially implemented | Settings and detail labels exist; true cloud status needs configured Supabase verification. |
@@ -48,13 +51,13 @@ Important code finding: Flutter's `AI_ANALYSIS_PROVIDER=mock` path returns a bui
 | Marketplace | Foundation only | Pricing provider boundaries and backend provider integrations exist; no marketplace buying/selling UI. |
 | Multi-language/currency/time zone | Not started | UI and pricing mostly assume English/AUD; no localization or currency/time-zone preference system. |
 | Automated tests | Complete for local MVP | `flutter test` passes; broad unit/widget tests. Integration tests exist but are not run by `flutter test`. |
-| Device/SIT testing | Broken/needs verification | Scripts/docs exist, but this audit did not run physical-device, native picker, Firebase, Supabase, or backend live-provider SIT. |
+| Device/SIT testing | Broken/needs verification | Scripts/docs exist, but this audit did not run physical-device, native picker, Supabase, or backend live-provider SIT. |
 
 ## C. Architecture Summary
 
 The Flutter app is organized by `lib/core`, `lib/features`, and `lib/shared`.
 
-Core contains navigation, theme/design system, network helpers, environment/feature flags, cloud service abstractions, Supabase/Firebase adapters, telemetry, and errors. Feature modules include AI, auth, cloud sync, diagnostics, home, image storage/sync, market, onboarding, portfolio, price alerts, scanner, settings, subscription, and wishlist. Shared domain models include `CollectibleItem`, pricing, and sorting.
+Core contains navigation, theme/design system, network helpers, environment/feature flags, cloud service abstractions, Supabase adapters, telemetry, and errors. Feature modules include AI, auth, cloud sync, diagnostics, home, image storage/sync, market, onboarding, portfolio, price alerts, scanner, settings, subscription, and wishlist. Shared domain models include `CollectibleItem`, pricing, and sorting.
 
 State management uses Riverpod 3 providers and `Notifier` controllers. Major presentation state lives in controllers such as `ScannerController`, `PortfolioController`, `AuthController`, `SyncController`, `ImageSyncController`, `SubscriptionController`, and price-alert/wishlist providers.
 
@@ -65,9 +68,10 @@ Environment handling has two tracks:
 - New cloud environment config: `core/config/AppEnvironment`, `EnvironmentConfig`, and `FeatureFlags`; defaults to local and all cloud flags false.
 - Older API config: `core/network/api_constants.dart` and `core/supabase/supabase_config.dart`; used by local FastAPI and Supabase HTTP gateway paths.
 
-Feature flags are compile-time `--dart-define` booleans. Production cloud services are disabled in the newer `EnvironmentConfig.allowsProductionServices`, `SupabaseBootstrap`, and `FirebaseBootstrap` paths.
+Feature flags are compile-time `--dart-define` booleans. Production Supabase is
+allowed only when core cloud flags and Supabase public config are supplied.
 
-Cloud abstraction exists through `CloudServiceRegistry`, `AuthService`, `CloudStorageService`, `CloudPortfolioSyncService`, `AnalyticsService`, `CrashReportingService`, and `RemoteConfigService`. Defaults are no-op services unless dev/staging flags select Supabase/Firebase adapters.
+Cloud abstraction exists through `CloudServiceRegistry`, `AuthService`, `CloudStorageService`, `CloudPortfolioSyncService`, `AnalyticsService`, `CrashReportingService`, and `RemoteConfigService`. Defaults are no-op services unless cloud flags select Supabase adapters.
 
 The backend is a FastAPI app under `backend/` with routers for health, scanner analysis, API analysis, and portfolio. It uses provider factories for AI recognition and pricing. Backend defaults are `AI_PROVIDER=mock` and `PRICING_PROVIDER=mock`, with OpenAI/eBay/TCGPlayer/PriceCharting provider code guarded by environment configuration and mocked tests.
 
@@ -79,19 +83,13 @@ Active backend in code:
 - FastAPI exposes `GET /health`, `POST /scanner/analyze`, `POST /api/analyze`, and portfolio endpoints.
 - Backend default provider settings are mock AI and mock pricing.
 
-Firebase status:
-
-- Flutter dependencies and service wrappers exist for Firebase Core, Analytics, Auth, Remote Config, Storage, Firestore, and Crashlytics.
-- The new cloud registry uses Firebase only for analytics and crash reporting when dev/staging flags are enabled.
-- Firebase is skipped in local mode and disabled in production by `FirebaseBootstrap`.
-- Auth/storage/portfolio sync are not selected from Firebase in the registry.
-
 Supabase status:
 
-- Supabase is the intended cloud auth/storage/portfolio sync direction in current code.
+- Supabase is the only cloud auth/storage/portfolio sync direction in current code.
 - Supabase migrations exist under `supabase/migrations`.
-- Supabase is disabled unless configured with dart defines and/or dev/staging feature flags.
-- The repo has both a newer `core/cloud/supabase` adapter set and an older `core/supabase` Dio gateway used by auth/sync/image storage paths.
+- Supabase is disabled unless configured with dart defines and feature flags.
+- The canonical implementation uses `core/supabase` as the gateway and
+  `core/cloud/supabase` as registry adapters over that gateway.
 
 No-op services:
 
@@ -102,14 +100,15 @@ Real implementations:
 
 - Local FastAPI backend mock analysis/pricing is real runnable backend code.
 - Supabase auth/storage/sync implementations are real but config-gated and not default.
-- Firebase analytics/crash wrappers are real but config-gated.
+- Analytics/crash reporting are placeholders and no external provider is wired.
 - Backend OpenAI/pricing provider integrations are implemented but require server-side credentials and were not live-validated in this audit.
 
 Production status:
 
-- Production cloud service wiring is disabled in the newer cloud bootstrap code.
+- Production cloud service wiring is Supabase-only and requires explicit flags
+  and Supabase public config.
 - Release backend endpoint safety blocks unsafe local HTTP endpoints for Flutter backend AI.
-- Production credentials/config files required before cloud use include Supabase URL/anon key, Supabase SQL migrations/storage policies, optional Firebase native config or dart defines, backend `.env` provider keys, and Android signing variables for release distribution.
+- Production credentials/config files required before cloud use include Supabase URL/anon key, Supabase SQL migrations/storage policies, backend `.env` provider keys, and Android signing variables for release distribution.
 
 ## E. Data Status
 
@@ -150,7 +149,7 @@ Backend tests:
 
 Coverage includes navigation, onboarding, scanner states, mock/sample analysis, portfolio save/list/delete/detail/search/sort/filter, local persistence, cloud foundation/no-op behavior, Supabase foundation, AI/backend contract validation, image sync queue, subscription foundations, analytics/telemetry, price alerts, wishlist, dashboard analytics, backend API/provider contracts, pricing providers, and validation lab helpers.
 
-Not covered or not fully verified by this audit: real camera/gallery OS pickers, real Android permission flows, physical-device force-stop image persistence, live Supabase auth/storage/sync, Firebase Analytics/Crashlytics delivery, real OpenAI/eBay/TCGPlayer/PriceCharting calls, release builds, app bundle signing, Play Billing purchases, and production dataset accuracy.
+Not covered or not fully verified by this audit: real camera/gallery OS pickers, real Android permission flows, physical-device force-stop image persistence, live Supabase auth/storage/sync, real OpenAI/eBay/TCGPlayer/PriceCharting calls, release builds, app bundle signing, Play Billing purchases, and production dataset accuracy.
 
 Verification commands:
 
@@ -160,14 +159,15 @@ Verification commands:
 
 ## G. Known Risks / Issues
 
-- Cloud direction is split across newer `core/cloud/*` registry services and older `core/supabase/*` gateway/repositories, which increases integration risk.
-- Firebase and Supabase dependencies both exist; Firebase is telemetry-only in the newer registry, while Supabase is auth/storage/sync. This should be documented as the intentional split or simplified.
+- Supabase still uses a hand-rolled gateway over REST rather than relying fully
+  on `supabase_flutter` session refresh APIs; this should be revisited after
+  SIT credentials are available.
 - Flutter mock analysis for real camera/gallery images depends on a local FastAPI backend in current code, while some docs describe mock mode as no-network. This mismatch can confuse tester setup.
 - Image persistence relies on local file paths copied to app documents. It needs physical-device force-stop/restart and OS cleanup validation.
 - Cloud image upload queue marks local-only fallback as failed/retryable when Supabase is not configured, so Settings may show attention-needed states in local-only usage.
 - Manual cloud sync requires specific dev/staging flags and Supabase sign-in; default Settings sync is mostly status/placeholder.
 - Supabase production is documented but not enabled by default and requires migrations, Auth settings, storage bucket/policies, and dart defines.
-- Firebase analytics/crash reporting requires native config or dart defines and has not been verified in this audit.
+- Analytics/crash reporting provider selection remains future work.
 - Google/Apple sign-in are placeholders.
 - Billing has local entitlement and Google Play repository code but needs Play Console/internal testing and receipt strategy before beta reliance.
 - Global collectible recognition accuracy is not proven without a real reference dataset and validation corpus.
@@ -179,11 +179,13 @@ Verification commands:
 2. Run a physical Android smoke test for camera, gallery, analyze, save, app restart, and portfolio image display.
 3. Run `integration_test/collectiq_app_flow_test.dart` on emulator/device and record results.
 4. Run backend unit tests with `py -m unittest discover tests` from `backend/`.
-5. Choose one Supabase integration path for auth/sync/image upload and reduce duplicate gateway/registry ambiguity.
-6. Validate Supabase dev/staging end to end: email sign-up/sign-in, image upload, portfolio row upload, sign-out, and local data preservation.
+5. Validate Supabase SIT end to end: email sign-up/sign-in, image upload,
+   portfolio row upload, sign-out, and local data preservation.
+6. Decide whether to migrate the current Supabase REST gateway to the official
+   `supabase_flutter` client for token refresh and password-update flows.
 7. Decide how local-only image sync queue should behave when cloud is not configured so local users do not see false failure states.
 8. Build a small licensed/user-owned validation dataset with ground truth and run the validation lab against mock and real backend modes.
-9. Verify Firebase analytics/crash reporting in a dev build with safe config and confirm no sensitive fields are emitted.
+9. Choose an observability provider or keep no-op telemetry for beta.
 10. Run Android debug/release build and Play Billing internal-test setup only after local/device scan flows are stable.
 
 ## I. Definition Of Done Before Beta
@@ -192,8 +194,8 @@ Verification commands:
 - Saved local portfolio items and images survive app restart, force-stop, and normal OS lifecycle transitions.
 - The AI default mode and required backend setup are documented and match code behavior.
 - Local-only users can scan, analyze, save, search, sort, view detail, delete, and manage settings without cloud errors that look like failures.
-- Supabase dev/staging auth, image storage, and portfolio sync are validated or explicitly excluded from beta.
-- Firebase analytics/crash reporting is either validated with beta-safe config or left disabled with no-op behavior confirmed.
+- Supabase SIT auth, image storage, and portfolio sync are validated or explicitly excluded from beta.
+- Analytics/crash reporting is either provider-selected in a future sprint or left disabled with no-op behavior confirmed.
 - Backend mock mode, OpenAI opt-in mode, and pricing fallback behavior are validated against known images.
 - A validation dataset with clear licensing/ownership and expected outputs exists.
 - `dart format --set-exit-if-changed lib test`, `flutter analyze`, `flutter test`, backend tests, integration tests, and Android builds pass for the beta candidate.

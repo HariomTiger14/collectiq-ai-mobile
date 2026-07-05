@@ -21,7 +21,6 @@ void main() {
         config: const TelemetryConfig(
           enabled: true,
           providerType: TelemetryProviderType.sentry,
-          firebaseConfigured: false,
           sentryConfigured: true,
         ),
       );
@@ -42,7 +41,6 @@ void main() {
         config: const TelemetryConfig(
           enabled: true,
           providerType: TelemetryProviderType.sentry,
-          firebaseConfigured: false,
           sentryConfigured: true,
         ),
       );
@@ -69,7 +67,6 @@ void main() {
         config: const TelemetryConfig(
           enabled: false,
           providerType: TelemetryProviderType.sentry,
-          firebaseConfigured: false,
           sentryConfigured: true,
         ),
       );
@@ -86,50 +83,13 @@ void main() {
       final service = createAppTelemetryService(
         const TelemetryConfig(
           enabled: true,
-          providerType: TelemetryProviderType.firebase,
-          firebaseConfigured: false,
+          providerType: TelemetryProviderType.sentry,
           sentryConfigured: false,
         ),
       );
 
       expect(service.status.enabled, isFalse);
       expect(service.status.message, contains('not configured'));
-    });
-
-    test('firebase disabled without config falls back safely', () async {
-      final service = createAppTelemetryService(
-        const TelemetryConfig(
-          enabled: true,
-          providerType: TelemetryProviderType.firebase,
-          firebaseConfigured: false,
-          sentryConfigured: false,
-        ),
-      );
-
-      expect(service, isA<NoopTelemetryService>());
-      expect(service.status.provider, 'Firebase');
-      expect(service.status.analyticsEnabled, isFalse);
-      expect(service.status.crashReportingEnabled, isFalse);
-    });
-
-    test('firebase configured uses Firebase telemetry service', () {
-      final service = createAppTelemetryService(
-        const TelemetryConfig(
-          enabled: true,
-          providerType: TelemetryProviderType.firebase,
-          firebaseConfigured: true,
-          sentryConfigured: false,
-          firebaseApiKey: 'test-api-key',
-          firebaseAppId: '1:123456789:android:abcdef',
-          firebaseMessagingSenderId: '123456789',
-          firebaseProjectId: 'collectiq-test',
-        ),
-      );
-
-      expect(service, isA<FirebaseTelemetryService>());
-      expect(service.status.provider, 'Firebase');
-      expect(service.status.analyticsEnabled, isTrue);
-      expect(service.status.crashReportingEnabled, isTrue);
     });
   });
 }

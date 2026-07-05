@@ -66,13 +66,6 @@ class SupabaseBootstrap {
       );
     }
 
-    if (config.environment == AppEnvironment.prod) {
-      return _result = const SupabaseBootstrapResult(
-        status: SupabaseBootstrapStatus.disabled,
-        message: 'Supabase production wiring is disabled.',
-      );
-    }
-
     if (!_requiresSupabase(config)) {
       return _result = const SupabaseBootstrapResult(
         status: SupabaseBootstrapStatus.skipped,
@@ -116,12 +109,7 @@ class SupabaseBootstrap {
   }
 
   static bool canUseSupabase(EnvironmentConfig config) {
-    return switch (config.environment) {
-      AppEnvironment.dev ||
-      AppEnvironment.sit ||
-      AppEnvironment.staging => _requiresSupabase(config),
-      AppEnvironment.local || AppEnvironment.prod => false,
-    };
+    return config.allowsCloudServices && _requiresSupabase(config);
   }
 
   static bool _requiresSupabase(EnvironmentConfig config) {

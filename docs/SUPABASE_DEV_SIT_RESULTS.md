@@ -13,7 +13,8 @@ Validate the existing non-production Supabase path for:
 - Supabase table `portfolio_items`
 - Local-save-first portfolio sync behavior
 
-Production remains disabled. Local mode remains the default.
+Production Supabase requires explicit production cloud flags and public config.
+Local mode remains the default.
 
 ## Required DEV Configuration
 
@@ -47,7 +48,7 @@ Do not commit Supabase values. Use only a DEV project.
 | Area | Result | Evidence |
 | --- | --- | --- |
 | Local mode unchanged | Passed | Registry returns no-op services in local mode; existing `flutter test` suite passed. |
-| Production disabled | Passed | Supabase bootstrap returns disabled in `APP_ENV=prod`; registry stays no-op. |
+| Production missing-config fallback | Passed | Supabase bootstrap returns missing-config in `APP_ENV=prod` when flags are enabled but URL/key are absent. |
 | DEV registry selection | Passed | `APP_ENV=dev` plus cloud flags selects Supabase Auth, Storage, and Portfolio Sync services. |
 | Missing config fallback | Passed | Missing Supabase URL/key returns safe missing-config status. |
 | Anonymous auth fallback | Passed | Startup attempts anonymous auth only in DEV with auth flag; failures are tracked and do not throw. |
@@ -87,4 +88,3 @@ Latest results from this sprint:
 - `dart format lib test`: passed
 - `flutter analyze`: passed
 - `flutter test`: passed
-

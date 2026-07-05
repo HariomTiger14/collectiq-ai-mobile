@@ -61,7 +61,14 @@ class EnvironmentConfig {
   bool get isLocal => environment == AppEnvironment.local;
 
   bool get allowsProductionServices {
-    return false;
+    return environment.isProduction &&
+        featureFlags.useCloudAuth &&
+        featureFlags.useCloudPortfolioSync &&
+        featureFlags.useCloudImageStorage;
+  }
+
+  bool get allowsCloudServices {
+    return environment.allowsNonProductionCloud || allowsProductionServices;
   }
 
   String get cloudModeLabel {

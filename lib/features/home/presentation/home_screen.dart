@@ -297,8 +297,9 @@ class HomeQuickActionsRow extends StatelessWidget {
         final isWide = constraints.maxWidth >= 720;
         final spacing = isWide ? AppSpacing.lg : AppSpacing.md;
         final columns = actions.length;
-        final tileWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        final availableWidth = (constraints.maxWidth - spacing * (columns - 1))
+            .clamp(0.0, double.infinity);
+        final tileWidth = availableWidth / columns;
 
         return MotionStagger(
           children: [
@@ -633,8 +634,9 @@ class _PortfolioSnapshotCompact extends StatelessWidget {
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 560 ? 3 : 2;
         final spacing = AppSpacing.sm;
-        final width =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        final availableWidth = (constraints.maxWidth - spacing * (columns - 1))
+            .clamp(0.0, double.infinity);
+        final width = availableWidth / columns;
 
         return Wrap(
           spacing: spacing,

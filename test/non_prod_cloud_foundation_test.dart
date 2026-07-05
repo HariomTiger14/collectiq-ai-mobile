@@ -1,9 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
-import 'package:collectiq_ai/core/cloud/firebase/firebase_analytics_service.dart';
-import 'package:collectiq_ai/core/cloud/firebase/firebase_bootstrap.dart';
-import 'package:collectiq_ai/core/cloud/firebase/firebase_crash_reporting_service.dart';
 import 'package:collectiq_ai/core/cloud/services/noop_cloud_services.dart';
 import 'package:collectiq_ai/core/cloud/supabase/supabase_auth_service.dart';
 import 'package:collectiq_ai/core/cloud/supabase/supabase_bootstrap.dart';
@@ -123,23 +120,28 @@ void main() {
       const config = EnvironmentConfig(environment: AppEnvironment.prod);
 
       expect(config.allowsProductionServices, isFalse);
+      expect(config.allowsCloudServices, isFalse);
     });
 
-    test('prod remains protected even if cloud flags are enabled', () {
-      const config = EnvironmentConfig(
-        environment: AppEnvironment.prod,
-        featureFlags: FeatureFlags(
-          useCloudAuth: true,
-          useCloudPortfolioSync: true,
-          useCloudImageStorage: true,
-          useAnalytics: true,
-          useCrashReporting: true,
-          useRealAiProvider: true,
-        ),
-      );
+    test(
+      'prod allows Supabase foundation only when core cloud flags are enabled',
+      () {
+        const config = EnvironmentConfig(
+          environment: AppEnvironment.prod,
+          featureFlags: FeatureFlags(
+            useCloudAuth: true,
+            useCloudPortfolioSync: true,
+            useCloudImageStorage: true,
+            useAnalytics: true,
+            useCrashReporting: true,
+            useRealAiProvider: true,
+          ),
+        );
 
-      expect(config.allowsProductionServices, isFalse);
-    });
+        expect(config.allowsProductionServices, isTrue);
+        expect(config.allowsCloudServices, isTrue);
+      },
+    );
   });
 
   group('CloudServiceRegistry', () {
@@ -179,33 +181,39 @@ void main() {
       expect(registry.remoteConfigService.getString('missing'), isEmpty);
     });
 
-    test('dev uses Supabase data services when matching flags are true', () {
-      const config = EnvironmentConfig(
-        environment: AppEnvironment.dev,
-        featureFlags: FeatureFlags(
-          useCloudAuth: true,
-          useCloudPortfolioSync: true,
-          useCloudImageStorage: true,
-          useAnalytics: true,
-          useCrashReporting: true,
-        ),
-      );
+    test(
+      'dev uses Supabase data services and no-op telemetry placeholders',
+      () {
+        const config = EnvironmentConfig(
+          environment: AppEnvironment.dev,
+          featureFlags: FeatureFlags(
+            useCloudAuth: true,
+            useCloudPortfolioSync: true,
+            useCloudImageStorage: true,
+            useAnalytics: true,
+            useCrashReporting: true,
+          ),
+        );
 
-      final registry = CloudServiceRegistry.fromConfig(config);
+        final registry = CloudServiceRegistry.fromConfig(config);
 
-      expect(registry.authService, isA<SupabaseAuthService>());
-      expect(registry.cloudStorageService, isA<SupabaseCloudStorageService>());
-      expect(
-        registry.cloudPortfolioSyncService,
-        isA<SupabaseCloudPortfolioSyncService>(),
-      );
-      expect(registry.analyticsService, isA<FirebaseAnalyticsService>());
-      expect(
-        registry.crashReportingService,
-        isA<FirebaseCrashReportingService>(),
-      );
-      expect(registry.remoteConfigService, isA<NoOpRemoteConfigService>());
-    });
+        expect(registry.authService, isA<SupabaseAuthService>());
+        expect(
+          registry.cloudStorageService,
+          isA<SupabaseCloudStorageService>(),
+        );
+        expect(
+          registry.cloudPortfolioSyncService,
+          isA<SupabaseCloudPortfolioSyncService>(),
+        );
+        expect(registry.analyticsService, isA<NoOpAnalyticsService>());
+        expect(
+          registry.crashReportingService,
+          isA<NoOpCrashReportingService>(),
+        );
+        expect(registry.remoteConfigService, isA<NoOpRemoteConfigService>());
+      },
+    );
 
     test('SIT uses non-production services when matching flags are true', () {
       const config = EnvironmentConfig(
@@ -229,28 +237,28 @@ void main() {
       expect(registry.crashReportingService, isA<NoOpCrashReportingService>());
     });
 
-    test('Firebase is not selected for auth storage or portfolio sync', () {
-      const config = EnvironmentConfig(
-        environment: AppEnvironment.dev,
-        featureFlags: FeatureFlags(
-          useCloudAuth: true,
-          useCloudPortfolioSync: true,
-          useCloudImageStorage: true,
-        ),
-      );
+    test(
+      'Supabase is the only selected auth storage and portfolio provider',
+      () {
+        const config = EnvironmentConfig(
+          environment: AppEnvironment.dev,
+          featureFlags: FeatureFlags(
+            useCloudAuth: true,
+            useCloudPortfolioSync: true,
+            useCloudImageStorage: true,
+          ),
+        );
 
-      final registry = CloudServiceRegistry.fromConfig(config);
+        final registry = CloudServiceRegistry.fromConfig(config);
 
-      expect(registry.authService.providerName, isNot(contains('Firebase')));
-      expect(
-        registry.cloudStorageService.providerName,
-        isNot(contains('Firebase')),
-      );
-      expect(
-        registry.cloudPortfolioSyncService.providerName,
-        isNot(contains('Firestore')),
-      );
-    });
+        expect(registry.authService.providerName, contains('Supabase'));
+        expect(registry.cloudStorageService.providerName, contains('Supabase'));
+        expect(
+          registry.cloudPortfolioSyncService.providerName,
+          contains('Supabase'),
+        );
+      },
+    );
 
     test('staging uses no-op services when flags are false', () {
       const config = EnvironmentConfig(environment: AppEnvironment.staging);
@@ -260,7 +268,7 @@ void main() {
       expect(registry.isUsingNoOpServices, isTrue);
     });
 
-    test('prod remains disabled even when cloud flags are true', () {
+    test('prod uses Supabase foundation when core cloud flags are true', () {
       const config = EnvironmentConfig(
         environment: AppEnvironment.prod,
         featureFlags: FeatureFlags(
@@ -275,45 +283,11 @@ void main() {
 
       final registry = CloudServiceRegistry.fromConfig(config);
 
-      expect(registry.isUsingNoOpServices, isTrue);
-    });
-  });
-
-  group('FirebaseBootstrap', () {
-    test('skips Firebase in local mode', () async {
-      final bootstrap = FirebaseBootstrap(config: EnvironmentConfig.local());
-
-      final result = await bootstrap.ensureInitialized();
-
-      expect(result.status, FirebaseBootstrapStatus.skipped);
-      expect(result.isInitialized, isFalse);
-    });
-
-    test('safe-disables Firebase in prod mode', () async {
-      final bootstrap = FirebaseBootstrap(
-        config: const EnvironmentConfig(
-          environment: AppEnvironment.prod,
-          featureFlags: FeatureFlags(useCrashReporting: true),
-        ),
-      );
-
-      final result = await bootstrap.ensureInitialized();
-
-      expect(result.status, FirebaseBootstrapStatus.disabled);
-      expect(result.isInitialized, isFalse);
-    });
-
-    test('analytics/crash wrappers skip disabled Firebase plugins', () async {
-      final bootstrap = FirebaseBootstrap(config: EnvironmentConfig.local());
-      final analytics = FirebaseAnalyticsService(bootstrap: bootstrap);
-      final crashReporting = FirebaseCrashReportingService(
-        bootstrap: bootstrap,
-      );
-
-      await analytics.trackEvent('scan_started');
-      await crashReporting.recordNonFatalError(
-        StateError('test'),
-        reason: 'unit_test',
+      expect(registry.authService, isA<SupabaseAuthService>());
+      expect(registry.cloudStorageService, isA<SupabaseCloudStorageService>());
+      expect(
+        registry.cloudPortfolioSyncService,
+        isA<SupabaseCloudPortfolioSyncService>(),
       );
     });
   });
@@ -328,17 +302,23 @@ void main() {
       expect(result.isInitialized, isFalse);
     });
 
-    test('safe-disables Supabase in prod mode', () async {
+    test('missing URL or anon key in prod falls back safely', () async {
       final bootstrap = SupabaseBootstrap(
         config: const EnvironmentConfig(
           environment: AppEnvironment.prod,
-          featureFlags: FeatureFlags(useCloudAuth: true),
+          featureFlags: FeatureFlags(
+            useCloudAuth: true,
+            useCloudPortfolioSync: true,
+            useCloudImageStorage: true,
+          ),
         ),
+        url: '',
+        anonKey: '',
       );
 
       final result = await bootstrap.ensureInitialized();
 
-      expect(result.status, SupabaseBootstrapStatus.disabled);
+      expect(result.status, SupabaseBootstrapStatus.missingConfig);
       expect(result.isInitialized, isFalse);
     });
 

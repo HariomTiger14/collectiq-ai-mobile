@@ -2,7 +2,7 @@
 
 Audit date: 2026-07-01
 
-This guide configures **CollectIQ SIT** as a non-production cloud-connected Android app. Production remains disabled.
+This guide configures **CollectIQ SIT** as a non-production cloud-connected Android app. Production Supabase uses the same foundation only when explicit production flags and public config are supplied.
 
 Authentication behaviour is defined in `docs/AUTHENTICATION_SPECIFICATION.md`.
 
@@ -265,7 +265,7 @@ AI backend is not reachable. Check your internet/backend setup.
 
 ## Known Limitations
 
-- Production remains disabled.
+- Production requires explicit cloud flags and Supabase public config.
 - The app still has local-first behavior; cloud failure must not delete local data.
 - Invalid or empty email/password input is rejected locally before Supabase is called.
 - With email confirmation enabled, successful sign-up shows an email

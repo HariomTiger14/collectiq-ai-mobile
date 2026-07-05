@@ -3,21 +3,21 @@
 CollectIQ AI syncs portfolio items and images through service interfaces so the
 app stays local-first and the UI does not depend on a vendor SDK.
 
-For DEV/STAGING, Supabase is now the primary backend for:
+Supabase is the single cloud backend for:
 
 - Auth identity: Supabase Auth anonymous user
 - Images: Supabase Storage
 - Portfolio metadata: Supabase table `portfolio_items`
 
-Local mode remains no-op. Production remains disabled. Firebase is reserved for
-optional analytics/crash reporting only and is not selected for auth, portfolio
-metadata sync, image storage, or Firestore sync.
+Local mode remains no-op. Production can use the same Supabase foundation only
+when the explicit cloud flags and Supabase public config are supplied.
+Analytics and crash reporting remain no-op placeholders in this sprint.
 
 ## Feature Flags
 
 Cloud portfolio sync can run only when all of these are true:
 
-- `APP_ENV=dev` or `APP_ENV=staging`
+- `APP_ENV=dev`, `APP_ENV=sit`, `APP_ENV=staging`, or `APP_ENV=prod`
 - `USE_CLOUD_AUTH=true`
 - `USE_CLOUD_PORTFOLIO_SYNC=true`
 - `USE_CLOUD_IMAGE_STORAGE=true`
@@ -25,10 +25,10 @@ Cloud portfolio sync can run only when all of these are true:
 - `SUPABASE_ANON_KEY` is provided by dart-define
 - a Supabase user is signed in
 
-Local and production are safe-disabled:
+Local is safe-disabled:
 
 - `APP_ENV=local` returns no-op services
-- `APP_ENV=prod` returns no-op services for now
+- `APP_ENV=prod` requires the same cloud flags plus Supabase config
 
 Legacy `COLLECTIQ_ENV` and `COLLECTIQ_USE_*` names are still accepted as
 fallbacks, but new Android SIT runs should use `APP_ENV` and `USE_*`.
@@ -111,8 +111,8 @@ Anonymous auth is attempted only when:
 If anonymous auth succeeds, `anonymous_auth_success` is recorded. If it fails,
 `anonymous_auth_failed` is recorded and the app continues in local-only mode.
 
-`local` and `prod` never start real cloud auth in this foundation. Production
-remains disabled until explicitly configured in a later release sprint.
+`sit` and `prod` require explicit email auth and do not create anonymous
+sessions at startup.
 
 ## Save-Triggered Sync Flow
 
@@ -121,7 +121,7 @@ When a scan result is saved:
 1. The item is saved to the local portfolio first.
 2. `portfolio_item_saved` is recorded through `AnalyticsService`.
 3. Existing local image sync queue behavior remains intact.
-4. If dev/staging cloud sync flags are enabled, `CloudPortfolioSyncCoordinator`
+4. If cloud sync flags are enabled, `CloudPortfolioSyncCoordinator`
    runs after the local save.
 5. Sync records `portfolio_sync_started`, then either `portfolio_sync_success`
    or `portfolio_sync_failed`.
@@ -133,11 +133,11 @@ items keep `syncStatus=failed` and a short `syncError` for troubleshooting.
 
 Settings shows a `Sync Now` action only as an enabled action when:
 
-- `APP_ENV=dev` or `APP_ENV=staging`
+- `APP_ENV=dev`, `APP_ENV=sit`, `APP_ENV=staging`, or `APP_ENV=prod`
 - `USE_CLOUD_PORTFOLIO_SYNC=true`
 - `USE_CLOUD_IMAGE_STORAGE=true`
 
-In local/prod, Settings displays:
+In local mode, Settings displays:
 
 ```text
 Cloud sync is disabled in this environment
@@ -178,7 +178,7 @@ signed in:
 
 Check these in order:
 
-1. Confirm `APP_ENV` is `dev` or `staging`.
+1. Confirm `APP_ENV` is `dev`, `sit`, `staging`, or `prod`.
 2. Confirm cloud auth, portfolio sync, and image storage feature flags are true.
 3. Confirm Supabase initializes for the selected environment.
 4. Confirm anonymous auth returns a non-empty user id.
@@ -186,17 +186,17 @@ Check these in order:
 6. Confirm Supabase Storage and RLS policies allow the signed-in user's path.
 7. Review the detail page `Sync failed` message for the latest local error.
 
-## Production Checklist Later
+## Production Checklist
 
-Before production can be enabled:
+Before production cloud traffic is trusted:
 
 1. Create separate production Supabase project.
 2. Review Supabase Storage policies.
 3. Review table RLS policies.
-4. Add explicit production feature flag approval.
+4. Supply explicit production feature flags and public Supabase config.
 5. Add server-side monitoring and alerting.
 6. Validate deletion/conflict rules.
 7. Verify privacy policy and Data Safety disclosures.
 8. Run real-device sync tests with test accounts.
 
-Production is intentionally no-op until that checklist is complete.
+Production falls back safely when flags or Supabase config are missing.

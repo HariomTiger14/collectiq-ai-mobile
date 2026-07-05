@@ -1,4 +1,5 @@
 import json
+import base64
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -174,14 +175,14 @@ class ApiEndpointsTest(unittest.TestCase):
 
         response = self.client.post("/analyze", json=payload)
 
-        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.status_code, 415)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "invalid_payload")
+        self.assertEqual(error["code"], "unsupported_media_type")
         self.assertFalse(error["retryable"])
 
     def test_api_analyze_openai_without_key_returns_safe_error(self) -> None:
         with patch(
-            "app.routers.api_analyze.get_ai_recognition_provider",
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
             return_value=OpenAIRecognitionProvider(api_key=""),
         ):
             response = self.client.post(
@@ -189,9 +190,9 @@ class ApiEndpointsTest(unittest.TestCase):
                 json=_api_analyze_payload(),
             )
 
-        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.status_code, 503)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "ai_provider_not_configured")
+        self.assertEqual(error["code"], "provider_unavailable")
         self.assertIn("OPENAI_API_KEY", error["message"])
         self.assertFalse(error["retryable"])
 
@@ -230,7 +231,7 @@ class ApiEndpointsTest(unittest.TestCase):
         )
 
         with patch(
-            "app.routers.api_analyze.get_ai_recognition_provider",
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
             return_value=provider,
         ):
             response = self.client.post(
@@ -242,6 +243,12 @@ class ApiEndpointsTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["itemName"], "1999 Pokemon Charizard Holo")
         self.assertEqual(payload["category"], "Pokemon Card")
+        self.assertEqual(payload["estimated_value"], payload["estimatedValue"])
+        self.assertEqual(payload["currency"], "AUD")
+        self.assertIsInstance(payload["tags"], list)
+        self.assertIsInstance(payload["attributes"], dict)
+        self.assertIsInstance(payload["images"], list)
+        self.assertIsInstance(payload["rawProviderPayload"], dict)
         self.assertEqual(payload["confidence"], 94)
         self.assertEqual(payload["aiReview"]["primaryMatch"], payload["itemName"])
         self.assertEqual(len(payload["alternatives"]), 3)
@@ -271,7 +278,7 @@ class ApiEndpointsTest(unittest.TestCase):
         )
 
         with patch(
-            "app.routers.api_analyze.get_ai_recognition_provider",
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
             return_value=provider,
         ):
             response = self.client.post(
@@ -281,7 +288,7 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "ai_provider_invalid_response")
+        self.assertEqual(error["code"], "provider_unavailable")
         self.assertTrue(error["retryable"])
 
     def test_api_analyze_openai_timeout_returns_safe_error(self) -> None:
@@ -291,7 +298,7 @@ class ApiEndpointsTest(unittest.TestCase):
         )
 
         with patch(
-            "app.routers.api_analyze.get_ai_recognition_provider",
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
             return_value=provider,
         ):
             response = self.client.post(
@@ -301,7 +308,7 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 504)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "ai_provider_timeout")
+        self.assertEqual(error["code"], "timeout")
         self.assertTrue(error["retryable"])
 
     def test_golden_manifest_structure(self) -> None:
@@ -330,19 +337,41 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "missing_image")
+        self.assertEqual(error["code"], "invalid_image")
         self.assertFalse(error["retryable"])
 
-    def test_api_analyze_invalid_payload(self) -> None:
+    def test_api_analyze_invalid_image(self) -> None:
+        payload = _api_analyze_payload()
+        payload["image"]["base64Image"] = base64.b64encode(b"not-an-image").decode("ascii")
+
+        response = self.client.post("/api/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 422)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "invalid_image")
+        self.assertFalse(error["retryable"])
+
+    def test_api_analyze_unsupported_type(self) -> None:
         payload = _api_analyze_payload()
         payload["image"]["fileName"] = "card.gif"
         payload["image"]["mimeType"] = "image/gif"
 
         response = self.client.post("/api/analyze", json=payload)
 
-        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.status_code, 415)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "invalid_payload")
+        self.assertEqual(error["code"], "unsupported_media_type")
+        self.assertFalse(error["retryable"])
+
+    def test_api_analyze_oversized_image_metadata(self) -> None:
+        payload = _api_analyze_payload()
+        payload["image"]["sizeBytes"] = 10 * 1024 * 1024 + 1
+
+        response = self.client.post("/api/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 413)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "image_too_large")
         self.assertFalse(error["retryable"])
 
     def test_api_analyze_unsupported_category(self) -> None:
@@ -353,12 +382,12 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "unsupported_category")
+        self.assertEqual(error["code"], "invalid_image")
         self.assertFalse(error["retryable"])
 
     def test_api_analyze_server_error(self) -> None:
         with patch(
-            "app.routers.api_analyze.get_ai_recognition_provider",
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
             side_effect=RuntimeError("provider failed"),
         ):
             response = self.client.post(
@@ -368,7 +397,36 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         error = response.json()["error"]
-        self.assertEqual(error["code"], "server_error")
+        self.assertEqual(error["code"], "unknown")
+        self.assertTrue(error["retryable"])
+
+    def test_root_analyze_multipart_upload(self) -> None:
+        response = self.client.post(
+            "/analyze",
+            data={
+                "imageSource": "camera",
+                "requestedCategory": "coin",
+                "timestamp": "2026-06-30T09:00:00Z",
+            },
+            files={"image": ("coin.png", _valid_png_bytes(), "image/png")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["category"], "Coin")
+        self.assertEqual(payload["rawProviderPayload"]["provider"], "mock")
+        self.assertIn("validate_image", payload["rawProviderPayload"]["pipelineStages"])
+
+    def test_root_analyze_provider_unavailable(self) -> None:
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            side_effect=ValueError("Unsupported AI_PROVIDER 'broken'."),
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 503)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "provider_unavailable")
         self.assertTrue(error["retryable"])
 
     def test_scanner_analyze_invalid_extension(self) -> None:
@@ -437,7 +495,7 @@ def _api_analyze_payload(*, base64_image: bool = False) -> dict:
         "localFilePath": "/local/app/path/card.jpg",
     }
     if base64_image:
-        image_payload["base64Image"] = "aW1hZ2UtYnl0ZXM="
+        image_payload["base64Image"] = base64.b64encode(_valid_jpeg_bytes()).decode("ascii")
 
     return {
         "request": {
@@ -450,6 +508,19 @@ def _api_analyze_payload(*, base64_image: bool = False) -> dict:
         },
         "image": image_payload,
     }
+
+
+def _valid_png_bytes() -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        b"\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00"
+    )
+
+
+def _valid_jpeg_bytes() -> bytes:
+    return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
 
 
 def _openai_output() -> dict:

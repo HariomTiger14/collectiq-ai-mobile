@@ -8,7 +8,7 @@ This setup creates three Android app identities:
 | --- | --- | --- | --- |
 | Local | `local` | CollectIQ Local | Local storage, mock/backend-dev safe, no cloud required. |
 | SIT | `sit` | CollectIQ SIT | Non-production Supabase DEV and backend API config can be supplied. |
-| Production | `prod` | CollectIQ | Production services remain disabled in app code. |
+| Production | `prod` | CollectIQ | Supabase can be enabled only with explicit cloud flags and public config. |
 
 ## Config Files
 
@@ -111,7 +111,10 @@ The installed app should appear as **CollectIQ SIT** and can coexist with the lo
 
 ## Production Safety
 
-`prod` exists as a distinct Android flavor and app name, but production cloud services remain disabled by code. This sprint does not enable production Supabase, production Firebase, production AI, billing, or release distribution.
+`prod` exists as a distinct Android flavor and app name. Production Supabase is
+not automatic: it requires `APP_ENV=prod`, the three cloud flags, and
+`SUPABASE_URL`/`SUPABASE_ANON_KEY`. This sprint does not enable production AI,
+billing, marketplace, subscriptions, or release distribution.
 
 ## Verification
 

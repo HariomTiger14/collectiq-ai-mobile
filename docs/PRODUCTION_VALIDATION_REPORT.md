@@ -21,7 +21,7 @@
 | Average latency | Not measured |
 | Sync success rate | Covered by Flutter sync tests; live Supabase rate requires configured project run. |
 | Billing status | Google Play Billing foundation tested; production products require Play Console setup. |
-| Crash-free sessions | Telemetry/Crashlytics integration available; live crash-free sessions require Firebase configuration and beta traffic. |
+| Crash-free sessions | Telemetry placeholder available; live crash-free sessions require a selected observability provider and beta traffic. |
 | Backend health | PASS |
 | Test status | Flutter: PASS; Backend: PASS |
 | Release readiness | Android builds: PASS |
@@ -55,5 +55,5 @@
 
 - Automated validation runs in mock/default mode and does not call paid OpenAI/eBay/TCGPlayer/PriceCharting APIs.
 - Real AI accuracy and pricing agreement require manual/local validation with configured backend providers and licensed or user-owned images.
-- Crash-free sessions are not a local metric; they become meaningful after Firebase Crashlytics is configured and beta testers generate sessions.
+- Crash-free sessions are not a local metric; they become meaningful after an observability provider is configured and beta testers generate sessions.
 

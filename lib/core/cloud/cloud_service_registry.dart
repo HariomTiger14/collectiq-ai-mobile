@@ -3,9 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 
-import 'firebase/firebase_analytics_service.dart';
-import 'firebase/firebase_bootstrap.dart';
-import 'firebase/firebase_crash_reporting_service.dart';
 import 'services/analytics_service.dart';
 import 'services/auth_service.dart';
 import 'services/cloud_portfolio_sync_service.dart';
@@ -28,8 +25,7 @@ final cloudServiceRegistryProvider = Provider<CloudServiceRegistry>((ref) {
 /// Registry for cloud-capable services.
 ///
 /// The registry gives controllers and future adapters a single place to resolve
-/// service implementations without binding UI code to Firebase, Supabase, or
-/// another provider directly.
+/// service implementations without binding UI code to Supabase directly.
 class CloudServiceRegistry {
   const CloudServiceRegistry({
     required this.config,
@@ -57,13 +53,11 @@ class CloudServiceRegistry {
     EnvironmentConfig config, {
     SupabaseDataGateway? supabaseDataGateway,
   }) {
-    if (!SupabaseBootstrap.canUseSupabase(config) &&
-        !FirebaseBootstrap.canUseFirebase(config)) {
+    if (!SupabaseBootstrap.canUseSupabase(config)) {
       return CloudServiceRegistry.local(config: config);
     }
 
     final supabaseBootstrap = SupabaseBootstrap(config: config);
-    final firebaseBootstrap = FirebaseBootstrap(config: config);
     final flags = config.featureFlags;
     final authService = flags.useCloudAuth
         ? SupabaseAuthService(
@@ -89,12 +83,8 @@ class CloudServiceRegistry {
               supabaseDataGateway: supabaseDataGateway,
             )
           : const NoOpCloudPortfolioSyncService(),
-      analyticsService: flags.useAnalytics
-          ? FirebaseAnalyticsService(bootstrap: firebaseBootstrap)
-          : const NoOpAnalyticsService(),
-      crashReportingService: flags.useCrashReporting
-          ? FirebaseCrashReportingService(bootstrap: firebaseBootstrap)
-          : const NoOpCrashReportingService(),
+      analyticsService: const NoOpAnalyticsService(),
+      crashReportingService: const NoOpCrashReportingService(),
       remoteConfigService: const NoOpRemoteConfigService(),
     );
   }

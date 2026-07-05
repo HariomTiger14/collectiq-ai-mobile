@@ -3,7 +3,8 @@
 Supabase is the primary DEV/STAGING backend for CollectIQ AI auth, portfolio
 metadata sync, and image storage.
 
-Production remains disabled. Local mode remains no-op.
+Production uses the same Supabase foundation only when explicit production
+flags and public Supabase config are supplied. Local mode remains no-op.
 
 ## Runtime Flags
 

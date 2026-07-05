@@ -234,9 +234,8 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   }
 
   bool _cloudSyncAvailable(CloudServiceRegistry registry) {
-    final environment = registry.config.environment;
     final flags = registry.config.featureFlags;
-    return environment.allowsNonProductionCloud &&
+    return registry.config.allowsCloudServices &&
         flags.useCloudPortfolioSync &&
         flags.useCloudImageStorage;
   }
