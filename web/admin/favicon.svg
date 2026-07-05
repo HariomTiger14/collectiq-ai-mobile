@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PackLox">
+  <rect width="64" height="64" rx="16" fill="#1d4ed8"/>
+  <path fill="#ffffff" d="M18 16h18.5c8 0 13.5 5.2 13.5 12.8 0 7.7-5.5 12.9-13.5 12.9H28v6.3H18V16Zm17.4 17.2c2.9 0 4.7-1.7 4.7-4.4 0-2.6-1.8-4.3-4.7-4.3H28v8.7h7.4Z"/>
+</svg>
