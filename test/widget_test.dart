@@ -21,6 +21,7 @@ import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.da
 import 'package:collectiq_ai/features/home/presentation/widgets/portfolio_visual_analytics.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -2243,6 +2244,74 @@ void main() {
     expect(find.text('Delete'), findsOneWidget);
   });
 
+  testWidgets('demo mode can seed portfolio from Settings', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(demoSeedEnabled: true);
+
+    await tester.openSettings();
+    await tester.reveal(find.text('Demo Data'));
+    expect(find.text('Demo Data'), findsOneWidget);
+    expect(find.text('Demo portfolio data'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-seed-demo-data-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Seeded 500 demo/mock collectibles locally.'),
+      findsOneWidget,
+    );
+    final preferences = await SharedPreferences.getInstance();
+    final encodedItems = preferences.getString('portfolio_items');
+    final decodedItems = jsonDecode(encodedItems!) as List<dynamic>;
+
+    expect(decodedItems, hasLength(packLoxDemoSeedItemCount));
+    expect(
+      decodedItems.every(
+        (item) =>
+            (item as Map<String, dynamic>)['id'].toString().startsWith(
+              packLoxDemoItemIdPrefix,
+            ) &&
+            item['notes'].toString().contains('DEMO MOCK DATA'),
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('portfolio renders 500 seeded demo items without crashing', (
+    WidgetTester tester,
+  ) async {
+    final demoItems = const DemoCollectibleSeedService().generateItems(
+      anchorDate: DateTime.utc(2026, 7),
+    );
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        for (final item in demoItems) item.toJson(),
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Total collection value'), findsOneWidget);
+    await tester.reveal(
+      find.byKey(ValueKey('portfolio-grid-item-${demoItems.first.id}')),
+    );
+    expect(find.text(demoItems.first.title), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('portfolio-grid-item-${demoItems.last.id}')),
+      800,
+      maxScrolls: 80,
+    );
+    expect(find.text(demoItems.last.title), findsOneWidget);
+    expectNoFlutterError(tester);
+  });
+
   testWidgets('removes saved portfolio item from local storage', (
     WidgetTester tester,
   ) async {
@@ -2880,6 +2949,7 @@ extension on WidgetTester {
     EnvironmentConfig? environmentConfig,
     bool onboardingCompleted = true,
     OnboardingRepository? onboardingRepository,
+    bool? demoSeedEnabled,
   }) async {
     final effectiveOnboardingRepository =
         onboardingRepository ??
@@ -2919,6 +2989,8 @@ extension on WidgetTester {
             galleryServiceProvider.overrideWithValue(galleryService),
           if (environmentConfig != null)
             environmentConfigProvider.overrideWithValue(environmentConfig),
+          if (demoSeedEnabled != null)
+            demoSeedEnabledProvider.overrideWithValue(demoSeedEnabled),
         ],
         child: const CollectIqApp(),
       ),

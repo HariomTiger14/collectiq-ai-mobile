@@ -69,6 +69,7 @@ import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_
 import 'package:collectiq_ai/features/onboarding/data/repositories/shared_preferences_onboarding_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
@@ -550,6 +551,73 @@ void main() {
       );
       expect(enriched.scanResult.pricing.pricingConfidence, 0);
       expect(enriched.recommendation, 'Fallback recommendation.');
+    });
+  });
+
+  group('DemoCollectibleSeedService', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('generator returns 500 demo/mock items', () {
+      final items = const DemoCollectibleSeedService().generateItems(
+        anchorDate: DateTime.utc(2026, 7),
+      );
+
+      expect(items, hasLength(packLoxDemoSeedItemCount));
+      expect(
+        items.every((item) => item.id.startsWith(packLoxDemoItemIdPrefix)),
+        isTrue,
+      );
+      expect(
+        items.every((item) => item.notes?.contains('DEMO MOCK DATA') ?? false),
+        isTrue,
+      );
+      expect(
+        items.every(
+          (item) => item.pricing?.pricingSource == 'PackLox demo seed (mock)',
+        ),
+        isTrue,
+      );
+    });
+
+    test('categories are diverse and cover the demo catalog', () {
+      final items = const DemoCollectibleSeedService().generateItems(
+        anchorDate: DateTime.utc(2026, 7),
+      );
+      final categories = items.map((item) => item.category).toSet();
+
+      expect(categories, containsAll(DemoCollectibleSeedService.categories));
+      expect(categories, hasLength(20));
+    });
+
+    test('normal mode does not seed automatically', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(demoSeedEnabledProvider), isFalse);
+      const repository = SharedPreferencesPortfolioRepository();
+
+      expect(await repository.getItems(), isEmpty);
+    });
+
+    test('demo mode can seed and clear local demo data', () async {
+      const repository = SharedPreferencesPortfolioRepository();
+
+      final seededCount = await const DemoCollectibleSeedService()
+          .seedPortfolio(repository);
+      final seededItems = await repository.getItems();
+
+      expect(seededCount, packLoxDemoSeedItemCount);
+      expect(seededItems, hasLength(packLoxDemoSeedItemCount));
+      expect(seededItems.every(DemoCollectibleSeedService.isDemoItem), isTrue);
+
+      final removedCount = await const DemoCollectibleSeedService()
+          .clearDemoItems(repository);
+      final remainingItems = await repository.getItems();
+
+      expect(removedCount, packLoxDemoSeedItemCount);
+      expect(remainingItems, isEmpty);
     });
   });
 

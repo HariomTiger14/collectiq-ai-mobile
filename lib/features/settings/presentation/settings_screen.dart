@@ -24,6 +24,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -48,6 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scrollController = ScrollController();
   Timer? _resendCountdownTimer;
   bool _isManualCloudSyncing = false;
+  bool _isUpdatingDemoData = false;
 
   @override
   void initState() {
@@ -98,6 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final apiConfig = ref.watch(network.environmentConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
     final subscriptionState = ref.watch(subscriptionControllerProvider);
+    final demoSeedEnabled = ref.watch(demoSeedEnabledProvider);
     final notificationState = ref.watch(
       priceAlertNotificationControllerProvider,
     );
@@ -297,6 +300,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final demoDataTiles = [
+      const _SettingsRow(
+        icon: Icons.science_outlined,
+        title: 'Demo portfolio data',
+        subtitle:
+            'Local-only mock collectibles for demos, UI testing, search, filter, and sort.',
+        trailing: '500 items',
+      ),
+      _DemoDataSeedPanel(
+        isBusy: _isUpdatingDemoData,
+        onSeed: _seedDemoPortfolio,
+        onClear: _clearDemoPortfolio,
+      ),
+    ];
+
     final infoTiles = [
       _SettingsRow(
         icon: Icons.info_outline_rounded,
@@ -378,6 +396,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ...sectionSlivers('Scanning', scanTiles),
             ...sectionSlivers('Notifications', notificationTiles),
             ...sectionSlivers('Appearance', appearanceTiles),
+            if (demoSeedEnabled) ...sectionSlivers('Demo Data', demoDataTiles),
             if (showDeveloperTools) ...[
               sliverBox(
                 SettingsSectionHeader('Developer Tools'),
@@ -487,6 +506,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } finally {
       if (mounted) {
         setState(() => _isManualCloudSyncing = false);
+      }
+    }
+  }
+
+  Future<void> _seedDemoPortfolio() async {
+    if (_isUpdatingDemoData) {
+      return;
+    }
+    setState(() => _isUpdatingDemoData = true);
+    try {
+      final count = await ref
+          .read(portfolioControllerProvider.notifier)
+          .seedDemoItems();
+      if (mounted) {
+        _showSettingsSnackBar('Seeded $count demo/mock collectibles locally.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingDemoData = false);
+      }
+    }
+  }
+
+  Future<void> _clearDemoPortfolio() async {
+    if (_isUpdatingDemoData) {
+      return;
+    }
+    setState(() => _isUpdatingDemoData = true);
+    try {
+      final count = await ref
+          .read(portfolioControllerProvider.notifier)
+          .clearDemoItems();
+      if (mounted) {
+        _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingDemoData = false);
       }
     }
   }
@@ -685,6 +742,56 @@ class _OnboardingResetPanel extends StatelessWidget {
             onPressed: onReset,
             icon: const Icon(Icons.restart_alt_outlined),
             label: const Text('Reset Onboarding'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DemoDataSeedPanel extends StatelessWidget {
+  const _DemoDataSeedPanel({
+    required this.isBusy,
+    required this.onSeed,
+    required this.onClear,
+  });
+
+  final bool isBusy;
+  final VoidCallback onSeed;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Enabled only by PACKLOX_DEMO_SEED. Demo records use fallback thumbnails and never call external services.',
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const ValueKey('settings-seed-demo-data-button'),
+            onPressed: isBusy ? null : onSeed,
+            icon: const Icon(Icons.dataset_outlined),
+            label: Text(isBusy ? 'Updating Demo Data...' : 'Seed Demo Data'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const ValueKey('settings-clear-demo-data-button'),
+            onPressed: isBusy ? null : onClear,
+            icon: const Icon(Icons.cleaning_services_outlined),
+            label: const Text('Clear Demo Data'),
           ),
         ),
       ],

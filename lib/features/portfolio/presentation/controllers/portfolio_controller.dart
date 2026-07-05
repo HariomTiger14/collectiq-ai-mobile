@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -196,6 +197,46 @@ class PortfolioController extends Notifier<PortfolioState> {
         isLoading: false,
         errorMessage: 'Unable to clear portfolio.',
       );
+    }
+  }
+
+  Future<int> seedDemoItems() async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      final seededCount = await const DemoCollectibleSeedService()
+          .seedPortfolio(_repository);
+      final items = await _repository.getItems();
+      state = state.copyWith(
+        items: collectiblesNewestFirst(items),
+        isLoading: false,
+      );
+      return seededCount;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to seed demo portfolio items.',
+      );
+      return 0;
+    }
+  }
+
+  Future<int> clearDemoItems() async {
+    state = state.copyWith(isLoading: true, clearErrorMessage: true);
+    try {
+      final removedCount = await const DemoCollectibleSeedService()
+          .clearDemoItems(_repository);
+      final items = await _repository.getItems();
+      state = state.copyWith(
+        items: collectiblesNewestFirst(items),
+        isLoading: false,
+      );
+      return removedCount;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to clear demo portfolio items.',
+      );
+      return 0;
     }
   }
 
