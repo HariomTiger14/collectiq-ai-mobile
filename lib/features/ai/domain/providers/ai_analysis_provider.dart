@@ -71,10 +71,14 @@ class AiAnalysisProviderConfig {
     const backendAnalysisEndpointUrl = String.fromEnvironment(
       'AI_BACKEND_ANALYSIS_ENDPOINT_URL',
     );
+    const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
     return AiAnalysisProviderConfig(
       type: AiAnalysisProviderType.fromConfig(configuredProvider),
-      backendAnalysisEndpointUrl: backendAnalysisEndpointUrl,
+      backendAnalysisEndpointUrl: _resolveBackendAnalysisEndpointUrl(
+        backendAnalysisEndpointUrl: backendAnalysisEndpointUrl,
+        apiBaseUrl: apiBaseUrl,
+      ),
     );
   }
 
@@ -107,6 +111,23 @@ class AiAnalysisProviderConfig {
         'Gemini Vision is prepared as a future backend-only provider.',
     };
   }
+}
+
+String _resolveBackendAnalysisEndpointUrl({
+  required String backendAnalysisEndpointUrl,
+  required String apiBaseUrl,
+}) {
+  final explicitEndpoint = backendAnalysisEndpointUrl.trim();
+  if (explicitEndpoint.isNotEmpty) {
+    return explicitEndpoint;
+  }
+
+  final baseUrl = apiBaseUrl.trim();
+  if (baseUrl.isEmpty) {
+    return '';
+  }
+
+  return '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/analyze';
 }
 
 /// Input sent to an AI analysis provider.

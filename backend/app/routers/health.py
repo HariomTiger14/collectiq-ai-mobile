@@ -15,3 +15,11 @@ async def health() -> dict[str, str]:
         "pricing_provider": settings.pricing_provider,
         "version": settings.version,
     }
+
+
+@router.get("/version")
+async def version() -> dict[str, str]:
+    return {
+        "version": settings.version,
+        "environment": settings.environment,
+    }

@@ -23,6 +23,7 @@ from app.services.ai.openai_recognition_provider import (
     OpenAITimeoutError,
 )
 from app.services.ai.provider_factory import get_ai_recognition_provider
+from app.services.analyzer.backend_analyzer_service import BackendAnalyzerService
 from app.services.pricing.base_pricing_provider import (
     EmptyMarketDataError,
     PricingProviderError,
@@ -34,6 +35,7 @@ from app.services.pricing.provider_factory import get_pricing_provider
 
 
 router = APIRouter(prefix="/api", tags=["Analyze API"])
+root_router = APIRouter(tags=["Analyzer API"])
 logger = logging.getLogger("collectiq.api.analyze")
 
 SUPPORTED_CATEGORIES = {
@@ -58,18 +60,26 @@ SUPPORTED_CATEGORIES = {
     summary="Analyze a collectible image from the Flutter backend contract",
 )
 async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
+    return await _analyze_collectible(payload)
+
+
+@root_router.post(
+    "/analyze",
+    response_model=ApiAnalyzeResponse,
+    summary="Analyze a collectible image from the production Analyzer API contract",
+)
+async def analyze_collectible_root(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
+    return await _analyze_collectible(payload)
+
+
+async def _analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     _validate_contract(payload)
     started_at = time.perf_counter()
 
     try:
-        provider = get_ai_recognition_provider()
-        if hasattr(provider, "recognize_api_payload"):
-            recognition = provider.recognize_api_payload(
-                request_metadata=_model_to_dict(payload.request),
-                image_payload=_model_to_dict(payload.image),
-            )
-        else:
-            recognition = provider.recognize(Path(payload.image.localFilePath))
+        provider, recognition = BackendAnalyzerService(
+            provider_factory=get_ai_recognition_provider,
+        ).analyze(payload)
         pricing = get_pricing_provider().price(recognition)
     except AIProviderNotConfiguredError as exc:
         raise _api_error(
@@ -196,8 +206,19 @@ async def analyze_collectible(payload: ApiAnalyzeRequest) -> ApiAnalyzeResponse:
     return ApiAnalyzeResponse(
         id=f"backend-{uuid4()}",
         itemName=recognition.title,
+        title=recognition.title,
         category=recognition.category,
+        manufacturer=recognition.brand,
+        year=recognition.year,
+        series=recognition.series,
+        variant=recognition.edition,
         estimatedValue=pricing.estimatedMarketValue,
+        currency=pricing.currency,
+        tags=recognition.detectedObjects,
+        description=recognition.description,
+        attributes=_provider_neutral_attributes(recognition),
+        images=[],
+        rawProviderPayload={"provider": diagnostics.aiProvider},
         lowEstimate=pricing.lowEstimate,
         highEstimate=pricing.highEstimate,
         confidence=recognition.confidence,
@@ -284,12 +305,6 @@ def _validate_contract(payload: ApiAnalyzeRequest) -> None:
         )
 
 
-def _model_to_dict(model) -> dict:
-    if hasattr(model, "model_dump"):
-        return model.model_dump()
-    return model.dict()
-
-
 def _api_error(
     status_code: int,
     code: str,
@@ -330,6 +345,14 @@ def _key_attributes(recognition) -> dict[str, str]:
         key: value.strip()
         for key, value in attributes.items()
         if isinstance(value, str) and value.strip()
+    }
+
+
+def _provider_neutral_attributes(recognition) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in _key_attributes(recognition).items()
+        if value.strip()
     }
 
 

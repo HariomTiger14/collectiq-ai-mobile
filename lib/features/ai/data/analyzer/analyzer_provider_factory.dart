@@ -2,6 +2,7 @@ import 'package:collectiq_ai/features/ai/data/analyzer/future_gemini_provider.da
 import 'package:collectiq_ai/features/ai/data/analyzer/future_openai_provider.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/future_vision_provider.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/mock_analyzer_provider.dart';
+import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_provider.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
@@ -13,10 +14,14 @@ class AnalyzerProviderFactory {
   AnalyzerProvider create({
     required AnalyzerConfig config,
     required AiAnalysisProvider legacyAnalysisProvider,
+    required AiBackendClient backendClient,
+    bool useBackendContract = false,
   }) {
     return switch (config.providerType) {
       AnalyzerProviderType.mock => MockAnalyzerProvider(
         analysisProvider: legacyAnalysisProvider,
+        backendClient: backendClient,
+        useBackendContract: useBackendContract,
       ),
       AnalyzerProviderType.futureVision => const FutureVisionProvider(),
       AnalyzerProviderType.futureOpenAI => const FutureOpenAIProvider(),

@@ -90,8 +90,19 @@ class ApiAnalyzeDiagnosticsResponse(BaseModel):
 class ApiAnalyzeResponse(BaseModel):
     id: str
     itemName: str
+    title: str | None = None
     category: str
+    manufacturer: str | None = None
+    year: str | None = None
+    series: str | None = None
+    variant: str | None = None
     estimatedValue: int
+    currency: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    description: str | None = None
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    images: list[str] = Field(default_factory=list)
+    rawProviderPayload: dict[str, Any] = Field(default_factory=dict)
     lowEstimate: int
     highEstimate: int
     confidence: int

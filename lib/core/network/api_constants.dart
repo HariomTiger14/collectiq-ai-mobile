@@ -85,6 +85,9 @@ class ApiConstants {
   /// Scanner local AI analysis endpoint.
   static const scannerAnalyzePath = '/scanner/analyze';
 
+  /// Production analyzer endpoint.
+  static const analyzerPath = '/analyze';
+
   /// Portfolio endpoint.
   static const portfolioPath = '/portfolio';
 

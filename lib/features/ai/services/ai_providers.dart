@@ -48,10 +48,7 @@ final aiBackendApiServiceProvider = Provider<AiBackendApiService>((ref) {
     endpointUrl: config.backendAnalysisEndpointUrl,
     isReleaseMode: kReleaseMode,
   );
-  if (config.type == AiAnalysisProviderType.openAiVision &&
-      readiness.isConfigured &&
-      readiness.isValid &&
-      readiness.isReleaseSafe) {
+  if (readiness.isConfigured && readiness.isValid && readiness.isReleaseSafe) {
     return DioAiBackendApiService(
       endpointUrl: config.backendAnalysisEndpointUrl,
       isReleaseMode: kReleaseMode,
@@ -68,7 +65,11 @@ final aiBackendApiServiceProvider = Provider<AiBackendApiService>((ref) {
 /// before transport.
 final aiBackendClientProvider = Provider<AiBackendClient>((ref) {
   final config = ref.watch(aiAnalysisProviderConfigProvider);
-  if (config.type == AiAnalysisProviderType.openAiVision) {
+  final readiness = const AiBackendEndpointReadinessChecker().check(
+    endpointUrl: config.backendAnalysisEndpointUrl,
+    isReleaseMode: kReleaseMode,
+  );
+  if (readiness.isConfigured && readiness.isValid && readiness.isReleaseSafe) {
     return HttpAiBackendClient(
       endpointUrl: config.backendAnalysisEndpointUrl,
       apiService: ref.watch(aiBackendApiServiceProvider),
@@ -99,9 +100,12 @@ final analyzerConfigProvider = Provider<AnalyzerConfig>((ref) {
 
 /// Provides the configured analyzer provider.
 final analyzerProviderProvider = Provider<AnalyzerProvider>((ref) {
+  final aiConfig = ref.watch(aiAnalysisProviderConfigProvider);
   return const AnalyzerProviderFactory().create(
     config: ref.watch(analyzerConfigProvider),
     legacyAnalysisProvider: ref.watch(aiAnalysisProviderProvider),
+    backendClient: ref.watch(aiBackendClientProvider),
+    useBackendContract: aiConfig.hasBackendAnalysisEndpoint,
   );
 });
 

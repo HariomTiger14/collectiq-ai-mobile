@@ -37,6 +37,18 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertNotIn("secret", serialized.lower())
         self.assertNotIn("token", serialized.lower())
 
+    def test_version(self) -> None:
+        response = self.client.get("/version")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("version", payload)
+        self.assertIn("environment", payload)
+        serialized = json.dumps(payload)
+        self.assertNotIn("api_key", serialized.lower())
+        self.assertNotIn("secret", serialized.lower())
+        self.assertNotIn("token", serialized.lower())
+
     def test_scanner_analyze_happy_path(self) -> None:
         response = self.client.post(
             "/scanner/analyze",
@@ -108,7 +120,10 @@ class ApiEndpointsTest(unittest.TestCase):
         payload = response.json()
         self.assertTrue(payload["id"].startswith("backend-"))
         self.assertTrue(payload["itemName"])
+        self.assertEqual(payload["title"], payload["itemName"])
         self.assertTrue(payload["category"])
+        self.assertIn("attributes", payload)
+        self.assertIn("rawProviderPayload", payload)
         self.assertGreater(payload["estimatedValue"], 0)
         self.assertGreater(payload["lowEstimate"], 0)
         self.assertGreaterEqual(payload["highEstimate"], payload["estimatedValue"])
@@ -138,6 +153,31 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("pricingFallbackUsed", diagnostics)
         self.assertIn("totalLatencyMs", diagnostics)
         self.assertIn(diagnostics["confidenceLevel"], ["High", "Medium", "Low"])
+
+    def test_root_analyze_uses_final_contract(self) -> None:
+        response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["id"].startswith("backend-"))
+        self.assertTrue(payload["itemName"])
+        self.assertTrue(payload["category"])
+        self.assertGreater(payload["estimatedValue"], 0)
+        self.assertTrue(payload["recommendation"])
+        self.assertEqual(payload["timestamp"], "2026-06-30T09:00:00Z")
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "mock")
+
+    def test_root_analyze_error_maps_to_final_contract(self) -> None:
+        payload = _api_analyze_payload()
+        payload["image"]["fileName"] = "card.gif"
+        payload["image"]["mimeType"] = "image/gif"
+
+        response = self.client.post("/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 422)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "invalid_payload")
+        self.assertFalse(error["retryable"])
 
     def test_api_analyze_openai_without_key_returns_safe_error(self) -> None:
         with patch(

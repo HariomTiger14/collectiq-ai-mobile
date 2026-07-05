@@ -6,6 +6,8 @@ import 'package:collectiq_ai/features/ai/data/analyzer/future_gemini_provider.da
 import 'package:collectiq_ai/features/ai/data/analyzer/future_openai_provider.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/future_vision_provider.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/mock_analyzer_provider.dart';
+import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
+import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_provider.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_service.dart';
@@ -49,6 +51,7 @@ void main() {
         factory.create(
           config: const AnalyzerConfig(),
           legacyAnalysisProvider: legacyProvider,
+          backendClient: const _FakeBackendClient(),
         ),
         isA<MockAnalyzerProvider>(),
       );
@@ -58,6 +61,7 @@ void main() {
             providerType: AnalyzerProviderType.futureVision,
           ),
           legacyAnalysisProvider: legacyProvider,
+          backendClient: const _FakeBackendClient(),
         ),
         isA<FutureVisionProvider>(),
       );
@@ -67,6 +71,7 @@ void main() {
             providerType: AnalyzerProviderType.futureOpenAI,
           ),
           legacyAnalysisProvider: legacyProvider,
+          backendClient: const _FakeBackendClient(),
         ),
         isA<FutureOpenAIProvider>(),
       );
@@ -76,6 +81,7 @@ void main() {
             providerType: AnalyzerProviderType.futureGemini,
           ),
           legacyAnalysisProvider: legacyProvider,
+          backendClient: const _FakeBackendClient(),
         ),
         isA<FutureGeminiProvider>(),
       );
@@ -216,6 +222,26 @@ void main() {
     });
   });
 
+  group('MockAnalyzerProvider', () {
+    test('consumes the backend analyzer contract when configured', () async {
+      final provider = MockAnalyzerProvider(
+        analysisProvider: const _SuccessfulLegacyProvider(),
+        backendClient: const _FakeBackendClient(),
+        useBackendContract: true,
+      );
+
+      final response = await provider.analyze(
+        const AnalyzerRequest(
+          imagePath: '/tmp/card.jpg',
+          metadata: {'imageSource': 'gallery'},
+        ),
+      );
+
+      expect(response.title, 'Backend Contract Card');
+      expect(response.rawProviderPayload['contract'], 'POST /analyze');
+    });
+  });
+
   group('AnalyzerException', () {
     test('maps network status codes to analyzer errors', () {
       expect(
@@ -311,6 +337,37 @@ class _SuccessfulLegacyProvider implements AiAnalysisProvider {
   @override
   Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
     return _legacyResult(request.imagePath);
+  }
+}
+
+class _FakeBackendClient implements AiBackendClient {
+  const _FakeBackendClient();
+
+  @override
+  Future<AiBackendAnalysisResponse> analyze(
+    AiBackendAnalysisRequest request,
+  ) async {
+    return AiBackendAnalysisResponse.fromJson({
+      'id': 'backend-test',
+      'title': 'Backend Contract Card',
+      'category': 'Trading Card',
+      'estimatedValue': 42,
+      'lowEstimate': 35,
+      'highEstimate': 55,
+      'confidence': 91,
+      'condition': 'Near Mint',
+      'marketTrend': 'Stable',
+      'attributes': {'brand': 'PackLox', 'year': '2026'},
+      'aiReview': {
+        'primaryMatch': 'Backend Contract Card',
+        'confidenceExplanation': 'Mapped from contract JSON.',
+        'detectionQuality': 'Good',
+        'reasoning': 'Contract mapping test.',
+      },
+      'alternatives': const [],
+      'recommendation': 'Review before saving.',
+      'timestamp': '2026-07-05T10:00:00Z',
+    });
   }
 }
 
