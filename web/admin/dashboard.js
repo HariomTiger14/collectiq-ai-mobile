@@ -4,15 +4,6 @@
     frontendUrl: "https://sit.packlox.com",
     refreshIntervalMs: 30000,
   };
-  const config = { ...DEFAULT_CONFIG, ...(window.PACKLOX_ADMIN_CONFIG || {}) };
-  const root = document.documentElement;
-  const themeToggle = document.querySelector("[data-theme-toggle]");
-  const toast = document.querySelector("[data-toast]");
-  const storedTheme = window.localStorage.getItem("packlox-admin-theme");
-
-  if (storedTheme === "light" || storedTheme === "dark") {
-    root.dataset.theme = storedTheme;
-  }
 
   class AdminApiClient {
     constructor(baseUrl) {
@@ -45,7 +36,10 @@
     }
   }
 
-  const client = new AdminApiClient(config.apiBaseUrl);
+  const getConfig = () => ({
+    ...DEFAULT_CONFIG,
+    ...(window.PACKLOX_ADMIN_CONFIG || {}),
+  });
 
   const setText = (selector, value) => {
     document.querySelectorAll(selector).forEach((element) => {
@@ -70,7 +64,7 @@
     }
   };
 
-  const renderVersion = (version) => {
+  const renderVersion = (version, config) => {
     const environment = version.environment || "unknown";
     const buildTime = version.buildTime || "unknown";
     const commit = version.commit || "unknown";
@@ -120,7 +114,7 @@
     setServiceState("analyzer", "Unavailable", "offline", "No response");
   };
 
-  const showToast = (message) => {
+  const showToast = (message, toast) => {
     if (!toast) {
       return;
     }
@@ -133,7 +127,7 @@
     }, 2600);
   };
 
-  const refreshHealth = async () => {
+  const refreshHealth = async (client) => {
     try {
       renderHealth(await client.getHealth());
     } catch (error) {
@@ -142,40 +136,81 @@
     }
   };
 
-  const loadVersion = async () => {
+  const loadVersion = async (client, config) => {
     try {
-      renderVersion(await client.getVersion());
+      renderVersion(await client.getVersion(), config);
     } catch (error) {
       console.warn("PackLox version request failed", error);
-      renderVersion({
-        environment: "unavailable",
-        version: "unknown",
-        commit: "unknown",
-        buildTime: "unavailable",
-      });
+      renderVersion(
+        {
+          environment: "unavailable",
+          version: "unknown",
+          commit: "unknown",
+          buildTime: "unavailable",
+        },
+        config,
+      );
       setServiceState("cloudflare", "Unavailable", "offline", "No version data");
     }
   };
 
-  document.querySelectorAll("[data-api-link]").forEach((link) => {
-    const endpoint = link.dataset.apiLink;
-    link.href = `${config.apiBaseUrl}/${endpoint}`;
-  });
+  const restoreTheme = (root) => {
+    try {
+      const storedTheme = window.localStorage.getItem("packlox-admin-theme");
+      if (storedTheme === "light" || storedTheme === "dark") {
+        root.dataset.theme = storedTheme;
+      }
+    } catch (error) {
+      console.warn("PackLox admin theme storage unavailable", error);
+    }
+  };
 
-  document.querySelectorAll("[data-module]").forEach((button) => {
-    button.addEventListener("click", () => {
-      showToast(`${button.dataset.module} is coming soon.`);
+  const initDashboard = () => {
+    const config = getConfig();
+    const client = new AdminApiClient(config.apiBaseUrl);
+    const root = document.documentElement;
+    const themeToggle = document.querySelector("[data-theme-toggle]");
+    const toast = document.querySelector("[data-toast]");
+
+    restoreTheme(root);
+
+    document.querySelectorAll("[data-api-link]").forEach((link) => {
+      const endpoint = link.dataset.apiLink;
+      link.href = `${config.apiBaseUrl}/${endpoint}`;
     });
-  });
 
-  themeToggle?.addEventListener("click", () => {
-    const currentTheme = root.dataset.theme;
-    const nextTheme = currentTheme === "dark" ? "light" : "dark";
-    root.dataset.theme = nextTheme;
-    window.localStorage.setItem("packlox-admin-theme", nextTheme);
-  });
+    document.querySelectorAll("[data-module]").forEach((button) => {
+      button.addEventListener("click", () => {
+        showToast(`${button.dataset.module} is coming soon.`, toast);
+      });
+    });
 
-  loadVersion();
-  refreshHealth();
-  window.setInterval(refreshHealth, config.refreshIntervalMs);
+    themeToggle?.addEventListener("click", () => {
+      const currentTheme = root.dataset.theme;
+      const nextTheme = currentTheme === "dark" ? "light" : "dark";
+      root.dataset.theme = nextTheme;
+      try {
+        window.localStorage.setItem("packlox-admin-theme", nextTheme);
+      } catch (error) {
+        console.warn("PackLox admin theme storage unavailable", error);
+      }
+    });
+
+    window.PACKLOX_ADMIN_READY = true;
+    window.dispatchEvent(new CustomEvent("packlox-admin-ready"));
+    console.info("PackLox admin dashboard polling started", {
+      apiBaseUrl: config.apiBaseUrl,
+      refreshIntervalMs: config.refreshIntervalMs,
+    });
+
+    loadVersion(client, config);
+    refreshHealth(client);
+    window.setInterval(() => refreshHealth(client), config.refreshIntervalMs);
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initDashboard, { once: true });
+  } else {
+    initDashboard();
+  }
 })();
