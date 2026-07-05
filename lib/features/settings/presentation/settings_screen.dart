@@ -12,8 +12,6 @@ import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/widgets/glass_card.dart';
 import 'package:collectiq_ai/core/widgets/modern_settings_row.dart';
-import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
-import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/widgets/auth_access_panel.dart';
@@ -29,6 +27,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -94,7 +93,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final lastAuthAttempt = ref.watch(supabaseAuthAttemptMetadataProvider);
     final lastDeepLink = ref.watch(authDeepLinkMetadataProvider);
     final apiConfig = ref.watch(network.environmentConfigProvider);
-    final aiProviderConfig = ref.watch(aiAnalysisProviderConfigProvider);
     final diagnostics = ref.watch(providerDiagnosticsProvider);
     final subscriptionState = ref.watch(subscriptionControllerProvider);
     final notificationState = ref.watch(
@@ -102,6 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     final isSitEnvironment =
         cloudRegistry.config.environment == AppEnvironment.sit;
+    final showDeveloperTools = kDebugMode || isSitEnvironment;
     final now = DateTime.now();
     final colorScheme = Theme.of(context).colorScheme;
     Widget framed(Widget child, {EdgeInsetsGeometry? padding}) {
@@ -162,7 +161,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         icon: Icons.lock_outline,
         title: 'Password',
         subtitle: authState.isSignedIn
-            ? 'Password is managed securely by Supabase Auth.'
+            ? 'Password is managed securely for this account.'
             : 'Use email and password to create or access an account.',
         trailing: authState.isSignedIn ? 'Managed' : 'Optional',
       ),
@@ -193,10 +192,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final syncTiles = [
       _SettingsRow(
         icon: Icons.cloud_sync_outlined,
-        title: 'Cloud Sync',
+        title: 'Backup & Sync',
         subtitle: canRunCloudSync
-            ? 'Cloud sync is available for this signed-in account.'
-            : 'Cloud sync is disabled in this environment',
+            ? 'Keep your collection backed up across devices.'
+            : 'Sign in to prepare backup and restore for your collection.',
         trailing: canRunCloudSync ? 'Ready' : 'Local only',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
@@ -204,37 +203,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       _SettingsRow(
         icon: Icons.cloud_done_outlined,
-        title: 'Cloud sync status',
+        title: 'Backup status',
         subtitle: syncState.errorMessage ?? syncState.status.message,
         trailing: syncState.status.statusLabel,
       ),
       _SettingsRow(
         icon: Icons.backup_outlined,
         title: 'Backup',
-        subtitle:
-            'Portfolio metadata and images sync when cloud services are configured.',
+        subtitle: 'Portfolio details and images are prepared for safe backup.',
         trailing: syncState.status.isCloudBackupEnabled ? 'On' : 'Off',
       ),
       _SettingsRow(
         icon: Icons.restore_outlined,
         title: 'Restore',
-        subtitle: 'Signed-in cloud items merge safely during manual sync.',
+        subtitle: 'Restore saved items when you sign in on another device.',
         trailing: canRunCloudSync ? 'Ready' : 'Unavailable',
       ),
       _SettingsRow(
         icon: Icons.pending_actions_outlined,
         title: 'Pending uploads',
-        subtitle: 'Local images remain usable while upload work is queued.',
+        subtitle: 'Local images remain usable while backup work is queued.',
         trailing: imageSyncState.snapshot.readyToSyncCount.toString(),
-      ),
-      _SettingsRow(
-        icon: Icons.cloud_queue_outlined,
-        title: 'Supabase Storage',
-        subtitle:
-            'Cloud image storage requires Supabase setup and is not enabled in local mode.',
-        trailing: 'Requires setup',
-        message:
-            'Supabase Storage requires cloud setup and is disabled in local mode.',
       ),
       _CloudSyncActionPanel(
         canRunCloudSync: canRunCloudSync,
@@ -246,50 +235,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
-    final aiTiles = [
-      _SettingsRow(
-        icon: Icons.auto_awesome_outlined,
-        title: 'Current AI provider',
-        subtitle: aiProviderConfig.selectedProviderMessage,
-        trailing: aiProviderConfig.type.isAvailable
-            ? aiProviderConfig.type.displayName
-            : 'Unavailable',
-      ),
-      _SettingsRow(
+    final scanTiles = [
+      const _SettingsRow(
         icon: Icons.document_scanner_outlined,
         title: 'Scan quality',
-        subtitle: 'Camera and gallery scans stay available locally.',
+        subtitle: 'Use clear, well-lit photos for the best estimates.',
         trailing: 'High',
       ),
-      _SettingsRow(
-        icon: Icons.science_outlined,
-        title: 'Mock mode active',
-        subtitle: 'No external AI calls run while mock analysis is selected.',
-        trailing: aiProviderConfig.type == AiAnalysisProviderType.mock
-            ? 'Active'
-            : 'Off',
+      const _SettingsRow(
+        icon: Icons.verified_outlined,
+        title: 'Estimate guidance',
+        subtitle: 'AI values are helpful starting points; verify before sale.',
+        trailing: 'Review',
       ),
-      _SettingsRow(
-        icon: Icons.visibility_outlined,
-        title: AiAnalysisProviderType.openAiVision.displayName,
-        subtitle: 'Backend-only provider option prepared for future scanning.',
-        trailing: _providerOptionStatus(
-          config: aiProviderConfig,
-          type: AiAnalysisProviderType.openAiVision,
-          backendConfigured: aiProviderConfig.hasBackendAnalysisEndpoint,
-        ),
-      ),
-      _SettingsRow(
-        icon: Icons.auto_awesome_motion_outlined,
-        title: AiAnalysisProviderType.geminiVision.displayName,
-        subtitle:
-            'Future backend-only provider. API keys must stay server-side.',
-        trailing: _providerOptionStatus(
-          config: aiProviderConfig,
-          type: AiAnalysisProviderType.geminiVision,
-          backendConfigured: aiProviderConfig.hasBackendAnalysisEndpoint,
-        ),
-      ),
+    ];
+
+    final appearanceTiles = [
       _SettingsRow(
         icon: Icons.palette_outlined,
         title: 'Theme',
@@ -300,11 +261,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.tips_and_updates_outlined,
         title: 'First-launch onboarding',
-        subtitle: 'Replay the welcome guide and local-first setup notes.',
+        subtitle: 'Replay the welcome guide and first scan tips.',
         trailing: 'Available',
         message: 'Use Reset Onboarding below to replay it.',
       ),
       _OnboardingResetPanel(onReset: () => _resetOnboarding(context)),
+    ];
+
+    final notificationTiles = [
       _SettingsRow(
         icon: Icons.notifications_none_outlined,
         title: 'Price alert notifications',
@@ -314,8 +278,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.admin_panel_settings_outlined,
         title: 'Notification permission',
-        subtitle:
-            'Android notification permission controls local price alerts.',
+        subtitle: 'Allow PackLox to notify you about item price alerts.',
         trailing: notificationState.permissionStatus.label,
       ),
       _NotificationActionsPanel(
@@ -333,8 +296,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.info_outline_rounded,
         title: 'About PackLox',
-        subtitle:
-            'Version, support links, privacy, terms, and platform details.',
+        subtitle: 'Version, product details, and collection privacy basics.',
         trailing: 'Open',
         onTap: () => Navigator.of(
           context,
@@ -346,15 +308,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         subtitle: 'Portfolio export will be available in a future release.',
         trailing: 'Soon',
         message: 'Portfolio export is coming soon.',
-      ),
-      const _SettingsRow(
-        icon: Icons.cloud_queue_outlined,
-        title: 'Local vs cloud mode',
-        subtitle:
-            'Local mode works without sign-in. Cloud sync is optional when configured.',
-        trailing: 'Local-first',
-        message:
-            'Local mode is active. Cloud sync requires explicit dev or staging setup.',
       ),
       const _SettingsRow(
         icon: Icons.mail_outline,
@@ -415,34 +368,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 apiConfig: apiConfig,
               ),
             ),
-            ...sectionSlivers('Cloud & Sync', syncTiles),
-            ...sectionSlivers('AI & Scanning', aiTiles),
-            sliverBox(
-              SettingsSectionHeader('Developer Tools'),
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.xl,
-                AppSpacing.lg,
-                AppSpacing.md,
+            ...sectionSlivers('Backup & Sync', syncTiles),
+            ...sectionSlivers('Scanning', scanTiles),
+            ...sectionSlivers('Notifications', notificationTiles),
+            ...sectionSlivers('Appearance', appearanceTiles),
+            if (showDeveloperTools) ...[
+              sliverBox(
+                SettingsSectionHeader('Developer Tools'),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
               ),
-            ),
-            sliverBox(
-              _DeveloperToolsSection(
-                isSitEnvironment: isSitEnvironment,
-                authState: authState,
-                supabaseConfig: supabaseConfig,
-                lastAuthAttempt: lastAuthAttempt,
-                lastDeepLink: lastDeepLink,
-                apiConfig: apiConfig,
-                diagnostics: diagnostics,
-                syncState: syncState,
-                cloudRegistry: cloudRegistry,
-                now: now,
-                maskedEmail: _maskedEmail,
-                formatDiagnosticDate: _formatDiagnosticDate,
-                formatDiagnosticDuration: _formatDiagnosticDuration,
+              sliverBox(
+                _DeveloperToolsSection(
+                  isSitEnvironment: isSitEnvironment,
+                  authState: authState,
+                  supabaseConfig: supabaseConfig,
+                  lastAuthAttempt: lastAuthAttempt,
+                  lastDeepLink: lastDeepLink,
+                  apiConfig: apiConfig,
+                  diagnostics: diagnostics,
+                  syncState: syncState,
+                  cloudRegistry: cloudRegistry,
+                  now: now,
+                  maskedEmail: _maskedEmail,
+                  formatDiagnosticDate: _formatDiagnosticDate,
+                  formatDiagnosticDuration: _formatDiagnosticDuration,
+                ),
               ),
-            ),
+            ],
             ...sectionSlivers('Help & About', infoTiles),
             const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
           ],
@@ -1560,7 +1517,7 @@ class _SettingsRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       trailingText: trailing,
-      onTap: onTap ?? () => _showRowMessage(context),
+      onTap: onTap ?? (message == null ? null : () => _showRowMessage(context)),
     );
   }
 
@@ -1586,20 +1543,4 @@ class _SettingsRow extends StatelessWidget {
     }
     return '$title: $trailing';
   }
-}
-
-String _providerOptionStatus({
-  required AiAnalysisProviderConfig config,
-  required AiAnalysisProviderType type,
-  required bool backendConfigured,
-}) {
-  if (config.type == type) {
-    return type.isAvailable ? 'Selected' : 'Unavailable';
-  }
-
-  if (type.isAvailable) {
-    return 'Available';
-  }
-
-  return backendConfigured ? 'Backend set' : 'Coming soon';
 }

@@ -270,7 +270,7 @@ class _ScanActions extends ConsumerWidget {
                   await scannerController.pickImageFromGallery();
                 },
           icon: const Icon(Icons.photo_library_outlined),
-          label: const Text('Choose from Gallery'),
+          label: const Text('Gallery'),
         ),
         const SizedBox(height: AppSpacing.md),
         OutlinedButton.icon(
@@ -404,7 +404,7 @@ class ScanPreparingImageCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Copying your photo into CollectIQ storage.',
+                  'Preparing your PackLox scan.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.bodySmall?.copyWith(
@@ -496,19 +496,6 @@ class ScanPreviewCard extends ConsumerWidget {
     final isLoading = ref.watch(
       scannerControllerProvider.select((state) => state.isLoading),
     );
-    final isPreparingImage = ref.watch(
-      scannerControllerProvider.select((state) => state.isPreparingImage),
-    );
-    final isBusy = isLoading || isPreparingImage;
-    final scannerController = ref.read(scannerControllerProvider.notifier);
-    logCollectIqScanFlow(
-      'analyze button visible',
-      selectedImagePath: imagePath,
-      isLoading: isLoading,
-      isPreparingImage: isPreparingImage,
-      currentTabIndex: ref.read(appShellTabControllerProvider),
-      details: {'enabled': !isBusy},
-    );
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
@@ -519,11 +506,11 @@ class ScanPreviewCard extends ConsumerWidget {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: isBusy
+          color: isLoading
               ? colorScheme.primary.withValues(alpha: 0.34)
               : colorScheme.outlineVariant,
         ),
-        boxShadow: isBusy
+        boxShadow: isLoading
             ? [...AppElevation.level1, ...AppElevation.accentGlow]
             : AppElevation.level1,
       ),
@@ -598,26 +585,6 @@ class ScanPreviewCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              key: const ValueKey('scan-analyze-button'),
-              onPressed: isBusy
-                  ? null
-                  : () async {
-                      await scannerController.analyzeWithAi();
-                    },
-              icon: isLoading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.auto_awesome_outlined),
-              label: Text(isLoading ? 'Analyzing...' : 'Analyze with AI'),
             ),
           ),
           AnimatedSwitcher(
@@ -1060,6 +1027,7 @@ class AiResultCard extends ConsumerWidget {
     final trendLabel = marketSummary?.trendLabel ?? 'Stable';
     final valueRange =
         '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}';
+    final freshnessLabel = _formatPricingDate(pricing.lastUpdated);
     final keyAttributes = [
       _MetadataDetail('Category', category),
       _MetadataDetail('Condition', condition),
@@ -1166,6 +1134,56 @@ class AiResultCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
+            _TrustSummaryCard(
+              pricingSource: pricing.pricingSource,
+              freshnessLabel: freshnessLabel,
+              pricingConfidence:
+                  '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isSaved
+                    ? null
+                    : () async {
+                        final didSave = await scannerController
+                            .saveScanResultToPortfolio();
+                        if (!context.mounted || !didSave) {
+                          return;
+                        }
+                        _showScannerSnackBar(context, 'Saved to portfolio');
+                      },
+                icon: Icon(
+                  isSaved
+                      ? Icons.check_circle_outline
+                      : Icons.bookmark_add_outlined,
+                ),
+                label: Text(
+                  isSaved ? 'Saved to Portfolio' : 'Save to Portfolio',
+                ),
+              ),
+            ),
+            if (isSaved && onViewPortfolio != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onViewPortfolio,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('View in Portfolio'),
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'AI estimates are a starting point. Verify identity, condition, and recent market comps before buying, selling, or grading.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             if (keyAttributes.isNotEmpty)
               _ResultSectionCard(
                 title: 'Key Attributes',
@@ -1247,39 +1265,6 @@ class AiResultCard extends ConsumerWidget {
               icon: Icons.lightbulb_outline,
               child: Text(recommendation, style: textTheme.bodyMedium),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: isSaved
-                    ? null
-                    : () async {
-                        final didSave = await scannerController
-                            .saveScanResultToPortfolio();
-                        if (!context.mounted || !didSave) {
-                          return;
-                        }
-                        _showScannerSnackBar(context, 'Saved to portfolio');
-                      },
-                icon: Icon(
-                  isSaved
-                      ? Icons.check_circle_outline
-                      : Icons.bookmark_add_outlined,
-                ),
-                label: Text(isSaved ? 'Saved' : 'Save to Portfolio'),
-              ),
-            ),
-            if (isSaved && onViewPortfolio != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onViewPortfolio,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('View in Portfolio'),
-                ),
-              ),
-            ],
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
@@ -1351,6 +1336,64 @@ class _ResultBadgeData {
   final IconData icon;
   final String label;
   final Color color;
+}
+
+class _TrustSummaryCard extends StatelessWidget {
+  const _TrustSummaryCard({
+    required this.pricingSource,
+    required this.freshnessLabel,
+    required this.pricingConfidence,
+  });
+
+  final String pricingSource;
+  final String freshnessLabel;
+  final String pricingConfidence;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.verified_outlined,
+                color: colorScheme.primary,
+                size: AppIconSizes.md,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Trust summary',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppLabelValueRow(label: 'Pricing source', value: pricingSource),
+          AppLabelValueRow(label: 'Freshness', value: freshnessLabel),
+          AppLabelValueRow(
+            label: 'Pricing confidence',
+            value: pricingConfidence,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ResultBadgeWrap extends StatelessWidget {

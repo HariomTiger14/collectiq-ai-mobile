@@ -1,4 +1,3 @@
-import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/ui/about/about_ui.dart';
 import 'package:collectiq_ai/core/ui/home/home_ui.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -24,8 +23,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final supabaseConfig = ref.watch(supabaseConfigProvider);
-    final appInfo = _AppInfo.fromSupabaseConfig(supabaseConfig);
+    final appInfo = _AppInfo.current();
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -75,74 +73,24 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: AboutInfoTile(
-                                icon: Icons.flutter_dash_rounded,
-                                title: 'Flutter',
-                                subtitle: appInfo.flutterVersion,
+                                icon: Icons.privacy_tip_outlined,
+                                title: 'Privacy',
+                                subtitle:
+                                    'Your collection starts locally on this device',
                               ),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: AboutInfoTile(
                                 icon: Icons.cloud_done_outlined,
-                                title: 'Supabase Project',
-                                subtitle: appInfo.supabaseProject,
+                                title: 'Backup',
+                                subtitle: appInfo.backupMode,
                               ),
                             ),
                             AboutInfoTile(
                               icon: Icons.folder_outlined,
                               title: 'Storage Location',
                               subtitle: appInfo.storageLocation,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      SectionCard(
-                        title: 'Links',
-                        child: MotionStagger(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: AboutLinkTile(
-                                icon: Icons.privacy_tip_outlined,
-                                title: 'Privacy Policy',
-                                subtitle: 'How we handle your data',
-                                onTap: () => _showLinkPlaceholder(
-                                  context,
-                                  'Privacy policy',
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: AboutLinkTile(
-                                icon: Icons.description_outlined,
-                                title: 'Terms of Service',
-                                subtitle: 'Legal information',
-                                onTap: () =>
-                                    _showLinkPlaceholder(context, 'Terms'),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: AboutLinkTile(
-                                icon: Icons.mail_outline_rounded,
-                                title: 'Contact Support',
-                                subtitle: 'Get help with PackLox',
-                                onTap: () => _showLinkPlaceholder(
-                                  context,
-                                  'Contact support',
-                                ),
-                              ),
-                            ),
-                            AboutLinkTile(
-                              icon: Icons.menu_book_outlined,
-                              title: 'Documentation',
-                              subtitle: 'Developer & API docs',
-                              onTap: () => _showLinkPlaceholder(
-                                context,
-                                'Documentation',
-                              ),
                             ),
                           ],
                         ),
@@ -160,51 +108,27 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
       ),
     );
   }
-
-  void _showLinkPlaceholder(BuildContext context, String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('$label will open here before release.')),
-      );
-  }
 }
 
 class _AppInfo {
   const _AppInfo({
     required this.version,
     required this.buildNumber,
-    required this.flutterVersion,
-    required this.supabaseProject,
+    required this.backupMode,
     required this.storageLocation,
   });
 
   final String version;
   final String buildNumber;
-  final String flutterVersion;
-  final String supabaseProject;
+  final String backupMode;
   final String storageLocation;
 
-  factory _AppInfo.fromSupabaseConfig(SupabaseConfig supabaseConfig) {
-    return _AppInfo(
+  factory _AppInfo.current() {
+    return const _AppInfo(
       version: '1.0.0',
       buildNumber: '1',
-      flutterVersion: const String.fromEnvironment(
-        'FLUTTER_VERSION',
-        defaultValue: 'Flutter SDK',
-      ),
-      supabaseProject: _supabaseProjectLabel(supabaseConfig),
-      storageLocation: supabaseConfig.isConfigured
-          ? 'Local device + Supabase cloud'
-          : 'Local device storage',
+      backupMode: 'Optional account backup',
+      storageLocation: 'Local device storage',
     );
-  }
-
-  static String _supabaseProjectLabel(SupabaseConfig config) {
-    final host = config.baseUri?.host;
-    if (!config.isConfigured || host == null || host.isEmpty) {
-      return 'Not configured';
-    }
-    return host;
   }
 }

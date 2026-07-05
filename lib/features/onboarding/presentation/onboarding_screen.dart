@@ -93,7 +93,7 @@ class OnboardingScreen extends StatelessWidget {
                           icon: Icons.auto_awesome_outlined,
                           title: 'Analyze',
                           body:
-                              'Mock AI mode identifies the item and prepares pricing fields for beta testing.',
+                              'Review an item match, estimated value, and confidence notes before you save.',
                         ),
                         SizedBox(height: AppSpacing.md),
                         _OnboardingStep(
@@ -119,7 +119,7 @@ class OnboardingScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'You can use PackLox without signing in. Camera, gallery, mock analysis, portfolio saves, alerts, wishlist, and goals all work locally on this device.',
+                          'You can use PackLox without signing in. Camera, gallery, estimates, portfolio saves, alerts, wishlist, and goals all work locally on this device.',
                           style: textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -129,7 +129,7 @@ class OnboardingScreen extends StatelessWidget {
                           icon: Icons.cloud_done_outlined,
                           title: 'Cloud sync is optional',
                           body:
-                              'Sign-in and sync are prepared for production, but they are never required to start collecting.',
+                              'Sign in when you want backup and restore. You can start collecting right away.',
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         const _OnboardingCallout(

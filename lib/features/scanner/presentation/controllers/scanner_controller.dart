@@ -309,11 +309,8 @@ class ScannerController extends Notifier<ScannerState> {
       _keepScanSelected('camera-picker-return');
       if (capturedImage == null || capturedImage.path.isEmpty) {
         _setState(
-          state.copyWith(
-            isPreparingImage: false,
-            errorMessage: 'Camera capture cancelled.',
-          ),
-          event: 'preparing image state false',
+          state.copyWith(isPreparingImage: false, clearErrorMessage: true),
+          event: 'camera capture cancelled',
         );
         return;
       }
@@ -325,7 +322,7 @@ class ScannerController extends Notifier<ScannerState> {
           isPreparingImage: true,
           isLoading: false,
           selectedItemTitle: 'Preparing image',
-          selectedItemStatus: 'Copying image into CollectIQ storage',
+          selectedItemStatus: 'Preparing your PackLox scan',
           clearErrorMessage: true,
         ),
         event: 'image copy started',
@@ -472,11 +469,8 @@ class ScannerController extends Notifier<ScannerState> {
       _keepScanSelected('gallery-picker-return');
       if (image == null) {
         _setState(
-          state.copyWith(
-            isPreparingImage: false,
-            errorMessage: 'Gallery selection cancelled.',
-          ),
-          event: 'preparing image state false',
+          state.copyWith(isPreparingImage: false, clearErrorMessage: true),
+          event: 'gallery selection cancelled',
         );
         return;
       }
@@ -489,7 +483,7 @@ class ScannerController extends Notifier<ScannerState> {
           isPreparingImage: true,
           isLoading: false,
           selectedItemTitle: 'Preparing image',
-          selectedItemStatus: 'Copying image into CollectIQ storage',
+          selectedItemStatus: 'Preparing your PackLox scan',
           clearErrorMessage: true,
         ),
         event: 'image copy started',

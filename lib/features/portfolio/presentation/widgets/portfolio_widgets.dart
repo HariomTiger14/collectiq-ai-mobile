@@ -311,7 +311,7 @@ class PortfolioGridTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PortfolioGridThumbnail(category: item.category),
+                _PortfolioGridThumbnail(item: item),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   item.title,
@@ -367,27 +367,13 @@ class PortfolioGridTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _GridTileIconButton(
-                      icon: Icons.edit_outlined,
-                      tooltip: 'Edit item',
-                      onTap: onEdit,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _GridTileIconButton(
-                      icon: Icons.ios_share_outlined,
-                      tooltip: 'Share item',
-                      onTap: onShare,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _GridTileIconButton(
-                      icon: Icons.delete_outline,
-                      tooltip: 'Remove item',
-                      onTap: onDelete,
-                    ),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _PortfolioOverflowMenu(
+                    onEdit: onEdit,
+                    onShare: onShare,
+                    onDelete: onDelete,
+                  ),
                 ),
               ],
             ),
@@ -399,52 +385,124 @@ class PortfolioGridTile extends StatelessWidget {
 }
 
 class _PortfolioGridThumbnail extends StatelessWidget {
-  const _PortfolioGridThumbnail({required this.category});
+  const _PortfolioGridThumbnail({required this.item});
 
-  final String category;
+  final CollectibleItem item;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final normalizedPath = item.imagePath.trim();
+    final hasImage =
+        normalizedPath.isNotEmpty &&
+        !normalizedPath.startsWith('sample://') &&
+        !normalizedPath.startsWith('selected-image');
 
     return AspectRatio(
       aspectRatio: 1.42,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Icon(
-          _categoryIcon(category),
-          color: colorScheme.primary,
-          size: AppIconSizes.lg,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: hasImage
+              ? _PortfolioItemImage(
+                  key: ValueKey('portfolio-grid-image-${item.id}'),
+                  imagePath: normalizedPath,
+                  size: double.infinity,
+                )
+              : Icon(
+                  _categoryIcon(item.category),
+                  color: colorScheme.primary,
+                  size: AppIconSizes.lg,
+                ),
         ),
       ),
     );
   }
 }
 
-class _GridTileIconButton extends StatelessWidget {
-  const _GridTileIconButton({
-    required this.icon,
-    required this.tooltip,
-    this.onTap,
-  });
+class _PortfolioOverflowMenu extends StatelessWidget {
+  const _PortfolioOverflowMenu({this.onEdit, this.onShare, this.onDelete});
 
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onShare;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 20,
-        child: SizedBox.square(dimension: 34, child: Icon(icon, size: 18)),
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<_PortfolioMenuAction>(
+      tooltip: 'Item actions',
+      icon: const Icon(Icons.more_horiz),
+      onSelected: (value) {
+        switch (value) {
+          case _PortfolioMenuAction.edit:
+            onEdit?.call();
+          case _PortfolioMenuAction.share:
+            onShare?.call();
+          case _PortfolioMenuAction.delete:
+            onDelete?.call();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _PortfolioMenuAction.edit,
+          enabled: onEdit != null,
+          child: const _PortfolioMenuItem(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+          ),
+        ),
+        PopupMenuItem(
+          value: _PortfolioMenuAction.share,
+          enabled: onShare != null,
+          child: const _PortfolioMenuItem(
+            icon: Icons.ios_share_outlined,
+            label: 'Share',
+          ),
+        ),
+        PopupMenuItem(
+          value: _PortfolioMenuAction.delete,
+          enabled: onDelete != null,
+          child: _PortfolioMenuItem(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: colorScheme.error,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _PortfolioMenuAction { edit, share, delete }
+
+class _PortfolioMenuItem extends StatelessWidget {
+  const _PortfolioMenuItem({
+    required this.icon,
+    required this.label,
+    this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = color ?? Theme.of(context).colorScheme.onSurface;
+
+    return Row(
+      children: [
+        Icon(icon, color: effectiveColor, size: 18),
+        const SizedBox(width: AppSpacing.md),
+        Text(label, style: TextStyle(color: effectiveColor)),
+      ],
     );
   }
 }

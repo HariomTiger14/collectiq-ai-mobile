@@ -376,18 +376,18 @@ class _AboutBrandCardState extends State<AboutBrandCard>
             ),
             const SizedBox(height: 22),
             const _BrandLine(
-              icon: Icons.flutter_dash_rounded,
-              label: 'Made with Flutter',
+              icon: Icons.lock_outline_rounded,
+              label: 'Private by default',
             ),
             const SizedBox(height: 12),
             const _BrandLine(
-              icon: Icons.cloud_done_rounded,
-              label: 'Powered by Supabase',
+              icon: Icons.inventory_2_outlined,
+              label: 'Built for careful collectors',
             ),
             const SizedBox(height: 12),
             const _BrandLine(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Designed for PackLox',
+              icon: Icons.query_stats_rounded,
+              label: 'Ready for organized portfolios',
             ),
             const SizedBox(height: 22),
             ClipRRect(

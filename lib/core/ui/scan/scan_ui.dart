@@ -141,6 +141,7 @@ class ScanPreviewFrame extends StatefulWidget {
 class _ScanPreviewFrameState extends State<ScanPreviewFrame>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  bool _isRepeating = false;
 
   @override
   void initState() {
@@ -149,10 +150,33 @@ class _ScanPreviewFrameState extends State<ScanPreviewFrame>
       vsync: this,
       duration: PackLoxMotionTheme.waveDuration * 2,
     );
-    if (_scanMotionEnabled) {
+    _syncMotion();
+  }
+
+  @override
+  void didUpdateWidget(covariant ScanPreviewFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isAnalyzing != widget.isAnalyzing) {
+      _syncMotion();
+    }
+  }
+
+  void _syncMotion() {
+    final shouldRepeat = _scanMotionEnabled && widget.isAnalyzing;
+    if (shouldRepeat == _isRepeating) {
+      if (!shouldRepeat) {
+        _controller.value = 0.5;
+      }
+      return;
+    }
+
+    _isRepeating = shouldRepeat;
+    if (shouldRepeat) {
       _controller.repeat();
     } else {
-      _controller.value = 0.5;
+      _controller
+        ..stop()
+        ..value = 0.5;
     }
   }
 
@@ -175,7 +199,7 @@ class _ScanPreviewFrameState extends State<ScanPreviewFrame>
           animation: _controller,
           builder: (context, child) {
             final pulse = Curves.easeInOut.transform(_controller.value);
-            final glowAlpha = widget.isAnalyzing ? 0.24 : 0.12 + pulse * 0.06;
+            final glowAlpha = widget.isAnalyzing ? 0.20 : 0.08;
 
             return DecoratedBox(
               decoration: BoxDecoration(
@@ -185,71 +209,68 @@ class _ScanPreviewFrameState extends State<ScanPreviewFrame>
                     color: colorScheme.shadow.withValues(
                       alpha: isDark ? 0.26 : 0.12,
                     ),
-                    blurRadius: 44,
-                    offset: const Offset(0, 24),
+                    blurRadius: widget.isAnalyzing ? 34 : 24,
+                    offset: const Offset(0, 16),
                   ),
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: glowAlpha),
-                    blurRadius: 34 + pulse * 14,
-                    spreadRadius: 1,
-                  ),
+                  if (widget.isAnalyzing)
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: glowAlpha),
+                      blurRadius: 28 + pulse * 8,
+                      spreadRadius: 1,
+                    ),
                 ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.xl),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.36,
-                            )
-                          : Colors.white.withValues(alpha: 0.64),
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                      border: Border.all(
-                        color: colorScheme.primary.withValues(
-                          alpha: 0.18 + pulse * 0.08,
-                        ),
-                        width: 1.2,
-                      ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.52,
+                          )
+                        : Colors.white.withValues(alpha: 0.86),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.58),
+                      width: 1.2,
                     ),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(AppRadius.lg),
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.white.withValues(
-                                    alpha: isDark ? 0.04 : 0.32,
-                                  ),
-                                  colorScheme.primary.withValues(alpha: 0.03),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(
+                                  alpha: isDark ? 0.02 : 0.18,
+                                ),
+                                colorScheme.primary.withValues(alpha: 0.02),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
                           ),
                         ),
-                        child!,
+                      ),
+                      child!,
+                      if (widget.isAnalyzing)
                         Positioned.fill(
                           child: IgnorePointer(
                             child: CustomPaint(
                               painter: _ScanWavePainter(
                                 progress: _controller.value,
                                 color: colorScheme.primary,
-                                opacity: widget.isAnalyzing ? 0.30 : 0.18,
+                                opacity: 0.26,
                                 scannerLine: true,
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -449,76 +470,67 @@ class ScanStatusBar extends StatelessWidget {
 
 class ScanActionRow extends StatelessWidget {
   const ScanActionRow({
-    required this.onCapture,
+    required this.onCamera,
     required this.onGallery,
     required this.onSample,
+    required this.onAnalyze,
+    required this.onRetake,
+    required this.onChooseAnother,
     required this.onReset,
     super.key,
     this.isBusy = false,
-    this.canReset = false,
-    this.captureLabel = 'Capture',
+    this.hasImage = false,
+    this.hasResult = false,
+    this.cameraLabel = 'Camera',
     this.galleryLabel = 'Gallery',
     this.sampleLabel = 'Sample',
     this.resetLabel = 'Reset',
-    this.captureIcon = Icons.photo_camera_outlined,
   });
 
-  final VoidCallback? onCapture;
+  final VoidCallback? onCamera;
   final VoidCallback? onGallery;
   final VoidCallback? onSample;
+  final VoidCallback? onAnalyze;
+  final VoidCallback? onRetake;
+  final VoidCallback? onChooseAnother;
   final VoidCallback? onReset;
   final bool isBusy;
-  final bool canReset;
-  final String captureLabel;
+  final bool hasImage;
+  final bool hasResult;
+  final String cameraLabel;
   final String galleryLabel;
   final String sampleLabel;
   final String resetLabel;
-  final IconData captureIcon;
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      _ScanAction(
-        label: isBusy ? 'Scanning' : captureLabel,
-        icon: isBusy ? Icons.hourglass_top_outlined : captureIcon,
-        onTap: isBusy ? null : onCapture,
-        emphasized: true,
-      ),
-      _ScanAction(
-        label: galleryLabel,
-        icon: Icons.photo_library_outlined,
-        onTap: isBusy ? null : onGallery,
-      ),
-      _ScanAction(
-        label: sampleLabel,
-        icon: Icons.science_outlined,
-        onTap: isBusy ? null : onSample,
-      ),
-      _ScanAction(
-        label: resetLabel,
-        icon: Icons.refresh_outlined,
-        onTap: canReset && !isBusy ? onReset : null,
-      ),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 640;
-        final children = [
-          for (final action in actions)
-            isWide
-                ? Expanded(child: _ScanActionTile(action: action))
-                : _ScanActionTile(action: action),
-        ];
+        final primaryAction = _primaryAction();
+        final secondaryActions = _secondaryActions();
 
         return MotionStagger(
           children: [
+            SizedBox(
+              width: double.infinity,
+              child: _PrimaryScanActionButton(action: primaryAction),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (isWide)
               Row(
                 children: [
-                  for (var index = 0; index < children.length; index++) ...[
-                    children[index],
-                    if (index != children.length - 1)
+                  for (
+                    var index = 0;
+                    index < secondaryActions.length;
+                    index++
+                  ) ...[
+                    Expanded(
+                      child: _SecondaryScanActionButton(
+                        action: secondaryActions[index],
+                      ),
+                    ),
+                    if (index != secondaryActions.length - 1)
                       const SizedBox(width: AppSpacing.md),
                   ],
                 ],
@@ -528,10 +540,10 @@ class ScanActionRow extends StatelessWidget {
                 spacing: AppSpacing.md,
                 runSpacing: AppSpacing.md,
                 children: [
-                  for (final child in children)
+                  for (final action in secondaryActions)
                     SizedBox(
                       width: (constraints.maxWidth - AppSpacing.md) / 2,
-                      child: child,
+                      child: _SecondaryScanActionButton(action: action),
                     ),
                 ],
               ),
@@ -539,6 +551,97 @@ class ScanActionRow extends StatelessWidget {
         );
       },
     );
+  }
+
+  _ScanAction _primaryAction() {
+    if (isBusy) {
+      return const _ScanAction(
+        label: 'Analyzing Image',
+        icon: Icons.hourglass_top_outlined,
+        onTap: null,
+      );
+    }
+    if (hasImage && !hasResult) {
+      return _ScanAction(
+        label: 'Analyze Image',
+        icon: Icons.auto_awesome_outlined,
+        onTap: onAnalyze,
+      );
+    }
+    if (hasResult) {
+      return _ScanAction(
+        label: 'Scan Another Item',
+        icon: Icons.photo_camera_outlined,
+        onTap: onReset,
+      );
+    }
+    return _ScanAction(
+      label: 'Scan with Camera',
+      icon: Icons.photo_camera_outlined,
+      onTap: onCamera,
+    );
+  }
+
+  List<_ScanAction> _secondaryActions() {
+    if (isBusy) {
+      return const [
+        _ScanAction(
+          label: 'Working',
+          icon: Icons.hourglass_empty_outlined,
+          onTap: null,
+        ),
+      ];
+    }
+    if (hasImage && !hasResult) {
+      return [
+        _ScanAction(
+          label: 'Retake',
+          icon: Icons.photo_camera_outlined,
+          onTap: onRetake,
+        ),
+        _ScanAction(
+          label: 'Choose Another',
+          icon: Icons.photo_library_outlined,
+          onTap: onChooseAnother,
+        ),
+        _ScanAction(
+          label: resetLabel,
+          icon: Icons.refresh_outlined,
+          onTap: onReset,
+        ),
+      ];
+    }
+    if (hasResult) {
+      return [
+        _ScanAction(
+          label: 'Choose Image',
+          icon: Icons.photo_library_outlined,
+          onTap: onGallery,
+        ),
+        _ScanAction(
+          label: resetLabel,
+          icon: Icons.refresh_outlined,
+          onTap: onReset,
+        ),
+      ];
+    }
+    return [
+      _ScanAction(
+        label: cameraLabel,
+        icon: Icons.photo_camera_outlined,
+        onTap: onCamera,
+      ),
+      _ScanAction(
+        label: galleryLabel,
+        icon: Icons.photo_library_outlined,
+        onTap: onGallery,
+      ),
+      _ScanAction(
+        label: sampleLabel,
+        icon: Icons.science_outlined,
+        onTap: onSample,
+      ),
+    ];
   }
 }
 
@@ -649,22 +752,22 @@ class ScanActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ScanActionRow(
-      onCapture: onStart,
+      onCamera: onCamera ?? onStart,
       onGallery: onGallery,
       onSample: onSample,
+      onAnalyze: onStart,
+      onRetake: onRetake,
+      onChooseAnother: onGallery,
       onReset: onRetake,
       isBusy: isBusy,
-      canReset: canRetake,
-      captureLabel: canRetake && !canSave && !isSaved ? 'Analyze' : 'Capture',
-      captureIcon: canRetake && !canSave && !isSaved
-          ? Icons.auto_awesome_outlined
-          : Icons.photo_camera_outlined,
+      hasImage: canRetake,
+      hasResult: canSave || isSaved,
     );
   }
 }
 
-class _ScanActionTile extends StatelessWidget {
-  const _ScanActionTile({required this.action});
+class _PrimaryScanActionButton extends StatelessWidget {
+  const _PrimaryScanActionButton({required this.action});
 
   final _ScanAction action;
 
@@ -673,66 +776,54 @@ class _ScanActionTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final enabled = action.onTap != null;
 
-    return MotionTapScale(
-      onTap: action.onTap,
-      enabled: enabled,
-      scale: 0.97,
-      child: TextButton(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: enabled ? AppGradients.primary : null,
+        color: enabled
+            ? null
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: enabled ? AppElevation.level1 : null,
+      ),
+      child: FilledButton.icon(
+        key: ValueKey('scan-primary-${action.label}'),
         onPressed: enabled ? action.onTap : null,
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          foregroundColor: colorScheme.onSurface,
+        icon: Icon(action.icon),
+        label: Text(action.label),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(54),
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          disabledForegroundColor: colorScheme.onSurfaceVariant,
+          textStyle: AppTextStyles.body.copyWith(fontWeight: FontWeight.w900),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
-        child: GlassCard(
-          enablePress: false,
-          child: AnimatedOpacity(
-            opacity: enabled ? 1 : 0.46,
-            duration: PackLoxMotionTheme.fast,
-            child: SizedBox(
-              height: 76,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: action.emphasized ? AppGradients.primary : null,
-                      color: action.emphasized
-                          ? null
-                          : colorScheme.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      action.icon,
-                      color: action.emphasized
-                          ? Colors.white
-                          : colorScheme.primary,
-                      size: AppIconSizes.md,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: enabled ? action.onTap : null,
-                    child: Text(
-                      action.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryScanActionButton extends StatelessWidget {
+  const _SecondaryScanActionButton({required this.action});
+
+  final _ScanAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = action.onTap != null;
+
+    return OutlinedButton.icon(
+      key: ValueKey('scan-secondary-${action.label}'),
+      onPressed: enabled ? action.onTap : null,
+      icon: Icon(action.icon, size: AppIconSizes.sm),
+      label: Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       ),
     );
   }
@@ -743,13 +834,11 @@ class _ScanAction {
     required this.label,
     required this.icon,
     required this.onTap,
-    this.emphasized = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool emphasized;
 }
 
 class _StatusPill extends StatelessWidget {

@@ -279,57 +279,23 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 isBusy:
                                     scannerState.isLoading ||
                                     scannerState.isPreparingImage,
-                                canReset: selectedImagePath != null,
-                                captureLabel:
-                                    selectedImagePath != null &&
-                                        scanResult == null
-                                    ? 'Analyze'
-                                    : 'Scan with Camera',
-                                captureIcon:
-                                    selectedImagePath != null &&
-                                        scanResult == null
-                                    ? Icons.auto_awesome_outlined
-                                    : Icons.photo_camera_outlined,
-                                galleryLabel: 'Choose from Gallery',
+                                hasImage: selectedImagePath != null,
+                                hasResult: scanResult != null,
+                                cameraLabel: 'Camera',
+                                galleryLabel: 'Gallery',
                                 sampleLabel: 'Use Sample Scan',
-                                onCapture: () {
-                                  if (selectedImagePath == null) {
-                                    scannerController.startCameraScan(context);
-                                    return;
-                                  }
-                                  if (scanResult == null) {
-                                    scannerController.analyzeWithAi();
-                                    return;
-                                  }
-                                  scannerController.resetScan();
-                                  scannerController.startCameraScan(context);
-                                },
+                                onCamera: () =>
+                                    scannerController.startCameraScan(context),
                                 onGallery:
                                     scannerController.pickImageFromGallery,
                                 onSample: scannerController.useSampleScan,
+                                onAnalyze: scannerController.analyzeWithAi,
+                                onRetake: () =>
+                                    scannerController.startCameraScan(context),
+                                onChooseAnother:
+                                    scannerController.pickImageFromGallery,
                                 onReset: scannerController.resetScan,
                               ),
-                              if (selectedImagePath != null &&
-                                  scanResult == null) ...[
-                                const SizedBox(height: AppSpacing.xs),
-                                SizedBox(
-                                  height: AppSpacing.xl,
-                                  child: Opacity(
-                                    opacity: 0.01,
-                                    child: TextButton(
-                                      onPressed:
-                                          scannerController.analyzeWithAi,
-                                      style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      child: const Text('Analyze with AI'),
-                                    ),
-                                  ),
-                                ),
-                              ],
                               if (showPickerShell) ...[
                                 const SizedBox(height: AppSpacing.xl),
                                 const ScanPreparingImageCard(

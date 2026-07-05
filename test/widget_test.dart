@@ -84,7 +84,10 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(find.text('AI Scanner'), findsOneWidget);
-    expect(find.text('Scan with Camera'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('onboarding Explore Dashboard goes Home', (
@@ -312,13 +315,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -348,7 +362,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsOneWidget);
-    expect(find.text('Scan with Camera'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shell recreation returns to Home and Scan still works', (
@@ -372,7 +389,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsOneWidget);
-    expect(find.text('Scan with Camera'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows scanner experience content', (WidgetTester tester) async {
@@ -386,9 +406,18 @@ void main() {
       find.text('Instantly identify and value collectibles.'),
       findsOneWidget,
     );
-    expect(find.text('Scan with Camera'), findsOneWidget);
-    expect(find.text('Choose from Gallery'), findsOneWidget);
-    expect(find.text('Use Sample Scan'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-secondary-Gallery')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      findsOneWidget,
+    );
     expect(find.text('Supported Categories'), findsOneWidget);
     expect(find.text('How It Works'), findsOneWidget);
     expect(find.text('Unlimited AI Scans'), findsOneWidget);
@@ -446,25 +475,24 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.reveal(find.text('Cloud & Sync'));
-    expect(find.text('Cloud & Sync'), findsOneWidget);
-    expect(find.text('Cloud Sync'), findsOneWidget);
-    expect(find.text('Cloud sync status'), findsOneWidget);
-    expect(find.text('Supabase Storage'), findsOneWidget);
+    await tester.reveal(find.text('Backup & Sync'));
+    expect(find.text('Backup & Sync'), findsWidgets);
+    expect(find.text('Backup status'), findsOneWidget);
     expect(find.text('Sync Now'), findsOneWidget);
 
-    await tester.reveal(find.text('AI & Scanning'));
-    expect(find.text('AI & Scanning'), findsOneWidget);
-    expect(find.text('Current AI provider'), findsOneWidget);
+    await tester.reveal(find.text('Scanning'));
+    expect(find.text('Scanning'), findsOneWidget);
     expect(find.text('Scan quality'), findsOneWidget);
-    expect(find.text('Mock mode active'), findsOneWidget);
-    expect(find.text('First-launch onboarding'), findsOneWidget);
+    expect(find.text('Estimate guidance'), findsOneWidget);
+
+    await tester.reveal(find.text('Notifications'));
+    expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('Price alert notifications'), findsOneWidget);
     expect(find.text('Notification permission'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('settings-price-alert-notifications-switch')),
-      findsOneWidget,
-    );
+
+    await tester.reveal(find.text('Appearance'));
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('First-launch onboarding'), findsOneWidget);
 
     await tester.reveal(find.text('Developer Tools'));
     expect(find.text('Developer Tools'), findsOneWidget);
@@ -475,7 +503,6 @@ void main() {
     expect(find.text('Help & About'), findsOneWidget);
     expect(find.text('About PackLox'), findsOneWidget);
     expect(find.text('Export portfolio'), findsOneWidget);
-    expect(find.text('Local vs cloud mode'), findsOneWidget);
     expect(find.text('Contact'), findsOneWidget);
   });
   testWidgets('settings rows respond with safe local messages', (
@@ -485,18 +512,6 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-
-    await tester.reveal(find.text('Supabase Storage'));
-    await tester.pump();
-    await tester.tap(find.text('Supabase Storage'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Supabase Storage requires cloud setup and is disabled in local mode.',
-      ),
-      findsOneWidget,
-    );
-    await tester.pump(const Duration(seconds: 4));
 
     await tester.reveal(find.text('Theme'));
     await tester.pump();
@@ -514,17 +529,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Portfolio export is coming soon.'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
-
-    await tester.reveal(find.text('Local vs cloud mode'));
-    await tester.pump();
-    await tester.tap(find.text('Local vs cloud mode'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Local mode is active. Cloud sync requires explicit dev or staging setup.',
-      ),
-      findsOneWidget,
-    );
   });
 
   testWidgets('settings disabled cloud controls show config-required state', (
@@ -534,11 +538,11 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Cloud Sync'));
+    await tester.reveal(find.text('Backup & Sync'));
     await tester.pump();
 
     expect(
-      find.text('Cloud sync is disabled in this environment'),
+      find.text('Sign in to prepare backup and restore for your collection.'),
       findsOneWidget,
     );
     final syncButton = tester.widget<FilledButton>(
@@ -546,9 +550,7 @@ void main() {
     );
     expect(syncButton.onPressed, isNull);
 
-    await tester.reveal(find.text('Supabase Storage'));
-    await tester.pump();
-    expect(find.text('Requires setup'), findsOneWidget);
+    expect(find.text('Local only'), findsWidgets);
   });
 
   testWidgets('reset onboarding works from Settings', (
@@ -1002,7 +1004,7 @@ void main() {
     },
   );
 
-  testWidgets('settings displays unavailable configured AI provider', (
+  testWidgets('settings hides configured AI provider internals', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(
@@ -1012,19 +1014,14 @@ void main() {
     );
 
     await tester.openSettings();
-    await tester.reveal(find.text('Current AI provider'));
+    await tester.reveal(find.text('Scanning'));
     await tester.pump();
 
-    expect(find.text('Current AI provider'), findsOneWidget);
-    expect(find.text('OpenAI Vision'), findsWidgets);
-    expect(find.text('Unavailable'), findsWidgets);
-    expect(find.text('Coming soon'), findsWidgets);
-    expect(
-      find.text(
-        'OpenAI Vision requires the CollectIQ AI backend endpoint before it can be enabled.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Scanning'), findsOneWidget);
+    expect(find.text('Estimate guidance'), findsOneWidget);
+    expect(find.text('Current AI provider'), findsNothing);
+    expect(find.text('OpenAI Vision'), findsNothing);
+    expect(find.text('Unavailable'), findsNothing);
   });
 
   testWidgets('switches between feature placeholders', (
@@ -1045,9 +1042,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -1062,14 +1059,21 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pumpUntilFound(find.text('Captured image'));
 
     expect(find.text('Captured image'), findsOneWidget);
     expect(find.text('Ready for AI analysis'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
     expect(
       tester
           .widgetList<Image>(find.byType(Image))
@@ -1086,22 +1090,26 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pumpUntilFound(find.text('Preparing image...'));
 
-    expect(
-      find.text('Copying your photo into CollectIQ storage.'),
-      findsOneWidget,
-    );
+    expect(find.text('Preparing your PackLox scan.'), findsOneWidget);
     expect(find.text('Welcome back to PackLox'), findsNothing);
 
     cameraService.complete();
     await tester.pumpUntilFound(find.text('Captured image'));
 
     expect(find.text('Captured image'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('camera completion remains on Scan tab', (
@@ -1111,13 +1119,20 @@ void main() {
 
     await tester.tap(find.text('Scan Item').first);
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pumpUntilFound(find.text('Captured image'));
 
     expect(find.text('Captured image'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
     expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
@@ -1135,7 +1150,10 @@ void main() {
 
     expect(find.text('AI Scanner'), findsOneWidget);
     expect(find.text('Recovered image'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
     expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
@@ -1146,30 +1164,41 @@ void main() {
 
     await tester.tap(find.text('Scan Item').first);
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pumpUntilFound(find.text('Gallery image'));
 
     expect(find.text('Gallery image'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
     expect(find.text('Welcome back to PackLox'), findsNothing);
   });
 
-  testWidgets('scanner camera cancellation shows friendly message', (
+  testWidgets('scanner camera cancellation is neutral', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(cameraService: _CancelledCameraService());
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
 
-    expect(find.text('Camera capture cancelled.'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsNothing);
+    expect(find.text('Camera capture cancelled.'), findsNothing);
+    expect(find.text('Scan interrupted'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
+    );
   });
 
   testWidgets('camera missing image path shows error without crashing', (
@@ -1179,9 +1208,13 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pumpUntilFound(
       find.text(
         'Selected image could not be found. Please choose another image.',
@@ -1194,7 +1227,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Analyze with AI'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
+    );
   });
 
   testWidgets('gallery missing image path shows error without crashing', (
@@ -1204,9 +1240,9 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pumpUntilFound(
       find.text(
         'Selected image could not be found. Please choose another image.',
@@ -1219,7 +1255,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Analyze with AI'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
+    );
   });
 
   testWidgets('scanner sample scan shows fake AI result', (
@@ -1229,17 +1268,28 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
 
     expect(find.text('Sample Sports Card'), findsOneWidget);
     expect(find.text('Ready for AI analysis'), findsOneWidget);
 
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1277,13 +1327,22 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
-    await tester.pumpUntilFound(find.text('Analyze with AI'));
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
 
     expect(
@@ -1304,13 +1363,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pumpAndSettle();
 
     expect(find.text('Provider Test Collectible'), findsWidgets);
@@ -1326,13 +1396,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pumpAndSettle();
 
     final container = ProviderScope.containerOf(
@@ -1358,13 +1439,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pumpAndSettle();
 
     expect(usageRepository.count, 1);
@@ -1386,13 +1478,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
 
     expect(usageRepository.count, 0);
@@ -1413,13 +1516,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
 
     expect(usageRepository.count, 1);
@@ -1439,13 +1553,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
 
     expect(find.text('Provider failed safely.'), findsOneWidget);
@@ -1463,13 +1588,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
 
     expect(
@@ -1491,16 +1627,23 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pumpUntilFound(find.text('Gallery image'));
 
     expect(find.text('Gallery image'), findsOneWidget);
 
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Gallery image'), findsOneWidget);
@@ -1519,13 +1662,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1550,13 +1704,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1567,8 +1732,14 @@ void main() {
 
     expect(find.text('Analysis Result'), findsNothing);
     expect(find.text('Sample Sports Card'), findsNothing);
-    expect(find.text('Analyze with AI'), findsNothing);
-    expect(find.text('Use Sample Scan'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('saves scanner result to portfolio', (WidgetTester tester) async {
@@ -1576,13 +1747,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1613,13 +1795,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1645,13 +1838,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1660,7 +1864,7 @@ void main() {
     await tester.tap(find.text('Save to Portfolio'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Saved to Portfolio'), findsOneWidget);
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
@@ -1669,8 +1873,14 @@ void main() {
 
     expect(find.text('Sample Sports Card'), findsNothing);
     expect(find.text('Analysis Complete'), findsNothing);
-    expect(find.text('Analyze with AI'), findsNothing);
-    expect(find.text('Use Sample Scan'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('unsaved analysis is preserved when navigating away from Scan', (
@@ -1680,13 +1890,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1708,13 +1929,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Use Sample Scan'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Use Sample Scan'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1728,13 +1960,20 @@ void main() {
     expect(find.text('1999 PokÃ©mon Charizard'), findsNothing);
     expect(find.text('AI Scanner'), findsOneWidget);
 
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Captured image'), findsOneWidget);
-    expect(find.text('Analyze with AI'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('saves gallery image path to portfolio item', (
@@ -1744,13 +1983,22 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Choose from Gallery'));
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.text('Choose from Gallery'));
-    await tester.pumpUntilFound(find.text('Analyze with AI'));
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1779,13 +2027,24 @@ void main() {
 
     await tester.tap(find.text('Scan'));
     await tester.pump();
-    await tester.reveal(find.text('Scan with Camera'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Scan with Camera'));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
     await tester.pump();
-    await tester.reveal(find.text('Analyze with AI'));
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Analyze with AI'));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -1862,7 +2121,9 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
     );
     await tester.pump();
-    await tester.tap(find.byTooltip('Remove item'));
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
