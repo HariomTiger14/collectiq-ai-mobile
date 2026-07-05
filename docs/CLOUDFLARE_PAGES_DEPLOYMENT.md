@@ -43,6 +43,8 @@ Expected build output:
 
 ```text
 build/web/index.html
+build/web/admin/index.html
+build/web/admin/config.js
 build/web/admin/styles.css
 build/web/admin/dashboard.js
 build/web/auth/reset-password/index.html

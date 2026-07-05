@@ -51,12 +51,18 @@ class SupabaseHealthProvider:
         self,
         *,
         supabase_url: str | None = None,
+        service_role_key: str | None = None,
         anon_key: str | None = None,
         timeout_seconds: float | None = None,
         required: bool | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         self._supabase_url = (supabase_url if supabase_url is not None else settings.supabase_url).strip().rstrip("/")
+        self._service_role_key = (
+            service_role_key
+            if service_role_key is not None
+            else settings.supabase_service_role_key
+        ).strip()
         self._anon_key = (anon_key if anon_key is not None else settings.supabase_anon_key).strip()
         self._timeout_seconds = timeout_seconds or settings.health_timeout_seconds
         self._client = client
@@ -64,7 +70,8 @@ class SupabaseHealthProvider:
 
     def check(self) -> HealthCheckResult:
         started_at = time.perf_counter()
-        if not self._supabase_url or not self._anon_key:
+        auth_key = self._service_role_key or self._anon_key
+        if not self._supabase_url or not auth_key:
             return HealthCheckResult(
                 name=self.name,
                 healthy=not self.required,
@@ -83,7 +90,7 @@ class SupabaseHealthProvider:
         try:
             response = client.get(
                 f"{self._supabase_url}/auth/v1/health",
-                headers={"apikey": self._anon_key},
+                headers={"apikey": auth_key},
                 timeout=self._timeout_seconds,
             )
             healthy = 200 <= response.status_code < 500
@@ -97,7 +104,11 @@ class SupabaseHealthProvider:
                     if healthy
                     else f"Supabase health check failed with status {response.status_code}."
                 ),
-                details={"statusCode": str(response.status_code), "configured": "true"},
+                details={
+                    "statusCode": str(response.status_code),
+                    "configured": "true",
+                    "credential": "service_role" if self._service_role_key else "anon",
+                },
             )
         except httpx.HTTPError as exc:
             logger.warning("Supabase health check failed: %s", exc)

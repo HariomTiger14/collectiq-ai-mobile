@@ -22,6 +22,12 @@ class AdminDashboardStaticTest(unittest.TestCase):
     def test_password_reset_route_is_preserved(self) -> None:
         self.assertTrue((WEB_ROOT / "auth" / "reset-password" / "index.html").exists())
 
+    def test_admin_route_entry_exists_for_cloudflare_output(self) -> None:
+        admin_index = WEB_ROOT / "admin" / "index.html"
+
+        self.assertTrue(admin_index.exists())
+        self.assertIn("PackLox Administration", admin_index.read_text(encoding="utf-8"))
+
     def test_dashboard_script_handles_healthy_offline_and_partial_states(self) -> None:
         script = (WEB_ROOT / "admin" / "dashboard.js").read_text(encoding="utf-8")
 

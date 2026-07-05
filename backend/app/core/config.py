@@ -32,10 +32,16 @@ def parse_cors_allowed_origins(raw_value: str | None = None) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class Settings:
-    environment: str = os.getenv("BACKEND_ENV", os.getenv("APP_ENV", "local"))
+    environment: str = os.getenv(
+        "ENVIRONMENT",
+        os.getenv("BACKEND_ENV", os.getenv("APP_ENV", "local")),
+    )
     application_name: str = os.getenv("APPLICATION_NAME", "PackLox API")
-    version: str = os.getenv("BACKEND_VERSION", "0.1.0")
-    commit: str = os.getenv("GIT_COMMIT", os.getenv("CF_PAGES_COMMIT_SHA", "unknown"))
+    version: str = os.getenv("APP_VERSION", os.getenv("BACKEND_VERSION", "0.1.0"))
+    commit: str = os.getenv(
+        "COMMIT_SHA",
+        os.getenv("GIT_COMMIT", os.getenv("CF_PAGES_COMMIT_SHA", "unknown")),
+    )
     build_time: str = os.getenv("BUILD_TIME", os.getenv("CF_PAGES_COMMIT_TIME", "unknown"))
     public_api_url: str = os.getenv("PUBLIC_API_URL", "https://api-sit.packlox.com")
     public_frontend_url: str = os.getenv("PUBLIC_FRONTEND_URL", "https://sit.packlox.com")
@@ -43,6 +49,7 @@ class Settings:
     cors_allowed_origins: tuple[str, ...] = parse_cors_allowed_origins()
     health_timeout_seconds: float = float(os.getenv("HEALTH_TIMEOUT_SECONDS", "3"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
     supabase_health_required: bool = os.getenv(
         "SUPABASE_HEALTH_REQUIRED",

@@ -64,12 +64,19 @@ Provider API keys must stay server-side.
 Required for SIT mock:
 
 ```text
+ENVIRONMENT=sit
 BACKEND_ENV=sit
+APP_VERSION=0.1.0
+BACKEND_VERSION=0.1.0
+COMMIT_SHA=<deployed git commit>
+GIT_COMMIT=<deployed git commit>
+BUILD_TIME=<ISO-8601 build timestamp>
 PORT=8000
 AI_PROVIDER=mock
 PRICING_PROVIDER=mock
 CORS_ALLOWED_ORIGINS=https://sit.packlox.com,https://admin.packlox.com,http://localhost:3000,http://127.0.0.1:3000
 SUPABASE_URL=https://YOUR-SIT-PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-side service role key>
 SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
 SUPABASE_HEALTH_REQUIRED=true
 ```
@@ -77,6 +84,7 @@ SUPABASE_HEALTH_REQUIRED=true
 Required for SIT OpenAI:
 
 ```text
+ENVIRONMENT=sit
 BACKEND_ENV=sit
 PORT=8000
 AI_PROVIDER=openai
@@ -89,9 +97,6 @@ Optional:
 
 ```text
 APPLICATION_NAME=PackLox API
-BACKEND_VERSION=0.1.0
-GIT_COMMIT=<deployed git commit>
-BUILD_TIME=<ISO-8601 build timestamp>
 PUBLIC_API_URL=https://api-sit.packlox.com
 PUBLIC_FRONTEND_URL=https://sit.packlox.com
 HEALTH_TIMEOUT_SECONDS=3
@@ -100,6 +105,14 @@ OPENAI_TIMEOUT_SECONDS=30
 ```
 
 Do not commit `.env` files with real values.
+
+Deployment variable aliases:
+
+- `ENVIRONMENT` is preferred; `BACKEND_ENV` and `APP_ENV` remain supported.
+- `APP_VERSION` is preferred; `BACKEND_VERSION` remains supported.
+- `COMMIT_SHA` is preferred; `GIT_COMMIT` and `CF_PAGES_COMMIT_SHA` remain supported.
+- `SUPABASE_SERVICE_ROLE_KEY` is used for server-side health checks when set.
+- `SUPABASE_ANON_KEY` is accepted for public/anon health checks when a service role key is not set.
 
 ## Local Run
 
@@ -158,6 +171,13 @@ If a required dependency is unhealthy, the endpoint returns HTTP `503` with
 `status: "unhealthy"`. In `sit`, `staging`, and `production`, Supabase health is
 required by default. Local development may leave Supabase unset unless
 `SUPABASE_HEALTH_REQUIRED=true`.
+
+The health check sequence is:
+
+```text
+Client -> FastAPI -> HealthCheckService -> SupabaseHealthProvider
+                                  \-----> AnalyzerHealthProvider -> Response
+```
 
 `GET /version` returns non-secret deployment metadata:
 
@@ -288,10 +308,15 @@ Create a Render Web Service:
 Environment variables for mock SIT:
 
 ```text
+ENVIRONMENT=sit
 BACKEND_ENV=sit
 AI_PROVIDER=mock
 PRICING_PROVIDER=mock
-CORS_ALLOWED_ORIGINS=
+CORS_ALLOWED_ORIGINS=https://sit.packlox.com,https://admin.packlox.com,http://localhost:3000,http://127.0.0.1:3000
+SUPABASE_URL=https://YOUR-SIT-PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-side service role key>
+SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+SUPABASE_HEALTH_REQUIRED=true
 ```
 
 Environment variables for OpenAI SIT:
@@ -314,9 +339,11 @@ The response should include:
 
 - `status`
 - `environment`
-- `ai_provider`
-- `pricing_provider`
 - `version`
+- `timestamp`
+- `services`
+- `latency`
+- `checks`
 
 It must not include secrets.
 

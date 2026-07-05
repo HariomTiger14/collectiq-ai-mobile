@@ -58,6 +58,25 @@ class HealthServiceTest(unittest.TestCase):
         self.assertTrue(result.healthy)
         self.assertTrue(result.required)
         self.assertEqual(result.details["statusCode"], "200")
+        self.assertEqual(result.details["credential"], "anon")
+
+    def test_supabase_service_role_key_takes_precedence(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.headers["apikey"], "service-role-key")
+            return httpx.Response(200, json={"status": "ok"})
+
+        provider = SupabaseHealthProvider(
+            supabase_url="https://example.supabase.co",
+            service_role_key="service-role-key",
+            anon_key="anon-key",
+            required=True,
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+
+        result = provider.check()
+
+        self.assertTrue(result.healthy)
+        self.assertEqual(result.details["credential"], "service_role")
 
     def test_analyzer_openai_requires_key(self) -> None:
         result = AnalyzerHealthProvider().check()
