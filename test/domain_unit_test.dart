@@ -1997,6 +1997,33 @@ void main() {
       },
     );
 
+    test('SIT release build docs include Supabase auth dart defines', () {
+      final buildSetup = File('docs/SIT_BUILD_SETUP.md').readAsStringSync();
+      final realDeviceCommands = File(
+        'docs/PACKLOX_REAL_DEVICE_SIT_COMMANDS.md',
+      ).readAsStringSync();
+
+      for (final docs in [buildSetup, realDeviceCommands]) {
+        expect(docs, contains('build apk'));
+        expect(docs, contains('--release'));
+        expect(docs, contains('--flavor sit'));
+        expect(docs, contains('--dart-define=APP_ENV=sit'));
+        expect(docs, contains('--dart-define=USE_CLOUD_AUTH=true'));
+        expect(docs, contains('--dart-define=SUPABASE_ENABLED=true'));
+        expect(
+          docs,
+          contains(
+            '--dart-define=SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co',
+          ),
+        );
+        expect(
+          docs,
+          contains('--dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY'),
+        );
+        expect(docs, isNot(contains('eyJ')));
+      }
+    });
+
     test('auth error mapper handles common Supabase auth failures', () {
       final missingKey = SupabaseService.authFailureMessageForTesting(
         DioException(

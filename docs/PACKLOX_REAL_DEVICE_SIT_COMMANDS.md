@@ -9,7 +9,7 @@ Create `config/sit.env` from `config/sit.env.example`.
 Required values:
 
 ```bat
-SUPABASE_URL=https://YOUR-SIT-PROJECT.supabase.co
+SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co
 SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
 ```
 
@@ -102,6 +102,31 @@ With no `API_BASE_URL` override, scanner analysis calls:
 ```text
 POST https://api-sit.packlox.com/analyze
 ```
+
+Build a release SIT APK with the same auth defines:
+
+```powershell
+C:\Users\hario\Desktop\flutter\bin\flutter.bat build apk `
+  --release `
+  --flavor sit `
+  --dart-define=APP_ENV=sit `
+  --dart-define=USE_CLOUD_AUTH=true `
+  --dart-define=USE_CLOUD_PORTFOLIO_SYNC=true `
+  --dart-define=USE_CLOUD_IMAGE_STORAGE=true `
+  --dart-define=SUPABASE_ENABLED=true `
+  --dart-define=SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+```
+
+Expected output:
+
+```text
+build\app\outputs\flutter-apk\app-sit-release.apk
+```
+
+If an APK was built with only `APP_ENV=sit`, Forgot Password will show the
+missing Supabase configuration state because the URL, anon key, and
+`SUPABASE_ENABLED=true` were not compiled into the app.
 
 ## 5. Useful Logs
 

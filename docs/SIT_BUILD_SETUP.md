@@ -27,7 +27,7 @@ Ignored local files:
 Create `config/sit.env` from the example and fill in DEV/SIT values:
 
 ```bat
-SUPABASE_URL=https://YOUR-DEV-PROJECT.supabase.co
+SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co
 SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
 API_BASE_URL=http://YOUR-LAN-IP:8000
 ```
@@ -94,6 +94,34 @@ The script builds a debug SIT APK so it can be installed on a phone without prod
 ```text
 build\app\outputs\flutter-apk\app-sit-debug.apk
 ```
+
+## Build SIT Release APK
+
+For a release APK with Supabase Auth enabled, pass the same public Supabase
+values at build time. `APP_ENV=sit` alone is not enough; the app also requires
+`SUPABASE_ENABLED=true`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`.
+
+```bat
+flutter build apk --release ^
+  --flavor sit ^
+  --dart-define=APP_ENV=sit ^
+  --dart-define=USE_CLOUD_AUTH=true ^
+  --dart-define=USE_CLOUD_PORTFOLIO_SYNC=true ^
+  --dart-define=USE_CLOUD_IMAGE_STORAGE=true ^
+  --dart-define=SUPABASE_ENABLED=true ^
+  --dart-define=SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co ^
+  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+```
+
+Expected release APK:
+
+```text
+build\app\outputs\flutter-apk\app-sit-release.apk
+```
+
+If you intentionally build the production package with SIT runtime config, use
+the same dart-defines with `--flavor prod`; otherwise Forgot Password and other
+Supabase Auth actions will show the missing-config state.
 
 ## Install On Android Phone
 

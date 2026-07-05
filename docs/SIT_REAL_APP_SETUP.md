@@ -11,7 +11,7 @@ Authentication behaviour is defined in `docs/AUTHENTICATION_SPECIFICATION.md`.
 Create `config/sit.env` from `config/sit.env.example`.
 
 ```bat
-SUPABASE_URL=https://YOUR-DEV-PROJECT.supabase.co
+SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co
 SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
 API_BASE_URL=http://YOUR-LAN-IP:8000
 ```
@@ -138,6 +138,24 @@ adb install -r build\app\outputs\flutter-apk\app-sit-debug.apk
 ```
 
 The installed app name is **CollectIQ SIT**.
+
+For a release APK, include the Supabase Auth dart-defines explicitly:
+
+```bat
+flutter build apk --release ^
+  --flavor sit ^
+  --dart-define=APP_ENV=sit ^
+  --dart-define=USE_CLOUD_AUTH=true ^
+  --dart-define=USE_CLOUD_PORTFOLIO_SYNC=true ^
+  --dart-define=USE_CLOUD_IMAGE_STORAGE=true ^
+  --dart-define=SUPABASE_ENABLED=true ^
+  --dart-define=SUPABASE_URL=https://ljrkhamgbgtsicqdisos.supabase.co ^
+  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+```
+
+Building with only `--dart-define=APP_ENV=sit` keeps Supabase disabled because
+the mobile app reads `SUPABASE_ENABLED`, `SUPABASE_URL`, and
+`SUPABASE_ANON_KEY` separately.
 
 ## Test Flow
 
