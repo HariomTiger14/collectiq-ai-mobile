@@ -376,6 +376,25 @@ main {
   background: var(--warning-soft);
 }
 
+.status-pill.loading {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.status-pill.offline {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.latency-label {
+  position: absolute;
+  left: 1.15rem;
+  bottom: 1.15rem;
+  color: var(--subtle);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);

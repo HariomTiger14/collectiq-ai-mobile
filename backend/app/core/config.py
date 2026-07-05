@@ -20,7 +20,8 @@ def parse_cors_allowed_origins(raw_value: str | None = None) -> tuple[str, ...]:
     value = raw_value if raw_value is not None else os.getenv(
         "CORS_ALLOWED_ORIGINS",
         "http://localhost:8000,http://127.0.0.1:8000,"
-        "http://localhost:3000,http://127.0.0.1:3000",
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "https://sit.packlox.com,https://admin.packlox.com",
     )
     return tuple(
         origin.strip()
@@ -32,9 +33,21 @@ def parse_cors_allowed_origins(raw_value: str | None = None) -> tuple[str, ...]:
 @dataclass(frozen=True)
 class Settings:
     environment: str = os.getenv("BACKEND_ENV", os.getenv("APP_ENV", "local"))
+    application_name: str = os.getenv("APPLICATION_NAME", "PackLox API")
     version: str = os.getenv("BACKEND_VERSION", "0.1.0")
+    commit: str = os.getenv("GIT_COMMIT", os.getenv("CF_PAGES_COMMIT_SHA", "unknown"))
+    build_time: str = os.getenv("BUILD_TIME", os.getenv("CF_PAGES_COMMIT_TIME", "unknown"))
+    public_api_url: str = os.getenv("PUBLIC_API_URL", "https://api-sit.packlox.com")
+    public_frontend_url: str = os.getenv("PUBLIC_FRONTEND_URL", "https://sit.packlox.com")
     port: int = int(os.getenv("PORT", "8000"))
     cors_allowed_origins: tuple[str, ...] = parse_cors_allowed_origins()
+    health_timeout_seconds: float = float(os.getenv("HEALTH_TIMEOUT_SECONDS", "3"))
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
+    supabase_health_required: bool = os.getenv(
+        "SUPABASE_HEALTH_REQUIRED",
+        "",
+    ).strip().lower() in {"1", "true", "yes", "required"}
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
     pricing_provider: str = os.getenv("PRICING_PROVIDER", "mock")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

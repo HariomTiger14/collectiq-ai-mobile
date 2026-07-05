@@ -21,11 +21,13 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["status"], "ok")
-        self.assertIn("environment", payload)
-        self.assertIn("ai_provider", payload)
-        self.assertIn("pricing_provider", payload)
-        self.assertIn("version", payload)
+        self.assertEqual(payload["status"], "healthy")
+        self.assertTrue(payload["services"]["api"])
+        self.assertTrue(payload["services"]["supabase"])
+        self.assertTrue(payload["services"]["analyzer"])
+        self.assertIn("timestamp", payload)
+        self.assertIn("latency", payload)
+        self.assertIn("checks", payload)
 
     def test_health_does_not_expose_secrets(self) -> None:
         response = self.client.get("/health")
@@ -43,8 +45,11 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
+        self.assertEqual(payload["application"], "PackLox API")
         self.assertIn("version", payload)
         self.assertIn("environment", payload)
+        self.assertIn("commit", payload)
+        self.assertIn("buildTime", payload)
         serialized = json.dumps(payload)
         self.assertNotIn("api_key", serialized.lower())
         self.assertNotIn("secret", serialized.lower())
@@ -219,6 +224,13 @@ class ApiEndpointsTest(unittest.TestCase):
             origins,
             ("https://collectiq-sit.example.com", "http://localhost:8000"),
         )
+
+    def test_cors_default_allows_sit_admin_and_localhost(self) -> None:
+        origins = parse_cors_allowed_origins()
+
+        self.assertIn("https://sit.packlox.com", origins)
+        self.assertIn("https://admin.packlox.com", origins)
+        self.assertIn("http://localhost:3000", origins)
 
     def test_api_analyze_openai_success_returns_contract_response(self) -> None:
         provider = OpenAIRecognitionProvider(

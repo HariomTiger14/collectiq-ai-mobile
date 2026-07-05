@@ -7,6 +7,8 @@ The Cloudflare Pages root route (`/`) serves the PackLox SIT Administration
 dashboard. Authentication utility pages remain under `/auth/` and must not be
 removed when changing the dashboard.
 
+The dashboard reads backend health data from `https://api-sit.packlox.com`.
+
 ## Cloudflare Pages Settings
 
 Use these settings in Cloudflare Pages:
@@ -44,6 +46,32 @@ build/web/index.html
 build/web/admin/styles.css
 build/web/admin/dashboard.js
 build/web/auth/reset-password/index.html
+```
+
+## Dashboard Backend Integration
+
+The dashboard calls these PackLox API endpoints on page load:
+
+```text
+GET https://api-sit.packlox.com/health
+GET https://api-sit.packlox.com/version
+```
+
+`/health` refreshes every 30 seconds. `/version` loads once per page load.
+
+The API must allow browser CORS from:
+
+```text
+https://sit.packlox.com
+https://admin.packlox.com
+http://localhost:3000
+http://127.0.0.1:3000
+```
+
+Dashboard API settings live in:
+
+```text
+web/admin/config.js
 ```
 
 ## Local Verification

@@ -17,6 +17,7 @@ Entrypoint:
 Routes:
 
 - `GET /health`
+- `GET /version`
 - `POST /scanner/analyze`
 - `POST /api/analyze`
 - `GET /portfolio`
@@ -67,7 +68,10 @@ BACKEND_ENV=sit
 PORT=8000
 AI_PROVIDER=mock
 PRICING_PROVIDER=mock
-CORS_ALLOWED_ORIGINS=
+CORS_ALLOWED_ORIGINS=https://sit.packlox.com,https://admin.packlox.com,http://localhost:3000,http://127.0.0.1:3000
+SUPABASE_URL=https://YOUR-SIT-PROJECT.supabase.co
+SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+SUPABASE_HEALTH_REQUIRED=true
 ```
 
 Required for SIT OpenAI:
@@ -84,7 +88,13 @@ CORS_ALLOWED_ORIGINS=
 Optional:
 
 ```text
+APPLICATION_NAME=PackLox API
 BACKEND_VERSION=0.1.0
+GIT_COMMIT=<deployed git commit>
+BUILD_TIME=<ISO-8601 build timestamp>
+PUBLIC_API_URL=https://api-sit.packlox.com
+PUBLIC_FRONTEND_URL=https://sit.packlox.com
+HEALTH_TIMEOUT_SECONDS=3
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TIMEOUT_SECONDS=30
 ```
@@ -105,6 +115,60 @@ Health check:
 
 ```text
 http://127.0.0.1:8000/health
+```
+
+Version check:
+
+```text
+http://127.0.0.1:8000/version
+```
+
+## Health Monitoring API
+
+`GET /health` verifies the API process, Supabase connectivity, and analyzer
+availability through reusable health providers:
+
+- `ApplicationHealthProvider`
+- `SupabaseHealthProvider`
+- `AnalyzerHealthProvider`
+
+Healthy response:
+
+```json
+{
+  "status": "healthy",
+  "environment": "sit",
+  "version": "0.1.0",
+  "timestamp": "2026-07-05T00:00:00Z",
+  "services": {
+    "api": true,
+    "supabase": true,
+    "analyzer": true
+  },
+  "latency": {
+    "api": 0,
+    "supabase": 72,
+    "analyzer": 0
+  },
+  "checks": []
+}
+```
+
+If a required dependency is unhealthy, the endpoint returns HTTP `503` with
+`status: "unhealthy"`. In `sit`, `staging`, and `production`, Supabase health is
+required by default. Local development may leave Supabase unset unless
+`SUPABASE_HEALTH_REQUIRED=true`.
+
+`GET /version` returns non-secret deployment metadata:
+
+```json
+{
+  "application": "PackLox API",
+  "environment": "sit",
+  "version": "0.1.0",
+  "commit": "<git hash>",
+  "buildTime": "<ISO-8601 build timestamp>"
+}
 ```
 
 ## SIT Mock Run
