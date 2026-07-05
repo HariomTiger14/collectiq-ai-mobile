@@ -46,6 +46,7 @@ import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validat
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_image_upload_payload.dart';
 import 'package:collectiq_ai/features/ai/data/providers/mock_ai_analysis_provider.dart';
+import 'package:collectiq_ai/features/ai/data/providers/mock_collectible_result_pool.dart';
 import 'package:collectiq_ai/features/ai/data/providers/open_ai_vision_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/data/services/dio_ai_backend_api_service.dart';
 import 'package:collectiq_ai/features/ai/data/services/noop_ai_backend_api_service.dart';
@@ -1652,7 +1653,10 @@ void main() {
         AiAnalysisRequest(imagePath: _fixturePath('image.jpg')),
       );
 
-      expect(result.scanResult.title, '1999 Pokemon Charizard');
+      expect(
+        MockCollectibleResultPool.templates.map((item) => item.title),
+        contains(result.scanResult.title),
+      );
       expect(adapter.calls, 0);
     });
   });
@@ -1812,38 +1816,104 @@ void main() {
       );
 
       expect(result.scanResult.title, contains('Charizard'));
-      expect(result.scanResult.category, 'Trading Card');
+      expect(result.scanResult.category, 'Pokemon Card');
       expect(result.scanResult.thumbnail, 'sample://sports-card');
       expect(result.scanResult.alternativeMatches, hasLength(3));
       expect(result.scanResult.marketSummary, isNotNull);
-      expect(result.recommendation, 'Consider grading before selling.');
+      expect(result.scanResult.year, '1999');
+      expect(result.scanResult.brand, 'Pokemon');
+      expect(result.scanResult.pricing.lowEstimate, greaterThan(0));
+      expect(result.scanResult.notes, contains('SIT MOCK DATA'));
+      expect(result.recommendation, contains('Sleeve it'));
     });
 
-    test(
-      'mock provider delegates real image analysis to recognition repository',
-      () async {
-        final repository = _StaticRecognitionRepository(
-          _testRecognitionResult(),
-        );
-        final provider = MockAiAnalysisProvider(
-          recognitionRepository: repository,
-          marketProvider: const MockMarketProvider(),
-        );
+    test('SIT mock analyzer can return more than one unique result', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'packlox-mock-pool-',
+      );
+      addTearDown(() async {
+        if (tempDir.existsSync()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      final firstImage = File('${tempDir.path}/first.jpg')
+        ..writeAsBytesSync(List<int>.generate(128, (index) => index));
+      final secondImage = File('${tempDir.path}/second.jpg')
+        ..writeAsBytesSync(List<int>.generate(128, (index) => 255 - index));
+      final repository = _StaticRecognitionRepository(_testRecognitionResult());
+      final provider = MockAiAnalysisProvider(
+        recognitionRepository: repository,
+        marketProvider: const MockMarketProvider(),
+      );
 
-        final result = await provider.analyze(
-          AiAnalysisRequest(
-            imagePath: _fixturePath('persistent-gallery-card.jpg'),
-          ),
-        );
+      final first = await provider.analyze(
+        AiAnalysisRequest(
+          imagePath: firstImage.path,
+          image: XFile(firstImage.path),
+        ),
+      );
+      final second = await provider.analyze(
+        AiAnalysisRequest(
+          imagePath: secondImage.path,
+          image: XFile(secondImage.path),
+        ),
+      );
 
-        expect(repository.calls, 1);
-        expect(result.scanResult.title, '1999 Pokemon Charizard');
-        expect(
-          result.scanResult.thumbnail,
-          _fixturePath('persistent-gallery-card.jpg'),
-        );
-      },
-    );
+      expect({first.scanResult.title, second.scanResult.title}, hasLength(2));
+      expect(repository.calls, 0);
+      expect(first.scanResult.thumbnail, firstImage.path);
+      expect(second.scanResult.thumbnail, secondImage.path);
+    });
+
+    test('mock result pool covers required SIT demo categories', () {
+      final categories = {
+        for (final template in MockCollectibleResultPool.templates)
+          template.category,
+      };
+
+      expect(
+        MockCollectibleResultPool.templates,
+        hasLength(greaterThanOrEqualTo(30)),
+      );
+      expect(categories, contains('Pokemon Card'));
+      expect(categories, contains('Sports Card'));
+      expect(categories, contains('Coin'));
+      expect(categories, contains('Action Figure'));
+      expect(categories, contains('Comic Book'));
+      expect(categories, contains('Stamp'));
+      expect(categories, contains('Retro Game'));
+      expect(categories, contains('Trading Card'));
+      expect(categories, contains('Vintage Toy'));
+      expect(
+        MockCollectibleResultPool.templates.map((item) => item.title),
+        contains('1999 Pokemon Charizard Holo'),
+      );
+    });
+
+    test('mock result shape matches scan result schema', () async {
+      const pool = MockCollectibleResultPool();
+
+      final recognition = await pool.resultFor(
+        const AiAnalysisRequest(imagePath: 'sample://sports-card'),
+      );
+
+      expect(recognition.success, isTrue);
+      expect(recognition.title, isNotEmpty);
+      expect(recognition.category, isNotEmpty);
+      expect(recognition.year, isNotEmpty);
+      expect(recognition.brand, isNotEmpty);
+      expect(recognition.confidence, inInclusiveRange(0, 1));
+      expect(recognition.estimatedValue, greaterThan(0));
+      expect(recognition.condition, isNotEmpty);
+      expect(recognition.description, isNotEmpty);
+      expect(recognition.notes, contains('SIT MOCK DATA'));
+      expect(recognition.pricing.lowEstimate, greaterThan(0));
+      expect(
+        recognition.pricing.highEstimate,
+        greaterThanOrEqualTo(recognition.estimatedValue),
+      );
+      expect(recognition.alternativeMatches, hasLength(3));
+    });
   });
 
   group('GalleryService', () {

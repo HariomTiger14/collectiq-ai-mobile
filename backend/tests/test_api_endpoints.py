@@ -74,8 +74,13 @@ class ApiEndpointsTest(unittest.TestCase):
                 "Sports Card",
                 "Trading Card",
                 "Coin",
-                "Comic",
                 "Toy/Figure",
+                "Action Figure",
+                "Comic",
+                "Comic Book",
+                "Stamp",
+                "Retro Game",
+                "Vintage Toy",
             ],
         )
         self.assertGreaterEqual(payload["confidence"], 0)

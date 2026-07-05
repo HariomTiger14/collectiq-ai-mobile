@@ -30,7 +30,6 @@ import 'package:collectiq_ai/features/subscription/domain/repositories/usage_rep
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
-import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -1391,7 +1390,7 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('Charizard'), findsWidgets);
-    expect(find.text('Trading Card'), findsWidgets);
+    expect(find.text('Pokemon Card'), findsWidgets);
     expect(find.text('AUD 1,850'), findsWidgets);
     expect(find.text('Market Value'), findsWidgets);
     expect(find.text('Market Summary'), findsWidgets);
@@ -1408,16 +1407,16 @@ void main() {
     expect(find.text('Charizard'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
     expect(find.text('Alternative Matches'), findsOneWidget);
-    expect(find.text('2016 Pokemon Evolutions Charizard'), findsOneWidget);
-    expect(find.textContaining('High confidence'), findsOneWidget);
-    expect(find.text('Consider grading before selling.'), findsOneWidget);
+    expect(find.text('1999 Pokemon Charizard Holo variant'), findsOneWidget);
+    expect(find.textContaining('Mock confidence'), findsOneWidget);
+    expect(find.textContaining('Sleeve it'), findsOneWidget);
   });
 
   testWidgets('scanner backend failure shows friendly message', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(
-      aiRecognitionService: const _FailingAIRecognitionService(),
+      aiAnalysisProvider: const _FailingAiAnalysisProvider(),
       galleryService: _SelectedGalleryService(),
     );
 
@@ -1441,12 +1440,7 @@ void main() {
         ?.call();
     await tester.pump();
 
-    expect(
-      find.text(
-        'AI backend is not reachable. Check your internet/backend setup.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Provider failed safely.'), findsOneWidget);
     expect(find.text('AI Result'), findsNothing);
   });
 
@@ -1717,7 +1711,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(
-      aiRecognitionService: const _DelayedAIRecognitionService(),
+      aiAnalysisProvider: const _DelayedAiAnalysisProvider(),
       galleryService: _SelectedGalleryService(),
     );
 
@@ -3143,6 +3137,16 @@ class _FailingAiAnalysisProvider implements AiAnalysisProvider {
   }
 }
 
+class _DelayedAiAnalysisProvider implements AiAnalysisProvider {
+  const _DelayedAiAnalysisProvider();
+
+  @override
+  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    return const _CustomAiAnalysisProvider().analyze(request);
+  }
+}
+
 class _FakeOnboardingRepository implements OnboardingRepository {
   _FakeOnboardingRepository({required this.completed});
 
@@ -3444,25 +3448,6 @@ class _LostDataCameraService extends CameraService {
   @override
   Future<XFile?> retrieveLostImage() async {
     return XFile(_fixturePath('persistent-camera-card.jpg'));
-  }
-}
-
-class _FailingAIRecognitionService implements AIRecognitionService {
-  const _FailingAIRecognitionService();
-
-  @override
-  Future<RecognitionResult> recognizeCollectible(XFile image) {
-    throw const NetworkException(message: 'Network connection failed.');
-  }
-}
-
-class _DelayedAIRecognitionService implements AIRecognitionService {
-  const _DelayedAIRecognitionService();
-
-  @override
-  Future<RecognitionResult> recognizeCollectible(XFile image) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return const _FakeAIRecognitionService().recognizeCollectible(image);
   }
 }
 

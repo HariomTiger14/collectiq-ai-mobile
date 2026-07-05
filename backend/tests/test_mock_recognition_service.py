@@ -20,17 +20,7 @@ class MockRecognitionProviderTest(unittest.TestCase):
         result = MockRecognitionProvider().recognize(Path("uploads/card.png"))
 
         self.assertIn(result.title, {item.title for item in MOCK_COLLECTIBLES})
-        self.assertIn(
-            result.category,
-            {
-                "Pokemon Card",
-                "Sports Card",
-                "Trading Card",
-                "Coin",
-                "Comic",
-                "Toy/Figure",
-            },
-        )
+        self.assertIn(result.category, {item.category for item in MOCK_COLLECTIBLES})
         self.assertGreaterEqual(result.confidence, 0)
         self.assertLessEqual(result.confidence, 100)
         self.assertGreater(result.estimatedValue, 0)
@@ -71,10 +61,42 @@ class MockRecognitionProviderTest(unittest.TestCase):
 
         titles = {
             provider.recognize(Path(f"uploads/card-{index}.png")).title
-            for index in range(8)
+            for index in range(12)
         }
 
         self.assertGreater(len(titles), 1)
+
+    def test_mock_pool_has_required_category_coverage(self) -> None:
+        categories = {item.category for item in MOCK_COLLECTIBLES}
+
+        self.assertGreaterEqual(len(MOCK_COLLECTIBLES), 30)
+        self.assertIn("Pokemon Card", categories)
+        self.assertIn("Sports Card", categories)
+        self.assertIn("Coin", categories)
+        self.assertIn("Action Figure", categories)
+        self.assertIn("Comic Book", categories)
+        self.assertIn("Stamp", categories)
+        self.assertIn("Retro Game", categories)
+        self.assertIn("Trading Card", categories)
+        self.assertIn("Vintage Toy", categories)
+        self.assertIn(
+            "1999 Pokemon Charizard Holo",
+            {item.title for item in MOCK_COLLECTIBLES},
+        )
+
+    def test_api_payload_uses_image_signal_for_deterministic_variation(self) -> None:
+        provider = MockRecognitionProvider()
+
+        first = provider.recognize_api_payload(
+            request_metadata={"imagePath": "/tmp/scan-a.jpg"},
+            image_payload={"base64Image": "first-upload-bytes"},
+        )
+        second = provider.recognize_api_payload(
+            request_metadata={"imagePath": "/tmp/scan-b.jpg"},
+            image_payload={"base64Image": "second-upload-bytes"},
+        )
+
+        self.assertNotEqual(first.title, second.title)
 
     def test_backwards_compatible_mock_service_alias(self) -> None:
         self.assertIs(MockRecognitionService, MockRecognitionProvider)
