@@ -74,6 +74,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     final portfolioState = ref.watch(portfolioControllerProvider);
     final registry = ref.watch(cloudServiceRegistryProvider);
     final supabaseConfig = ref.watch(supabaseConfigProvider);
+    final isSitEnvironment = registry.config.environment == AppEnvironment.sit;
+    final showProviderDiagnostics =
+        isSitEnvironment ||
+        const bool.fromEnvironment('PACKLOX_SHOW_DEVELOPER_TOOLS');
     final canRunCloudSync =
         _cloudSyncAvailable(registry) && authState.isSignedIn;
     final isSyncing =
@@ -98,6 +102,11 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     final backedUpItems = portfolioState.items
         .where((item) => item.syncStatus == CloudItemSyncStatus.synced)
         .length;
+    final userMessage = canRunCloudSync
+        ? syncState.errorMessage ??
+              imageSyncState.errorMessage ??
+              status.message
+        : 'Sign in to enable backup and restore. Your local portfolio stays on this device.';
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -133,14 +142,13 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                             syncState: status.state,
                             itemsBackedUp: backedUpItems,
                             itemsPending: pendingItems,
-                            message:
-                                syncState.errorMessage ??
-                                imageSyncState.errorMessage ??
-                                status.message,
+                            message: userMessage,
                           ),
                           const SizedBox(height: 32),
                           CloudSyncSectionCard(
-                            title: 'Diagnostics',
+                            title: showProviderDiagnostics
+                                ? 'Diagnostics'
+                                : 'Backup details',
                             child: MotionStagger(
                               children: [
                                 Padding(
@@ -155,7 +163,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
+                                  padding: EdgeInsets.only(
+                                    bottom: showProviderDiagnostics ? 16 : 0,
+                                  ),
                                   child: CloudSyncDiagnosticTile(
                                     icon: Icons.storage_outlined,
                                     title: 'Storage Usage',
@@ -170,28 +180,30 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                     ),
                                   ),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: CloudSyncDiagnosticTile(
-                                    icon: Icons.dns_outlined,
-                                    title: 'Supabase Project',
-                                    subtitle: _supabaseProjectLabel(
-                                      supabaseConfig,
-                                      registry.config.environment,
+                                if (showProviderDiagnostics) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: CloudSyncDiagnosticTile(
+                                      icon: Icons.dns_outlined,
+                                      title: 'Supabase Project',
+                                      subtitle: _supabaseProjectLabel(
+                                        supabaseConfig,
+                                        registry.config.environment,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                CloudSyncDiagnosticTile(
-                                  icon: Icons.receipt_long_outlined,
-                                  title: 'Sync Logs',
-                                  subtitle: 'View recent sync activity',
-                                  trailing: Icons.chevron_right_rounded,
-                                  onTap: () => _showCloudSyncMessage(
-                                    syncState.errorMessage ??
-                                        imageSyncState.errorMessage ??
-                                        status.message,
+                                  CloudSyncDiagnosticTile(
+                                    icon: Icons.receipt_long_outlined,
+                                    title: 'Sync Logs',
+                                    subtitle: 'View recent sync activity',
+                                    trailing: Icons.chevron_right_rounded,
+                                    onTap: () => _showCloudSyncMessage(
+                                      syncState.errorMessage ??
+                                          imageSyncState.errorMessage ??
+                                          status.message,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -322,10 +334,10 @@ String _backupLocation({
   required SyncStatus status,
 }) {
   if (status.isCloudConnected) {
-    return 'Supabase cloud storage';
+    return 'PackLox backup storage';
   }
   if (canRunCloudSync) {
-    return 'PackLox cloud ready, authentication required';
+    return 'PackLox backup ready, sign in required';
   }
   return 'Local device storage';
 }

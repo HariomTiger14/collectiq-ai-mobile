@@ -230,7 +230,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: crossAxisCount == 3 ? 0.60 : 0.48,
+                    childAspectRatio: crossAxisCount == 3 ? 0.60 : 0.46,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final item = visibleItems[index];

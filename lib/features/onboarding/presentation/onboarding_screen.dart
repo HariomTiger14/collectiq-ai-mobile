@@ -136,7 +136,7 @@ class OnboardingScreen extends StatelessWidget {
                           icon: Icons.lock_outline,
                           title: 'Privacy conscious',
                           body:
-                              'No API keys or personal image paths are sent through telemetry.',
+                              'Your photos and collection details stay private by default.',
                         ),
                       ],
                     ),

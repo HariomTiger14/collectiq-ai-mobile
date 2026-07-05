@@ -112,8 +112,8 @@ class NavBarItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 50,
-            height: 34,
+            width: 48,
+            height: 30,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.pill),
               gradient: isActive

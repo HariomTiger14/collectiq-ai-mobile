@@ -54,6 +54,38 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
+  testWidgets('bottom navigation switches all major tabs without crashing', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    expect(find.text('Your Collection Hub'), findsOneWidget);
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pumpAndSettle();
+    expect(find.text('Total collection value'), findsOneWidget);
+    expectNoFlutterError(tester);
+
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
+    expectNoFlutterError(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Account'), findsOneWidget);
+    expectNoFlutterError(tester);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your Collection Hub'), findsOneWidget);
+    expectNoFlutterError(tester);
+  });
+
   testWidgets('onboarding appears on first launch', (
     WidgetTester tester,
   ) async {
@@ -65,6 +97,12 @@ void main() {
     expect(find.text('Local-first by default'), findsOneWidget);
     expect(find.text('Start Scanning'), findsOneWidget);
     expect(find.text('Explore Dashboard'), findsOneWidget);
+    expect(find.textContaining('Mock AI'), findsNothing);
+    expect(find.textContaining('mock analysis'), findsNothing);
+    expect(find.textContaining('beta'), findsNothing);
+    expect(find.textContaining('Supabase'), findsNothing);
+    expect(find.textContaining('SIT'), findsNothing);
+    expect(find.textContaining('API'), findsNothing);
     expect(find.text('Home'), findsNothing);
   });
 
@@ -418,6 +456,7 @@ void main() {
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
       findsOneWidget,
     );
+    expect(find.text('Analyze with AI'), findsNothing);
     expect(find.text('Supported Categories'), findsOneWidget);
     expect(find.text('How It Works'), findsOneWidget);
     expect(find.text('Unlimited AI Scans'), findsOneWidget);
@@ -494,16 +533,18 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('First-launch onboarding'), findsOneWidget);
 
-    await tester.reveal(find.text('Developer Tools'));
-    expect(find.text('Developer Tools'), findsOneWidget);
-    expect(find.text('Developer Diagnostics'), findsOneWidget);
-    expect(find.text('Show diagnostics'), findsOneWidget);
-
     await tester.reveal(find.text('Help & About'));
     expect(find.text('Help & About'), findsOneWidget);
     expect(find.text('About PackLox'), findsOneWidget);
     expect(find.text('Export portfolio'), findsOneWidget);
     expect(find.text('Contact'), findsOneWidget);
+    expect(find.text('Developer Tools'), findsNothing);
+    expect(find.text('Developer Diagnostics'), findsNothing);
+    expect(find.text('Mock mode active'), findsNothing);
+    expect(find.text('Supabase Project'), findsNothing);
+    expect(find.text('SIT readiness'), findsNothing);
+    expect(find.text('API backend'), findsNothing);
+    expect(find.textContaining('not configured'), findsNothing);
   });
   testWidgets('settings rows respond with safe local messages', (
     WidgetTester tester,
@@ -551,6 +592,60 @@ void main() {
     expect(syncButton.onPressed, isNull);
 
     expect(find.text('Local only'), findsWidgets);
+  });
+
+  testWidgets('backup and sync route renders consumer copy without diagnostics', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.openSettings();
+    await tester.reveal(find.text('Backup & Sync'));
+    await tester.pump();
+    await tester.tap(find.text('Backup & Sync').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('PackLox Backup & Restore'), findsOneWidget);
+    expect(find.text('Backup details'), findsOneWidget);
+    expect(find.text('Backup Location'), findsOneWidget);
+    expect(find.text('Storage Usage'), findsOneWidget);
+    expect(find.text('Sync Now'), findsOneWidget);
+    expect(
+      find.text(
+        'Sign in to enable backup and restore. Your local portfolio stays on this device.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Diagnostics'), findsNothing);
+    expect(find.text('Supabase Project'), findsNothing);
+    expect(find.textContaining('Supabase'), findsNothing);
+    expect(find.textContaining('not configured'), findsNothing);
+    expect(find.textContaining('API backend'), findsNothing);
+    expect(find.textContaining('SIT'), findsNothing);
+  });
+
+  testWidgets('about route renders PackLox info without placeholder links', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.openSettings();
+    await tester.reveal(find.text('About PackLox'));
+    await tester.pump();
+    await tester.tap(find.text('About PackLox'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('About PackLox'), findsOneWidget);
+    expect(find.text('Version'), findsOneWidget);
+    expect(find.text('Privacy'), findsOneWidget);
+    expect(find.text('Backup'), findsOneWidget);
+    expect(find.text('Storage Location'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsNothing);
+    expect(find.text('Terms of Service'), findsNothing);
+    expect(find.text('Documentation'), findsNothing);
+    expect(find.textContaining('Flutter'), findsNothing);
+    expect(find.textContaining('Supabase'), findsNothing);
+    expect(find.textContaining('will open here before release'), findsNothing);
   });
 
   testWidgets('reset onboarding works from Settings', (
@@ -1691,6 +1786,15 @@ void main() {
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Estimated market value'), findsOneWidget);
     expect(find.textContaining('Estimated value range'), findsOneWidget);
+    expect(find.text('Trust summary'), findsOneWidget);
+    expect(find.text('Pricing source'), findsOneWidget);
+    expect(find.text('Freshness'), findsOneWidget);
+    expect(find.text('Pricing confidence'), findsOneWidget);
+    expect(find.textContaining('Mock pricing blend'), findsWidgets);
+    expect(
+      find.textContaining('AI estimates are a starting point'),
+      findsOneWidget,
+    );
     expect(find.text('Key Attributes'), findsOneWidget);
     expect(find.textContaining('Market trend:'), findsOneWidget);
     expect(find.text('Save to Portfolio'), findsOneWidget);
@@ -2104,6 +2208,41 @@ void main() {
     expect(find.text('Scan Collectible'), findsWidgets);
   });
 
+  testWidgets('portfolio grid renders local thumbnail and overflow actions', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"local-thumb","title":"Local Thumbnail Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading.","imagePath":"test/fixtures/persistent-camera-card.jpg","createdAt":"2026-06-27T00:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-local-thumb')),
+    );
+
+    expect(find.text('Local Thumbnail Charizard'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-image-local-thumb')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Item actions'), findsOneWidget);
+    expect(find.byTooltip('Edit item'), findsNothing);
+    expect(find.byTooltip('Share item'), findsNothing);
+    expect(find.byTooltip('Remove item'), findsNothing);
+
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+  });
+
   testWidgets('removes saved portfolio item from local storage', (
     WidgetTester tester,
   ) async {
@@ -2364,6 +2503,42 @@ void main() {
     expect(find.text('Recommendation'), findsOneWidget);
   });
 
+  testWidgets('collectible detail handles missing optional fields safely', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"minimal-detail","title":"Minimal Silver Coin","category":"Coin","estimatedValue":120,"confidence":0.72,"condition":"Good","recommendation":"Store safely.","imagePath":"","createdAt":"2026-06-27T00:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio'));
+    await tester.pump();
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-minimal-detail')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-minimal-detail')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(find.text('Minimal Silver Coin'), findsWidgets);
+    expect(find.text('AUD 120'), findsWidgets);
+    expect(find.text('Coin'), findsWidgets);
+    expect(find.text('72% confidence'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-edit-button')),
+      findsOneWidget,
+    );
+    await tester.reveal(find.text('Price Alerts'));
+    expect(find.text('Price Alerts'), findsOneWidget);
+    expectNoFlutterError(tester);
+  });
+
   testWidgets('edit collectible persists locally and preserves image path', (
     WidgetTester tester,
   ) async {
@@ -2617,6 +2792,77 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Marketplace listing coming next'), findsOneWidget);
   });
+
+  for (final viewport in const [
+    ('small phone', Size(360, 640)),
+    ('large phone', Size(430, 932)),
+  ]) {
+    testWidgets('responsive smoke renders key screens on ${viewport.$1}', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = viewport.$2
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items':
+            '[{"id":"responsive-card","title":"Responsive Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Hold safely.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000"}]',
+      });
+
+      await tester.pumpCollectIqApp();
+      expect(find.text('Your Collection Hub'), findsOneWidget);
+      expectNoFlutterError(tester);
+
+      await tester.tap(find.text('Scan'));
+      await tester.pumpAndSettle();
+      expect(find.text('AI Scanner'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+        findsOneWidget,
+      );
+      expectNoFlutterError(tester);
+
+      await tester.tap(find.text('Portfolio'));
+      await tester.pumpAndSettle();
+      await tester.reveal(
+        find.byKey(const ValueKey('portfolio-grid-item-responsive-card')),
+      );
+      expect(find.text('Responsive Charizard'), findsOneWidget);
+      expectNoFlutterError(tester);
+
+      await tester.tap(
+        find.byKey(const ValueKey('portfolio-grid-item-responsive-card')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Collectible Details'), findsOneWidget);
+      expectNoFlutterError(tester);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Account'), findsOneWidget);
+      await tester.reveal(find.text('Backup & Sync'));
+      expect(find.text('Backup & Sync'), findsWidgets);
+      expectNoFlutterError(tester);
+    });
+  }
+}
+
+void expectNoFlutterError(WidgetTester tester) {
+  final exception = tester.takeException();
+  if (exception == null) {
+    return;
+  }
+  if (exception is FlutterError) {
+    final details = exception.diagnostics
+        .map((node) => node.toStringDeep())
+        .join('\n');
+    fail('$exception\n$details');
+  }
+  fail(exception.toString());
 }
 
 extension on WidgetTester {

@@ -96,7 +96,7 @@ class HomeHeroHeader extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isCompactWidth = constraints.maxWidth < 340;
-                    final isCompactHeight = constraints.maxHeight < 184;
+                    final isCompactHeight = constraints.maxHeight < 232;
                     final isCompactText = textScale > 1.1;
                     final useCompactLayout =
                         isCompactWidth || isCompactHeight || isCompactText;

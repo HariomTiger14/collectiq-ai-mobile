@@ -1271,17 +1271,26 @@ class _ItemValueSummaryVisual extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
-                Text(
-                  'Low ${_formatMoney(low, pricing?.currency ?? 'AUD')}',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: Text(
+                    'Low ${_formatMoney(low, pricing?.currency ?? 'AUD')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  'High ${_formatMoney(high, pricing?.currency ?? 'AUD')}',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    'High ${_formatMoney(high, pricing?.currency ?? 'AUD')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -1314,12 +1323,16 @@ class _PriceBars extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Text(
-                    _formatAud(point.value.toDouble()),
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _formatAud(point.value.toDouble()),
+                      maxLines: 1,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Container(
@@ -1333,6 +1346,8 @@ class _PriceBars extends StatelessWidget {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     point.month,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: textTheme.labelMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

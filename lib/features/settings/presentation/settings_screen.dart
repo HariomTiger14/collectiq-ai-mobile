@@ -27,9 +27,12 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+const _showDeveloperSurfaces = bool.fromEnvironment(
+  'PACKLOX_SHOW_DEVELOPER_TOOLS',
+);
 
 /// Settings screen for account and sync placeholders.
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -100,7 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     final isSitEnvironment =
         cloudRegistry.config.environment == AppEnvironment.sit;
-    final showDeveloperTools = kDebugMode || isSitEnvironment;
+    final showDeveloperTools = _showDeveloperSurfaces || isSitEnvironment;
     final now = DateTime.now();
     final colorScheme = Theme.of(context).colorScheme;
     Widget framed(Widget child, {EdgeInsetsGeometry? padding}) {
@@ -204,7 +207,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.cloud_done_outlined,
         title: 'Backup status',
-        subtitle: syncState.errorMessage ?? syncState.status.message,
+        subtitle: canRunCloudSync
+            ? syncState.errorMessage ?? syncState.status.message
+            : 'Your collection is saved locally. Sign in to prepare backup and restore.',
         trailing: syncState.status.statusLabel,
       ),
       _SettingsRow(
@@ -356,18 +361,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: EdgeInsets.zero,
             ),
             sliverBox(accountAccessPanel),
-            sliverBox(
-              _SettingsCompatibilityLabels(
-                authState: authState,
-                supabaseConfig: supabaseConfig,
-                subscriptionState: subscriptionState,
-                diagnostics: diagnostics,
-                syncState: syncState,
-                imageSyncState: imageSyncState,
-                cloudRegistry: cloudRegistry,
-                apiConfig: apiConfig,
+            if (showDeveloperTools)
+              sliverBox(
+                _SettingsCompatibilityLabels(
+                  authState: authState,
+                  supabaseConfig: supabaseConfig,
+                  subscriptionState: subscriptionState,
+                  diagnostics: diagnostics,
+                  syncState: syncState,
+                  imageSyncState: imageSyncState,
+                  cloudRegistry: cloudRegistry,
+                  apiConfig: apiConfig,
+                ),
               ),
-            ),
             ...sectionSlivers('Backup & Sync', syncTiles),
             ...sectionSlivers('Scanning', scanTiles),
             ...sectionSlivers('Notifications', notificationTiles),
