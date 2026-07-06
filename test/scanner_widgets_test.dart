@@ -82,7 +82,7 @@ void main() {
     expect(find.byKey(const ValueKey('filmstrip-closeup')), findsOneWidget);
     expect(find.byKey(const ValueKey('filmstrip-add-photo')), findsOneWidget);
     expect(find.text('Warning'), findsOneWidget);
-    expect(find.text('Captured'), findsOneWidget);
+    expect(find.text('Done'), findsOneWidget);
     expect(find.text('Required'), findsOneWidget);
   });
 

@@ -175,7 +175,7 @@ class CaptureWorkspace extends StatelessWidget {
                     onPressed: isBusy ? null : onPrimaryCapture,
                     icon: const Icon(Icons.add_photo_alternate_outlined),
                     label: Text(
-                      'Add ${nextRole.title}',
+                      'Add ${_shortRoleLabel(nextRole)}',
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -807,10 +807,10 @@ class _FilmstripTile extends StatelessWidget {
                       warning
                           ? 'Warning'
                           : hasPhoto
-                          ? 'Captured'
+                          ? 'Done'
                           : requiredRole
                           ? 'Required'
-                          : 'Optional',
+                          : 'Opt.',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelSmall?.copyWith(
@@ -932,6 +932,21 @@ String _statusLabel(CaptureRoleCardStatus status) {
     CaptureRoleCardStatus.missing => 'Missing',
     CaptureRoleCardStatus.captured => 'Captured',
     CaptureRoleCardStatus.warning => 'Warning',
+  };
+}
+
+String _shortRoleLabel(ScanCaptureRole role) {
+  return switch (role) {
+    ScanCaptureRole.front => 'Front',
+    ScanCaptureRole.back => 'Back',
+    ScanCaptureRole.closeUp => 'Close-up',
+    ScanCaptureRole.edge => 'Edge',
+    ScanCaptureRole.side => 'Side',
+    ScanCaptureRole.top => 'Top',
+    ScanCaptureRole.bottom => 'Bottom',
+    ScanCaptureRole.serialOrMark => 'Serial',
+    ScanCaptureRole.damageDetail => 'Damage',
+    ScanCaptureRole.angledReflective => 'Angle',
   };
 }
 

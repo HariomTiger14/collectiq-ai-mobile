@@ -279,13 +279,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final notificationTiles = [
       _SettingsRow(
         icon: Icons.notifications_none_outlined,
-        title: 'Price alert notifications',
+        title: 'Price alerts',
         subtitle: notificationState.settingsSubtitle,
         trailing: notificationState.settingsStatusLabel,
       ),
       _SettingsRow(
         icon: Icons.admin_panel_settings_outlined,
-        title: 'Notification permission',
+        title: 'Permissions',
         subtitle: 'Allow PackLox to notify you about item price alerts.',
         trailing: notificationState.permissionStatus.label,
       ),
@@ -426,7 +426,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
             ...sectionSlivers('Help & About', infoTiles),
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+            const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
       ),
@@ -1080,8 +1080,8 @@ class IdentityBlock extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isSignedIn ? email ?? 'Signed in' : 'You are not signed in',
-                  maxLines: 1,
+                  isSignedIn ? email ?? 'Signed in' : 'Guest mode',
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,

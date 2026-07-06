@@ -645,8 +645,8 @@ void main() {
 
     await tester.reveal(find.text('Notifications'));
     expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Price alert notifications'), findsOneWidget);
-    expect(find.text('Notification permission'), findsOneWidget);
+    expect(find.text('Price alerts'), findsOneWidget);
+    expect(find.text('Permissions'), findsOneWidget);
 
     await tester.reveal(find.text('Appearance'));
     expect(find.text('Appearance'), findsOneWidget);
