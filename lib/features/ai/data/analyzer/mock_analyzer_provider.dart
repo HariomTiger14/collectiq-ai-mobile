@@ -49,6 +49,16 @@ class MockAnalyzerProvider implements AnalyzerProvider {
             'requestedCategory',
           ),
           timestamp: DateTime.now(),
+          scanGoal: _optionalMetadataString(request, 'scanGoal'),
+          confidenceTarget: _optionalMetadataDouble(
+            request,
+            'confidenceTarget',
+          ),
+          scannerUxVersion: _optionalMetadataString(
+            request,
+            'scannerUxVersion',
+          ),
+          qualityMetadata: _optionalMetadataMap(request, 'qualityMetadata'),
           images: [
             for (final image in request.images)
               AiBackendAnalysisImage(
@@ -132,6 +142,28 @@ class MockAnalyzerProvider implements AnalyzerProvider {
     }
 
     return value.trim();
+  }
+
+  double? _optionalMetadataDouble(AnalyzerRequest request, String key) {
+    final value = request.metadata[key];
+    if (value is num) {
+      return value.toDouble();
+    }
+    return null;
+  }
+
+  Map<String, Object?> _optionalMetadataMap(
+    AnalyzerRequest request,
+    String key,
+  ) {
+    final value = request.metadata[key];
+    if (value is Map<String, Object?>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, Object?>.from(value);
+    }
+    return const {};
   }
 
   void _logAnalyzerTrace(String message) {

@@ -18,8 +18,17 @@ import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/capture_event.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_session.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scanner_constants.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -37,6 +46,7 @@ class ScannerPhotoSlot {
     required this.path,
     required this.source,
     this.image,
+    this.qualityMetadata = const {},
   });
 
   final String role;
@@ -44,6 +54,7 @@ class ScannerPhotoSlot {
   final String path;
   final String source;
   final XFile? image;
+  final Map<String, Object?> qualityMetadata;
 }
 
 /// Immutable presentation state for the scanner workflow.
@@ -58,6 +69,7 @@ class ScannerState {
     this.selectedItemTitle,
     this.selectedItemStatus,
     this.photoSlots = const {},
+    this.scanSession,
     this.scanResult,
     this.aiRecommendation,
     this.isSavedToPortfolio = false,
@@ -88,6 +100,8 @@ class ScannerState {
 
   final Map<String, ScannerPhotoSlot> photoSlots;
 
+  final ScanSession? scanSession;
+
   /// Latest scan result, once AI scanning is implemented.
   final ScanResult? scanResult;
 
@@ -113,6 +127,7 @@ class ScannerState {
     String? selectedItemTitle,
     String? selectedItemStatus,
     Map<String, ScannerPhotoSlot>? photoSlots,
+    ScanSession? scanSession,
     ScanResult? scanResult,
     String? aiRecommendation,
     bool? isSavedToPortfolio,
@@ -123,6 +138,7 @@ class ScannerState {
     bool clearSelectedItemTitle = false,
     bool clearSelectedItemStatus = false,
     bool clearPhotoSlots = false,
+    bool clearScanSession = false,
     bool clearScanResult = false,
     bool clearAiRecommendation = false,
     bool clearErrorMessage = false,
@@ -144,6 +160,7 @@ class ScannerState {
           ? null
           : selectedItemStatus ?? this.selectedItemStatus,
       photoSlots: clearPhotoSlots ? const {} : photoSlots ?? this.photoSlots,
+      scanSession: clearScanSession ? null : scanSession ?? this.scanSession,
       scanResult: clearScanResult ? null : scanResult ?? this.scanResult,
       aiRecommendation: clearAiRecommendation
           ? null
@@ -171,6 +188,8 @@ class ScannerController extends Notifier<ScannerState> {
   /// Scan enrichment service dependency.
   late final ScanResultEnrichmentService _enrichmentService;
 
+  late final ScanCapturePlanService _capturePlanService;
+  late final ScanQualityGateService _qualityGateService;
   late final AppTelemetryService _telemetry;
   bool _isDisposed = false;
   bool _isPickerActive = false;
@@ -187,6 +206,8 @@ class ScannerController extends Notifier<ScannerState> {
     _galleryService = ref.watch(galleryServiceProvider);
     _analyzerService = ref.watch(analyzerServiceProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
+    _capturePlanService = ref.watch(scanCapturePlanServiceProvider);
+    _qualityGateService = ref.watch(scanQualityGateServiceProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     ref.onDispose(() {
       _isDisposed = true;
@@ -252,6 +273,33 @@ class ScannerController extends Notifier<ScannerState> {
     return _cameraService.requestPermissions();
   }
 
+  void selectGoal(ScanGoal goal) {
+    final session = _ensureSession(scanGoal: goal).addEvent(
+      CaptureEvent(
+        type: CaptureEventType.goalSelected,
+        timestamp: DateTime.now(),
+        metadata: {'scanGoal': goal.id},
+      ),
+    );
+    final capturedImages = _capturedImagesFromSlots(state.photoSlots);
+    final plan = _capturePlanService.buildPlan(goal, null, capturedImages);
+    _setState(
+      state.copyWith(
+        scanSession: session.copyWith(
+          scanGoal: goal,
+          capturePlan: plan,
+          capturedImages: capturedImages,
+          confidenceTarget: goal.confidenceTarget,
+          clearConfidenceAchieved: true,
+        ),
+        clearScanResult: true,
+        clearAiRecommendation: true,
+        isSavedToPortfolio: false,
+      ),
+      event: 'scan goal selected',
+    );
+  }
+
   /// Opens the selected camera.
   Future<void> openCamera() {
     return _cameraService.openCamera();
@@ -307,6 +355,15 @@ class ScannerController extends Notifier<ScannerState> {
     String imageRole = 'front',
   }) async {
     _logFlow('camera button tapped');
+    _setState(
+      state.copyWith(
+        scanSession: _sessionWithEventForRole(
+          CaptureEventType.roleRequested,
+          imageRole,
+        ),
+      ),
+      event: 'capture role requested',
+    );
     _trackTelemetry(
       TelemetryEventNames.scanStarted,
       properties: const {'source': 'camera'},
@@ -388,6 +445,13 @@ class ScannerController extends Notifier<ScannerState> {
       );
       final selectedImagePath = _displayPathFor(image);
       await _ensureLocalImageExists(selectedImagePath, source: 'camera');
+      final quality = await _evaluateImageQuality(selectedImagePath);
+      if (!quality.passed) {
+        throw ScannerException(
+          message: quality.userMessage,
+          code: 'scanner.camera.quality_blocked',
+        );
+      }
       debugPrint(
         '[Scanner] selectedImagePath after camera capture: '
         '$selectedImagePath',
@@ -409,6 +473,13 @@ class ScannerController extends Notifier<ScannerState> {
             path: selectedImagePath,
             source: 'camera',
             image: image,
+            qualityMetadata: quality.toMetadataJson(),
+          ),
+          scanSession: _updatedSessionWithImage(
+            imageRole: imageRole,
+            path: selectedImagePath,
+            source: 'camera',
+            quality: quality,
           ),
           isPreparingImage: false,
           clearScanResult: true,
@@ -472,6 +543,13 @@ class ScannerController extends Notifier<ScannerState> {
 
   /// Creates a sample selected scan for development and UI testing.
   void useSampleScan() {
+    final quality = const ScanQualityEvaluation(
+      passed: true,
+      severity: QualityGateSeverity.pass,
+      issues: [],
+      userMessage: 'Image accepted.',
+      technicalMetrics: {'source': 'sample'},
+    );
     state = state.copyWith(
       isLoading: false,
       isPreparingImage: false,
@@ -484,8 +562,15 @@ class ScannerController extends Notifier<ScannerState> {
           label: 'Front / Obverse',
           path: 'sample://sports-card',
           source: 'sample',
+          qualityMetadata: {'source': 'sample'},
         ),
       },
+      scanSession: _updatedSessionWithImage(
+        imageRole: 'front',
+        path: 'sample://sports-card',
+        source: 'sample',
+        quality: quality,
+      ),
       clearSelectedImage: true,
       clearScanResult: true,
       clearAiRecommendation: true,
@@ -497,6 +582,15 @@ class ScannerController extends Notifier<ScannerState> {
   /// Opens the gallery and stores a validated selected image.
   Future<void> pickImageFromGallery({String imageRole = 'front'}) async {
     _logFlow('gallery button tapped');
+    _setState(
+      state.copyWith(
+        scanSession: _sessionWithEventForRole(
+          CaptureEventType.roleRequested,
+          imageRole,
+        ),
+      ),
+      event: 'capture role requested',
+    );
     _trackTelemetry(
       TelemetryEventNames.scanStarted,
       properties: const {'source': 'gallery'},
@@ -568,6 +662,13 @@ class ScannerController extends Notifier<ScannerState> {
       );
       final selectedImagePath = _displayPathFor(persistedImage);
       await _ensureLocalImageExists(selectedImagePath, source: 'gallery');
+      final quality = await _evaluateImageQuality(selectedImagePath);
+      if (!quality.passed) {
+        throw ScannerException(
+          message: quality.userMessage,
+          code: 'scanner.gallery.quality_blocked',
+        );
+      }
       debugPrint('[Scanner] gallery picker returned path: ${image.path}');
       debugPrint(
         '[Scanner] copied persistent gallery path: $selectedImagePath',
@@ -589,6 +690,13 @@ class ScannerController extends Notifier<ScannerState> {
             path: selectedImagePath,
             source: 'gallery',
             image: persistedImage,
+            qualityMetadata: quality.toMetadataJson(),
+          ),
+          scanSession: _updatedSessionWithImage(
+            imageRole: imageRole,
+            path: selectedImagePath,
+            source: 'gallery',
+            quality: quality,
           ),
           isPreparingImage: false,
           clearScanResult: true,
@@ -688,6 +796,7 @@ class ScannerController extends Notifier<ScannerState> {
       );
       final selectedImagePath = _displayPathFor(persistedImage);
       await _ensureLocalImageExists(selectedImagePath, source: 'recovered');
+      final quality = await _evaluateImageQuality(selectedImagePath);
       debugPrint('[Scanner] lost picker persistent path: $selectedImagePath');
       _setState(
         state.copyWith(
@@ -697,6 +806,19 @@ class ScannerController extends Notifier<ScannerState> {
           selectedImagePath: selectedImagePath,
           selectedItemTitle: 'Recovered image',
           selectedItemStatus: 'Ready for AI analysis',
+          photoSlots: _updatedPhotoSlots(
+            imageRole: 'front',
+            path: selectedImagePath,
+            source: 'recovered',
+            image: persistedImage,
+            qualityMetadata: quality.toMetadataJson(),
+          ),
+          scanSession: _updatedSessionWithImage(
+            imageRole: 'front',
+            path: selectedImagePath,
+            source: 'recovered',
+            quality: quality,
+          ),
           clearScanResult: true,
           clearAiRecommendation: true,
           clearErrorMessage: true,
@@ -839,6 +961,7 @@ class ScannerController extends Notifier<ScannerState> {
             'selectedItemStatus': state.selectedItemStatus,
             'imageCount': state.photoSlots.length,
             'imageRoles': state.photoSlots.keys.join(','),
+            ..._analyzeMetadata(),
           },
         ),
       );
@@ -884,6 +1007,9 @@ class ScannerController extends Notifier<ScannerState> {
         state.copyWith(
           scanResult: scanResultWithPhotoMetadata,
           aiRecommendation: enrichedAnalysis.recommendation,
+          scanSession: _sessionWithAnalyzeCompleted(
+            confidenceAchieved: scanResultWithPhotoMetadata.confidence,
+          ),
           isSavedToPortfolio: false,
         ),
       );
@@ -1159,6 +1285,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearSelectedItemTitle: true,
       clearSelectedItemStatus: true,
       clearPhotoSlots: true,
+      clearScanSession: true,
       clearScanResult: true,
       clearAiRecommendation: true,
       clearErrorMessage: true,
@@ -1209,6 +1336,7 @@ class ScannerController extends Notifier<ScannerState> {
     required String path,
     required String source,
     XFile? image,
+    Map<String, Object?> qualityMetadata = const {},
   }) {
     final normalizedRole = _normalizeImageRole(imageRole);
     return {
@@ -1219,34 +1347,172 @@ class ScannerController extends Notifier<ScannerState> {
         path: path,
         source: source,
         image: image,
+        qualityMetadata: qualityMetadata,
       ),
     };
   }
 
-  String _normalizeImageRole(String value) {
-    final normalized = value.trim().toLowerCase();
-    return switch (normalized) {
-      'obverse' || 'front' => 'front',
-      'reverse' || 'back' => 'back',
-      'close-up' ||
-      'closeup' ||
-      'detail' ||
-      'serial' ||
-      'signature' ||
-      'damage' => 'closeup',
-      'packaging' || 'package' => 'packaging',
-      _ => 'other',
+  ScanSession _ensureSession({ScanGoal? scanGoal}) {
+    final goal =
+        scanGoal ?? state.scanSession?.scanGoal ?? ScanGoal.identifyValue;
+    final capturedImages = _capturedImagesFromSlots(state.photoSlots);
+    final plan = _capturePlanService.buildPlan(goal, null, capturedImages);
+    final existing = state.scanSession;
+    if (existing != null) {
+      return existing.copyWith(
+        scanGoal: goal,
+        capturePlan: plan,
+        capturedImages: capturedImages,
+        confidenceTarget: goal.confidenceTarget,
+      );
+    }
+    return ScanSession.start(
+      sessionId: 'scan-${DateTime.now().microsecondsSinceEpoch}',
+      scanGoal: goal,
+      capturePlan: plan,
+    ).copyWith(capturedImages: capturedImages);
+  }
+
+  ScanSession _updatedSessionWithImage({
+    required String imageRole,
+    required String path,
+    required String source,
+    required ScanQualityEvaluation quality,
+  }) {
+    final session = _ensureSession();
+    final capturedImages = [
+      for (final image in session.capturedImages)
+        if (image.role != ScanCaptureRole.fromId(imageRole)) image,
+      CapturedScanImage(
+        path: path,
+        role: ScanCaptureRole.fromId(imageRole),
+        source: source,
+        qualityMetadata: quality.toMetadataJson(),
+      ),
+    ];
+    final plan = _capturePlanService.buildPlan(
+      session.scanGoal,
+      null,
+      capturedImages,
+    );
+    return session
+        .copyWith(
+          capturePlan: plan,
+          capturedImages: capturedImages,
+          clearConfidenceAchieved: true,
+          clearEndTime: true,
+        )
+        .addEvent(
+          CaptureEvent(
+            type: CaptureEventType.roleCaptured,
+            timestamp: DateTime.now(),
+            role: ScanCaptureRole.fromId(imageRole).id,
+            metadata: {'source': source},
+          ),
+        )
+        .addEvent(
+          CaptureEvent(
+            type: switch (quality.severity) {
+              QualityGateSeverity.pass => CaptureEventType.qualityGatePassed,
+              QualityGateSeverity.warning =>
+                CaptureEventType.qualityGateWarning,
+              QualityGateSeverity.blocker =>
+                CaptureEventType.qualityGateBlocked,
+            },
+            timestamp: DateTime.now(),
+            role: ScanCaptureRole.fromId(imageRole).id,
+            metadata: quality.toMetadataJson(),
+          ),
+        );
+  }
+
+  ScanSession _sessionWithEventForRole(
+    CaptureEventType type,
+    String imageRole,
+  ) {
+    return _ensureSession().addEvent(
+      CaptureEvent(
+        type: type,
+        timestamp: DateTime.now(),
+        role: ScanCaptureRole.fromId(imageRole).id,
+      ),
+    );
+  }
+
+  ScanSession _sessionWithAnalyzeCompleted({
+    required double confidenceAchieved,
+  }) {
+    final session = _ensureSession();
+    return session
+        .copyWith(
+          confidenceAchieved: confidenceAchieved,
+          endTime: DateTime.now(),
+        )
+        .addEvent(
+          CaptureEvent(
+            type: CaptureEventType.analyzeCompleted,
+            timestamp: DateTime.now(),
+            metadata: {'confidenceAchieved': confidenceAchieved},
+          ),
+        )
+        .addEvent(
+          CaptureEvent(
+            type: CaptureEventType.sessionCompleted,
+            timestamp: DateTime.now(),
+          ),
+        );
+  }
+
+  List<CapturedScanImage> _capturedImagesFromSlots(
+    Map<String, ScannerPhotoSlot> slots,
+  ) {
+    return [
+      for (final slot in slots.values)
+        CapturedScanImage(
+          path: slot.path,
+          role: ScanCaptureRole.fromId(slot.role),
+          source: slot.source,
+          qualityMetadata: slot.qualityMetadata,
+        ),
+    ];
+  }
+
+  Future<ScanQualityEvaluation> _evaluateImageQuality(String imagePath) {
+    return _qualityGateService.evaluateFile(imagePath);
+  }
+
+  Map<String, Object?> _analyzeMetadata() {
+    final session = _ensureSession().addEvent(
+      CaptureEvent(
+        type: CaptureEventType.analyzeTriggered,
+        timestamp: DateTime.now(),
+      ),
+    );
+    _setState(state.copyWith(scanSession: session), event: 'analyze event');
+    final confidence = ConfidenceModel(
+      confidenceTarget: session.confidenceTarget,
+      confidenceAchieved: session.confidenceAchieved,
+    );
+    return {
+      'scanGoal': session.scanGoal.id,
+      'confidenceTarget': session.confidenceTarget,
+      'confidenceAchieved': session.confidenceAchieved,
+      'confidenceDeltaFromTarget': confidence.deltaFromTarget,
+      'scannerUxVersion': scannerUxVersion,
+      'sessionId': session.sessionId,
+      'qualityMetadata': {
+        for (final image in session.capturedImages)
+          image.role.id: image.qualityMetadata,
+      },
     };
   }
 
+  String _normalizeImageRole(String value) {
+    return ScanCaptureRole.fromId(value).id;
+  }
+
   String _slotLabel(String role) {
-    return switch (_normalizeImageRole(role)) {
-      'front' => 'Front / Obverse',
-      'back' => 'Back / Reverse',
-      'closeup' => 'Close-up / detail',
-      'packaging' => 'Packaging',
-      _ => 'Other',
-    };
+    return ScanCaptureRole.fromId(role).title;
   }
 
   String _selectedTitleForRole({

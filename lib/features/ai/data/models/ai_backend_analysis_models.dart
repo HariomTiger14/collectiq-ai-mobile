@@ -17,6 +17,10 @@ class AiBackendAnalysisRequest {
     this.appVersion,
     this.deviceMetadata = const {},
     this.images = const [],
+    this.scanGoal,
+    this.confidenceTarget,
+    this.scannerUxVersion,
+    this.qualityMetadata = const {},
   });
 
   final String imagePath;
@@ -26,6 +30,10 @@ class AiBackendAnalysisRequest {
   final String? appVersion;
   final Map<String, String> deviceMetadata;
   final List<AiBackendAnalysisImage> images;
+  final String? scanGoal;
+  final double? confidenceTarget;
+  final String? scannerUxVersion;
+  final Map<String, Object?> qualityMetadata;
 
   Map<String, dynamic> toJson() {
     return {
@@ -34,6 +42,10 @@ class AiBackendAnalysisRequest {
       'requestedCategory': requestedCategory,
       'appVersion': appVersion,
       'deviceMetadata': deviceMetadata,
+      if (scanGoal != null) 'scanGoal': scanGoal,
+      if (confidenceTarget != null) 'confidenceTarget': confidenceTarget,
+      if (scannerUxVersion != null) 'scannerUxVersion': scannerUxVersion,
+      if (qualityMetadata.isNotEmpty) 'qualityMetadata': qualityMetadata,
       'timestamp': timestamp.toIso8601String(),
       if (images.isNotEmpty)
         'images': [for (final image in images) image.toJson()],
