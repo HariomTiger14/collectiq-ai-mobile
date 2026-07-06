@@ -25,6 +25,7 @@ class NoopAiBackendApiService implements AiBackendApiService {
   Future<AiBackendAnalysisResponse> analyzeImage({
     required AiBackendAnalysisRequest request,
     required AiImageUploadPayload imagePayload,
+    List<AiImageUploadPayload> imagePayloads = const [],
   }) async {
     final response = injectedResponse;
     if (response != null) {

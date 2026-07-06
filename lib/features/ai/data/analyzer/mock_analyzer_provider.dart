@@ -3,6 +3,7 @@ import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_provider.dart'
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
 import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
+import 'package:flutter/foundation.dart';
 
 /// Production analyzer provider for the current mock/backend-SIT path.
 class MockAnalyzerProvider implements AnalyzerProvider {
@@ -10,11 +11,13 @@ class MockAnalyzerProvider implements AnalyzerProvider {
     required this.analysisProvider,
     required this.backendClient,
     this.useBackendContract = false,
+    this.localFallbackReason,
   });
 
   final AiAnalysisProvider analysisProvider;
   final AiBackendClient backendClient;
   final bool useBackendContract;
+  final String? localFallbackReason;
 
   @override
   String get id => AnalyzerProviderType.mock.configValue;
@@ -33,6 +36,10 @@ class MockAnalyzerProvider implements AnalyzerProvider {
     );
 
     if (useBackendContract) {
+      _logAnalyzerTrace(
+        'request-start provider=$id path=remote_backend_contract '
+        'imageSource=${_imageSourceFor(request)}',
+      );
       final response = await backendClient.analyze(
         AiBackendAnalysisRequest(
           imagePath: request.imagePath,
@@ -42,6 +49,14 @@ class MockAnalyzerProvider implements AnalyzerProvider {
             'requestedCategory',
           ),
           timestamp: DateTime.now(),
+          images: [
+            for (final image in request.images)
+              AiBackendAnalysisImage(
+                imagePath: image.path,
+                imageSource: image.source ?? _imageSourceFor(request),
+                imageRole: image.role,
+              ),
+          ],
         ),
       );
       request.cancellationToken?.throwIfCancelled();
@@ -51,10 +66,20 @@ class MockAnalyzerProvider implements AnalyzerProvider {
           scanResult: response.toScanResult(thumbnail: request.imagePath),
           recommendation: response.recommendation,
         ),
-        rawProviderPayload: {'provider': id, 'contract': 'POST /analyze'},
+        rawProviderPayload: {
+          'provider': id,
+          'analysisPath': 'remote_backend_contract',
+          'contract': 'POST /analyze',
+          ...response.rawProviderPayload,
+        },
       );
     }
 
+    final fallbackReason =
+        localFallbackReason ?? 'backend_contract_disabled_for_provider';
+    _logAnalyzerTrace(
+      'request-start provider=$id path=local_mock fallbackReason=$fallbackReason',
+    );
     final result = await analysisProvider.analyze(
       AiAnalysisRequest(
         imagePath: request.imagePath,
@@ -66,7 +91,11 @@ class MockAnalyzerProvider implements AnalyzerProvider {
 
     return AnalyzerResponse.fromAiAnalysisResult(
       result,
-      rawProviderPayload: {'provider': id},
+      rawProviderPayload: {
+        'provider': id,
+        'analysisPath': 'local_mock',
+        'fallbackReason': fallbackReason,
+      },
     );
   }
 
@@ -103,5 +132,12 @@ class MockAnalyzerProvider implements AnalyzerProvider {
     }
 
     return value.trim();
+  }
+
+  void _logAnalyzerTrace(String message) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[AnalyzerTrace] $message');
   }
 }

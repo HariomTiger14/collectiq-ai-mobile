@@ -10,5 +10,6 @@ abstract interface class AiBackendApiService {
   Future<AiBackendAnalysisResponse> analyzeImage({
     required AiBackendAnalysisRequest request,
     required AiImageUploadPayload imagePayload,
+    List<AiImageUploadPayload> imagePayloads = const [],
   });
 }

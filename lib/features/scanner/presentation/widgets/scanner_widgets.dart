@@ -420,15 +420,16 @@ class ScanPreparingImageCard extends StatelessWidget {
   }
 }
 
-class ScanErrorPanel extends StatelessWidget {
+class ScanErrorPanel extends ConsumerWidget {
   const ScanErrorPanel({required this.message, super.key});
 
   final String message;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final scannerController = ref.read(scannerControllerProvider.notifier);
 
     return Container(
       width: double.infinity,
@@ -438,31 +439,71 @@ class ScanErrorPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: colorScheme.error.withValues(alpha: 0.22)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: colorScheme.error),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Scan interrupted',
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: colorScheme.onErrorContainer,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.error_outline, color: colorScheme.error),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'We need a clearer photo',
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Try better lighting or include the full item.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      message,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onErrorContainer.withValues(
+                          alpha: 0.82,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  message,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onErrorContainer,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: scannerController.analyzeWithAi,
+                icon: const Icon(Icons.refresh_outlined),
+                label: const Text('Try Again'),
+              ),
+              OutlinedButton.icon(
+                onPressed: scannerController.pickImageFromGallery,
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Choose Another Photo'),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  ref
+                      .read(appShellTabControllerProvider.notifier)
+                      .selectTab(AppShellTabController.homeTab);
+                },
+                icon: const Icon(Icons.home_outlined),
+                label: const Text('Back to Home'),
+              ),
+            ],
           ),
         ],
       ),
@@ -933,6 +974,9 @@ class AiResultCard extends ConsumerWidget {
     required this.estimatedValue,
     required this.confidence,
     required this.condition,
+    required this.imagePath,
+    required this.confidenceScore,
+    required this.rawEstimatedValue,
     required this.primaryMatch,
     required this.alternativeMatches,
     required this.confidenceExplanation,
@@ -942,6 +986,7 @@ class AiResultCard extends ConsumerWidget {
     this.marketSummary,
     required this.recommendation,
     required this.isSaved,
+    required this.isSaving,
     required this.onScanAnother,
     this.onViewPortfolio,
     this.year,
@@ -958,6 +1003,12 @@ class AiResultCard extends ConsumerWidget {
     this.mint,
     this.material,
     this.notes,
+    this.photosUsed,
+    this.photoRoles = const [],
+    this.faceValue,
+    this.estimatedMarketValue,
+    this.askingPriceWarning,
+    this.valuationConfidence,
     super.key,
   });
 
@@ -975,6 +1026,15 @@ class AiResultCard extends ConsumerWidget {
 
   /// Result condition.
   final String condition;
+
+  /// Selected image shown in the review.
+  final String imagePath;
+
+  /// Raw confidence value from 0.0 to 1.0.
+  final double confidenceScore;
+
+  /// Raw value used for edit-before-save.
+  final double rawEstimatedValue;
 
   /// Primary AI match label.
   final String primaryMatch;
@@ -1000,6 +1060,7 @@ class AiResultCard extends ConsumerWidget {
   final MarketSummary? marketSummary;
 
   final bool isSaved;
+  final bool isSaving;
   final VoidCallback? onViewPortfolio;
   final VoidCallback onScanAnother;
 
@@ -1017,6 +1078,12 @@ class AiResultCard extends ConsumerWidget {
   final String? mint;
   final String? material;
   final String? notes;
+  final int? photosUsed;
+  final List<String> photoRoles;
+  final double? faceValue;
+  final double? estimatedMarketValue;
+  final String? askingPriceWarning;
+  final double? valuationConfidence;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1024,20 +1091,31 @@ class AiResultCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final scannerController = ref.read(scannerControllerProvider.notifier);
     final collectibleDetails = _metadataRows();
-    final trendLabel = marketSummary?.trendLabel ?? 'Stable';
     final valueRange =
         '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}';
     final freshnessLabel = _formatPricingDate(pricing.lastUpdated);
+    final confidenceBand = _confidenceBand(confidenceScore);
+    final itemTitle = _reviewValue(item, 'Needs review');
+    final categoryLabel = _reviewValue(category, 'Unknown');
+    final conditionLabel = _reviewValue(condition, 'Not detected');
+    final yearLabel = _reviewValue(year, 'Unknown');
+    final brandLabel = _reviewValue(brand, 'Not detected');
+    final aiExplanation = _buildAiExplanation(
+      confidenceScore: confidenceScore,
+      brand: brand,
+      category: category,
+      condition: condition,
+      year: year,
+    );
     final keyAttributes = [
-      _MetadataDetail('Category', category),
-      _MetadataDetail('Condition', condition),
-      _MetadataDetail('Trend', trendLabel),
+      _MetadataDetail('Category', categoryLabel),
+      _MetadataDetail('Condition', conditionLabel),
       _MetadataDetail('Rarity', rarity),
-      _MetadataDetail('Year', year),
-      _MetadataDetail('Brand', brand),
+      _MetadataDetail('Year', yearLabel),
+      _MetadataDetail('Brand', brandLabel),
       _MetadataDetail('Set', setName),
       _MetadataDetail('Character', playerOrCharacter),
-    ].where((detail) => detail.value.trim().isNotEmpty).take(6).toList();
+    ].take(6).toList();
 
     return _FadeSlideIn(
       child: Container(
@@ -1052,86 +1130,17 @@ class AiResultCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primary,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    boxShadow: AppElevation.accentGlow,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_outlined,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Analysis Result',
-                        style: textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Primary match and market estimate',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AppTwoLineTitle(
-              item,
-              style: textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                height: 1.12,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              primaryMatch,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AppPriceHero(
-              label: 'Estimated market value',
-              value: estimatedValue,
-              subtitle: 'Estimated value range: $valueRange',
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _ResultBadgeWrap(
-              badges: [
-                _ResultBadgeData(
-                  icon: Icons.verified_outlined,
-                  label: '$confidence confidence',
-                  color: colorScheme.primary,
-                ),
-                _ResultBadgeData(
-                  icon: Icons.grade_outlined,
-                  label: condition,
-                  color: AppColors.success,
-                ),
-                _ResultBadgeData(
-                  icon: Icons.trending_up_outlined,
-                  label: 'Market trend: $trendLabel',
-                  color: AppColors.secondaryAccent,
-                ),
-              ],
+            _ScanResultHero(
+              imagePath: imagePath,
+              item: itemTitle,
+              primaryMatch: primaryMatch,
+              estimatedValue: estimatedValue,
+              confidence: confidence,
+              confidenceBand: confidenceBand,
+              category: categoryLabel,
+              condition: conditionLabel,
+              year: yearLabel,
+              brand: brandLabel,
             ),
             const SizedBox(height: AppSpacing.lg),
             _TrustSummaryCard(
@@ -1139,12 +1148,18 @@ class AiResultCard extends ConsumerWidget {
               freshnessLabel: freshnessLabel,
               pricingConfidence:
                   '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+              photosUsed: photosUsed,
+              photoRoles: photoRoles,
+              faceValue: faceValue,
+              estimatedMarketValue: estimatedMarketValue,
+              askingPriceWarning: askingPriceWarning,
+              valuationConfidence: valuationConfidence,
             ),
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: isSaved
+                onPressed: isSaved || isSaving
                     ? null
                     : () async {
                         final didSave = await scannerController
@@ -1155,12 +1170,18 @@ class AiResultCard extends ConsumerWidget {
                         _showScannerSnackBar(context, 'Saved to portfolio');
                       },
                 icon: Icon(
-                  isSaved
+                  isSaving
+                      ? Icons.hourglass_top_outlined
+                      : isSaved
                       ? Icons.check_circle_outline
                       : Icons.bookmark_add_outlined,
                 ),
                 label: Text(
-                  isSaved ? 'Saved to Portfolio' : 'Save to Portfolio',
+                  isSaving
+                      ? 'Saving...'
+                      : isSaved
+                      ? 'Saved to Portfolio'
+                      : 'Save to Portfolio',
                 ),
               ),
             ),
@@ -1175,12 +1196,55 @@ class AiResultCard extends ConsumerWidget {
                 ),
               ),
             ],
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isSaved
+                        ? null
+                        : () => _showEditResultSheet(
+                            context,
+                            ref,
+                            title: item,
+                            category: category,
+                            condition: condition,
+                            estimatedValue: rawEstimatedValue,
+                            notes: notes,
+                          ),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Details'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => _showScannerSnackBar(
+                      context,
+                      'Retry analysis coming soon',
+                    ),
+                    icon: const Icon(Icons.refresh_outlined),
+                    label: const Text('Retry Analysis'),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               'AI estimates are a starting point. Verify identity, condition, and recent market comps before buying, selling, or grading.',
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ResultSectionCard(
+              title: 'AI Explanation',
+              icon: Icons.psychology_alt_outlined,
+              child: _AiReviewSection(
+                title: confidenceBand.label,
+                body:
+                    '$aiExplanation\n\nReview year, variant, and condition before saving.',
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1300,12 +1364,491 @@ class AiResultCard extends ConsumerWidget {
   }
 }
 
+class _ScanResultHero extends StatelessWidget {
+  const _ScanResultHero({
+    required this.imagePath,
+    required this.item,
+    required this.primaryMatch,
+    required this.estimatedValue,
+    required this.confidence,
+    required this.confidenceBand,
+    required this.category,
+    required this.condition,
+    required this.year,
+    required this.brand,
+  });
+
+  final String imagePath;
+  final String item;
+  final String primaryMatch;
+  final String estimatedValue;
+  final String confidence;
+  final _ConfidenceBand confidenceBand;
+  final String category;
+  final String condition;
+  final String year;
+  final String brand;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: ColoredBox(
+                color: colorScheme.surfaceContainerHighest,
+                child: _ScanPreviewThumbnail(
+                  imagePath: imagePath,
+                  colorScheme: colorScheme,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: AppGradients.primary,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  boxShadow: AppElevation.accentGlow,
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Review',
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    AppTwoLineTitle(
+                      item,
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1.12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            primaryMatch.trim().isEmpty
+                ? 'Primary match needs review'
+                : primaryMatch,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _ReviewValuePanel(
+            label: 'Estimated value',
+            value: estimatedValue,
+            icon: Icons.paid_outlined,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _ResultBadgeWrap(
+            badges: [
+              _ResultBadgeData(
+                icon: confidenceBand.icon,
+                label: '${confidenceBand.label} ($confidence)',
+                color: confidenceBand.color,
+              ),
+              _ResultBadgeData(
+                icon: Icons.category_outlined,
+                label: category,
+                color: colorScheme.primary,
+              ),
+              _ResultBadgeData(
+                icon: Icons.grade_outlined,
+                label: condition,
+                color: AppColors.success,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _KeyAttributesGrid(
+            items: [
+              _MetadataDetail('Category', category),
+              _MetadataDetail('Condition', condition),
+              _MetadataDetail('Year', year),
+              _MetadataDetail('Brand', brand),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewValuePanel extends StatelessWidget {
+  const _ReviewValuePanel({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: AppGradients.primary,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        boxShadow: AppElevation.accentGlow,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfidenceBand {
+  const _ConfidenceBand({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+}
+
+_ConfidenceBand _confidenceBand(double confidence) {
+  if (confidence >= 0.85) {
+    return const _ConfidenceBand(
+      label: 'High confidence',
+      color: AppColors.success,
+      icon: Icons.verified_outlined,
+    );
+  }
+  if (confidence >= 0.70) {
+    return const _ConfidenceBand(
+      label: 'Medium confidence',
+      color: AppColors.secondaryAccent,
+      icon: Icons.fact_check_outlined,
+    );
+  }
+  return const _ConfidenceBand(
+    label: 'Needs review',
+    color: Color(0xFFF59E0B),
+    icon: Icons.report_problem_outlined,
+  );
+}
+
+String _reviewValue(String? value, String fallback) {
+  final normalized = value?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return fallback;
+  }
+  return normalized;
+}
+
+String _buildAiExplanation({
+  required double confidenceScore,
+  required String? brand,
+  required String? category,
+  required String? condition,
+  required String? year,
+}) {
+  final hasBrand = brand != null && brand.trim().isNotEmpty;
+  final hasCategory = category != null && category.trim().isNotEmpty;
+  final hasCondition = condition != null && condition.trim().isNotEmpty;
+  final hasYear = year != null && year.trim().isNotEmpty;
+
+  if (confidenceScore < 0.70) {
+    return 'Confidence is lower because some details are unclear in the image.';
+  }
+
+  if (hasBrand && hasCategory && hasCondition) {
+    return 'Identified from visible branding, category cues, and item condition.';
+  }
+
+  if (hasCategory || hasYear) {
+    return 'Identified from visible category cues and collectible details.';
+  }
+
+  return 'Identified from the available image details.';
+}
+
+Future<void> _showEditResultSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  required String title,
+  required String category,
+  required String condition,
+  required double estimatedValue,
+  required String? notes,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      return _EditResultSheet(
+        title: title,
+        category: category,
+        condition: condition,
+        estimatedValue: estimatedValue,
+        notes: notes,
+        onApply:
+            ({
+              required title,
+              required category,
+              required condition,
+              required estimatedValue,
+              required notes,
+            }) {
+              ref
+                  .read(scannerControllerProvider.notifier)
+                  .applyResultReviewEdits(
+                    title: title,
+                    category: category,
+                    condition: condition,
+                    estimatedValue: estimatedValue,
+                    notes: notes,
+                  );
+              Navigator.of(sheetContext).pop();
+              _showScannerSnackBar(context, 'Details updated');
+            },
+      );
+    },
+  );
+}
+
+class _EditResultSheet extends StatefulWidget {
+  const _EditResultSheet({
+    required this.title,
+    required this.category,
+    required this.condition,
+    required this.estimatedValue,
+    required this.notes,
+    required this.onApply,
+  });
+
+  final String title;
+  final String category;
+  final String condition;
+  final double estimatedValue;
+  final String? notes;
+  final void Function({
+    required String title,
+    required String category,
+    required String condition,
+    required double estimatedValue,
+    required String? notes,
+  })
+  onApply;
+
+  @override
+  State<_EditResultSheet> createState() => _EditResultSheetState();
+}
+
+class _EditResultSheetState extends State<_EditResultSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _conditionController;
+  late final TextEditingController _valueController;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.title);
+    _categoryController = TextEditingController(text: widget.category);
+    _conditionController = TextEditingController(text: widget.condition);
+    _valueController = TextEditingController(
+      text: widget.estimatedValue > 0
+          ? widget.estimatedValue.toStringAsFixed(0)
+          : '',
+    );
+    _notesController = TextEditingController(text: widget.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _categoryController.dispose();
+    _conditionController.dispose();
+    _valueController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Edit Details',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Review the AI result before saving it to your portfolio.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _titleController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _categoryController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Category'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _conditionController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Condition'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _valueController,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Estimated value',
+                prefixText: r'$',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _notesController,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Notes'),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  final parsedValue =
+                      double.tryParse(_valueController.text.trim()) ??
+                      widget.estimatedValue;
+                  widget.onApply(
+                    title: _titleController.text,
+                    category: _categoryController.text,
+                    condition: _conditionController.text,
+                    estimatedValue: parsedValue,
+                    notes: _notesController.text,
+                  );
+                },
+                icon: const Icon(Icons.check_outlined),
+                label: const Text('Apply Changes'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 String _formatMoney(double value, String currency) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
+
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
+  if (currency.toUpperCase() == 'AUD' || currency.trim().isEmpty) {
+    return '\$$withCommas';
+  }
   return '$currency $withCommas';
 }
 
@@ -1343,16 +1886,35 @@ class _TrustSummaryCard extends StatelessWidget {
     required this.pricingSource,
     required this.freshnessLabel,
     required this.pricingConfidence,
+    this.photosUsed,
+    this.photoRoles = const [],
+    this.faceValue,
+    this.estimatedMarketValue,
+    this.askingPriceWarning,
+    this.valuationConfidence,
   });
 
   final String pricingSource;
   final String freshnessLabel;
   final String pricingConfidence;
+  final int? photosUsed;
+  final List<String> photoRoles;
+  final double? faceValue;
+  final double? estimatedMarketValue;
+  final String? askingPriceWarning;
+  final double? valuationConfidence;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final hasFrontBack =
+        photoRoles.contains('front') && photoRoles.contains('back');
+    final usedLabel = hasFrontBack
+        ? 'Front + Back supplied'
+        : 'Photos used: ${photosUsed ?? photoRoles.length}/2';
+    final missingPhotoWarning =
+        !hasFrontBack && (photoRoles.isNotEmpty || (photosUsed ?? 0) > 0);
 
     return Container(
       width: double.infinity,
@@ -1386,9 +1948,77 @@ class _TrustSummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           AppLabelValueRow(label: 'Pricing source', value: pricingSource),
           AppLabelValueRow(label: 'Freshness', value: freshnessLabel),
+          AppLabelValueRow(label: 'Photos used', value: usedLabel),
+          if (faceValue != null && faceValue! > 0)
+            AppLabelValueRow(
+              label: 'Face value',
+              value: _formatMoney(faceValue!, 'AUD'),
+            ),
+          if (estimatedMarketValue != null)
+            AppLabelValueRow(
+              label: 'Market value',
+              value: estimatedMarketValue! <= 0
+                  ? 'Insufficient evidence'
+                  : _formatMoney(estimatedMarketValue!, 'AUD'),
+            ),
           AppLabelValueRow(
             label: 'Pricing confidence',
             value: pricingConfidence,
+          ),
+          if (valuationConfidence != null)
+            AppLabelValueRow(
+              label: 'Valuation confidence',
+              value: '${(valuationConfidence! * 100).toStringAsFixed(0)}%',
+            ),
+          if (missingPhotoWarning) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _AccuracyWarning(
+              message:
+                  'Accuracy warning: add front and back photos for stronger coin and card analysis.',
+            ),
+          ],
+          if (askingPriceWarning != null &&
+              askingPriceWarning!.trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _AccuracyWarning(message: askingPriceWarning!.trim()),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccuracyWarning extends StatelessWidget {
+  const _AccuracyWarning({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: colorScheme.tertiary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onTertiaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

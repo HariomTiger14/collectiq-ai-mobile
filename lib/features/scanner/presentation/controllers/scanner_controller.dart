@@ -4,12 +4,16 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/config/feature_flags.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/network/api_constants.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_service.dart';
+import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/ai/services/ai_providers.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
@@ -26,6 +30,22 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+class ScannerPhotoSlot {
+  const ScannerPhotoSlot({
+    required this.role,
+    required this.label,
+    required this.path,
+    required this.source,
+    this.image,
+  });
+
+  final String role;
+  final String label;
+  final String path;
+  final String source;
+  final XFile? image;
+}
+
 /// Immutable presentation state for the scanner workflow.
 class ScannerState {
   /// Creates scanner state.
@@ -37,9 +57,11 @@ class ScannerState {
     this.selectedImagePath,
     this.selectedItemTitle,
     this.selectedItemStatus,
+    this.photoSlots = const {},
     this.scanResult,
     this.aiRecommendation,
     this.isSavedToPortfolio = false,
+    this.isSavingToPortfolio = false,
     this.errorMessage,
   });
 
@@ -64,6 +86,8 @@ class ScannerState {
   /// Display status for the currently selected scan preview item.
   final String? selectedItemStatus;
 
+  final Map<String, ScannerPhotoSlot> photoSlots;
+
   /// Latest scan result, once AI scanning is implemented.
   final ScanResult? scanResult;
 
@@ -72,6 +96,9 @@ class ScannerState {
 
   /// Whether the current result has already been saved.
   final bool isSavedToPortfolio;
+
+  /// Whether the current result is being saved.
+  final bool isSavingToPortfolio;
 
   /// Latest user-safe scanner error message.
   final String? errorMessage;
@@ -85,14 +112,17 @@ class ScannerState {
     String? selectedImagePath,
     String? selectedItemTitle,
     String? selectedItemStatus,
+    Map<String, ScannerPhotoSlot>? photoSlots,
     ScanResult? scanResult,
     String? aiRecommendation,
     bool? isSavedToPortfolio,
+    bool? isSavingToPortfolio,
     String? errorMessage,
     bool clearSelectedImage = false,
     bool clearSelectedImagePath = false,
     bool clearSelectedItemTitle = false,
     bool clearSelectedItemStatus = false,
+    bool clearPhotoSlots = false,
     bool clearScanResult = false,
     bool clearAiRecommendation = false,
     bool clearErrorMessage = false,
@@ -113,11 +143,13 @@ class ScannerState {
       selectedItemStatus: clearSelectedItemStatus
           ? null
           : selectedItemStatus ?? this.selectedItemStatus,
+      photoSlots: clearPhotoSlots ? const {} : photoSlots ?? this.photoSlots,
       scanResult: clearScanResult ? null : scanResult ?? this.scanResult,
       aiRecommendation: clearAiRecommendation
           ? null
           : aiRecommendation ?? this.aiRecommendation,
       isSavedToPortfolio: isSavedToPortfolio ?? this.isSavedToPortfolio,
+      isSavingToPortfolio: isSavingToPortfolio ?? this.isSavingToPortfolio,
       errorMessage: clearErrorMessage
           ? null
           : errorMessage ?? this.errorMessage,
@@ -270,7 +302,10 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   /// Opens the camera capture page and stores the captured image path.
-  Future<void> startCameraScan(BuildContext context) async {
+  Future<void> startCameraScan(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) async {
     _logFlow('camera button tapped');
     _trackTelemetry(
       TelemetryEventNames.scanStarted,
@@ -294,10 +329,23 @@ class ScannerController extends Notifier<ScannerState> {
       event: 'camera loading shell emitted',
     );
     try {
-      final capturedImage = await _cameraService.pickImageFromCamera();
+      final captureResult = await _cameraService.captureWithInAppCamera(
+        context,
+        imageRole: imageRole,
+      );
       if (_isDisposed) {
         return;
       }
+      if (captureResult?.openGallery ?? false) {
+        _isPickerActive = false;
+        _setState(
+          state.copyWith(isPreparingImage: false, isLoading: false),
+          event: 'camera gallery fallback requested',
+        );
+        await pickImageFromGallery(imageRole: imageRole);
+        return;
+      }
+      final capturedImage = captureResult?.image;
       debugPrint(
         '[Scanner] camera picker returned on tab '
         '${ref.read(appShellTabControllerProvider)}',
@@ -351,8 +399,17 @@ class ScannerController extends Notifier<ScannerState> {
         state.copyWith(
           selectedImage: image,
           selectedImagePath: selectedImagePath,
-          selectedItemTitle: 'Captured image',
+          selectedItemTitle: _selectedTitleForRole(
+            imageRole: imageRole,
+            source: 'camera',
+          ),
           selectedItemStatus: 'Ready for AI analysis',
+          photoSlots: _updatedPhotoSlots(
+            imageRole: imageRole,
+            path: selectedImagePath,
+            source: 'camera',
+            image: image,
+          ),
           isPreparingImage: false,
           clearScanResult: true,
           clearAiRecommendation: true,
@@ -421,6 +478,14 @@ class ScannerController extends Notifier<ScannerState> {
       selectedImagePath: 'sample://sports-card',
       selectedItemTitle: 'Sample Sports Card',
       selectedItemStatus: 'Ready for AI analysis',
+      photoSlots: {
+        'front': const ScannerPhotoSlot(
+          role: 'front',
+          label: 'Front / Obverse',
+          path: 'sample://sports-card',
+          source: 'sample',
+        ),
+      },
       clearSelectedImage: true,
       clearScanResult: true,
       clearAiRecommendation: true,
@@ -430,7 +495,7 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   /// Opens the gallery and stores a validated selected image.
-  Future<void> pickImageFromGallery() async {
+  Future<void> pickImageFromGallery({String imageRole = 'front'}) async {
     _logFlow('gallery button tapped');
     _trackTelemetry(
       TelemetryEventNames.scanStarted,
@@ -514,8 +579,17 @@ class ScannerController extends Notifier<ScannerState> {
         state.copyWith(
           selectedImage: persistedImage,
           selectedImagePath: selectedImagePath,
-          selectedItemTitle: 'Gallery image',
+          selectedItemTitle: _selectedTitleForRole(
+            imageRole: imageRole,
+            source: 'gallery',
+          ),
           selectedItemStatus: 'Ready for AI analysis',
+          photoSlots: _updatedPhotoSlots(
+            imageRole: imageRole,
+            path: selectedImagePath,
+            source: 'gallery',
+            image: persistedImage,
+          ),
           isPreparingImage: false,
           clearScanResult: true,
           clearAiRecommendation: true,
@@ -680,6 +754,10 @@ class ScannerController extends Notifier<ScannerState> {
   /// Runs AI analysis for the selected scan preview.
   Future<void> analyzeWithAi() async {
     debugPrint('[Scanner] analyze start');
+    if (state.isLoading || state.isPreparingImage) {
+      _logFlow('analyze ignored while busy');
+      return;
+    }
     final scanToResultStopwatch = Stopwatch()..start();
     _logFlow('analyze tapped');
     _trackTelemetry(
@@ -740,21 +818,47 @@ class ScannerController extends Notifier<ScannerState> {
       ),
     );
     try {
+      _logAnalyzerRuntimeConfig();
       final aiStopwatch = Stopwatch()..start();
       final analyzerResponse = await _analyzerService.analyze(
         AnalyzerRequest(
           imagePath: selectedImagePath,
           image: state.selectedImage,
+          images: [
+            for (final slot in state.photoSlots.values)
+              if (!slot.path.startsWith('sample://'))
+                AnalyzerImageInput(
+                  path: slot.path,
+                  role: slot.role,
+                  image: slot.image,
+                  source: slot.source,
+                ),
+          ],
           metadata: {
             'selectedItemTitle': state.selectedItemTitle,
             'selectedItemStatus': state.selectedItemStatus,
+            'imageCount': state.photoSlots.length,
+            'imageRoles': state.photoSlots.keys.join(','),
           },
         ),
       );
       final analysis = analyzerResponse.toAiAnalysisResult();
+      final localPhotoRoles = [
+        for (final slot in state.photoSlots.values)
+          if (!slot.path.startsWith('sample://')) slot.role,
+      ];
       aiStopwatch.stop();
       debugPrint(
         '[Scanner] AI analysis latencyMs=${aiStopwatch.elapsedMilliseconds}',
+      );
+      debugPrint(
+        '[AnalyzerTrace] response-mapped '
+        'analysisPath=${analyzerResponse.rawProviderPayload['analysisPath'] ?? 'unknown'} '
+        'provider=${analyzerResponse.rawProviderPayload['provider'] ?? 'unknown'} '
+        'selectedProvider=${analyzerResponse.rawProviderPayload['selectedProvider'] ?? 'unknown'} '
+        'requestedProvider=${analyzerResponse.rawProviderPayload['requestedProvider'] ?? 'unknown'} '
+        'title="${analyzerResponse.title}" '
+        'category=${analyzerResponse.category}',
       );
       final enrichmentStopwatch = Stopwatch()..start();
       final enrichedAnalysis = await _enrichmentService.enrich(
@@ -769,9 +873,16 @@ class ScannerController extends Notifier<ScannerState> {
         '[Scanner] pricing enrichment latencyMs='
         '${enrichmentStopwatch.elapsedMilliseconds}',
       );
+      final enrichedScanResult = enrichedAnalysis.scanResult;
+      final scanResultWithPhotoMetadata = enrichedScanResult.copyWith(
+        photosUsed: enrichedScanResult.photosUsed ?? localPhotoRoles.length,
+        photoRoles: enrichedScanResult.photoRoles.isNotEmpty
+            ? enrichedScanResult.photoRoles
+            : localPhotoRoles,
+      );
       _setState(
         state.copyWith(
-          scanResult: enrichedAnalysis.scanResult,
+          scanResult: scanResultWithPhotoMetadata,
           aiRecommendation: enrichedAnalysis.recommendation,
           isSavedToPortfolio: false,
         ),
@@ -793,6 +904,10 @@ class ScannerController extends Notifier<ScannerState> {
         '${scanToResultStopwatch.elapsedMilliseconds}',
       );
     } on AnalyzerException catch (error) {
+      debugPrint(
+        '[AnalyzerTrace] request-failed type=${error.type.name} '
+        'status=${error.statusCode ?? 0} message="${error.message}"',
+      );
       ref.read(scanPipelineStatusProvider.notifier).markError();
       _trackTelemetry(
         TelemetryEventNames.analyzeFailed,
@@ -862,15 +977,58 @@ class ScannerController extends Notifier<ScannerState> {
     }
   }
 
+  void _logAnalyzerRuntimeConfig() {
+    final environmentConfig = EnvironmentConfig.fromEnvironment();
+    final flags = FeatureFlags.fromEnvironment();
+    final supabaseConfig = SupabaseConfig.fromEnvironment();
+    final aiConfig = AiAnalysisProviderConfig.fromEnvironment();
+    final analyzerConfig = AnalyzerConfig.fromEnvironment();
+    debugPrint(
+      '[AnalyzerTrace] runtime-config '
+      'APP_ENV=${environmentConfig.environment.name} '
+      'USE_CLOUD_AUTH=${flags.useCloudAuth} '
+      'USE_CLOUD_PORTFOLIO_SYNC=${flags.useCloudPortfolioSync} '
+      'USE_CLOUD_IMAGE_STORAGE=${flags.useCloudImageStorage} '
+      'SUPABASE_ENABLED=${supabaseConfig.isEnabled} '
+      'SUPABASE_URL_CONFIGURED=${supabaseConfig.hasUrl} '
+      'SUPABASE_ANON_KEY_CONFIGURED=${supabaseConfig.hasAnonKey} '
+      'SUPABASE_ANON_KEY_LENGTH=${supabaseConfig.anonKeyLength} '
+      'AI_ANALYSIS_PROVIDER=${aiConfig.type.configValue} '
+      'ANALYZER_PROVIDER=${analyzerConfig.providerType.configValue} '
+      'AI_BACKEND_ANALYSIS_ENDPOINT_URL=${_safeEndpoint(aiConfig.backendAnalysisEndpointUrl)} '
+      'API_BASE_URL=${_safeEndpoint(environmentConfig.baseUrl)}',
+    );
+  }
+
+  String _safeEndpoint(String endpoint) {
+    final trimmed = endpoint.trim();
+    if (trimmed.isEmpty) {
+      return '<empty>';
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return '<invalid>';
+    }
+    return Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: uri.path,
+    ).toString();
+  }
+
   /// Saves the latest scan result to the in-memory portfolio.
   Future<bool> saveScanResultToPortfolio() async {
     final result = state.scanResult;
-    if (result == null || state.isSavedToPortfolio) {
+    if (result == null ||
+        state.isSavedToPortfolio ||
+        state.isSavingToPortfolio) {
       return false;
     }
 
     debugPrint('[Scanner] Save to Portfolio tapped for result id=${result.id}');
     _logFlow('save tapped', details: {'scanResultId': result.id});
+    state = state.copyWith(isSavingToPortfolio: true);
     final item = CollectibleItem(
       id: result.id,
       title: result.title,
@@ -931,28 +1089,64 @@ class ScannerController extends Notifier<ScannerState> {
       '[Scanner] image file exists before save: '
       '${await _localFileExists(item.imagePath)}',
     );
-    await ref.read(portfolioControllerProvider.notifier).saveItem(item);
-    _logFlow('portfolio updated', details: {'itemId': item.id});
-    _trackCloudAnalytics(
-      'portfolio_item_saved',
-      properties: {
-        'category': item.category,
-        'source': _imageSourceFor(item.imagePath),
-      },
+    try {
+      await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+      _logFlow('portfolio updated', details: {'itemId': item.id});
+      _trackCloudAnalytics(
+        'portfolio_item_saved',
+        properties: {
+          'category': item.category,
+          'source': _imageSourceFor(item.imagePath),
+        },
+      );
+      _trackTelemetry(
+        TelemetryEventNames.saveToPortfolio,
+        properties: {
+          'category': item.category,
+          'source': _imageSourceFor(item.imagePath),
+        },
+      );
+      await ref
+          .read(imageSyncControllerProvider.notifier)
+          .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
+      unawaited(_syncSavedItemIfEnabled(itemId: item.id));
+      state = state.copyWith(
+        isSavedToPortfolio: true,
+        isSavingToPortfolio: false,
+      );
+      return true;
+    } catch (_) {
+      state = state.copyWith(isSavingToPortfolio: false);
+      rethrow;
+    }
+  }
+
+  /// Applies local-only review edits to the current scan result before saving.
+  void applyResultReviewEdits({
+    required String title,
+    required String category,
+    required String condition,
+    required double estimatedValue,
+    String? notes,
+  }) {
+    final result = state.scanResult;
+    if (result == null || state.isSavedToPortfolio) {
+      return;
+    }
+
+    state = state.copyWith(
+      scanResult: result.copyWith(
+        title: title.trim().isEmpty ? result.title : title.trim(),
+        category: category.trim().isEmpty ? result.category : category.trim(),
+        condition: condition.trim().isEmpty
+            ? result.condition
+            : condition.trim(),
+        estimatedValue: estimatedValue < 0
+            ? result.estimatedValue
+            : estimatedValue,
+        notes: notes?.trim(),
+      ),
     );
-    _trackTelemetry(
-      TelemetryEventNames.saveToPortfolio,
-      properties: {
-        'category': item.category,
-        'source': _imageSourceFor(item.imagePath),
-      },
-    );
-    await ref
-        .read(imageSyncControllerProvider.notifier)
-        .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
-    unawaited(_syncSavedItemIfEnabled(itemId: item.id));
-    state = state.copyWith(isSavedToPortfolio: true);
-    return true;
   }
 
   /// Clears the active scan so the user can start over.
@@ -964,6 +1158,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearSelectedImagePath: true,
       clearSelectedItemTitle: true,
       clearSelectedItemStatus: true,
+      clearPhotoSlots: true,
       clearScanResult: true,
       clearAiRecommendation: true,
       clearErrorMessage: true,
@@ -1007,6 +1202,62 @@ class ScannerController extends Notifier<ScannerState> {
     }
 
     return image.name.isEmpty ? 'selected-image' : image.name;
+  }
+
+  Map<String, ScannerPhotoSlot> _updatedPhotoSlots({
+    required String imageRole,
+    required String path,
+    required String source,
+    XFile? image,
+  }) {
+    final normalizedRole = _normalizeImageRole(imageRole);
+    return {
+      ...state.photoSlots,
+      normalizedRole: ScannerPhotoSlot(
+        role: normalizedRole,
+        label: _slotLabel(normalizedRole),
+        path: path,
+        source: source,
+        image: image,
+      ),
+    };
+  }
+
+  String _normalizeImageRole(String value) {
+    final normalized = value.trim().toLowerCase();
+    return switch (normalized) {
+      'obverse' || 'front' => 'front',
+      'reverse' || 'back' => 'back',
+      'close-up' ||
+      'closeup' ||
+      'detail' ||
+      'serial' ||
+      'signature' ||
+      'damage' => 'closeup',
+      'packaging' || 'package' => 'packaging',
+      _ => 'other',
+    };
+  }
+
+  String _slotLabel(String role) {
+    return switch (_normalizeImageRole(role)) {
+      'front' => 'Front / Obverse',
+      'back' => 'Back / Reverse',
+      'closeup' => 'Close-up / detail',
+      'packaging' => 'Packaging',
+      _ => 'Other',
+    };
+  }
+
+  String _selectedTitleForRole({
+    required String imageRole,
+    required String source,
+  }) {
+    final normalizedRole = _normalizeImageRole(imageRole);
+    if (normalizedRole == 'front') {
+      return source == 'camera' ? 'Captured image' : 'Gallery image';
+    }
+    return '${_slotLabel(normalizedRole)} photo';
   }
 
   Future<String?> _validateSelectedImagePath(String imagePath) async {

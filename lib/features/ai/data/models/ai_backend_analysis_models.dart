@@ -16,6 +16,7 @@ class AiBackendAnalysisRequest {
     this.requestedCategory,
     this.appVersion,
     this.deviceMetadata = const {},
+    this.images = const [],
   });
 
   final String imagePath;
@@ -24,6 +25,7 @@ class AiBackendAnalysisRequest {
   final String? requestedCategory;
   final String? appVersion;
   final Map<String, String> deviceMetadata;
+  final List<AiBackendAnalysisImage> images;
 
   Map<String, dynamic> toJson() {
     return {
@@ -33,6 +35,28 @@ class AiBackendAnalysisRequest {
       'appVersion': appVersion,
       'deviceMetadata': deviceMetadata,
       'timestamp': timestamp.toIso8601String(),
+      if (images.isNotEmpty)
+        'images': [for (final image in images) image.toJson()],
+    };
+  }
+}
+
+class AiBackendAnalysisImage {
+  const AiBackendAnalysisImage({
+    required this.imagePath,
+    required this.imageSource,
+    required this.imageRole,
+  });
+
+  final String imagePath;
+  final String imageSource;
+  final String imageRole;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'imagePath': imagePath,
+      'imageSource': imageSource,
+      'imageRole': imageRole,
     };
   }
 }
@@ -56,6 +80,11 @@ class AiBackendAnalysisResponse {
     required this.comparableSales,
     required this.imageUrl,
     required this.timestamp,
+    this.faceValue,
+    this.estimatedMarketValue,
+    this.askingPriceWarning,
+    this.valuationConfidence,
+    this.rawProviderPayload = const {},
   });
 
   final String? id;
@@ -75,6 +104,11 @@ class AiBackendAnalysisResponse {
   final List<MarketComp> comparableSales;
   final String? imageUrl;
   final DateTime? timestamp;
+  final double? faceValue;
+  final double? estimatedMarketValue;
+  final String? askingPriceWarning;
+  final double? valuationConfidence;
+  final Map<String, dynamic> rawProviderPayload;
 
   factory AiBackendAnalysisResponse.fromJson(Map<String, dynamic> json) {
     final valueRange = parseJsonMap(json['valueRange']);
@@ -150,6 +184,23 @@ class AiBackendAnalysisResponse {
       comparableSales: comparableSales,
       imageUrl: _optionalString(json['imageUrl'] ?? json['image_url']),
       timestamp: parseNullableDateTime(json['timestamp']),
+      faceValue: parseNullableDouble(json['faceValue']),
+      estimatedMarketValue: parseNullableDouble(json['estimatedMarketValue']),
+      askingPriceWarning: _optionalString(json['askingPriceWarning']),
+      valuationConfidence: _normalizeNullableConfidence(
+        json['valuationConfidence'],
+      ),
+      rawProviderPayload: {
+        ...parseJsonMap(json['rawProviderPayload']),
+        if (_optionalString(json['selectedProvider']) != null)
+          'selectedProvider': _optionalString(json['selectedProvider']),
+        if (_optionalString(json['requestedProvider']) != null)
+          'requestedProvider': _optionalString(json['requestedProvider']),
+        if (_optionalString(json['provider']) != null)
+          'provider': _optionalString(json['provider']),
+        if (_optionalString(json['model']) != null)
+          'model': _optionalString(json['model']),
+      },
     );
   }
 
@@ -208,6 +259,12 @@ class AiBackendAnalysisResponse {
       mint: _attribute('mint'),
       material: _attribute('material'),
       notes: _attribute('notes'),
+      faceValue: faceValue,
+      estimatedMarketValue: estimatedMarketValue,
+      askingPriceWarning: askingPriceWarning,
+      valuationConfidence: valuationConfidence,
+      photosUsed: _photosUsed(),
+      photoRoles: _photoRoles(),
     );
   }
 
@@ -237,6 +294,28 @@ class AiBackendAnalysisResponse {
     }
 
     return null;
+  }
+
+  int? _photosUsed() {
+    final value = rawProviderPayload['photosUsed'];
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return null;
+  }
+
+  List<String> _photoRoles() {
+    final roles = rawProviderPayload['photoRoles'];
+    if (roles is! List) {
+      return const [];
+    }
+    return [
+      for (final role in roles)
+        if (role is String && role.trim().isNotEmpty) role.trim(),
+    ];
   }
 }
 
@@ -355,6 +434,14 @@ List<dynamic> _parseList(Object? value) {
 
 double _normalizeConfidence(Object? value) {
   final confidence = parseNullableDouble(value) ?? 0;
+  return confidence > 1 ? confidence / 100 : confidence;
+}
+
+double? _normalizeNullableConfidence(Object? value) {
+  final confidence = parseNullableDouble(value);
+  if (confidence == null) {
+    return null;
+  }
   return confidence > 1 ? confidence / 100 : confidence;
 }
 

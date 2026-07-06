@@ -40,13 +40,40 @@ class HttpAiBackendClient implements AiBackendClient {
     _validateEndpoint();
 
     try {
+      String? primaryRole;
+      for (final image in request.images) {
+        if (image.imagePath == request.imagePath) {
+          primaryRole = image.imageRole;
+          break;
+        }
+      }
       final imagePayload = await payloadPreparer.fromLocalFile(
         localFilePath: request.imagePath,
         imageSource: request.imageSource,
+        imageRole: primaryRole ?? 'front',
       );
+      final imagePayloads = <AiImageUploadPayload>[];
+      for (final image in request.images) {
+        imagePayloads.add(
+          await payloadPreparer.fromLocalFile(
+            localFilePath: image.imagePath,
+            imageSource: image.imageSource,
+            imageRole: image.imageRole,
+          ),
+        );
+      }
+      if (imagePayloads.isEmpty) {
+        imagePayloads.add(imagePayload);
+      }
+      if (!imagePayloads.any(
+        (payload) => payload.localFilePath == imagePayload.localFilePath,
+      )) {
+        imagePayloads.insert(0, imagePayload);
+      }
       return await apiService.analyzeImage(
         request: request,
         imagePayload: imagePayload,
+        imagePayloads: imagePayloads,
       );
     } on AiImagePayloadException catch (error) {
       throw AiBackendClientException.invalidImagePayload(error.message);

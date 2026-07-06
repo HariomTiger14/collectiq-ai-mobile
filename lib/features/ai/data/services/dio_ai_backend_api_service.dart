@@ -6,6 +6,7 @@ import 'package:collectiq_ai/features/ai/data/models/ai_image_upload_payload.dar
 import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/services/ai_backend_api_service.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 /// Dio-backed API service for future CollectIQ backend AI analysis.
 ///
@@ -56,16 +57,32 @@ class DioAiBackendApiService implements AiBackendApiService {
   Future<AiBackendAnalysisResponse> analyzeImage({
     required AiBackendAnalysisRequest request,
     required AiImageUploadPayload imagePayload,
+    List<AiImageUploadPayload> imagePayloads = const [],
   }) async {
     _validateEndpoint();
     _validateRequest(request);
 
     try {
+      final stopwatch = Stopwatch()..start();
+      _logAnalyzerTrace(
+        'http-request-start endpoint=${_safeEndpoint(endpointUrl)} '
+        'file=${imagePayload.fileName} mime=${imagePayload.mimeType} '
+        'sizeBytes=${imagePayload.sizeBytes} '
+        'base64Length=${imagePayload.base64Image?.length ?? 0} '
+        'imageCount=${_effectivePayloads(imagePayload, imagePayloads).length}',
+      );
       final response = await _dio.post<dynamic>(
         endpointUrl.trim(),
         data: {
           'request': request.toJson(),
           'image': imagePayload.toMetadataJson(),
+          'images': [
+            for (final payload in _effectivePayloads(
+              imagePayload,
+              imagePayloads,
+            ))
+              payload.toMetadataJson(),
+          ],
         },
         options: Options(
           responseType: ResponseType.json,
@@ -78,12 +95,39 @@ class DioAiBackendApiService implements AiBackendApiService {
           },
         ),
       );
+      stopwatch.stop();
+      _logAnalyzerTrace(
+        'http-response endpoint=${_safeEndpoint(endpointUrl)} '
+        'status=${response.statusCode ?? 0} '
+        'durationMs=${stopwatch.elapsedMilliseconds}',
+      );
       return _handleResponse(response);
     } on DioException catch (error) {
+      _logAnalyzerTrace(
+        'http-error endpoint=${_safeEndpoint(endpointUrl)} '
+        'type=${error.type.name} status=${error.response?.statusCode ?? 0}',
+      );
       throw _mapDioException(error);
     } on FormatException {
+      _logAnalyzerTrace(
+        'http-error endpoint=${_safeEndpoint(endpointUrl)} type=malformed_json',
+      );
       throw AiBackendClientException.malformedJson();
     }
+  }
+
+  List<AiImageUploadPayload> _effectivePayloads(
+    AiImageUploadPayload primary,
+    List<AiImageUploadPayload> payloads,
+  ) {
+    if (payloads.isEmpty) {
+      return [primary];
+    }
+    final seen = <String>{};
+    return [
+      for (final payload in [primary, ...payloads])
+        if (seen.add(payload.localFilePath)) payload,
+    ];
   }
 
   void _validateEndpoint() {
@@ -214,5 +258,29 @@ class DioAiBackendApiService implements AiBackendApiService {
       'details': payload['details'] ?? {'statusCode': statusCode},
     });
     return AiBackendClientException.backendError(error, statusCode: statusCode);
+  }
+
+  void _logAnalyzerTrace(String message) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[AnalyzerTrace] $message');
+  }
+
+  String _safeEndpoint(String endpoint) {
+    final trimmed = endpoint.trim();
+    if (trimmed.isEmpty) {
+      return '<empty>';
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return '<invalid>';
+    }
+    return Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: uri.path,
+    ).toString();
   }
 }

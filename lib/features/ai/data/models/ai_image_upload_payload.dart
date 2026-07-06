@@ -13,6 +13,7 @@ class AiImageUploadPayload {
     required this.sizeBytes,
     required this.imageSource,
     required this.localFilePath,
+    this.imageRole = 'front',
     this.base64Image,
     this.base64Preview,
   });
@@ -32,6 +33,9 @@ class AiImageUploadPayload {
   /// Local path metadata. This is for future backend upload preparation only.
   final String localFilePath;
 
+  /// Role for multi-photo analysis, such as front, back, closeup, packaging.
+  final String imageRole;
+
   /// Full image bytes encoded for the backend analyzer contract.
   final String? base64Image;
 
@@ -46,6 +50,7 @@ class AiImageUploadPayload {
       'sizeBytes': sizeBytes,
       'imageSource': imageSource,
       'localFilePath': localFilePath,
+      'imageRole': imageRole,
       if (base64Image != null) 'base64Image': base64Image,
       if (base64Preview != null) 'base64Preview': base64Preview,
     };
@@ -82,6 +87,7 @@ class AiImagePayloadPreparer {
   Future<AiImageUploadPayload> fromLocalFile({
     required String localFilePath,
     required String imageSource,
+    String imageRole = 'front',
   }) async {
     final normalizedPath = localFilePath.trim();
     if (normalizedPath.isEmpty) {
@@ -123,11 +129,28 @@ class AiImagePayloadPreparer {
       sizeBytes: sizeBytes,
       imageSource: imageSource.trim().isEmpty ? 'unknown' : imageSource.trim(),
       localFilePath: normalizedPath,
+      imageRole: _normalizeRole(imageRole),
       base64Image: base64Encode(await file.readAsBytes()),
       base64Preview: includeBase64Preview
           ? base64Encode(await file.openRead(0, sizeBytes.clamp(0, 128)).first)
           : null,
     );
+  }
+
+  String _normalizeRole(String value) {
+    final normalized = value.trim().toLowerCase();
+    return switch (normalized) {
+      'obverse' || 'front' => 'front',
+      'reverse' || 'back' => 'back',
+      'close-up' ||
+      'closeup' ||
+      'detail' ||
+      'serial' ||
+      'signature' ||
+      'damage' => 'closeup',
+      'packaging' || 'package' => 'packaging',
+      _ => 'other',
+    };
   }
 
   String _fileNameFor(String path) {

@@ -151,14 +151,30 @@ class AnalyzerRequest {
   const AnalyzerRequest({
     required this.imagePath,
     this.image,
+    this.images = const [],
     this.metadata = const {},
     this.cancellationToken,
   });
 
   final String imagePath;
   final XFile? image;
+  final List<AnalyzerImageInput> images;
   final Map<String, Object?> metadata;
   final AnalyzerCancellationToken? cancellationToken;
+}
+
+class AnalyzerImageInput {
+  const AnalyzerImageInput({
+    required this.path,
+    required this.role,
+    this.image,
+    this.source,
+  });
+
+  final String path;
+  final String role;
+  final XFile? image;
+  final String? source;
 }
 
 /// Upload/progress event emitted during analysis.
@@ -307,7 +323,7 @@ class AnalyzerException implements Exception {
         type: _typeFromBackendException(error),
         message: error.message,
         statusCode: error.statusCode,
-        details: error.details,
+        details: {...error.details, 'backendClientErrorType': error.type.name},
       );
     }
 
