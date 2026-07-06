@@ -1249,8 +1249,10 @@ void main() {
       expect(payload.sizeBytes, greaterThan(0));
       expect(payload.imageSource, 'gallery');
       expect(payload.localFilePath, 'test/fixtures/image.jpg');
+      expect(payload.base64Image, isNotEmpty);
       expect(payload.base64Preview, isNull);
       expect(payload.toMetadataJson()['mimeType'], 'image/jpeg');
+      expect(payload.toMetadataJson()['base64Image'], payload.base64Image);
     });
 
     test('missing file returns friendly validation error', () async {
@@ -1523,6 +1525,10 @@ void main() {
       expect(adapter.lastPath, 'https://api.collectiq.test/api/analyze');
       expect(adapter.lastPayload?['request'], isA<Map>());
       expect(adapter.lastPayload?['image'], isA<Map>());
+      final imagePayload =
+          adapter.lastPayload?['image'] as Map<String, dynamic>;
+      expect(imagePayload['base64Image'], isNotEmpty);
+      expect(base64Decode(imagePayload['base64Image'] as String), isNotEmpty);
     });
 
     test('timeout maps to friendly error', () async {

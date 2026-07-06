@@ -3,8 +3,8 @@ import 'dart:io';
 
 /// Safe metadata-only image payload prepared for future backend analysis.
 ///
-/// This does not upload or send bytes by itself. The full image body will be
-/// attached later by a real backend API service implementation.
+/// This includes image bytes for the PackLox backend. Provider API keys remain
+/// server-side; Flutter sends only the user-selected image to PackLox.
 class AiImageUploadPayload {
   /// Creates an immutable image upload payload.
   const AiImageUploadPayload({
@@ -13,6 +13,7 @@ class AiImageUploadPayload {
     required this.sizeBytes,
     required this.imageSource,
     required this.localFilePath,
+    this.base64Image,
     this.base64Preview,
   });
 
@@ -31,6 +32,9 @@ class AiImageUploadPayload {
   /// Local path metadata. This is for future backend upload preparation only.
   final String localFilePath;
 
+  /// Full image bytes encoded for the backend analyzer contract.
+  final String? base64Image;
+
   /// Optional tiny preview/test placeholder. Full image bytes are not required.
   final String? base64Preview;
 
@@ -42,6 +46,7 @@ class AiImageUploadPayload {
       'sizeBytes': sizeBytes,
       'imageSource': imageSource,
       'localFilePath': localFilePath,
+      if (base64Image != null) 'base64Image': base64Image,
       if (base64Preview != null) 'base64Preview': base64Preview,
     };
   }
@@ -118,6 +123,7 @@ class AiImagePayloadPreparer {
       sizeBytes: sizeBytes,
       imageSource: imageSource.trim().isEmpty ? 'unknown' : imageSource.trim(),
       localFilePath: normalizedPath,
+      base64Image: base64Encode(await file.readAsBytes()),
       base64Preview: includeBase64Preview
           ? base64Encode(await file.openRead(0, sizeBytes.clamp(0, 128)).first)
           : null,

@@ -1,3 +1,4 @@
+import base64
 import unittest
 from pathlib import Path
 
@@ -97,6 +98,77 @@ class MockRecognitionProviderTest(unittest.TestCase):
         )
 
         self.assertNotEqual(first.title, second.title)
+
+    def test_same_filename_with_different_bytes_returns_varied_results(self) -> None:
+        provider = MockRecognitionProvider()
+        first_bytes = b"\xff\xd8\xff\xe0\x01\x02\xff\xd9"
+        second_bytes = b"\xff\xd8\xff\xe0\x09\x08\xff\xd9"
+
+        first = provider.recognize_api_payload(
+            request_metadata={"imagePath": "/tmp/camera_same.jpg", "timestamp": "t1"},
+            image_payload={
+                "fileName": "camera_same.jpg",
+                "mimeType": "image/jpeg",
+                "sizeBytes": len(first_bytes),
+                "imageSource": "camera",
+                "localFilePath": "/tmp/camera_same.jpg",
+                "base64Image": base64.b64encode(first_bytes).decode("ascii"),
+            },
+        )
+        second = provider.recognize_api_payload(
+            request_metadata={"imagePath": "/tmp/camera_same.jpg", "timestamp": "t2"},
+            image_payload={
+                "fileName": "camera_same.jpg",
+                "mimeType": "image/jpeg",
+                "sizeBytes": len(second_bytes),
+                "imageSource": "camera",
+                "localFilePath": "/tmp/camera_same.jpg",
+                "base64Image": base64.b64encode(second_bytes).decode("ascii"),
+            },
+        )
+
+        self.assertNotEqual(first.title, second.title)
+        self.assertEqual(provider.last_selection_diagnostics["seedSource"], "base64Image")
+        self.assertEqual(
+            provider.last_selection_diagnostics["byteLength"],
+            len(second_bytes),
+        )
+
+    def test_different_filenames_return_varied_metadata_results(self) -> None:
+        provider = MockRecognitionProvider()
+
+        titles = {
+            provider.recognize_api_payload(
+                request_metadata={
+                    "imagePath": f"/tmp/camera_{index}.jpg",
+                    "timestamp": f"2026-07-06T00:00:0{index}Z",
+                },
+                image_payload={
+                    "fileName": f"camera_{index}.jpg",
+                    "mimeType": "image/jpeg",
+                    "sizeBytes": 1024 + index,
+                    "imageSource": "camera",
+                    "localFilePath": f"/tmp/camera_{index}.jpg",
+                },
+            ).title
+            for index in range(6)
+        }
+
+        self.assertGreater(len(titles), 1)
+
+    def test_missing_bytes_uses_non_constant_fallback_when_metadata_is_empty(self) -> None:
+        provider = MockRecognitionProvider()
+
+        titles = {
+            provider.recognize_api_payload(
+                request_metadata={},
+                image_payload={},
+            ).title
+            for _ in range(6)
+        }
+
+        self.assertGreater(len(titles), 1)
+        self.assertEqual(provider.last_selection_diagnostics["seedSource"], "fallback")
 
     def test_backwards_compatible_mock_service_alias(self) -> None:
         self.assertIs(MockRecognitionService, MockRecognitionProvider)

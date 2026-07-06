@@ -488,6 +488,38 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(payload["category"], "Coin")
         self.assertEqual(payload["rawProviderPayload"]["provider"], "mock")
         self.assertIn("validate_image", payload["rawProviderPayload"]["pipelineStages"])
+        selection = payload["rawProviderPayload"]["mockSelection"]
+        self.assertEqual(selection["seedSource"], "base64Image")
+        self.assertEqual(selection["byteLength"], len(_valid_png_bytes()))
+
+    def test_root_analyze_camera_style_uploads_do_not_always_return_charizard(self) -> None:
+        titles = set()
+        for index, image_bytes in enumerate(
+            [
+                b"\xff\xd8\xff\xe0\x01\x02\xff\xd9",
+                b"\xff\xd8\xff\xe0\x09\x08\xff\xd9",
+                b"\xff\xd8\xff\xe0abc123\xff\xd9",
+            ]
+        ):
+            response = self.client.post(
+                "/analyze",
+                data={
+                    "imageSource": "camera",
+                    "timestamp": f"2026-07-06T00:00:0{index}Z",
+                },
+                files={"image": ("camera_scan.jpg", image_bytes, "image/jpeg")},
+            )
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            titles.add(payload["itemName"])
+            self.assertEqual(
+                payload["rawProviderPayload"]["mockSelection"]["seedSource"],
+                "base64Image",
+            )
+
+        self.assertGreater(len(titles), 1)
+        self.assertNotEqual(titles, {"1999 Pokemon Charizard Holo"})
 
     def test_root_analyze_provider_unavailable(self) -> None:
         with patch(

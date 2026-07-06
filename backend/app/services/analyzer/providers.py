@@ -36,6 +36,10 @@ class MockAnalyzerProvider:
             image_payload=image_payload,
         )
 
+    @property
+    def selection_diagnostics(self) -> dict[str, object]:
+        return self._delegate.last_selection_diagnostics
+
 
 class OpenAIAnalyzerProvider:
     provider_name = "openai"
