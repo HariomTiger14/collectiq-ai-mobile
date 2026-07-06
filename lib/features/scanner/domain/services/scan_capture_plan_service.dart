@@ -50,7 +50,6 @@ class ScanCapturePlanService {
       ScanGoal.prepareForSale => const [
         ScanCaptureRole.front,
         ScanCaptureRole.back,
-        ScanCaptureRole.side,
       ],
     };
   }
@@ -68,10 +67,8 @@ class ScanCapturePlanService {
         ScanCaptureRole.angledReflective,
       ],
       ScanGoal.prepareForSale => const [
-        ScanCaptureRole.top,
-        ScanCaptureRole.bottom,
+        ScanCaptureRole.closeUp,
         ScanCaptureRole.damageDetail,
-        ScanCaptureRole.angledReflective,
         ScanCaptureRole.serialOrMark,
       ],
     };
@@ -85,8 +82,8 @@ class ScanCapturePlanService {
         _ => 'Minimum photos are ready for analysis.',
       };
     }
-    if (goal == ScanGoal.prepareForSale && nextRole == ScanCaptureRole.side) {
-      return 'Add a side view so buyers can judge shape and thickness.';
+    if (goal == ScanGoal.prepareForSale && nextRole == ScanCaptureRole.back) {
+      return 'Capture the back clearly for listing condition notes.';
     }
     return nextRole.guidance;
   }

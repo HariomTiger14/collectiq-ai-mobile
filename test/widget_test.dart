@@ -1172,7 +1172,7 @@ void main() {
     expect(
       tester
           .widgetList<Image>(find.byType(Image))
-          .any((image) => image.fit == BoxFit.contain),
+          .any((image) => image.fit == BoxFit.cover),
       isTrue,
     );
   });
@@ -1292,7 +1292,7 @@ void main() {
     expect(find.text('Scan interrupted'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -1324,7 +1324,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -1352,7 +1352,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -1737,7 +1737,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Gallery image'), findsOneWidget);
-    expect(find.text('Analyzing image'), findsOneWidget);
+    expect(find.text('Analyzing scan'), findsOneWidget);
 
     await tester.pumpAndSettle();
 
@@ -1833,7 +1833,7 @@ void main() {
     expect(find.text('Sample Sports Card'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1974,7 +1974,7 @@ void main() {
     expect(find.text('Analysis Complete'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),

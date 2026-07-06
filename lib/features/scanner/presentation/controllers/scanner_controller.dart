@@ -22,6 +22,7 @@ import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_imag
 import 'package:collectiq_ai/features/scanner/domain/entities/capture_event.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_session.dart';
@@ -890,6 +891,19 @@ class ScannerController extends Notifier<ScannerState> {
     if (selectedImagePath == null) {
       return;
     }
+    final plan = _ensureSession().capturePlan;
+    if (!plan.isMinimumReadyForAnalyze) {
+      _setState(
+        state.copyWith(
+          errorMessage: _analyzeDisabledReason(plan),
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'analyze blocked missing required roles',
+      );
+      return;
+    }
     ref.read(scanPipelineStatusProvider.notifier).markReady();
 
     try {
@@ -1294,6 +1308,60 @@ class ScannerController extends Notifier<ScannerState> {
     ref.read(scanPipelineStatusProvider.notifier).markReady();
   }
 
+  /// Removes the captured image for a role and refreshes session readiness.
+  void deleteRoleImage(String imageRole) {
+    final normalizedRole = _normalizeImageRole(imageRole);
+    final nextSlots = {
+      for (final entry in state.photoSlots.entries)
+        if (entry.key != normalizedRole) entry.key: entry.value,
+    };
+    final capturedImages = _capturedImagesFromSlots(nextSlots);
+    final session = _ensureSession()
+        .copyWith(
+          capturedImages: capturedImages,
+          capturePlan: _capturePlanService.buildPlan(
+            state.scanSession?.scanGoal ?? ScanGoal.identifyValue,
+            null,
+            capturedImages,
+          ),
+          clearConfidenceAchieved: true,
+          clearEndTime: true,
+        )
+        .addEvent(
+          CaptureEvent(
+            type: CaptureEventType.roleRequested,
+            timestamp: DateTime.now(),
+            role: normalizedRole,
+            metadata: const {'action': 'delete'},
+          ),
+        );
+    final nextSelectedSlot = nextSlots.values.firstOrNull;
+
+    _setState(
+      state.copyWith(
+        photoSlots: nextSlots,
+        scanSession: session,
+        selectedImage: nextSelectedSlot?.image,
+        selectedImagePath: nextSelectedSlot?.path,
+        selectedItemTitle: nextSelectedSlot == null
+            ? null
+            : '${nextSelectedSlot.label} photo',
+        selectedItemStatus: nextSelectedSlot == null
+            ? null
+            : 'Ready for AI analysis',
+        clearSelectedImage: nextSelectedSlot == null,
+        clearSelectedImagePath: nextSelectedSlot == null,
+        clearSelectedItemTitle: nextSelectedSlot == null,
+        clearSelectedItemStatus: nextSelectedSlot == null,
+        clearScanResult: true,
+        clearAiRecommendation: true,
+        clearErrorMessage: true,
+        isSavedToPortfolio: false,
+      ),
+      event: 'role image deleted',
+    );
+  }
+
   /// Clears completed saved work when the user leaves the scan tab.
   void resetAfterSaved() {
     if (!state.isSavedToPortfolio) {
@@ -1513,6 +1581,16 @@ class ScannerController extends Notifier<ScannerState> {
 
   String _slotLabel(String role) {
     return ScanCaptureRole.fromId(role).title;
+  }
+
+  String _analyzeDisabledReason(ScanCapturePlan plan) {
+    final missingRequired = plan.requiredRoles
+        .where((role) => !state.photoSlots.containsKey(role.id))
+        .toList();
+    if (missingRequired.length == 1) {
+      return 'Add ${missingRequired.single.title.toLowerCase()} photo to continue.';
+    }
+    return 'Add ${missingRequired.length} more required photos.';
   }
 
   String _selectedTitleForRole({
