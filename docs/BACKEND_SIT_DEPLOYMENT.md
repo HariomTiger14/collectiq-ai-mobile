@@ -66,11 +66,6 @@ Required for SIT mock:
 ```text
 ENVIRONMENT=sit
 BACKEND_ENV=sit
-APP_VERSION=0.1.0
-BACKEND_VERSION=0.1.0
-COMMIT_SHA=<deployed git commit>
-GIT_COMMIT=<deployed git commit>
-BUILD_TIME=<ISO-8601 build timestamp>
 PORT=8000
 AI_PROVIDER=mock
 PRICING_PROVIDER=mock
@@ -97,6 +92,7 @@ Optional:
 
 ```text
 APPLICATION_NAME=PackLox API
+APP_VERSION=0.1.0
 PUBLIC_API_URL=https://api-sit.packlox.com
 PUBLIC_FRONTEND_URL=https://sit.packlox.com
 HEALTH_TIMEOUT_SECONDS=3
@@ -109,8 +105,12 @@ Do not commit `.env` files with real values.
 Deployment variable aliases:
 
 - `ENVIRONMENT` is preferred; `BACKEND_ENV` and `APP_ENV` remain supported.
-- `APP_VERSION` is preferred; `BACKEND_VERSION` remains supported.
-- `COMMIT_SHA` is preferred; `GIT_COMMIT` and `CF_PAGES_COMMIT_SHA` remain supported.
+- `APP_VERSION` is optional and preferred; `BACKEND_VERSION` remains supported.
+- `COMMIT_SHA` is optional and overrides automatic deployment metadata. Do not manually freeze it for normal Render deploys.
+- `GIT_COMMIT` and `CF_PAGES_COMMIT_SHA` remain supported explicit commit aliases.
+- `RENDER_GIT_COMMIT` is used automatically when Render provides it.
+- `BUILD_TIME` is optional and overrides the startup timestamp. Do not manually freeze it for normal Render deploys.
+- `CF_PAGES_COMMIT_TIME` remains supported as a build-time alias.
 - `SUPABASE_SERVICE_ROLE_KEY` is used for server-side health checks when set.
 - `SUPABASE_ANON_KEY` is accepted for public/anon health checks when a service role key is not set.
 
@@ -190,6 +190,11 @@ Client -> FastAPI -> HealthCheckService -> SupabaseHealthProvider
   "buildTime": "<ISO-8601 build timestamp>"
 }
 ```
+
+For Render SIT deployments, leave `COMMIT_SHA` and `BUILD_TIME` unset unless
+you intentionally need an override. The backend will use Render's commit
+metadata when available, fall back to the Git checkout commit when possible,
+and use the app startup UTC timestamp when no build-time value is supplied.
 
 ## SIT Mock Run
 
