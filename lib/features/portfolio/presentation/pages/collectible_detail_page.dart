@@ -1,13 +1,11 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
-import 'package:collectiq_ai/core/ui/home/home_ui.dart';
-import 'package:collectiq_ai/core/ui/item_details/item_details_ui.dart';
-import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -33,6 +31,7 @@ class CollectibleDetailPage extends ConsumerStatefulWidget {
 
 class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
+  bool _isFavorited = false;
 
   @override
   void initState() {
@@ -49,19 +48,12 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   @override
   Widget build(BuildContext context) {
     final portfolioItems = ref.watch(portfolioControllerProvider).items;
-    final wishlistStatus = ref.watch(
-      wishlistStatusForItemProvider(widget.item.id),
-    );
     final currentItem =
         portfolioItems
             .where((portfolioItem) => portfolioItem.id == widget.item.id)
             .firstOrNull ??
         widget.item;
     final colorScheme = Theme.of(context).colorScheme;
-    final wishlistStatusLabel = wishlistStatus.maybeWhen(
-      data: (status) => status.label,
-      orElse: () => null,
-    );
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -85,14 +77,6 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            SliverToBoxAdapter(
-              child: ItemHeroImage(
-                imageUrl: currentItem.cloudImageUrl ?? currentItem.imagePath,
-                scrollController: _scrollController,
-                title: currentItem.title,
-                category: currentItem.category,
-              ),
-            ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               sliver: SliverToBoxAdapter(
@@ -102,155 +86,59 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ItemCategoryHeader(
-                          title: currentItem.category,
-                          subtitle: 'PackLox Item',
-                        ),
-                        const SizedBox(height: 24),
-                        ItemGlassMetadataCard(
+                        _PremiumDetailHero(
                           item: currentItem,
-                          wishlistStatusLabel: wishlistStatusLabel,
+                          onImageTap: () =>
+                              _showImageViewer(context, currentItem),
                         ),
-                        const SizedBox(height: 32),
-                        SectionCard(
-                          title: 'Attributes',
-                          child: MotionStagger(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: ItemAttributeRow(
-                                  title: 'Name',
-                                  subtitle: currentItem.title,
-                                  trailingIcon: Icons.badge_outlined,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: ItemAttributeRow(
-                                  title: 'Brand',
-                                  subtitle: currentItem.brand ?? '',
-                                  trailingIcon: Icons.business_outlined,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: ItemAttributeRow(
-                                  title: 'Model',
-                                  subtitle: '',
-                                  trailingIcon: Icons.view_in_ar_outlined,
-                                ),
-                              ),
-                              ItemAttributeRow(
-                                title: 'Notes',
-                                subtitle: currentItem.notes ?? '',
-                                trailingIcon: Icons.notes_outlined,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        if (_hasAiInsights(currentItem)) ...[
-                          SectionCard(
-                            title: 'AI Insights',
-                            child: MotionStagger(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: ItemAttributeRow(
-                                    title: 'Confidence',
-                                    subtitle:
-                                        '${(currentItem.confidence * 100).toStringAsFixed(0)}%',
-                                    trailingIcon: Icons.verified_outlined,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom:
-                                        (currentItem.aiReasoning ?? '')
-                                            .trim()
-                                            .isNotEmpty
-                                        ? 16
-                                        : 0,
-                                  ),
-                                  child: ItemAttributeRow(
-                                    title: 'Detected Category',
-                                    subtitle:
-                                        currentItem.primaryMatch ??
-                                        currentItem.category,
-                                    trailingIcon: Icons.auto_awesome_outlined,
-                                  ),
-                                ),
-                                if ((currentItem.aiReasoning ?? '')
-                                    .trim()
-                                    .isNotEmpty)
-                                  ItemAttributeRow(
-                                    title: 'Reasoning',
-                                    subtitle: currentItem.aiReasoning!,
-                                    trailingIcon: Icons.psychology_outlined,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 32),
+                        if (currentItem.confidence < 0.70) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LowConfidenceBanner(),
                         ],
-                        AppPriceHero(
-                          label: 'Estimated market value',
-                          value: _formatAud(currentItem.estimatedValue),
-                          subtitle: currentItem.pricing == null
-                              ? 'Based on the saved AI estimate'
-                              : 'Value range: ${_formatMoney(currentItem.pricing!.lowEstimate, currentItem.pricing!.currency)} - ${_formatMoney(currentItem.pricing!.highEstimate, currentItem.pricing!.currency)}',
-                        ),
-                        const SizedBox(height: 32),
-                        _WishlistStatusSection(item: currentItem),
-                        const SizedBox(height: 32),
-                        _DetailSections(item: currentItem),
-                        const SizedBox(height: 32),
-                        _PriceAlertSection(item: currentItem),
-                        const SizedBox(height: 32),
-                        SectionCard(
-                          title: 'Quick Actions',
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed: () {
-                                    _showDetailSnackBar(
-                                      context,
-                                      'Re-analysis coming next',
-                                    );
-                                  },
-                                  child: const Text('Re-analyze'),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    _showDetailSnackBar(
-                                      context,
-                                      'Marketplace listing coming next',
-                                    );
-                                  },
-                                  child: const Text('Sell Item'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        ItemActionBar(
+                        const SizedBox(height: AppSpacing.lg),
+                        _PrimaryMetadataSection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _AiSummarySection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _KeyAttributeChipsSection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _PortfolioInformationSection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _NotesCard(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _DetailActionSection(
+                          isFavorited: _isFavorited,
                           onEdit: () => _showEditCollectibleDialog(
                             context: context,
                             ref: ref,
                             item: currentItem,
                           ),
                           onShare: () => _shareItem(context, currentItem),
+                          onFavorite: () {
+                            setState(() => _isFavorited = !_isFavorited);
+                            _showDetailSnackBar(
+                              context,
+                              _isFavorited
+                                  ? 'Added to favorites'
+                                  : 'Removed from favorites',
+                            );
+                          },
                           onDelete: widget.onDelete == null
                               ? null
-                              : () => widget.onDelete!(currentItem.id),
+                              : () => _confirmDetailDelete(
+                                  context,
+                                  currentItem,
+                                  widget.onDelete!,
+                                ),
                         ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _WishlistStatusSection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _DetailSections(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        _PriceAlertSection(item: currentItem),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _SimilarCollectiblesSection(),
                         const SizedBox(height: AppSpacing.xxl),
                       ],
                     ),
@@ -265,14 +153,753 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   }
 }
 
-bool _hasAiInsights(CollectibleItem item) {
-  return item.confidence > 0 ||
-      (item.primaryMatch ?? '').trim().isNotEmpty ||
-      (item.aiReasoning ?? '').trim().isNotEmpty;
+void _shareItem(BuildContext context, CollectibleItem item) {
+  _showDetailSnackBar(context, 'Sharing coming soon');
 }
 
-void _shareItem(BuildContext context, CollectibleItem item) {
-  _showDetailSnackBar(context, 'Share summary ready for ${item.title}');
+Future<void> _confirmDetailDelete(
+  BuildContext context,
+  CollectibleItem item,
+  Future<bool> Function(String itemId) onDelete,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Delete collectible?'),
+        content: Text('${item.title} will be removed from your portfolio.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmed != true || !context.mounted) {
+    return;
+  }
+
+  final deleted = await onDelete(item.id);
+  if (!context.mounted) {
+    return;
+  }
+  if (deleted) {
+    Navigator.of(context).maybePop();
+  }
+}
+
+void _showImageViewer(BuildContext context, CollectibleItem item) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.92),
+    builder: (_) => _FullscreenImageViewer(item: item),
+  );
+}
+
+class _PremiumDetailHero extends StatelessWidget {
+  const _PremiumDetailHero({required this.item, required this.onImageTap});
+
+  final CollectibleItem item;
+  final VoidCallback onImageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: AppElevation.level2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            button: true,
+            label: 'Open image preview',
+            child: InkWell(
+              key: const ValueKey('collectible-detail-image-preview'),
+              onTap: onImageTap,
+              child: AspectRatio(
+                aspectRatio: 16 / 11,
+                child: _DetailImageSurface(item: item),
+              ),
+            ),
+          ),
+          if (item.effectiveGalleryImages.length > 1)
+            _DetailGalleryFilmstrip(item: item),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    _DetailChip(
+                      icon: Icons.category_outlined,
+                      label: _fallback(item.category),
+                    ),
+                    _DetailChip(
+                      icon: Icons.verified_outlined,
+                      label:
+                          '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppTwoLineTitle(
+                  item.title,
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.12,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _HeroValuePill(value: _formatAud(item.estimatedValue)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailImageSurface extends StatelessWidget {
+  const _DetailImageSurface({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final imagePath = (item.cloudImageUrl ?? item.imagePath).trim();
+    final placeholder = _DetailImagePlaceholder(item: item);
+    if (imagePath.isEmpty || imagePath.startsWith('sample://')) {
+      return placeholder;
+    }
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    if (imagePath.startsWith('assets/')) {
+      return Image.asset(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    return buildLocalPortfolioImage(
+      imagePath: imagePath,
+      fit: BoxFit.cover,
+      placeholderBuilder: () => placeholder,
+    );
+  }
+}
+
+class _DetailImagePlaceholder extends StatelessWidget {
+  const _DetailImagePlaceholder({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.28),
+            colorScheme.tertiary.withValues(alpha: 0.18),
+            colorScheme.surfaceContainerHighest,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.image_outlined,
+              color: colorScheme.primary,
+              size: AppIconSizes.xl,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _fallback(item.category, fallback: 'Collectible image'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailGalleryFilmstrip extends StatelessWidget {
+  const _DetailGalleryFilmstrip({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final images = item.effectiveGalleryImages;
+    return Container(
+      key: const ValueKey('collectible-detail-gallery-filmstrip'),
+      height: 112,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        0,
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final image = images[index];
+          return SizedBox(
+            key: ValueKey('collectible-detail-gallery-${image.path}'),
+            width: 92,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color: image.isPrimary
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant,
+                  width: image.isPrimary ? 2 : 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        child: _DetailGalleryImage(image: image, item: item),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _galleryRoleLabel(image),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DetailGalleryImage extends StatelessWidget {
+  const _DetailGalleryImage({required this.image, required this.item});
+
+  final CollectibleImage image;
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = image.path.trim();
+    final placeholder = _DetailImagePlaceholder(item: item);
+    if (path.isEmpty || path.startsWith('sample://')) {
+      return placeholder;
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    return buildLocalPortfolioImage(
+      imagePath: path,
+      fit: BoxFit.cover,
+      placeholderBuilder: () => placeholder,
+    );
+  }
+}
+
+class _HeroValuePill extends StatelessWidget {
+  const _HeroValuePill({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: AppGradients.premium,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppElevation.level2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Estimated value',
+            style: textTheme.labelLarge?.copyWith(
+              color: Colors.white.withValues(alpha: 0.86),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FullscreenImageViewer extends StatelessWidget {
+  const _FullscreenImageViewer({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black,
+      child: Stack(
+        children: [
+          Center(
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: _DetailImageSurface(item: item),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + AppSpacing.sm,
+            right: AppSpacing.sm,
+            child: IconButton.filledTonal(
+              tooltip: 'Close image preview',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LowConfidenceBanner extends StatelessWidget {
+  const _LowConfidenceBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.report_problem_outlined, color: colorScheme.error),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Needs Review',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Review the collectible information before relying on this identification.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrimaryMetadataSection extends StatelessWidget {
+  const _PrimaryMetadataSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'Primary Metadata',
+      children: [
+        AppCompactMetadata(
+          items: [
+            AppMetadataItem(label: 'Category', value: _fallback(item.category)),
+            AppMetadataItem(
+              label: 'Brand / Manufacturer',
+              value: _fallback(item.brand),
+            ),
+            AppMetadataItem(label: 'Year', value: _fallback(item.year)),
+            AppMetadataItem(
+              label: 'Condition',
+              value: _fallback(item.condition),
+            ),
+            AppMetadataItem(
+              label: 'Variant',
+              value: _fallback(item.setName ?? item.edition ?? item.rarity),
+            ),
+            AppMetadataItem(label: 'Language', value: _fallback(item.language)),
+            AppMetadataItem(label: 'Country', value: _fallback(item.country)),
+            AppMetadataItem(label: 'Series', value: _fallback(item.series)),
+            AppMetadataItem(label: 'Material', value: _fallback(item.material)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AiSummarySection extends StatelessWidget {
+  const _AiSummarySection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'AI Summary',
+      children: [
+        Text(
+          _aiSummaryFor(item),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}
+
+class _KeyAttributeChipsSection extends StatelessWidget {
+  const _KeyAttributeChipsSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = _attributeChipsFor(item);
+
+    return AppProfileSection(
+      title: 'Key Attributes',
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final chip in chips)
+              _DetailChip(icon: Icons.sell_outlined, label: chip),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PortfolioInformationSection extends StatelessWidget {
+  const _PortfolioInformationSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'Portfolio Information',
+      children: [
+        AppCompactMetadata(
+          items: [
+            AppMetadataItem(
+              label: 'Date Added',
+              value: _formatDate(item.createdAt),
+            ),
+            AppMetadataItem(
+              label: 'Last Updated',
+              value: _formatDate(item.lastSyncedAt ?? item.createdAt),
+            ),
+            AppMetadataItem(label: 'Scan Source', value: _scanSource(item)),
+            AppMetadataItem(label: 'Image Source', value: _imageSource(item)),
+            AppMetadataItem(
+              label: 'Confidence',
+              value: _confidencePercent(item.confidence),
+            ),
+            AppMetadataItem(
+              label: 'Estimated Value',
+              value: _formatAud(item.estimatedValue),
+            ),
+            AppMetadataItem(label: 'Notes', value: _fallback(item.notes)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _NotesCard extends ConsumerStatefulWidget {
+  const _NotesCard({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  ConsumerState<_NotesCard> createState() => _NotesCardState();
+}
+
+class _NotesCardState extends ConsumerState<_NotesCard> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.item.notes ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant _NotesCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.id != widget.item.id ||
+        oldWidget.item.notes != widget.item.notes) {
+      _controller.text = widget.item.notes ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'Notes',
+      children: [
+        TextField(
+          key: const ValueKey('collectible-detail-notes-field'),
+          controller: _controller,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Add private collection notes',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            key: const ValueKey('collectible-detail-notes-save-button'),
+            onPressed: _save,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Save notes'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _save() async {
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .updateItem(widget.item.copyWith(notes: _controller.text.trim()));
+    if (mounted) {
+      _showDetailSnackBar(context, 'Notes saved');
+    }
+  }
+}
+
+class _DetailActionSection extends StatelessWidget {
+  const _DetailActionSection({
+    required this.isFavorited,
+    required this.onEdit,
+    required this.onShare,
+    required this.onFavorite,
+    required this.onDelete,
+  });
+
+  final bool isFavorited;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final VoidCallback onFavorite;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'Actions',
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const ValueKey('collectible-detail-primary-edit-action'),
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            OutlinedButton.icon(
+              key: const ValueKey('collectible-detail-share-action'),
+              onPressed: onShare,
+              icon: const Icon(Icons.ios_share_outlined),
+              label: const Text('Share'),
+            ),
+            OutlinedButton.icon(
+              key: const ValueKey('collectible-detail-favorite-action'),
+              onPressed: onFavorite,
+              icon: Icon(
+                isFavorited ? Icons.favorite : Icons.favorite_border_outlined,
+              ),
+              label: Text(isFavorited ? 'Favorited' : 'Favorite'),
+            ),
+            if (onDelete != null)
+              OutlinedButton.icon(
+                key: const ValueKey('collectible-detail-delete-action'),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SimilarCollectiblesSection extends StatelessWidget {
+  const _SimilarCollectiblesSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppProfileSection(
+      title: 'Similar Collectibles',
+      children: [
+        Text(
+          'Similar collectible suggestions will appear here as PackLox learns more from your portfolio.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: AppIconSizes.sm, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<void> _showEditCollectibleDialog({
@@ -1694,13 +2321,122 @@ Color _wishlistStatusColor(BuildContext context, WishlistStatus status) {
   };
 }
 
+String _fallback(String? value, {String fallback = 'Unknown'}) {
+  final trimmed = (value ?? '').trim();
+  return trimmed.isEmpty ? fallback : trimmed;
+}
+
+String _confidenceBand(double confidence) {
+  if (confidence >= 0.85) {
+    return 'High confidence';
+  }
+  if (confidence >= 0.70) {
+    return 'Medium confidence';
+  }
+  return 'Needs review';
+}
+
+String _confidencePercent(double confidence) {
+  final bounded = confidence.clamp(0.0, 1.0);
+  return '${(bounded * 100).toStringAsFixed(0)}%';
+}
+
+String _aiSummaryFor(CollectibleItem item) {
+  final category = _fallback(item.category).toLowerCase();
+  final evidence = <String>{
+    if (_clean(item.brand) != null) 'visible branding',
+    if (_clean(item.year) != null) 'date cues',
+    if (_clean(item.condition) != null) 'condition details',
+    if (_clean(item.rarity) != null || _clean(item.edition) != null)
+      'variant cues',
+    'category cues',
+  }.join(', ');
+  final title = _fallback(item.title, fallback: 'this collectible');
+  final confidenceNote = item.confidence < 0.70
+      ? ' Confidence is lower because some details may be unclear in the image.'
+      : ' Review year, variant, and condition before making sale or grading decisions.';
+
+  return '$title appears to be a $category identified from $evidence.$confidenceNote';
+}
+
+List<String> _attributeChipsFor(CollectibleItem item) {
+  final chips = <String?>{
+    _clean(item.year),
+    _clean(item.setName),
+    _clean(item.edition),
+    _clean(item.rarity),
+    _clean(item.estimatedGrade),
+    _clean(item.condition),
+    _clean(item.language),
+    _clean(item.country),
+    _clean(item.material),
+    _clean(item.playerOrCharacter),
+  }.whereType<String>().toList(growable: false);
+
+  if (chips.isEmpty) {
+    return const ['Unknown'];
+  }
+  return chips.take(8).toList(growable: false);
+}
+
+String? _clean(String? value) {
+  final trimmed = (value ?? '').trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+String _scanSource(CollectibleItem item) {
+  final imagePath = item.imagePath.trim();
+  if (imagePath.startsWith('sample://')) {
+    return 'Sample scan';
+  }
+  if (imagePath.isNotEmpty) {
+    return 'Device image';
+  }
+  return 'Unknown';
+}
+
+String _imageSource(CollectibleItem item) {
+  if ((item.cloudImageUrl ?? '').trim().isNotEmpty) {
+    return 'Cloud image';
+  }
+  final imagePath = item.imagePath.trim();
+  if (imagePath.startsWith('sample://')) {
+    return 'Sample image';
+  }
+  if (imagePath.isNotEmpty) {
+    return 'Local image';
+  }
+  return 'Unknown';
+}
+
+String _galleryRoleLabel(CollectibleImage image) {
+  final role = (image.role ?? '').trim();
+  if (role.isEmpty) {
+    return image.isPrimary ? 'Primary' : 'Photo';
+  }
+  final spaced = role
+      .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (match) {
+        return '${match.group(1)} ${match.group(2)}';
+      })
+      .replaceAll('_', ' ')
+      .replaceAll('-', ' ');
+  return spaced
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
+
 String _formatAud(double value) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  return 'AUD $withCommas';
+  return '\$$withCommas';
 }
 
 double _parseMoney(String value) {
@@ -1764,11 +2500,17 @@ String _formatDate(DateTime date) {
 }
 
 String _formatMoney(double value, String currency) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
+  if (currency.trim().isEmpty || currency.toUpperCase() == 'AUD') {
+    return '\$$withCommas';
+  }
   return '$currency $withCommas';
 }
 
