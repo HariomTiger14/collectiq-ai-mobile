@@ -1,9 +1,11 @@
 import json
 import base64
 import os
+import time
 import unittest
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
@@ -11,7 +13,25 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings, parse_cors_allowed_origins
 from app.main import app
+from app.services.ai.gemini_recognition_provider import GeminiRecognitionProvider
 from app.services.ai.openai_recognition_provider import OpenAIRecognitionProvider
+from app.services.analyzer.backend_analyzer_service import BackendAnalyzerService
+from app.services.analyzer.errors import AnalyzerPipelineError
+from app.services.analyzer.providers import (
+    AutoAnalyzerProvider,
+    FallbackAnalyzerProvider,
+    MockAnalyzerProvider,
+)
+from app.services.pricing.base_pricing_provider import (
+    EmptyMarketDataError,
+    MarketComparableSale,
+    PricingProviderError,
+    PricingProviderUnavailableError,
+    PricingResult,
+    utc_timestamp,
+)
+from app.services.health.health_check_service import HealthCheckService
+from app.services.health.providers import HealthCheckResult
 
 
 class ApiEndpointsTest(unittest.TestCase):
@@ -42,6 +62,26 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertNotIn("secret", serialized.lower())
         self.assertNotIn("token", serialized.lower())
 
+    def test_health_returns_quickly_without_gemini_credentials(self) -> None:
+        providers = [
+            _StaticHealthProvider("api", True, True),
+            _StaticHealthProvider("supabase", True, False),
+            _StaticHealthProvider("analyzer", True, True),
+        ]
+        started_at = time.perf_counter()
+
+        with patch(
+            "app.routers.health.HealthCheckService",
+            return_value=HealthCheckService(providers=providers),
+        ), patch("app.routers.health.settings") as health_settings:
+            health_settings.environment = "sit"
+            health_settings.version = "0.1.0"
+            response = self.client.get("/health")
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(elapsed_ms, 250)
+
     def test_version(self) -> None:
         response = self.client.get("/version")
 
@@ -60,6 +100,21 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertNotIn("api_key", serialized.lower())
         self.assertNotIn("secret", serialized.lower())
         self.assertNotIn("token", serialized.lower())
+
+    def test_version_returns_quickly_without_gemini_credentials(self) -> None:
+        started_at = time.perf_counter()
+
+        with patch("app.routers.health.settings") as health_settings:
+            health_settings.application_name = "PackLox API"
+            health_settings.environment = "sit"
+            health_settings.version = "0.1.0"
+            health_settings.commit = "test-commit"
+            health_settings.build_time = "2026-07-06T00:00:00Z"
+            response = self.client.get("/version")
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(elapsed_ms, 250)
 
     def test_version_metadata_uses_explicit_env_values(self) -> None:
         with patch.dict(
@@ -191,8 +246,10 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("attributes", payload)
         self.assertIn("rawProviderPayload", payload)
         self.assertGreater(payload["estimatedValue"], 0)
-        self.assertGreater(payload["lowEstimate"], 0)
-        self.assertGreaterEqual(payload["highEstimate"], payload["estimatedValue"])
+        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
+        self.assertEqual(payload["valuationSource"], "not_configured")
+        self.assertEqual(payload["lowEstimate"], 0)
+        self.assertEqual(payload["highEstimate"], 0)
         self.assertGreaterEqual(payload["confidence"], 0)
         self.assertLessEqual(payload["confidence"], 100)
         self.assertTrue(payload["condition"])
@@ -203,8 +260,8 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(len(payload["alternatives"]), 3)
         self.assertTrue(payload["recommendation"])
         self.assertIn("marketSummary", payload)
-        self.assertGreaterEqual(payload["marketSummary"]["salesCount"], 1)
-        self.assertGreaterEqual(len(payload["comparableSales"]), 1)
+        self.assertEqual(payload["marketSummary"]["salesCount"], 0)
+        self.assertEqual(len(payload["comparableSales"]), 0)
         self.assertEqual(payload["timestamp"], "2026-06-30T09:00:00Z")
         self.assertIn(payload["confidenceLevel"], ["High", "Medium", "Low"])
         self.assertIsInstance(payload["fieldConfidence"], dict)
@@ -252,7 +309,7 @@ class ApiEndpointsTest(unittest.TestCase):
         ):
             response = self.client.post(
                 "/api/analyze",
-                json=_api_analyze_payload(),
+                json=_api_analyze_payload(base64_image=True),
             )
 
         self.assertEqual(response.status_code, 503)
@@ -324,8 +381,9 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(payload["confidence"], 94)
         self.assertEqual(payload["aiReview"]["primaryMatch"], payload["itemName"])
         self.assertEqual(len(payload["alternatives"]), 3)
-        self.assertGreaterEqual(payload["marketSummary"]["salesCount"], 1)
-        self.assertEqual(payload["comparableSales"][0]["currency"], "AUD")
+        self.assertEqual(payload["marketSummary"]["salesCount"], 0)
+        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
+        self.assertEqual(payload["comparableSales"], [])
         self.assertEqual(payload["confidenceLevel"], "High")
         self.assertEqual(payload["fieldConfidence"]["itemName"], 96)
         self.assertEqual(payload["imageQualityIssues"], ["none"])
@@ -340,6 +398,537 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("glare/reflections", prompt_text)
         image_content = request_json["input"][0]["content"][1]
         self.assertTrue(image_content["image_url"].startswith("data:image/jpeg;base64,"))
+
+    def test_backend_analyzer_sit_mock_with_real_key_selects_auto_provider(self) -> None:
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.settings",
+            SimpleNamespace(
+                ai_provider="mock",
+                environment="sit",
+                gemini_api_key="",
+                openai_api_key="test-key",
+                allow_mock_analyzer=False,
+            ),
+        ):
+            provider = BackendAnalyzerService()._resolve_provider()
+
+        self.assertIsInstance(provider, AutoAnalyzerProvider)
+
+    def test_backend_analyzer_sit_mock_without_real_key_returns_config_error(self) -> None:
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.settings",
+            SimpleNamespace(
+                ai_provider="mock",
+                environment="sit",
+                gemini_api_key="",
+                openai_api_key="",
+                allow_mock_analyzer=False,
+            ),
+        ):
+            with self.assertRaises(AnalyzerPipelineError) as context:
+                BackendAnalyzerService()._resolve_provider()
+
+        self.assertEqual(context.exception.code, "AI_PROVIDER_NOT_CONFIGURED")
+
+    def test_backend_analyzer_sit_mock_allowed_only_when_explicit(self) -> None:
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.settings",
+            SimpleNamespace(
+                ai_provider="mock",
+                environment="sit",
+                gemini_api_key="",
+                openai_api_key="",
+                allow_mock_analyzer=True,
+            ),
+        ):
+            provider = BackendAnalyzerService()._resolve_provider()
+
+        self.assertIsInstance(provider, MockAnalyzerProvider)
+
+    def test_backend_analyzer_gemini_provider_selects_fallback_chain(self) -> None:
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.settings",
+            SimpleNamespace(
+                ai_provider="gemini",
+                environment="sit",
+                gemini_api_key="test-key",
+                openai_api_key="",
+                allow_mock_analyzer=False,
+            ),
+        ):
+            provider = BackendAnalyzerService()._resolve_provider()
+
+        self.assertIsInstance(provider, FallbackAnalyzerProvider)
+        self.assertEqual(provider.selection_diagnostics["requestedProvider"], "gemini")
+        self.assertEqual(
+            provider.selection_diagnostics["preferredOrder"],
+            ["gemini", "mock"],
+        )
+
+    def test_api_analyze_auto_provider_uses_gemini_before_openai(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        response=_FakeOpenAIResponse(
+                            body=_gemini_response(_openai_output(title="Gemini Card"))
+                        )
+                    ),
+                ),
+                OpenAIRecognitionProvider(
+                    api_key="test-key",
+                    client=_FakeOpenAIClient(
+                        response=_FakeOpenAIResponse(
+                            body={"output_text": json.dumps(_openai_output())}
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "gemini")
+        self.assertEqual(
+            payload["rawProviderPayload"]["providerSelection"]["selectedProvider"],
+            "gemini",
+        )
+        self.assertNotIn("mockSelection", payload["rawProviderPayload"])
+        self.assertEqual(payload["itemName"], "Gemini Card")
+
+    def test_api_analyze_auto_provider_uses_openai_when_gemini_unavailable(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(api_key=""),
+                OpenAIRecognitionProvider(
+                    api_key="test-key",
+                    client=_FakeOpenAIClient(
+                        response=_FakeOpenAIResponse(
+                            body={"output_text": json.dumps(_openai_output())}
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "openai")
+        self.assertEqual(
+            payload["rawProviderPayload"]["providerSelection"]["selectedProvider"],
+            "openai",
+        )
+
+    def test_api_analyze_real_provider_rejects_missing_image_bytes(self) -> None:
+        gemini_client = _FakeGeminiClient(
+            response=_FakeOpenAIResponse(
+                body=_gemini_response(_openai_output(title="Should Not Run"))
+            )
+        )
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=gemini_client,
+                )
+            ],
+            allow_mock_fallback=False,
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 422)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "INVALID_IMAGE_PAYLOAD")
+        self.assertIsNone(gemini_client.last_request)
+
+    def test_api_analyze_auto_provider_handles_unknown_low_confidence(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        response=_FakeOpenAIResponse(
+                            body=_gemini_response(
+                                _openai_output(
+                                    title="Unknown collectible",
+                                    category="Other",
+                                    confidence=42,
+                                    estimated_value=0,
+                                    condition="Unknown",
+                                    image_quality_issues=["blurry image"],
+                                    low_confidence_reasons=[
+                                        "The image is too blurry to verify fine details."
+                                    ],
+                                )
+                            )
+                        )
+                    ),
+                ),
+            ]
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["itemName"], "Unknown collectible")
+        self.assertEqual(payload["confidenceLevel"], "Low")
+        self.assertEqual(payload["confidence"], 42)
+        self.assertIn("blurry image", payload["imageQualityIssues"])
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "gemini")
+
+    def test_api_analyze_auto_provider_returns_error_without_mock_fallback(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(api_key=""),
+                OpenAIRecognitionProvider(api_key=""),
+            ],
+            allow_mock_fallback=False,
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 503)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "AI_PROVIDER_NOT_CONFIGURED")
+        provider_errors = error["details"]["providerErrors"]
+        self.assertTrue(
+            any(
+                message.startswith("gemini:AIProviderNotConfiguredError")
+                for message in provider_errors
+            ),
+        )
+        self.assertTrue(
+            any(
+                message.startswith("openai:AIProviderNotConfiguredError")
+                for message in provider_errors
+            ),
+        )
+
+    def test_api_analyze_auto_provider_can_fallback_to_mock_when_explicit(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(api_key=""),
+                OpenAIRecognitionProvider(api_key=""),
+            ],
+            allow_mock_fallback=True,
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "mock")
+        self.assertEqual(
+            payload["rawProviderPayload"]["providerSelection"]["selectedProvider"],
+            "mock",
+        )
+
+    def test_api_analyze_gemini_mapping_handles_missing_fields_safely(self) -> None:
+        provider = FallbackAnalyzerProvider(
+            requested_provider="gemini",
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        response=_FakeOpenAIResponse(
+                            body=_gemini_response(
+                                {
+                                    "title": "Partially visible collectible",
+                                    "category": "Other",
+                                    "confidence": 38,
+                                }
+                            )
+                        )
+                    ),
+                )
+            ],
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["itemName"], "Partially visible collectible")
+        self.assertEqual(payload["category"], "Other")
+        self.assertEqual(payload["confidence"], 38)
+        self.assertEqual(payload["condition"], "Unknown")
+        self.assertEqual(payload["diagnostics"]["aiProvider"], "gemini")
+
+    def test_api_analyze_accepts_multi_image_payload(self) -> None:
+        gemini_client = _FakeGeminiClient(
+            response=_FakeOpenAIResponse(
+                body=_gemini_response(
+                    _openai_output(
+                        title="Australian $2 Coin",
+                        category="Coin",
+                        confidence=82,
+                        estimated_value=12,
+                        condition="Circulated",
+                    )
+                    | {
+                        "faceValue": 2,
+                        "estimatedMarketValue": 12,
+                        "valuationConfidence": 70,
+                        "scanRecommendations": [],
+                    }
+                )
+            )
+        )
+        provider = FallbackAnalyzerProvider(
+            requested_provider="gemini",
+            providers=[
+                GeminiRecognitionProvider(api_key="gemini-key", client=gemini_client)
+            ],
+        )
+        payload = _api_analyze_payload(base64_image=True)
+        payload["image"]["imageRole"] = "front"
+        payload["images"] = [
+            payload["image"],
+            {
+                **payload["image"],
+                "fileName": "coin-back.jpg",
+                "localFilePath": "/local/app/path/coin-back.jpg",
+                "imageRole": "back",
+            },
+        ]
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post("/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["itemName"], "Australian $2 Coin")
+        self.assertEqual(body["faceValue"], 2)
+        self.assertIsNone(body["estimatedMarketValue"])
+        self.assertEqual(body["aiEstimatedValue"], 12)
+        self.assertEqual(body["valuationStatus"], "provider_not_configured")
+        self.assertEqual(body["rawProviderPayload"]["photosUsed"], 2)
+        self.assertEqual(body["rawProviderPayload"]["photoRoles"], ["front", "back"])
+        sent_parts = gemini_client.last_request["json"]["contents"][0]["parts"]
+        image_parts = [part for part in sent_parts if "inline_data" in part]
+        self.assertEqual(len(image_parts), 2)
+
+    def test_api_analyze_single_coin_image_recommends_reverse(self) -> None:
+        provider = FallbackAnalyzerProvider(
+            requested_provider="gemini",
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        response=_FakeOpenAIResponse(
+                            body=_gemini_response(
+                                _openai_output(
+                                    title="Australian $2 Coin",
+                                    category="Coin",
+                                    confidence=58,
+                                    estimated_value=0,
+                                    condition="Unknown",
+                                )
+                                | {
+                                    "faceValue": 2,
+                                    "estimatedMarketValue": 0,
+                                    "valuationConfidence": 35,
+                                    "scanRecommendations": [
+                                        "Add a reverse/back photo to verify the coin."
+                                    ],
+                                }
+                            )
+                        )
+                    ),
+                )
+            ],
+        )
+        payload = _api_analyze_payload(base64_image=True)
+        payload["image"]["imageRole"] = "front"
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post("/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["faceValue"], 2)
+        self.assertEqual(body["estimatedValue"], 0)
+        self.assertIsNone(body["estimatedMarketValue"])
+        self.assertEqual(body["valuationStatus"], "provider_not_configured")
+        self.assertIn("reverse", " ".join(body["scanRecommendations"]).lower())
+
+    def test_api_analyze_response_contract_keys_remain_unchanged(self) -> None:
+        response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(response.json().keys()),
+            {
+                "id",
+                "itemName",
+                "title",
+                "category",
+                "manufacturer",
+                "year",
+                "series",
+                "variant",
+                "estimatedValue",
+                "estimated_value",
+                "currency",
+                "tags",
+                "description",
+                "attributes",
+                "images",
+                "rawProviderPayload",
+                "faceValue",
+                "estimatedMarketValue",
+                "aiEstimatedValue",
+                "valuationStatus",
+                "valuationSource",
+                "askingPriceWarning",
+                "valuationConfidence",
+                "lowEstimate",
+                "highEstimate",
+                "confidence",
+                "condition",
+                "marketTrend",
+                "keyAttributes",
+                "aiReview",
+                "alternatives",
+                "recommendation",
+                "marketSummary",
+                "comparableSales",
+                "imageUrl",
+                "timestamp",
+                "fieldConfidence",
+                "confidenceLevel",
+                "lowConfidenceReasons",
+                "imageQualityIssues",
+                "scanRecommendations",
+                "diagnostics",
+            },
+        )
+
+    def test_api_analyze_successful_identification_without_pricing_provider(self) -> None:
+        response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
+        self.assertEqual(payload["valuationSource"], "not_configured")
+        self.assertGreater(payload["aiEstimatedValue"], 0)
+        self.assertIsNone(payload["estimatedMarketValue"])
+        self.assertEqual(payload["marketSummary"]["salesCount"], 0)
+        self.assertEqual(payload["comparableSales"], [])
+
+    def test_api_analyze_market_estimated_value_from_pricing_provider(self) -> None:
+        with patch("app.routers.api_analyze.settings", _settings_with_pricing("ebay")), patch(
+            "app.routers.api_analyze.get_pricing_provider",
+            return_value=_FakePricingProvider(),
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["valuationStatus"], "market_estimated")
+        self.assertEqual(payload["valuationSource"], "eBay sold comps")
+        self.assertEqual(payload["estimatedMarketValue"], 42)
+        self.assertEqual(payload["estimatedValue"], 42)
+        self.assertEqual(payload["marketSummary"]["salesCount"], 1)
+
+    def test_api_analyze_no_market_match_status(self) -> None:
+        with patch("app.routers.api_analyze.settings", _settings_with_pricing("ebay")), patch(
+            "app.routers.api_analyze.get_pricing_provider",
+            return_value=_FailingPricingProvider(EmptyMarketDataError("no comps")),
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["valuationStatus"], "no_market_match")
+        self.assertEqual(payload["valuationSource"], "ebay")
+        self.assertIsNone(payload["estimatedMarketValue"])
+
+    def test_api_analyze_pricing_lookup_failed_status(self) -> None:
+        with patch("app.routers.api_analyze.settings", _settings_with_pricing("ebay")), patch(
+            "app.routers.api_analyze.get_pricing_provider",
+            return_value=_FailingPricingProvider(PricingProviderError("upstream failed")),
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["valuationStatus"], "lookup_failed")
+        self.assertEqual(payload["valuationSource"], "ebay")
+        self.assertIsNone(payload["estimatedMarketValue"])
+
+    def test_api_analyze_pricing_provider_not_configured_status(self) -> None:
+        with patch("app.routers.api_analyze.settings", _settings_with_pricing("ebay")), patch(
+            "app.routers.api_analyze.get_pricing_provider",
+            return_value=_FailingPricingProvider(
+                PricingProviderUnavailableError("EBAY_ACCESS_TOKEN is missing")
+            ),
+        ):
+            response = self.client.post("/analyze", json=_api_analyze_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
+        self.assertEqual(payload["valuationSource"], "ebay")
 
     def test_api_analyze_openai_invalid_json_returns_safe_error(self) -> None:
         provider = OpenAIRecognitionProvider(
@@ -627,13 +1216,74 @@ def _valid_jpeg_bytes() -> bytes:
     return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
 
 
-def _openai_output() -> dict:
+def _settings_with_pricing(provider: str):
+    return SimpleNamespace(
+        environment="test",
+        ai_provider="mock",
+        allow_mock_analyzer=True,
+        pricing_provider=provider,
+    )
+
+
+class _FakePricingProvider:
+    provider_name = "fake_market"
+
+    def price(self, recognition) -> PricingResult:
+        return PricingResult(
+            estimatedMarketValue=42,
+            lowEstimate=35,
+            highEstimate=50,
+            currency="AUD",
+            pricingSource="eBay sold comps",
+            pricingConfidence=82,
+            lastUpdated=utc_timestamp(),
+            valuationStatus="market_estimated",
+            valuationSource="eBay sold comps",
+            aiEstimatedValue=recognition.estimatedValue,
+            comparableSales=[
+                MarketComparableSale(
+                    source="eBay sold comps",
+                    title=f"{recognition.title} sold listing",
+                    soldPrice=42,
+                    currency="AUD",
+                    soldDate="2026-07-01T00:00:00Z",
+                    condition=recognition.condition,
+                )
+            ],
+            providerDiagnostics={
+                "providerCount": "1",
+                "providers": "eBay sold comps",
+                "comparableCount": "1",
+            },
+        )
+
+
+class _FailingPricingProvider:
+    provider_name = "failing_market"
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    def price(self, recognition):
+        raise self._error
+
+
+def _openai_output(
+    *,
+    title: str = "1999 Pokemon Charizard Holo",
+    category: str = "Pokemon Card",
+    confidence: int = 94,
+    estimated_value: int = 1850,
+    condition: str = "Near Mint",
+    low_confidence_reasons: list[str] | None = None,
+    image_quality_issues: list[str] | None = None,
+) -> dict:
     return {
-        "title": "1999 Pokemon Charizard Holo",
-        "category": "Pokemon Card",
-        "confidence": 94,
-        "estimatedValue": 1850,
-        "condition": "Near Mint",
+        "title": title,
+        "category": category,
+        "confidence": confidence,
+        "estimatedValue": estimated_value,
+        "condition": condition,
         "recommendation": "Consider professional grading before selling.",
         "description": "Likely a Base Set Charizard holographic card.",
         "detectedObjects": ["Card", "Pokemon", "Charizard"],
@@ -646,14 +1296,16 @@ def _openai_output() -> dict:
             "cardNumber": 78,
             "condition": 70,
         },
-        "confidenceLevel": "High",
-        "lowConfidenceReasons": [],
-        "imageQualityIssues": ["none"],
+        "confidenceLevel": (
+            "High" if confidence >= 90 else "Medium" if confidence >= 70 else "Low"
+        ),
+        "lowConfidenceReasons": low_confidence_reasons or [],
+        "imageQualityIssues": image_quality_issues or ["none"],
         "scanRecommendations": [
             "Use bright, even lighting.",
             "Keep the card fully inside the frame.",
         ],
-        "primaryMatch": "1999 Pokemon Charizard Holo",
+        "primaryMatch": title,
         "alternativeMatches": [
             {
                 "title": "2002 Pokemon Expedition Charizard",
@@ -694,6 +1346,22 @@ def _openai_output() -> dict:
     }
 
 
+def _gemini_response(output: dict) -> dict:
+    return {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": json.dumps(output),
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+
 class _FakeOpenAIResponse:
     def __init__(self, *, status_code: int = 200, body: dict | None = None) -> None:
         self.status_code = status_code
@@ -722,6 +1390,25 @@ class _FakeOpenAIClient:
         if self.response is None:
             raise AssertionError("Fake OpenAI client requires a response.")
         return self.response
+
+
+class _FakeGeminiClient(_FakeOpenAIClient):
+    pass
+
+
+class _StaticHealthProvider:
+    def __init__(self, name: str, healthy: bool, required: bool) -> None:
+        self.name = name
+        self.required = required
+        self._healthy = healthy
+
+    def check(self) -> HealthCheckResult:
+        return HealthCheckResult(
+            name=self.name,
+            healthy=self._healthy,
+            required=self.required,
+            latency_ms=1,
+        )
 
 
 if __name__ == "__main__":

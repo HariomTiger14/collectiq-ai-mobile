@@ -37,6 +37,7 @@ import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -955,6 +956,8 @@ class ScannerController extends Notifier<ScannerState> {
     );
     try {
       _logAnalyzerRuntimeConfig();
+      final scannerTraceId = 'scan-${DateTime.now().microsecondsSinceEpoch}';
+      debugPrint('[AnalyzerTrace] scanner-trace-id=$scannerTraceId');
       final aiStopwatch = Stopwatch()..start();
       final analyzerResponse = await _analyzerService.analyze(
         AnalyzerRequest(
@@ -975,6 +978,7 @@ class ScannerController extends Notifier<ScannerState> {
             'selectedItemStatus': state.selectedItemStatus,
             'imageCount': state.photoSlots.length,
             'imageRoles': state.photoSlots.keys.join(','),
+            'scannerTraceId': scannerTraceId,
             ..._analyzeMetadata(),
           },
         ),
@@ -994,8 +998,18 @@ class ScannerController extends Notifier<ScannerState> {
         'provider=${analyzerResponse.rawProviderPayload['provider'] ?? 'unknown'} '
         'selectedProvider=${analyzerResponse.rawProviderPayload['selectedProvider'] ?? 'unknown'} '
         'requestedProvider=${analyzerResponse.rawProviderPayload['requestedProvider'] ?? 'unknown'} '
+        'backendResponseSource=${analyzerResponse.rawProviderPayload['backendResponseSource'] ?? 'unknown'} '
         'title="${analyzerResponse.title}" '
-        'category=${analyzerResponse.category}',
+        'category=${analyzerResponse.category} '
+        'manufacturer=${analyzerResponse.manufacturer ?? 'unknown'} '
+        'normalizedLookupQuery="${_pricingLookupQuery(analyzerResponse.scanResult)}" '
+        'pricingAttempted=${analyzerResponse.scanResult.valuationStatus != ValuationStatus.providerNotConfigured} '
+        'pricingProvider=${analyzerResponse.scanResult.pricing.pricingSource} '
+        'pricingStatus=${analyzerResponse.scanResult.valuationStatus.wireValue} '
+        'marketEstimatedValue=${analyzerResponse.scanResult.estimatedMarketValue ?? 0} '
+        'aiEstimatedValue=${analyzerResponse.scanResult.aiEstimatedValue ?? 0} '
+        'finalValue=${analyzerResponse.scanResult.estimatedValue} '
+        'renderedValue="${_renderedValueForTrace(analyzerResponse.scanResult)}"',
       );
       final enrichmentStopwatch = Stopwatch()..start();
       final enrichedAnalysis = await _enrichmentService.enrich(
@@ -1135,6 +1149,7 @@ class ScannerController extends Notifier<ScannerState> {
       'SUPABASE_ANON_KEY_LENGTH=${supabaseConfig.anonKeyLength} '
       'AI_ANALYSIS_PROVIDER=${aiConfig.type.configValue} '
       'ANALYZER_PROVIDER=${analyzerConfig.providerType.configValue} '
+      'MOCK_MODE_ENABLED=${!aiConfig.hasBackendAnalysisEndpoint} '
       'AI_BACKEND_ANALYSIS_ENDPOINT_URL=${_safeEndpoint(aiConfig.backendAnalysisEndpointUrl)} '
       'API_BASE_URL=${_safeEndpoint(environmentConfig.baseUrl)}',
     );
@@ -1155,6 +1170,38 @@ class ScannerController extends Notifier<ScannerState> {
       port: uri.hasPort ? uri.port : null,
       path: uri.path,
     ).toString();
+  }
+
+  String _pricingLookupQuery(ScanResult result) {
+    return [
+          result.title,
+          result.brand,
+          result.series,
+          result.year,
+          result.category,
+          result.condition,
+        ]
+        .whereType<String>()
+        .map((value) => value.trim())
+        .where((value) {
+          return value.isNotEmpty;
+        })
+        .join(' ');
+  }
+
+  String _renderedValueForTrace(ScanResult result) {
+    if (result.estimatedValue > 0) {
+      return result.estimatedValue.toStringAsFixed(0);
+    }
+    return switch (result.valuationStatus) {
+      ValuationStatus.providerNotConfigured =>
+        'Market value unavailable — pricing source not connected yet',
+      ValuationStatus.noMarketMatch => 'No reliable market match found yet',
+      ValuationStatus.lookupFailed => 'Value lookup failed — try again',
+      ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
+      ValuationStatus.marketEstimated => 'Value unavailable',
+      ValuationStatus.unavailable => 'Value unavailable',
+    };
   }
 
   /// Saves the latest scan result to the in-memory portfolio.
@@ -1209,6 +1256,9 @@ class ScannerController extends Notifier<ScannerState> {
       mint: result.mint,
       material: result.material,
       notes: result.notes,
+      valuationStatus: result.valuationStatus,
+      valuationSource: result.valuationSource,
+      aiEstimatedValue: result.aiEstimatedValue,
     );
 
     debugPrint(

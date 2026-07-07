@@ -45,6 +45,9 @@ class PricingResult:
     pricingSource: str
     pricingConfidence: int
     lastUpdated: str
+    valuationStatus: str = "market_estimated"
+    valuationSource: str = "market"
+    aiEstimatedValue: int | None = None
     marketTrend: str = "Stable"
     sourceCount: int = 1
     pricingAge: str = "fresh"

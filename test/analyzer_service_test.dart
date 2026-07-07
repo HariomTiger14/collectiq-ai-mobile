@@ -245,6 +245,7 @@ void main() {
       expect(response.rawProviderPayload['contract'], 'POST /analyze');
       expect(response.rawProviderPayload['selectedProvider'], 'gemini');
       expect(response.rawProviderPayload['requestedProvider'], 'auto');
+      expect(response.rawProviderPayload['backendResponseSource'], 'gemini');
     });
 
     test('missing endpoint path uses local mock fallback safely', () async {
@@ -262,6 +263,7 @@ void main() {
 
       expect(response.title, 'Analyzer Test Card');
       expect(response.rawProviderPayload['analysisPath'], 'local_mock');
+      expect(response.rawProviderPayload['backendResponseSource'], isNull);
       expect(
         response.rawProviderPayload['fallbackReason'],
         'backend_endpoint_not_configured',
@@ -361,6 +363,9 @@ void main() {
         'category': 'Coin',
         'estimatedValue': 0,
         'estimatedMarketValue': 0,
+        'aiEstimatedValue': null,
+        'valuationStatus': 'no_market_match',
+        'valuationSource': 'ebay',
         'faceValue': 2,
         'valuationConfidence': 35,
         'askingPriceWarning': 'Insufficient sold comparable evidence.',
@@ -377,6 +382,10 @@ void main() {
 
       expect(result.faceValue, 2);
       expect(result.estimatedMarketValue, 0);
+      expect(result.aiEstimatedValue, isNull);
+      expect(result.valuationStatus, ValuationStatus.noMarketMatch);
+      expect(result.valuationSource, 'ebay');
+      expect(result.pricing.valuationStatus, ValuationStatus.noMarketMatch);
       expect(result.askingPriceWarning, contains('Insufficient'));
       expect(result.valuationConfidence, 0.35);
       expect(result.photosUsed, 1);

@@ -40,6 +40,9 @@ class ScanResultEnrichmentService {
     required ScanResultEnrichmentMetadata metadata,
   }) async {
     final result = analysis.scanResult;
+    if (result.valuationStatus != ValuationStatus.unavailable) {
+      return analysis;
+    }
     try {
       final pricing = await marketPricingProvider.price(
         MarketPricingRequest(
@@ -88,6 +91,9 @@ class ScanResultEnrichmentService {
             pricingSource: 'Mock pricing unavailable',
             pricingConfidence: 0,
             lastUpdated: result.scanDate,
+            valuationStatus: result.valuationStatus,
+            valuationSource: result.valuationSource,
+            aiEstimatedValue: result.aiEstimatedValue,
           ),
           marketSummary: result.marketSummary,
         ),
@@ -107,6 +113,9 @@ class ScanResultEnrichmentService {
       pricingSource: enriched.pricingSource,
       pricingConfidence: enriched.pricingConfidence,
       lastUpdated: enriched.lastUpdated,
+      valuationStatus: existing.valuationStatus,
+      valuationSource: existing.valuationSource,
+      aiEstimatedValue: existing.aiEstimatedValue,
     );
   }
 
@@ -146,6 +155,15 @@ class ScanResultEnrichmentService {
       mint: result.mint,
       material: result.material,
       notes: result.notes,
+      faceValue: result.faceValue,
+      estimatedMarketValue: result.estimatedMarketValue,
+      askingPriceWarning: result.askingPriceWarning,
+      valuationConfidence: result.valuationConfidence,
+      valuationStatus: result.valuationStatus,
+      valuationSource: result.valuationSource,
+      aiEstimatedValue: result.aiEstimatedValue,
+      photosUsed: result.photosUsed,
+      photoRoles: result.photoRoles,
     );
   }
 }

@@ -45,18 +45,17 @@ def get_pricing_provider(provider_name: str | None = None) -> PricingProvider:
         return PricingAggregationService([_mock_provider], fallback_provider=_mock_provider)
 
     if selected_provider == "ebay":
-        return PricingAggregationService([_ebay_provider], fallback_provider=_mock_provider)
+        return PricingAggregationService([_ebay_provider])
 
     if selected_provider == "tcgplayer":
-        return PricingAggregationService([_tcgplayer_provider], fallback_provider=_mock_provider)
+        return PricingAggregationService([_tcgplayer_provider])
 
     if selected_provider == "pricecharting":
-        return PricingAggregationService([_pricecharting_provider], fallback_provider=_mock_provider)
+        return PricingAggregationService([_pricecharting_provider])
 
     if selected_provider == "aggregate":
         return PricingAggregationService(
-            [_ebay_provider, _tcgplayer_provider, _pricecharting_provider],
-            fallback_provider=_mock_provider,
+            [_ebay_provider, _tcgplayer_provider, _pricecharting_provider]
         )
 
     raise PricingProviderUnavailableError(

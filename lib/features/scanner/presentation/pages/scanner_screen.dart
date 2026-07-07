@@ -13,6 +13,7 @@ import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_c
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -341,6 +342,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   category: scanResult.category,
                                   estimatedValue: _formatScanValue(
                                     scanResult.estimatedValue,
+                                    scanResult.valuationStatus,
                                   ),
                                   confidence:
                                       '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
@@ -386,6 +388,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                       scanResult.askingPriceWarning,
                                   valuationConfidence:
                                       scanResult.valuationConfidence,
+                                  valuationStatus: scanResult.valuationStatus,
+                                  valuationSource: scanResult.valuationSource,
+                                  aiEstimatedValue: scanResult.aiEstimatedValue,
                                   onViewPortfolio: widget.onViewPortfolio,
                                   onScanAnother: ref
                                       .read(scannerControllerProvider.notifier)
@@ -436,9 +441,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   }
 }
 
-String _formatScanValue(double value) {
+String _formatScanValue(double value, ValuationStatus status) {
   if (value <= 0) {
-    return 'Value unavailable';
+    return _valuationStatusMessage(status);
   }
 
   final whole = value.toStringAsFixed(0);
@@ -447,6 +452,18 @@ String _formatScanValue(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+String _valuationStatusMessage(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.providerNotConfigured =>
+      'Market value unavailable — pricing source not connected yet',
+    ValuationStatus.noMarketMatch => 'No reliable market match found yet',
+    ValuationStatus.lookupFailed => 'Value lookup failed — try again',
+    ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
+    ValuationStatus.marketEstimated => 'Value unavailable',
+    ValuationStatus.unavailable => 'Value unavailable',
+  };
 }
 
 class _ScanGoalSelector extends StatelessWidget {

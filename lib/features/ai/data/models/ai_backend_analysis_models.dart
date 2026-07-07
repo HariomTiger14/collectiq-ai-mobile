@@ -94,6 +94,9 @@ class AiBackendAnalysisResponse {
     required this.timestamp,
     this.faceValue,
     this.estimatedMarketValue,
+    this.aiEstimatedValue,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
     this.askingPriceWarning,
     this.valuationConfidence,
     this.rawProviderPayload = const {},
@@ -118,6 +121,9 @@ class AiBackendAnalysisResponse {
   final DateTime? timestamp;
   final double? faceValue;
   final double? estimatedMarketValue;
+  final double? aiEstimatedValue;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
   final String? askingPriceWarning;
   final double? valuationConfidence;
   final Map<String, dynamic> rawProviderPayload;
@@ -198,6 +204,12 @@ class AiBackendAnalysisResponse {
       timestamp: parseNullableDateTime(json['timestamp']),
       faceValue: parseNullableDouble(json['faceValue']),
       estimatedMarketValue: parseNullableDouble(json['estimatedMarketValue']),
+      aiEstimatedValue: parseNullableDouble(json['aiEstimatedValue']),
+      valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
+      valuationSource: parseString(
+        json['valuationSource'],
+        fallback: 'unknown',
+      ),
       askingPriceWarning: _optionalString(json['askingPriceWarning']),
       valuationConfidence: _normalizeNullableConfidence(
         json['valuationConfidence'],
@@ -219,18 +231,22 @@ class AiBackendAnalysisResponse {
   ScanResult toScanResult({required String thumbnail, DateTime? scanDate}) {
     final resultDate = scanDate ?? timestamp ?? DateTime.now();
     final resolvedMarketSummary = marketSummary ?? _fallbackMarketSummary();
-    final pricingSource =
-        resolvedMarketSummary == null || resolvedMarketSummary.sources.isEmpty
-        ? 'Backend AI'
-        : resolvedMarketSummary.sources.first;
+    final pricingSource = valuationSource == 'unknown'
+        ? resolvedMarketSummary == null || resolvedMarketSummary.sources.isEmpty
+              ? 'Backend AI'
+              : resolvedMarketSummary.sources.first
+        : valuationSource;
     final pricing = PricingInfo(
-      estimatedMarketValue: estimatedValue,
+      estimatedMarketValue: estimatedMarketValue ?? 0,
       lowEstimate: lowEstimate,
       highEstimate: highEstimate,
       currency: 'AUD',
       pricingSource: pricingSource,
       pricingConfidence: confidence,
       lastUpdated: resolvedMarketSummary?.lastUpdated,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
     );
 
     return ScanResult(
@@ -275,6 +291,9 @@ class AiBackendAnalysisResponse {
       estimatedMarketValue: estimatedMarketValue,
       askingPriceWarning: askingPriceWarning,
       valuationConfidence: valuationConfidence,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
       photosUsed: _photosUsed(),
       photoRoles: _photoRoles(),
     );
