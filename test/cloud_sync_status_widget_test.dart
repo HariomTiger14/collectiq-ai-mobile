@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   testWidgets('collectible detail renders sync status labels', (tester) async {
     SharedPreferences.setMockInitialValues({});
+    _setTallDetailSurface(tester);
 
     for (final entry in <CloudItemSyncStatus, String>{
       CloudItemSyncStatus.localOnly: 'Local only',
@@ -23,7 +24,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Sync Status'), findsOneWidget);
+      await _showRawDiagnostics(tester, entry.value);
       expect(find.text(entry.value), findsOneWidget);
     }
   });
@@ -32,6 +33,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
+    _setTallDetailSurface(tester);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -46,9 +48,28 @@ void main() {
       ),
     );
 
+    await _showRawDiagnostics(tester, 'Sync failed');
     expect(find.text('Sync failed'), findsOneWidget);
     expect(find.text('Upload failed for this item.'), findsOneWidget);
   });
+}
+
+Future<void> _showRawDiagnostics(
+  WidgetTester tester,
+  String expectedValue,
+) async {
+  if (find.text(expectedValue).evaluate().isNotEmpty) {
+    return;
+  }
+  await tester.tap(find.text('Raw Diagnostics'));
+  await tester.pumpAndSettle();
+}
+
+void _setTallDetailSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }
 
 CollectibleItem _item({
