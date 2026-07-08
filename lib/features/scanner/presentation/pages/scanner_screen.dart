@@ -282,8 +282,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               CaptureWorkspace(
                                 key: _previewKey,
                                 goal: activeGoal,
+                                category: scannerState.captureCategory,
                                 plan: activePlan,
                                 slots: scannerState.photoSlots,
+                                captureImages: scannerState.captureImages,
                                 selectedItemTitle:
                                     scannerState.selectedItemTitle,
                                 selectedItemStatus:
@@ -293,10 +295,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     scannerState.isPreparingImage,
                                 hasResult: scanResult != null,
                                 selectedPath: selectedImagePath,
+                                activeRoleId: scannerState.activeCaptureRole,
                                 onPrimaryCapture: () {
                                   final role =
-                                      activePlan.nextRecommendedRole ??
-                                      ScanCaptureRole.front;
+                                      scannerState.activeCaptureRole == null
+                                      ? activePlan.nextRecommendedRole ??
+                                            ScanCaptureRole.front
+                                      : ScanCaptureRole.fromId(
+                                          scannerState.activeCaptureRole!,
+                                        );
                                   scannerController.startCameraScan(
                                     context,
                                     imageRole: role.id,
@@ -307,10 +314,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     .startCameraScan(context, imageRole: role),
                                 onGallery: (role) => scannerController
                                     .pickImageFromGallery(imageRole: role),
-                                onPreview: (slot) => scannerController
-                                    .selectCapturedImage(slot.role),
+                                onSelectRole:
+                                    scannerController.selectCaptureRole,
+                                onPreview:
+                                    scannerController.selectCapturedPhoto,
                                 onSample: scannerController.useSampleScan,
-                                onDelete: scannerController.deleteRoleImage,
+                                onDelete: scannerController.deleteCapturedImage,
                                 onReset: scannerController.resetScan,
                               ),
                               if (showPickerShell) ...[
@@ -379,6 +388,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   isSaving: scannerState.isSavingToPortfolio,
                                   photosUsed: scanResult.photosUsed,
                                   photoRoles: scanResult.photoRoles,
+                                  galleryImages: scanResult.galleryImages,
                                   faceValue: scanResult.faceValue,
                                   estimatedMarketValue:
                                       scanResult.estimatedMarketValue,
@@ -399,7 +409,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   goal:
                                       scannerState.scanSession?.scanGoal ??
                                       ScanGoal.identifyValue,
-                                  imageCount: scannerState.photoSlots.length,
+                                  imageCount: scannerState.captureImages.length,
                                   confidenceModel: ConfidenceModel(
                                     confidenceTarget:
                                         scannerState
@@ -770,13 +780,13 @@ String _scanStatusFor(ScannerState state) {
   if (state.scanResult != null) {
     return 'Ready to Save';
   }
-  final photoCount = state.photoSlots.length;
-  if (photoCount > 0) {
+  final captureCount = state.captureImages.length;
+  if (captureCount > 0) {
     final plan = state.scanSession?.capturePlan;
     if (plan?.isMinimumReadyForAnalyze ?? false) {
-      return '$photoCount photo${photoCount == 1 ? '' : 's'} ready';
+      return '$captureCount photo${captureCount == 1 ? '' : 's'} ready';
     }
-    return '$photoCount photo${photoCount == 1 ? '' : 's'} captured';
+    return '$captureCount photo${captureCount == 1 ? '' : 's'} captured';
   }
 
   return 'Ready to Scan';
@@ -794,7 +804,7 @@ String _modelStatusFor(ScannerState state) {
   }
   final plan = state.scanSession?.capturePlan;
   final nextRole = plan?.nextRecommendedRole;
-  if (state.photoSlots.isNotEmpty) {
+  if (state.captureImages.isNotEmpty) {
     if (plan?.isMinimumReadyForAnalyze ?? false) {
       return 'Ready for analysis';
     }
