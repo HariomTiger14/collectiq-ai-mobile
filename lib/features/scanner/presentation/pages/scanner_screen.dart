@@ -264,7 +264,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               ScanStatusBar(
                                 status: _scanStatusFor(scannerState),
                                 confidence: scanResult?.confidence,
-                                category: scanResult?.category,
+                                category: _scanCategoryStatus(scannerState),
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
                               const SizedBox(height: AppSpacing.md),
@@ -274,7 +274,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               _CaptureCategorySelector(
-                                selectedCategory: scannerState.captureCategory,
+                                selectedCategory:
+                                    scannerState.hasManualCaptureCategory
+                                    ? scannerState.captureCategory
+                                    : null,
                                 onCategorySelected:
                                     scannerController.selectCaptureCategory,
                               ),
@@ -283,6 +286,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 key: _previewKey,
                                 goal: activeGoal,
                                 category: scannerState.captureCategory,
+                                categoryLabel: _workspaceCategoryStatus(
+                                  scannerState,
+                                ),
+                                hasManualCategory:
+                                    scannerState.hasManualCaptureCategory,
+                                detectedCategory: scanResult?.category,
                                 plan: activePlan,
                                 slots: scannerState.photoSlots,
                                 captureImages: scannerState.captureImages,
@@ -320,6 +329,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     scannerController.selectCapturedPhoto,
                                 onUseAsPrimary:
                                     scannerController.useCapturedPhotoAsPrimary,
+                                onEnhance:
+                                    scannerController.applyEnhancementToPhoto,
                                 onSample: scannerController.useSampleScan,
                                 onDelete: scannerController.deleteCapturedImage,
                                 onReset: scannerController.resetScan,
@@ -464,6 +475,28 @@ String _formatScanValue(double value, ValuationStatus status) {
   return '\$$withCommas';
 }
 
+String _scanCategoryStatus(ScannerState state) {
+  final detected = state.scanResult?.category.trim();
+  if (detected != null && detected.isNotEmpty) {
+    return 'Detected: $detected';
+  }
+  if (state.hasManualCaptureCategory) {
+    return 'Selected: ${state.captureCategory.title}';
+  }
+  return 'Not selected yet';
+}
+
+String _workspaceCategoryStatus(ScannerState state) {
+  if (state.scanResult != null &&
+      state.scanResult!.category.trim().isNotEmpty) {
+    return 'Detected: ${state.scanResult!.category.trim()}';
+  }
+  if (state.hasManualCaptureCategory) {
+    return 'Selected: ${state.captureCategory.title}';
+  }
+  return 'Not selected yet';
+}
+
 String _valuationStatusMessage(ValuationStatus status) {
   return switch (status) {
     ValuationStatus.providerNotConfigured =>
@@ -512,7 +545,7 @@ class _CaptureCategorySelector extends StatelessWidget {
     required this.onCategorySelected,
   });
 
-  final CollectibleCategory selectedCategory;
+  final CollectibleCategory? selectedCategory;
   final ValueChanged<CollectibleCategory> onCategorySelected;
 
   @override

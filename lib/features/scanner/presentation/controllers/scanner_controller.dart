@@ -21,6 +21,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/capture_event.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
@@ -33,6 +34,7 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -48,6 +50,9 @@ class ScannerPhotoSlot {
     required this.path,
     required this.source,
     this.image,
+    this.originalPath,
+    this.enhancementPreset = ImageEnhancementPreset.original,
+    this.enhancedImagePath,
     this.qualityMetadata = const {},
     this.capturedAt,
   });
@@ -57,8 +62,37 @@ class ScannerPhotoSlot {
   final String path;
   final String source;
   final XFile? image;
+  final String? originalPath;
+  final ImageEnhancementPreset enhancementPreset;
+  final String? enhancedImagePath;
   final Map<String, Object?> qualityMetadata;
   final DateTime? capturedAt;
+
+  bool get isEnhanced => enhancementPreset.isEnhanced;
+
+  String get analyzerPath => path;
+
+  ScannerPhotoSlot copyWith({
+    String? path,
+    XFile? image,
+    String? originalPath,
+    ImageEnhancementPreset? enhancementPreset,
+    String? enhancedImagePath,
+    Map<String, Object?>? qualityMetadata,
+  }) {
+    return ScannerPhotoSlot(
+      role: role,
+      label: label,
+      path: path ?? this.path,
+      source: source,
+      image: image ?? this.image,
+      originalPath: originalPath ?? this.originalPath,
+      enhancementPreset: enhancementPreset ?? this.enhancementPreset,
+      enhancedImagePath: enhancedImagePath ?? this.enhancedImagePath,
+      qualityMetadata: qualityMetadata ?? this.qualityMetadata,
+      capturedAt: capturedAt,
+    );
+  }
 }
 
 /// Immutable presentation state for the scanner workflow.
@@ -75,6 +109,7 @@ class ScannerState {
     this.photoSlots = const {},
     this.captureImages = const [],
     this.captureCategory = CollectibleCategory.toyCar,
+    this.hasManualCaptureCategory = false,
     this.activeCaptureRole,
     this.primaryImagePath,
     this.scanSession,
@@ -111,6 +146,7 @@ class ScannerState {
   final List<ScannerPhotoSlot> captureImages;
 
   final CollectibleCategory captureCategory;
+  final bool hasManualCaptureCategory;
 
   final String? activeCaptureRole;
 
@@ -145,6 +181,7 @@ class ScannerState {
     Map<String, ScannerPhotoSlot>? photoSlots,
     List<ScannerPhotoSlot>? captureImages,
     CollectibleCategory? captureCategory,
+    bool? hasManualCaptureCategory,
     String? activeCaptureRole,
     String? primaryImagePath,
     ScanSession? scanSession,
@@ -187,6 +224,8 @@ class ScannerState {
           ? const []
           : captureImages ?? this.captureImages,
       captureCategory: captureCategory ?? this.captureCategory,
+      hasManualCaptureCategory:
+          hasManualCaptureCategory ?? this.hasManualCaptureCategory,
       activeCaptureRole: clearActiveCaptureRole
           ? null
           : activeCaptureRole ?? this.activeCaptureRole,
@@ -221,6 +260,7 @@ class ScannerController extends Notifier<ScannerState> {
   /// Scan enrichment service dependency.
   late final ScanResultEnrichmentService _enrichmentService;
 
+  late final ImageEnhancementService _imageEnhancementService;
   late final ScanCapturePlanService _capturePlanService;
   late final ScanQualityGateService _qualityGateService;
   late final AppTelemetryService _telemetry;
@@ -239,6 +279,7 @@ class ScannerController extends Notifier<ScannerState> {
     _galleryService = ref.watch(galleryServiceProvider);
     _analyzerService = ref.watch(analyzerServiceProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
+    _imageEnhancementService = const ImageEnhancementService();
     _capturePlanService = ref.watch(scanCapturePlanServiceProvider);
     _qualityGateService = ref.watch(scanQualityGateServiceProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
@@ -351,6 +392,7 @@ class ScannerController extends Notifier<ScannerState> {
     _setState(
       state.copyWith(
         captureCategory: category,
+        hasManualCaptureCategory: true,
         scanSession: session,
         clearScanResult: true,
         clearAiRecommendation: true,
@@ -421,6 +463,67 @@ class ScannerController extends Notifier<ScannerState> {
         selectedItemStatus: 'Primary portfolio image',
       ),
       event: 'capture primary photo selected',
+    );
+  }
+
+  Future<void> applyEnhancementToPhoto(
+    ScannerPhotoSlot slot,
+    ImageEnhancementPreset preset,
+  ) async {
+    final originalPath = (slot.originalPath ?? slot.path).trim();
+    if (originalPath.isEmpty) {
+      return;
+    }
+
+    final result = await _imageEnhancementService.enhance(
+      originalPath: originalPath,
+      preset: preset,
+    );
+    final enhancedSlot = ScannerPhotoSlot(
+      role: slot.role,
+      label: slot.label,
+      path: result.activePath,
+      source: slot.source,
+      image: _imageFileForEnhancementResult(slot, result),
+      originalPath: result.originalPath,
+      enhancedImagePath: result.preset.isEnhanced ? result.activePath : null,
+      enhancementPreset: result.preset,
+      qualityMetadata: {...slot.qualityMetadata, ...result.toMetadataJson()},
+      capturedAt: slot.capturedAt,
+    );
+    final nextImages = [
+      for (final existing in state.captureImages)
+        existing.path == slot.path ? enhancedSlot : existing,
+    ];
+    final nextPrimaryPath = state.primaryImagePath == slot.path
+        ? enhancedSlot.path
+        : state.primaryImagePath;
+    final nextSession = _ensureSession().copyWith(
+      capturedImages: [
+        for (final image in nextImages) _capturedImageFromSlot(image),
+      ],
+      clearConfidenceAchieved: true,
+      clearEndTime: true,
+    );
+
+    _setState(
+      state.copyWith(
+        selectedImage: enhancedSlot.image,
+        selectedImagePath: enhancedSlot.path,
+        selectedItemTitle: enhancedSlot.label,
+        selectedItemStatus: enhancedSlot.isEnhanced
+            ? '${enhancedSlot.enhancementPreset.label} applied'
+            : 'Ready for AI analysis',
+        photoSlots: _latestSlotsFromImages(nextImages),
+        captureImages: nextImages,
+        activeCaptureRole: enhancedSlot.role,
+        primaryImagePath: nextPrimaryPath,
+        scanSession: nextSession,
+        clearScanResult: true,
+        clearAiRecommendation: true,
+        isSavedToPortfolio: false,
+      ),
+      event: 'image enhancement applied',
     );
   }
 
@@ -1102,7 +1205,7 @@ class ScannerController extends Notifier<ScannerState> {
             for (final slot in state.captureImages)
               if (!slot.path.startsWith('sample://'))
                 AnalyzerImageInput(
-                  path: slot.path,
+                  path: slot.analyzerPath,
                   role: slot.role,
                   image: slot.image,
                   source: slot.source,
@@ -1116,6 +1219,14 @@ class ScannerController extends Notifier<ScannerState> {
                 .map((slot) => slot.role)
                 .join(','),
             'captureCategory': state.captureCategory.id,
+            'captureCategorySelected': state.hasManualCaptureCategory,
+            'activeImagePath': selectedImagePath,
+            'activeEnhancementPreset': _activeSlotForPath(
+              selectedImagePath,
+            )?.enhancementPreset.id,
+            'enhancedImageCount': state.captureImages
+                .where((slot) => slot.isEnhanced)
+                .length,
             'scannerTraceId': scannerTraceId,
             ..._analyzeMetadata(),
           },
@@ -1499,6 +1610,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearCaptureImages: true,
       clearActiveCaptureRole: true,
       clearPrimaryImagePath: true,
+      hasManualCaptureCategory: false,
       clearScanSession: true,
       clearScanResult: true,
       clearAiRecommendation: true,
@@ -1530,13 +1642,7 @@ class ScannerController extends Notifier<ScannerState> {
     ];
     final nextSlots = _latestSlotsFromImages(nextImages);
     final capturedImages = [
-      for (final slot in nextImages)
-        CapturedScanImage(
-          path: slot.path,
-          role: ScanCaptureRole.fromId(slot.role),
-          source: slot.source,
-          qualityMetadata: slot.qualityMetadata,
-        ),
+      for (final slot in nextImages) _capturedImageFromSlot(slot),
     ];
     final session = _ensureSession()
         .copyWith(
@@ -1644,6 +1750,7 @@ class ScannerController extends Notifier<ScannerState> {
       path: path,
       source: source,
       image: image,
+      originalPath: path,
       qualityMetadata: qualityMetadata,
       capturedAt: DateTime.now(),
     );
@@ -1651,6 +1758,24 @@ class ScannerController extends Notifier<ScannerState> {
 
   List<ScannerPhotoSlot> _appendCaptureImage(ScannerPhotoSlot slot) {
     return [...state.captureImages, slot];
+  }
+
+  CapturedScanImage _capturedImageFromSlot(ScannerPhotoSlot slot) {
+    return CapturedScanImage(
+      path: slot.analyzerPath,
+      role: ScanCaptureRole.fromId(slot.role),
+      source: slot.source,
+      originalPath: slot.originalPath ?? slot.path,
+      enhancementPreset: slot.enhancementPreset.id,
+      qualityMetadata: {
+        ...slot.qualityMetadata,
+        'originalImagePath': slot.originalPath ?? slot.path,
+        'activeImagePath': slot.path,
+        'enhancementPreset': slot.enhancementPreset.id,
+        'enhancementLabel': slot.enhancementPreset.label,
+        'enhanced': slot.isEnhanced,
+      },
+    );
   }
 
   Map<String, ScannerPhotoSlot> _latestSlotsFromImages(
@@ -1667,6 +1792,40 @@ class ScannerController extends Notifier<ScannerState> {
       }
     }
     return state.photoSlots[normalizedRole];
+  }
+
+  ScannerPhotoSlot? _activeSlotForPath(String imagePath) {
+    final normalizedPath = imagePath.trim();
+    for (final slot in state.captureImages) {
+      if (slot.path == normalizedPath) {
+        return slot;
+      }
+    }
+    return null;
+  }
+
+  XFile? _imageFileForEnhancementResult(
+    ScannerPhotoSlot slot,
+    ImageEnhancementResult result,
+  ) {
+    if (result.createdEnhancedFile) {
+      return XFile(result.activePath);
+    }
+    if (!result.preset.isEnhanced && _isLocalImagePath(result.originalPath)) {
+      return XFile(result.originalPath);
+    }
+    return slot.image;
+  }
+
+  bool _isLocalImagePath(String path) {
+    final normalized = path.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    return !normalized.startsWith('sample://') &&
+        !normalized.startsWith('assets/') &&
+        !normalized.startsWith('http://') &&
+        !normalized.startsWith('https://');
   }
 
   ScanSession _ensureSession({ScanGoal? scanGoal}) {
@@ -1707,7 +1866,16 @@ class ScannerController extends Notifier<ScannerState> {
         path: path,
         role: ScanCaptureRole.fromId(imageRole),
         source: source,
-        qualityMetadata: quality.toMetadataJson(),
+        originalPath: path,
+        enhancementPreset: ImageEnhancementPreset.original.id,
+        qualityMetadata: {
+          ...quality.toMetadataJson(),
+          'originalImagePath': path,
+          'activeImagePath': path,
+          'enhancementPreset': ImageEnhancementPreset.original.id,
+          'enhancementLabel': ImageEnhancementPreset.original.label,
+          'enhanced': false,
+        },
       ),
     ];
     final plan = _capturePlanService.buildPlan(
@@ -1802,13 +1970,7 @@ class ScannerController extends Notifier<ScannerState> {
       return _capturedImagesFromSlots(state.photoSlots);
     }
     return [
-      for (final slot in state.captureImages)
-        CapturedScanImage(
-          path: slot.path,
-          role: ScanCaptureRole.fromId(slot.role),
-          source: slot.source,
-          qualityMetadata: slot.qualityMetadata,
-        ),
+      for (final slot in state.captureImages) _capturedImageFromSlot(slot),
     ];
   }
 
@@ -1823,6 +1985,8 @@ class ScannerController extends Notifier<ScannerState> {
             path: slot.path,
             role: slot.role,
             source: slot.source,
+            originalPath: slot.originalPath,
+            enhancementPreset: slot.enhancementPreset.id,
             isPrimary: slot.path == primaryPath,
           ),
     ];

@@ -1296,6 +1296,60 @@ void main() {
     );
   });
 
+  testWidgets('empty scanner category stays awaiting scan state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Not selected yet'), findsWidgets);
+    expect(find.text('0 photos'), findsWidgets);
+    expect(find.text('--'), findsWidgets);
+    expect(find.text('Selected: Toy car'), findsNothing);
+    expect(find.text('Detected: Toy car'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('manual and detected scanner categories are labeled clearly', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('scan-category-toy_car')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selected: Toy car'), findsWidgets);
+
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.pump();
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detected: Pokemon Card'), findsWidgets);
+  });
+
   testWidgets('scanner slot updates after captured front image', (
     WidgetTester tester,
   ) async {
@@ -1564,6 +1618,133 @@ void main() {
     expect(find.text('1999 Pokemon Charizard Holo variant'), findsNothing);
     expect(find.textContaining('Mock confidence'), findsNothing);
     expect(find.textContaining('Sleeve it'), findsNothing);
+  });
+
+  testWidgets('scanner enhancement updates active photo metadata', (
+    WidgetTester tester,
+  ) async {
+    final provider = _CapturingAiAnalysisProvider();
+    await tester.pumpCollectIqApp(aiAnalysisProvider: provider);
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+      findsOneWidget,
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('enhancement-preset-brighten')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Brighten applied'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final controller = container.read(scannerControllerProvider);
+    expect(controller.captureImages.single.enhancementPreset.id, 'brighten');
+    expect(controller.captureImages.single.qualityMetadata['enhanced'], isTrue);
+
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('enhancement-preset-original')));
+    await tester.pumpAndSettle();
+
+    final reverted = container.read(scannerControllerProvider);
+    expect(reverted.captureImages.single.enhancementPreset.id, 'original');
+    expect(reverted.captureImages.single.qualityMetadata['enhanced'], isFalse);
+
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('enhancement-preset-brighten')));
+    await tester.pumpAndSettle();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.pump();
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpAndSettle();
+
+    expect(
+      provider.lastRequest?.metadata['activeEnhancementPreset'],
+      'brighten',
+    );
+    expect(provider.lastRequest?.metadata['enhancedImageCount'], 1);
+  });
+
+  testWidgets('saving enhanced scan preserves portfolio gallery metadata', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pumpAndSettle();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('enhancement-preset-contrast')));
+    await tester.pumpAndSettle();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.pump();
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpAndSettle();
+    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.pump();
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString('portfolio_items')!;
+    final item =
+        (jsonDecode(stored) as List<dynamic>).first as Map<String, dynamic>;
+    final gallery = item['galleryImages'] as List<dynamic>;
+    final firstImage = gallery.first as Map<String, dynamic>;
+    expect(firstImage['enhancementPreset'], 'contrast');
+    expect(firstImage['originalPath'], firstImage['path']);
   });
 
   testWidgets('scanner backend failure shows friendly message', (
@@ -4051,6 +4232,43 @@ class _CustomAiAnalysisProvider implements AiAnalysisProvider {
           pricingSource: 'Provider fixture',
           pricingConfidence: 0.8,
           lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      ),
+    );
+  }
+}
+
+class _CapturingAiAnalysisProvider implements AiAnalysisProvider {
+  AiAnalysisRequest? lastRequest;
+
+  @override
+  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
+    lastRequest = request;
+    final now = DateTime.now();
+    return AiAnalysisResult(
+      recommendation: 'Captured provider recommendation.',
+      scanResult: ScanResult(
+        id: 'captured-${now.microsecondsSinceEpoch}',
+        title: 'Captured Provider Collectible',
+        category: 'Trading Card',
+        estimatedValue: 42,
+        confidence: 0.84,
+        condition: 'Good',
+        thumbnail: request.imagePath,
+        scanDate: now,
+        primaryMatch: 'Captured Provider Collectible',
+        alternativeMatches: const [],
+        confidenceExplanation: 'Captured request metadata.',
+        detectionQuality: 'Good',
+        aiReasoning: 'Captured provider reasoning.',
+        pricing: PricingInfo(
+          estimatedMarketValue: 42,
+          lowEstimate: 35,
+          highEstimate: 50,
+          currency: 'AUD',
+          pricingSource: 'Captured fixture',
+          pricingConfidence: 0.7,
+          lastUpdated: DateTime.parse('2026-07-08T00:00:00Z'),
         ),
       ),
     );

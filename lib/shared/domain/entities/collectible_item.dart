@@ -38,12 +38,16 @@ class CollectibleImage {
     required this.path,
     this.role,
     this.source,
+    this.originalPath,
+    this.enhancementPreset,
     this.isPrimary = false,
   });
 
   final String path;
   final String? role;
   final String? source;
+  final String? originalPath;
+  final String? enhancementPreset;
   final bool isPrimary;
 
   factory CollectibleImage.fromJson(Map<String, dynamic> json) {
@@ -51,6 +55,8 @@ class CollectibleImage {
       path: json['path'] as String? ?? json['imagePath'] as String? ?? '',
       role: _optionalString(json['role']),
       source: _optionalString(json['source']),
+      originalPath: _optionalString(json['originalPath']),
+      enhancementPreset: _optionalString(json['enhancementPreset']),
       isPrimary: json['isPrimary'] as bool? ?? false,
     );
   }
@@ -60,6 +66,8 @@ class CollectibleImage {
       'path': path,
       'role': role,
       'source': source,
+      'originalPath': originalPath,
+      'enhancementPreset': enhancementPreset,
       'isPrimary': isPrimary,
     };
   }

@@ -210,6 +210,8 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           path: candidate.path,
           role: candidate.role,
           source: candidate.source,
+          originalPath: candidate.originalPath,
+          enhancementPreset: candidate.enhancementPreset,
           isPrimary: candidate.path == nextPrimary.path,
         ),
     ];
@@ -306,6 +308,8 @@ List<CollectibleImage> _normalizedGalleryWithPrimary(
         path: image.path,
         role: image.role,
         source: image.source,
+        originalPath: image.originalPath,
+        enhancementPreset: image.enhancementPreset,
         isPrimary: image.path == primaryPath,
       ),
   ];
@@ -810,6 +814,9 @@ class _PortfolioGalleryReviewState extends State<_PortfolioGalleryReview> {
                                     path: candidate.path,
                                     role: candidate.role,
                                     source: candidate.source,
+                                    originalPath: candidate.originalPath,
+                                    enhancementPreset:
+                                        candidate.enhancementPreset,
                                     isPrimary: candidate.path == image.path,
                                   ),
                               ];

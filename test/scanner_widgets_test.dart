@@ -320,6 +320,7 @@ void main() {
               onSelectRole: (_) {},
               onPreview: (_) {},
               onUseAsPrimary: (_) {},
+              onEnhance: (_, _) async {},
               onDelete: (_) {},
               onSample: () {},
               onReset: () {},
@@ -567,6 +568,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
+                onEnhance: (_, _) async {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -628,6 +630,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
+                onEnhance: (_, _) async {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -681,6 +684,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
+                onEnhance: (_, _) async {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -950,6 +954,7 @@ class _PhotoReviewTestHost extends StatelessWidget {
         onSelectRole: (_) {},
         onPreview: onSelect,
         onUseAsPrimary: onUseAsPrimary,
+        onEnhance: (_, _) async {},
         onDelete: (path) {
           final slot = photos.firstWhere((photo) => photo.path == path);
           onDelete(slot);
