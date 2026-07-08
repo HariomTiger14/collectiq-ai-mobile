@@ -76,6 +76,7 @@ class ScannerState {
     this.captureImages = const [],
     this.captureCategory = CollectibleCategory.toyCar,
     this.activeCaptureRole,
+    this.primaryImagePath,
     this.scanSession,
     this.scanResult,
     this.aiRecommendation,
@@ -113,6 +114,8 @@ class ScannerState {
 
   final String? activeCaptureRole;
 
+  final String? primaryImagePath;
+
   final ScanSession? scanSession;
 
   /// Latest scan result, once AI scanning is implemented.
@@ -143,6 +146,7 @@ class ScannerState {
     List<ScannerPhotoSlot>? captureImages,
     CollectibleCategory? captureCategory,
     String? activeCaptureRole,
+    String? primaryImagePath,
     ScanSession? scanSession,
     ScanResult? scanResult,
     String? aiRecommendation,
@@ -156,6 +160,7 @@ class ScannerState {
     bool clearPhotoSlots = false,
     bool clearCaptureImages = false,
     bool clearActiveCaptureRole = false,
+    bool clearPrimaryImagePath = false,
     bool clearScanSession = false,
     bool clearScanResult = false,
     bool clearAiRecommendation = false,
@@ -185,6 +190,9 @@ class ScannerState {
       activeCaptureRole: clearActiveCaptureRole
           ? null
           : activeCaptureRole ?? this.activeCaptureRole,
+      primaryImagePath: clearPrimaryImagePath
+          ? null
+          : primaryImagePath ?? this.primaryImagePath,
       scanSession: clearScanSession ? null : scanSession ?? this.scanSession,
       scanResult: clearScanResult ? null : scanResult ?? this.scanResult,
       aiRecommendation: clearAiRecommendation
@@ -399,6 +407,20 @@ class ScannerController extends Notifier<ScannerState> {
         selectedItemStatus: 'Ready for AI analysis',
       ),
       event: 'active captured photo selected',
+    );
+  }
+
+  void useCapturedPhotoAsPrimary(ScannerPhotoSlot slot) {
+    _setState(
+      state.copyWith(
+        primaryImagePath: slot.path,
+        activeCaptureRole: slot.role,
+        selectedImage: slot.image,
+        selectedImagePath: slot.path,
+        selectedItemTitle: slot.label,
+        selectedItemStatus: 'Primary portfolio image',
+      ),
+      event: 'capture primary photo selected',
     );
   }
 
@@ -1476,6 +1498,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearPhotoSlots: true,
       clearCaptureImages: true,
       clearActiveCaptureRole: true,
+      clearPrimaryImagePath: true,
       clearScanSession: true,
       clearScanResult: true,
       clearAiRecommendation: true,
@@ -1536,6 +1559,10 @@ class ScannerController extends Notifier<ScannerState> {
         );
     final nextSelectedSlot =
         nextImages.lastOrNull ?? nextSlots[ScanCaptureRole.front.id];
+    final deletedPrimary = state.primaryImagePath == normalizedPath;
+    final nextPrimaryPath = deletedPrimary
+        ? nextSelectedSlot?.path
+        : state.primaryImagePath;
 
     _setState(
       state.copyWith(
@@ -1545,6 +1572,8 @@ class ScannerController extends Notifier<ScannerState> {
         selectedImage: nextSelectedSlot?.image,
         selectedImagePath: nextSelectedSlot?.path,
         activeCaptureRole: nextSelectedSlot?.role ?? state.activeCaptureRole,
+        primaryImagePath: nextPrimaryPath,
+        clearPrimaryImagePath: nextPrimaryPath == null,
         selectedItemTitle: nextSelectedSlot == null
             ? null
             : '${nextSelectedSlot.label} photo',
@@ -1803,7 +1832,11 @@ class ScannerController extends Notifier<ScannerState> {
     final slots = state.captureImages.isNotEmpty
         ? state.captureImages
         : state.photoSlots.values.toList(growable: false);
+    final primaryPath = state.primaryImagePath;
     int priority(ScannerPhotoSlot slot) {
+      if (primaryPath != null && slot.path == primaryPath) {
+        return -1;
+      }
       if (slot.role == ScanCaptureRole.front.id) {
         return 0;
       }

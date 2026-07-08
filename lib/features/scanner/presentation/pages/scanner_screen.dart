@@ -318,6 +318,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     scannerController.selectCaptureRole,
                                 onPreview:
                                     scannerController.selectCapturedPhoto,
+                                onUseAsPrimary:
+                                    scannerController.useCapturedPhotoAsPrimary,
                                 onSample: scannerController.useSampleScan,
                                 onDelete: scannerController.deleteCapturedImage,
                                 onReset: scannerController.resetScan,

@@ -797,8 +797,8 @@ class _FadeSlideIn extends StatelessWidget {
   }
 }
 
-class _ResultSectionCard extends StatelessWidget {
-  const _ResultSectionCard({
+class _ResultExpansionSection extends StatelessWidget {
+  const _ResultExpansionSection({
     required this.title,
     required this.child,
     this.icon,
@@ -812,37 +812,41 @@ class _ResultSectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      key: ValueKey('result-section-$title'),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (icon != null) ...[
-                Icon(icon, color: colorScheme.primary, size: 20),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Expanded(
-                child: Text(
-                  title,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: Material(
+          color: Colors.transparent,
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            leading: icon == null
+                ? null
+                : Icon(icon, color: colorScheme.primary, size: 20),
+            title: Text(
+              title,
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
-            ],
+            ),
+            children: [child],
           ),
-          const SizedBox(height: AppSpacing.md),
-          child,
-        ],
+        ),
       ),
     );
   }
@@ -1153,25 +1157,10 @@ class AiResultCard extends ConsumerWidget {
               brand: brandLabel,
             ),
             const SizedBox(height: AppSpacing.lg),
-            _TrustSummaryCard(
-              pricingSource: pricing.pricingSource,
-              freshnessLabel: freshnessLabel,
-              pricingConfidence:
-                  '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
-              photosUsed: photosUsed,
-              photoRoles: photoRoles,
-              faceValue: faceValue,
-              estimatedMarketValue: estimatedMarketValue,
-              askingPriceWarning: askingPriceWarning,
-              valuationConfidence: valuationConfidence,
-              valuationStatus: valuationStatus,
-              valuationSource: valuationSource,
-              aiEstimatedValue: aiEstimatedValue,
-            ),
-            const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
+                key: const ValueKey('result-primary-add-to-portfolio'),
                 onPressed: isSaved || isSaving
                     ? null
                     : () async {
@@ -1196,6 +1185,26 @@ class AiResultCard extends ConsumerWidget {
                       ? 'Saved to Portfolio'
                       : 'Save to Portfolio',
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ResultExpansionSection(
+              title: 'Valuation evidence',
+              icon: Icons.verified_outlined,
+              child: _TrustSummaryCard(
+                pricingSource: pricing.pricingSource,
+                freshnessLabel: freshnessLabel,
+                pricingConfidence:
+                    '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+                photosUsed: photosUsed,
+                photoRoles: photoRoles,
+                faceValue: faceValue,
+                estimatedMarketValue: estimatedMarketValue,
+                askingPriceWarning: askingPriceWarning,
+                valuationConfidence: valuationConfidence,
+                valuationStatus: valuationStatus,
+                valuationSource: valuationSource,
+                aiEstimatedValue: aiEstimatedValue,
               ),
             ),
             if (isSaved && onViewPortfolio != null) ...[
@@ -1251,8 +1260,8 @@ class AiResultCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            _ResultSectionCard(
-              title: 'AI Explanation',
+            _ResultExpansionSection(
+              title: 'Identification details',
               icon: Icons.psychology_alt_outlined,
               child: _AiReviewSection(
                 title: confidenceBand.label,
@@ -1262,14 +1271,14 @@ class AiResultCard extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             if (keyAttributes.isNotEmpty)
-              _ResultSectionCard(
-                title: 'Key Attributes',
+              _ResultExpansionSection(
+                title: 'Metadata',
                 icon: Icons.tune_outlined,
                 child: _KeyAttributesGrid(items: keyAttributes),
               ),
             const SizedBox(height: AppSpacing.md),
-            _ResultSectionCard(
-              title: 'Market Pricing',
+            _ResultExpansionSection(
+              title: 'Market pricing',
               icon: Icons.paid_outlined,
               child: MotionStagger(
                 children: [
@@ -1299,7 +1308,7 @@ class AiResultCard extends ConsumerWidget {
             ),
             if (marketSummary != null) ...[
               const SizedBox(height: AppSpacing.md),
-              _ResultSectionCard(
+              _ResultExpansionSection(
                 title: 'Market Summary',
                 icon: Icons.query_stats_outlined,
                 child: _MarketSummarySection(summary: marketSummary!),
@@ -1307,15 +1316,15 @@ class AiResultCard extends ConsumerWidget {
             ],
             if (collectibleDetails.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
-              _ResultSectionCard(
+              _ResultExpansionSection(
                 title: 'Collectible Details',
                 icon: Icons.inventory_2_outlined,
                 child: _KeyAttributesGrid(items: collectibleDetails),
               ),
             ],
             const SizedBox(height: AppSpacing.md),
-            _ResultSectionCard(
-              title: 'Why this match?',
+            _ResultExpansionSection(
+              title: 'Condition notes',
               icon: Icons.psychology_alt_outlined,
               child: _AiReviewSection(
                 title: 'Confidence explanation',
@@ -1325,7 +1334,7 @@ class AiResultCard extends ConsumerWidget {
             ),
             if (alternativeMatches.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
-              _ResultSectionCard(
+              _ResultExpansionSection(
                 title: 'Alternative Matches',
                 icon: Icons.compare_arrows_outlined,
                 child: Column(
@@ -1337,7 +1346,7 @@ class AiResultCard extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: AppSpacing.md),
-            _ResultSectionCard(
+            _ResultExpansionSection(
               title: 'Recommendation',
               icon: Icons.lightbulb_outline,
               child: Text(recommendation, style: textTheme.bodyMedium),
@@ -1571,11 +1580,12 @@ class _ScanResultHero extends StatelessWidget {
           Text(
             primaryMatch.trim().isEmpty
                 ? 'Primary match needs review'
-                : primaryMatch,
+                : 'AI summary: $primaryMatch',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1602,15 +1612,18 @@ class _ScanResultHero extends StatelessWidget {
                 label: condition,
                 color: AppColors.success,
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _KeyAttributesGrid(
-            items: [
-              _MetadataDetail('Category', category),
-              _MetadataDetail('Condition', condition),
-              _MetadataDetail('Year', year),
-              _MetadataDetail('Brand', brand),
+              if (brand.trim().isNotEmpty && brand != 'Not detected')
+                _ResultBadgeData(
+                  icon: Icons.sell_outlined,
+                  label: brand,
+                  color: colorScheme.secondary,
+                ),
+              if (year.trim().isNotEmpty && year != 'Unknown')
+                _ResultBadgeData(
+                  icon: Icons.event_outlined,
+                  label: year,
+                  color: colorScheme.tertiary,
+                ),
             ],
           ),
         ],
