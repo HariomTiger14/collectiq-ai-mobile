@@ -89,6 +89,11 @@ class CaptureWorkspace extends StatelessWidget {
     final analyzeReady = plan.isMinimumReadyForAnalyze;
     final roles = [...plan.requiredRoles, ...plan.optionalRoles];
     final activeSlot = _activeSlot(captureImages, slots, selectedPath);
+    final readinessScore = _workspaceReadinessScore(
+      captureImages: captureImages,
+      requiredCompleted: requiredCompleted,
+      requiredTotal: plan.requiredRoles.length,
+    );
     final activeRole = activeSlot == null
         ? ScanCaptureRole.fromId(
             activeRoleId ?? nextRole?.id ?? ScanCaptureRole.front.id,
@@ -143,6 +148,7 @@ class CaptureWorkspace extends StatelessWidget {
             goal: goal,
             categoryLabel: categoryLabel ?? 'Not selected yet',
             imageCount: captureImages.length,
+            readinessScore: captureImages.isEmpty ? null : readinessScore,
             identificationConfidence: captureImages.isEmpty
                 ? null
                 : _heuristicConfidence(
@@ -197,6 +203,8 @@ class CaptureWorkspace extends StatelessWidget {
               plan: plan,
               imageCount: captureImages.length,
               requiredCompleted: requiredCompleted,
+              readinessScore: readinessScore,
+              captureImages: captureImages,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1125,6 +1133,7 @@ class _CaptureSetStatusCard extends StatelessWidget {
     required this.goal,
     required this.categoryLabel,
     required this.imageCount,
+    required this.readinessScore,
     required this.identificationConfidence,
     required this.valuationConfidence,
     required this.conditionConfidence,
@@ -1133,6 +1142,7 @@ class _CaptureSetStatusCard extends StatelessWidget {
   final ScanGoal goal;
   final String categoryLabel;
   final int imageCount;
+  final int? readinessScore;
   final double? identificationConfidence;
   final double? valuationConfidence;
   final double? conditionConfidence;
@@ -1167,6 +1177,8 @@ class _CaptureSetStatusCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
+          _WorkspaceReadinessScore(score: readinessScore),
+          const SizedBox(height: AppSpacing.xs),
           _ConfidenceMeter(label: 'ID', value: identificationConfidence),
           _ConfidenceMeter(label: 'Value', value: valuationConfidence),
           _ConfidenceMeter(label: 'Condition', value: conditionConfidence),
@@ -1212,6 +1224,74 @@ class _StatusChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceReadinessScore extends StatelessWidget {
+  const _WorkspaceReadinessScore({required this.score});
+
+  final int? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final value = score;
+    final label = value == null
+        ? 'Awaiting photos'
+        : value >= 84
+        ? 'Excellent'
+        : value >= 68
+        ? 'Good'
+        : 'Needs improvement';
+    return Container(
+      key: const ValueKey('scan-workspace-readiness'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 8,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.psychology_alt_outlined,
+            size: 16,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'AI Readiness',
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            value == null ? '--' : '$value/100 - $label',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          PopupMenuButton<void>(
+            key: const ValueKey('scan-workspace-readiness-why'),
+            tooltip: 'Why?',
+            icon: const Icon(Icons.info_outline, size: 17),
+            itemBuilder: (context) => [
+              const PopupMenuItem<void>(
+                enabled: false,
+                child: Text(
+                  'Based on role coverage, photo count, and image quality checks.',
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1998,12 +2078,28 @@ String _guidedMessage({
   required ScanCapturePlan plan,
   required int imageCount,
   required int requiredCompleted,
+  required int readinessScore,
+  required List<ScannerPhotoSlot> captureImages,
 }) {
   final nextRole = plan.nextRecommendedRole;
+  final warnings = captureImages
+      .expand((slot) => _warningLabels(slot.qualityMetadata))
+      .toList(growable: false);
+  if (warnings.isNotEmpty && readinessScore < 68) {
+    return 'Retake recommended: ${warnings.first.toLowerCase()}. You can still use this photo.';
+  }
   if (plan.isMinimumReadyForAnalyze && nextRole == null) {
-    return 'Ready for AI analysis. More photos can improve confidence.';
+    return readinessScore >= 82
+        ? 'Great. We can identify this already.'
+        : 'Ready to analyze. One clearer angle can improve confidence.';
   }
   if (plan.isMinimumReadyForAnalyze) {
+    if (nextRole == ScanCaptureRole.baseUnderside) {
+      return 'Great. Next best photo: capture the base/underside to improve exact model and year.';
+    }
+    if (nextRole == ScanCaptureRole.barcode) {
+      return 'Add a barcode/package photo to improve valuation.';
+    }
     return 'We can identify this already. Next best photo: ${nextRole!.guidance.toLowerCase()}';
   }
   if (imageCount == 0) {
@@ -2018,6 +2114,49 @@ String _guidedMessage({
   return nextRole == null
       ? 'Ready for AI analysis. More photos can improve confidence.'
       : 'Next best photo: ${nextRole.guidance.toLowerCase()}';
+}
+
+int _workspaceReadinessScore({
+  required List<ScannerPhotoSlot> captureImages,
+  required int requiredCompleted,
+  required int requiredTotal,
+}) {
+  if (captureImages.isEmpty) {
+    return 0;
+  }
+  final qualityScores = [
+    for (final slot in captureImages) _readinessScore(slot.qualityMetadata),
+  ];
+  final averageQuality =
+      qualityScores.fold<int>(0, (sum, score) => sum + score) /
+      qualityScores.length;
+  final coverage = requiredTotal <= 0
+      ? 1.0
+      : (requiredCompleted / requiredTotal).clamp(0.0, 1.0);
+  final countBoost = (captureImages.length * 4).clamp(0, 14);
+  return ((averageQuality * 0.62) + (coverage * 24) + countBoost).round().clamp(
+    0,
+    100,
+  );
+}
+
+int _readinessScore(Map<String, Object?> metadata) {
+  final raw = metadata['readinessScore'];
+  if (raw is num) {
+    return raw.round().clamp(0, 100);
+  }
+  return _hasWarning(metadata) ? 62 : 78;
+}
+
+List<String> _warningLabels(Map<String, Object?> metadata) {
+  final raw = metadata['qualityWarnings'];
+  if (raw is Iterable) {
+    return raw
+        .whereType<String>()
+        .where((label) => label.trim().isNotEmpty)
+        .toList();
+  }
+  return _hasWarning(metadata) ? const ['Image quality warning'] : const [];
 }
 
 String _photoCountLabel(int count, bool analyzeReady) {

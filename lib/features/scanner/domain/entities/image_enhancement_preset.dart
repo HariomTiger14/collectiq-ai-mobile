@@ -31,6 +31,18 @@ enum ImageEnhancementPreset {
     };
   }
 
+  String get shortLabel {
+    return switch (this) {
+      ImageEnhancementPreset.original => 'Original',
+      ImageEnhancementPreset.autoEnhance => 'Auto',
+      ImageEnhancementPreset.brighten => 'Bright',
+      ImageEnhancementPreset.contrast => 'Contrast',
+      ImageEnhancementPreset.sharpen => 'Sharp',
+      ImageEnhancementPreset.textPackageClarity => 'Package',
+      ImageEnhancementPreset.reduceGlare => 'Glare',
+    };
+  }
+
   bool get isEnhanced => this != ImageEnhancementPreset.original;
 
   static ImageEnhancementPreset fromId(Object? value) {

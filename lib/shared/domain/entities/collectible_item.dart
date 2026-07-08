@@ -40,6 +40,7 @@ class CollectibleImage {
     this.source,
     this.originalPath,
     this.enhancementPreset,
+    this.qualityMetadata = const {},
     this.isPrimary = false,
   });
 
@@ -48,6 +49,7 @@ class CollectibleImage {
   final String? source;
   final String? originalPath;
   final String? enhancementPreset;
+  final Map<String, Object?> qualityMetadata;
   final bool isPrimary;
 
   factory CollectibleImage.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class CollectibleImage {
       source: _optionalString(json['source']),
       originalPath: _optionalString(json['originalPath']),
       enhancementPreset: _optionalString(json['enhancementPreset']),
+      qualityMetadata: _mapFromJson(json['qualityMetadata']),
       isPrimary: json['isPrimary'] as bool? ?? false,
     );
   }
@@ -68,6 +71,7 @@ class CollectibleImage {
       'source': source,
       'originalPath': originalPath,
       'enhancementPreset': enhancementPreset,
+      'qualityMetadata': qualityMetadata,
       'isPrimary': isPrimary,
     };
   }
@@ -560,6 +564,13 @@ String? _optionalString(Object? value) {
 
   final normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
+}
+
+Map<String, Object?> _mapFromJson(Object? value) {
+  if (value is! Map) {
+    return const {};
+  }
+  return Map<String, Object?>.from(value);
 }
 
 DateTime _savedAtFromJson(Map<String, dynamic> json) {
