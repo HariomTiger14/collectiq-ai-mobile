@@ -105,12 +105,15 @@ class ImageEnhancementService {
     );
     return switch (preset) {
       ImageEnhancementPreset.original => working,
-      ImageEnhancementPreset.autoEnhance => image_lib.adjustColor(
-        image_lib.convolution(
-          image_lib.adjustColor(working, brightness: 1.05, contrast: 1.08),
-          filter: _sharpenKernel,
+      ImageEnhancementPreset.autoEnhance => image_lib.convolution(
+        image_lib.adjustColor(
+          working,
+          brightness: 1.08,
+          contrast: 1.14,
+          saturation: 1.02,
+          gamma: 1.04,
         ),
-        saturation: 1.04,
+        filter: _softClarityKernel,
       ),
       ImageEnhancementPreset.brighten => image_lib.adjustColor(
         working,
@@ -143,3 +146,4 @@ class ImageEnhancementService {
 
 const _sharpenKernel = <num>[0, -1, 0, -1, 5, -1, 0, -1, 0];
 const _clarityKernel = <num>[-1, -1, -1, -1, 9, -1, -1, -1, -1];
+const _softClarityKernel = <num>[0, -0.5, 0, -0.5, 3, -0.5, 0, -0.5, 0];

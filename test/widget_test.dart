@@ -1651,17 +1651,54 @@ void main() {
       find.byKey(const ValueKey('enhancement-preview-presets')),
       findsOneWidget,
     );
+    final previewSurface = find.byKey(
+      const ValueKey('enhancement-preview-surface'),
+    );
+    expect(
+      find.descendant(of: previewSurface, matching: find.text('Original')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: previewSurface, matching: find.text('AI Enhance')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: previewSurface, matching: find.text('Brighten')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: previewSurface, matching: find.text('Contrast')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: previewSurface,
+        matching: find.textContaining('AI Readiness'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: previewSurface,
+        matching: find.textContaining('Slight blur'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: previewSurface,
+        matching: find.textContaining('Use Anyway'),
+      ),
+      findsNothing,
+    );
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsNothing,
     );
-    tester
-        .widget<ChoiceChip>(
-          find.byKey(const ValueKey('enhancement-preview-brighten')).last,
-        )
-        .onSelected
-        ?.call(true);
-    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-auto_enhance')).last,
+    );
+    await tester.pump(const Duration(milliseconds: 600));
     tester
         .widget<FilledButton>(
           find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
@@ -1669,17 +1706,24 @@ void main() {
         .onPressed
         ?.call();
     await tester.pumpUntilFound(
-      find.text('Brighten applied'),
+      find.text('AI Enhance applied'),
       timeout: const Duration(seconds: 10),
     );
 
-    expect(find.text('Brighten applied'), findsOneWidget);
+    expect(find.text('AI Enhance applied'), findsOneWidget);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MaterialApp)),
     );
     final controller = container.read(scannerControllerProvider);
-    expect(controller.captureImages.single.enhancementPreset.id, 'brighten');
+    expect(
+      controller.captureImages.single.enhancementPreset.id,
+      'auto_enhance',
+    );
     expect(controller.captureImages.single.qualityMetadata['enhanced'], isTrue);
+    expect(
+      controller.captureImages.single.qualityMetadata['selectedEnhancement'],
+      'aiEnhance',
+    );
     expect(
       controller.captureImages.single.qualityMetadata['readinessScore'],
       57,
@@ -1708,12 +1752,9 @@ void main() {
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('enhancement-preview-presets')),
     );
-    tester
-        .widget<ChoiceChip>(
-          find.byKey(const ValueKey('enhancement-preview-original')).last,
-        )
-        .onSelected
-        ?.call(true);
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-original')).last,
+    );
     await tester.pump(const Duration(milliseconds: 300));
     tester
         .widget<FilledButton>(
@@ -1733,10 +1774,10 @@ void main() {
         .read(scannerControllerProvider.notifier)
         .applyEnhancementToPhoto(
           reverted.captureImages.single,
-          ImageEnhancementPreset.brighten,
+          ImageEnhancementPreset.autoEnhance,
         );
     await tester.pumpUntilFound(
-      find.text('Brighten applied'),
+      find.text('AI Enhance applied'),
       timeout: const Duration(seconds: 10),
     );
     await tester.tap(find.byKey(const ValueKey('photo-review-close')));
@@ -1755,7 +1796,11 @@ void main() {
 
     expect(
       provider.lastRequest?.metadata['activeEnhancementPreset'],
-      'brighten',
+      'auto_enhance',
+    );
+    expect(
+      provider.lastRequest?.metadata['activeSelectedEnhancement'],
+      'aiEnhance',
     );
     expect(provider.lastRequest?.metadata['activeReadinessScore'], 57);
     expect(
@@ -1765,80 +1810,94 @@ void main() {
     expect(provider.lastRequest?.metadata['enhancedImageCount'], 1);
   });
 
-  testWidgets(
-    'enhancement preview shows AI recommendation and compare toggle',
-    (WidgetTester tester) async {
-      ImageEnhancementPreviewResult? accepted;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: ImageEnhancementPreviewSurface(
-              image: XFile(_fixturePath('persistent-gallery-card.jpg')),
-              initialPreset: ImageEnhancementPreset.original,
-              title: 'Review photo',
-              subtitle: 'Choose the clearest version for analysis.',
-              enhancementService: const _FakeImageEnhancementService(),
-              assessmentService: const _FakeImageQualityAssessmentService(),
-              onCancel: () {},
-              onRetake: () {},
-              onUsePhoto: (result) => accepted = result,
-            ),
+  testWidgets('enhancement preview shows only Original and AI Enhance', (
+    WidgetTester tester,
+  ) async {
+    ImageEnhancementPreviewResult? accepted;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ImageEnhancementPreviewSurface(
+            image: XFile(_fixturePath('persistent-gallery-card.jpg')),
+            initialPreset: ImageEnhancementPreset.original,
+            title: 'Review photo',
+            subtitle: 'Choose the clearest version for analysis.',
+            enhancementService: const _FakeImageEnhancementService(),
+            assessmentService: const _FakeImageQualityAssessmentService(),
+            onCancel: () {},
+            onRetake: () {},
+            onUsePhoto: (result) => accepted = result,
           ),
         ),
-      );
+      ),
+    );
 
-      await tester.pumpUntilFound(
-        find.text('AI recommends: Text / Package Clarity'),
-      );
-      expect(
-        find.byKey(const ValueKey('enhancement-ai-recommendation')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('enhancement-readiness-summary')),
-        findsOneWidget,
-      );
-      expect(find.textContaining('57/100'), findsWidgets);
-      expect(find.text('Package AI'), findsOneWidget);
-      expect(find.text('Slight blur detected'), findsOneWidget);
+    await tester.pumpUntilFound(find.text('AI Enhance'));
+    expect(find.text('Original'), findsOneWidget);
+    expect(find.text('AI Enhance'), findsOneWidget);
+    expect(find.text('Brighten'), findsNothing);
+    expect(find.text('Contrast'), findsNothing);
+    expect(find.text('Sharpen'), findsNothing);
+    expect(find.textContaining('AI recommends'), findsNothing);
+    expect(find.textContaining('AI Readiness'), findsNothing);
+    expect(find.textContaining('Slight blur detected'), findsNothing);
+    expect(find.textContaining('Use Anyway'), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-auto_enhance')).last,
+    );
+    await tester.pump(const Duration(milliseconds: 600));
 
-      tester
-          .widget<ChoiceChip>(
-            find.byKey(const ValueKey('enhancement-preview-contrast')),
-          )
-          .onSelected
-          ?.call(true);
-      await tester.pump();
-      final scrollable = tester.state<ScrollableState>(
-        find.descendant(
-          of: find.byKey(const ValueKey('enhancement-preview-presets')),
-          matching: find.byType(Scrollable),
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+        )
+        .onPressed
+        ?.call();
+    expect(accepted?.preset, ImageEnhancementPreset.autoEnhance);
+    expect(accepted?.metadata['enhanced'], isTrue);
+    expect(accepted?.metadata['selectedEnhancement'], 'aiEnhance');
+    expect(accepted?.metadata['readinessScore'], 57);
+  });
+
+  testWidgets('enhancement preview can switch AI Enhance back to Original', (
+    WidgetTester tester,
+  ) async {
+    ImageEnhancementPreviewResult? accepted;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ImageEnhancementPreviewSurface(
+            image: XFile(_fixturePath('persistent-gallery-card.jpg')),
+            initialPreset: ImageEnhancementPreset.autoEnhance,
+            title: 'Review photo',
+            subtitle: 'Choose the clearest version for analysis.',
+            enhancementService: const _FakeImageEnhancementService(),
+            assessmentService: const _FakeImageQualityAssessmentService(),
+            onCancel: () {},
+            onRetake: () {},
+            onUsePhoto: (result) => accepted = result,
+          ),
         ),
-      );
-      final offsetAfterSelection = scrollable.position.pixels;
-      expect(offsetAfterSelection, greaterThanOrEqualTo(0));
+      ),
+    );
 
-      await tester.tap(
-        find.byKey(const ValueKey('enhancement-preview-compare')),
-      );
-      await tester.pump();
-      expect(find.text('Original preview'), findsOneWidget);
-      await tester.tap(
-        find.byKey(const ValueKey('enhancement-preview-compare')),
-      );
-      await tester.pump();
-      expect(find.text('Original preview'), findsNothing);
+    await tester.pumpUntilFound(find.text('AI Enhance'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-original')).last,
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+        )
+        .onPressed
+        ?.call();
 
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
-          )
-          .onPressed
-          ?.call();
-      expect(accepted?.preset, ImageEnhancementPreset.contrast);
-      expect(accepted?.metadata['readinessScore'], 57);
-    },
-  );
+    expect(accepted?.preset, ImageEnhancementPreset.original);
+    expect(accepted?.metadata['enhanced'], isFalse);
+    expect(accepted?.metadata['selectedEnhancement'], 'original');
+  });
 
   testWidgets('enhancement preview retake and cancel do not add photos', (
     WidgetTester tester,
@@ -1863,7 +1922,7 @@ void main() {
     );
 
     await tester.tap(
-      find.byKey(const ValueKey('enhancement-preview-auto_enhance')),
+      find.byKey(const ValueKey('enhancement-preview-auto_enhance')).last,
     );
     await tester.pump(const Duration(seconds: 1));
     expect(accepted, isNull);
@@ -1894,9 +1953,9 @@ void main() {
       find.byKey(const ValueKey('enhancement-preview-presets')),
     );
     await tester.tap(
-      find.byKey(const ValueKey('enhancement-preview-contrast')),
+      find.byKey(const ValueKey('enhancement-preview-auto_enhance')).last,
     );
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(
       find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
     );
@@ -1919,6 +1978,7 @@ void main() {
       find.byKey(const ValueKey('scan-result-analyzed-with-enhancement')),
       findsOneWidget,
     );
+    expect(find.text('AI Enhanced'), findsOneWidget);
     await tester.reveal(find.text('Save to Portfolio'));
     await tester.pump();
     await tester.tap(find.text('Save to Portfolio'));
@@ -1930,8 +1990,13 @@ void main() {
         (jsonDecode(stored) as List<dynamic>).first as Map<String, dynamic>;
     final gallery = item['galleryImages'] as List<dynamic>;
     final firstImage = gallery.first as Map<String, dynamic>;
-    expect(firstImage['enhancementPreset'], 'contrast');
+    expect(firstImage['enhancementPreset'], 'auto_enhance');
     expect(firstImage['originalPath'], isNotEmpty);
+    expect(
+      (firstImage['qualityMetadata']
+          as Map<String, dynamic>)['selectedEnhancement'],
+      'aiEnhance',
+    );
     expect(
       (firstImage['qualityMetadata'] as Map<String, dynamic>)['readinessScore'],
       57,
@@ -4341,12 +4406,13 @@ extension on WidgetTester {
     await pumpUntilFound(
       find.byKey(const ValueKey('enhancement-preview-presets')),
     );
-    if (preset != ImageEnhancementPreset.original) {
-      widget<ChoiceChip>(
-        find.byKey(ValueKey('enhancement-preview-${preset.id}')).last,
-      ).onSelected?.call(true);
-      await pump(const Duration(milliseconds: 500));
-    }
+    final effectivePreset = preset.isEnhanced
+        ? ImageEnhancementPreset.autoEnhance
+        : ImageEnhancementPreset.original;
+    await tap(
+      find.byKey(ValueKey('enhancement-preview-${effectivePreset.id}')).last,
+    );
+    await pump(const Duration(milliseconds: 500));
     widget<FilledButton>(
       find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
     ).onPressed?.call();

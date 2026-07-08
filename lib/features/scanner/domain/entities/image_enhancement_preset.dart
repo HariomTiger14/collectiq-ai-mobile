@@ -22,7 +22,7 @@ enum ImageEnhancementPreset {
   String get label {
     return switch (this) {
       ImageEnhancementPreset.original => 'Original',
-      ImageEnhancementPreset.autoEnhance => 'Auto Enhance',
+      ImageEnhancementPreset.autoEnhance => 'AI Enhance',
       ImageEnhancementPreset.brighten => 'Brighten',
       ImageEnhancementPreset.contrast => 'Contrast',
       ImageEnhancementPreset.sharpen => 'Sharpen',
@@ -34,7 +34,7 @@ enum ImageEnhancementPreset {
   String get shortLabel {
     return switch (this) {
       ImageEnhancementPreset.original => 'Original',
-      ImageEnhancementPreset.autoEnhance => 'Auto',
+      ImageEnhancementPreset.autoEnhance => 'AI Enhance',
       ImageEnhancementPreset.brighten => 'Bright',
       ImageEnhancementPreset.contrast => 'Contrast',
       ImageEnhancementPreset.sharpen => 'Sharp',

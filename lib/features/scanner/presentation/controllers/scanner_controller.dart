@@ -1068,6 +1068,7 @@ class ScannerController extends Notifier<ScannerState> {
       'originalImagePath': originalPath,
       'activeImagePath': activePath,
       'enhancementPreset': preset.id,
+      'selectedEnhancement': preset.isEnhanced ? 'aiEnhance' : 'original',
       'enhancementLabel': preset.label,
       'enhanced': preset.isEnhanced,
     };
@@ -1304,6 +1305,9 @@ class ScannerController extends Notifier<ScannerState> {
             'originalImagePath': activeSlot?.originalPath,
             'activeEnhancedImagePath': activeSlot?.enhancedImagePath,
             'activeEnhancementPreset': activeSlot?.enhancementPreset.id,
+            'activeSelectedEnhancement': activeSlot?.isEnhanced == true
+                ? 'aiEnhance'
+                : 'original',
             'activeReadinessScore':
                 activeSlot?.qualityMetadata['readinessScore'],
             'activeQualityWarnings':
@@ -1861,6 +1865,7 @@ class ScannerController extends Notifier<ScannerState> {
         'originalImagePath': slot.originalPath ?? slot.path,
         'activeImagePath': slot.path,
         'enhancementPreset': slot.enhancementPreset.id,
+        'selectedEnhancement': slot.isEnhanced ? 'aiEnhance' : 'original',
         'enhancementLabel': slot.enhancementPreset.label,
         'enhanced': slot.isEnhanced,
       },
@@ -1960,6 +1965,9 @@ class ScannerController extends Notifier<ScannerState> {
           'originalImagePath': effectiveOriginalPath,
           'activeImagePath': path,
           'enhancementPreset': enhancementPreset.id,
+          'selectedEnhancement': enhancementPreset.isEnhanced
+              ? 'aiEnhance'
+              : 'original',
           'enhancementLabel': enhancementPreset.label,
           'enhanced': enhancementPreset.isEnhanced,
         };
