@@ -321,8 +321,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 onAnalyze: scannerController.analyzeWithAi,
                                 onCamera: (role) => scannerController
                                     .startCameraScan(context, imageRole: role),
-                                onGallery: (role) => scannerController
-                                    .pickImageFromGallery(imageRole: role),
+                                onGallery: (role) =>
+                                    scannerController.pickImageFromGallery(
+                                      context: context,
+                                      imageRole: role,
+                                    ),
                                 onSelectRole:
                                     scannerController.selectCaptureRole,
                                 onPreview:

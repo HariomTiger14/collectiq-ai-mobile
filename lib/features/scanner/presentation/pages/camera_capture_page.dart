@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:camera/camera.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:flutter/material.dart';
@@ -9,13 +9,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class CameraCaptureFlowResult {
-  const CameraCaptureFlowResult._({this.image, this.openGallery = false});
+  const CameraCaptureFlowResult._({
+    this.image,
+    this.originalImage,
+    this.enhancementPreset = ImageEnhancementPreset.original,
+    this.enhancementMetadata = const {},
+    this.openGallery = false,
+  });
 
-  const CameraCaptureFlowResult.image(XFile image) : this._(image: image);
+  const CameraCaptureFlowResult.image(
+    XFile image, {
+    XFile? originalImage,
+    ImageEnhancementPreset enhancementPreset = ImageEnhancementPreset.original,
+    Map<String, Object?> enhancementMetadata = const {},
+  }) : this._(
+         image: image,
+         originalImage: originalImage,
+         enhancementPreset: enhancementPreset,
+         enhancementMetadata: enhancementMetadata,
+       );
 
   const CameraCaptureFlowResult.galleryFallback() : this._(openGallery: true);
 
   final XFile? image;
+  final XFile? originalImage;
+  final ImageEnhancementPreset enhancementPreset;
+  final Map<String, Object?> enhancementMetadata;
   final bool openGallery;
 }
 
@@ -197,12 +216,19 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     });
   }
 
-  void _usePhoto() {
+  void _usePhoto(ImageEnhancementPreviewResult result) {
     final image = _capturedImage;
     if (image == null) {
       return;
     }
-    Navigator.of(context).pop(CameraCaptureFlowResult.image(image));
+    Navigator.of(context).pop(
+      CameraCaptureFlowResult.image(
+        result.activeImage,
+        originalImage: result.originalImage,
+        enhancementPreset: result.preset,
+        enhancementMetadata: result.metadata,
+      ),
+    );
   }
 
   void _openGalleryFallback() {
@@ -239,15 +265,33 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
                 onRetryPermission: _initializeCamera,
                 onOpenSettings: _cameraService?.openSettings,
               )
-            : _CameraReviewView(
+            : ImageEnhancementPreviewSurface(
                 image: capturedImage,
-                qualityReport: _qualityReport,
-                isInspecting: _isInspecting,
+                initialPreset: ImageEnhancementPreset.original,
+                title: _qualityTitle(_qualityReport),
+                subtitle: _qualitySubtitle(_qualityReport, _isInspecting),
                 onRetake: _retake,
+                onCancel: () => Navigator.of(context).pop(),
                 onUsePhoto: _usePhoto,
               ),
       ),
     );
+  }
+
+  String _qualityTitle(ScanImageQualityReport? report) {
+    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
+    return warnings.isEmpty ? 'Review photo' : 'Quality warning';
+  }
+
+  String _qualitySubtitle(ScanImageQualityReport? report, bool isInspecting) {
+    if (isInspecting) {
+      return 'Checking image quality...';
+    }
+    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
+    if (warnings.isEmpty) {
+      return 'Choose the clearest version for analysis.';
+    }
+    return warnings.map((warning) => warning.message).join(' ');
   }
 }
 
@@ -482,100 +526,6 @@ class _CameraGuidanceCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _CameraReviewView extends StatelessWidget {
-  const _CameraReviewView({
-    required this.image,
-    required this.qualityReport,
-    required this.isInspecting,
-    required this.onRetake,
-    required this.onUsePhoto,
-  });
-
-  final XFile image;
-  final ScanImageQualityReport? qualityReport;
-  final bool isInspecting;
-  final VoidCallback onRetake;
-  final VoidCallback onUsePhoto;
-
-  @override
-  Widget build(BuildContext context) {
-    final report = qualityReport;
-    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.file(File(image.path), fit: BoxFit.contain),
-        Positioned(
-          left: 20,
-          right: 20,
-          bottom: 24,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    warnings.isEmpty ? 'Review photo' : 'Quality warning',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (isInspecting)
-                    const LinearProgressIndicator()
-                  else if (warnings.isEmpty)
-                    const Text(
-                      'Looks ready for analysis.',
-                      style: TextStyle(color: Colors.white70),
-                    )
-                  else
-                    for (final warning in warnings)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(
-                          warning.message,
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                      ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: onRetake,
-                          child: const Text('Retake'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: isInspecting ? null : onUsePhoto,
-                          child: Text(
-                            warnings.isEmpty ? 'Use Photo' : 'Use Anyway',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
