@@ -307,87 +307,96 @@ class _HomeQuickActionTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isEnabled = action.onTap != null;
 
-    return Material(
-      key: ValueKey('home-quick-action-${action.title}'),
-      color: Colors.transparent,
-      child: _PressScale(
-        enabled: isEnabled,
-        child: InkWell(
-          onTap: action.onTap,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 160),
-            opacity: isEnabled ? 1 : 0.72,
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 96),
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: Theme.of(context).brightness == Brightness.dark
-                      ? 0.50
-                      : 0.74,
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.82),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: action.accentColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 150;
+        final statusPill = !isEnabled
+            ? _TinyStatusPill(label: 'Soon', color: action.accentColor)
+            : null;
+        return Material(
+          key: ValueKey('home-quick-action-${action.title}'),
+          color: Colors.transparent,
+          child: _PressScale(
+            enabled: isEnabled,
+            child: InkWell(
+              onTap: action.onTap,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 160),
+                opacity: isEnabled ? 1 : 0.72,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 96),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: Theme.of(context).brightness == Brightness.dark
+                          ? 0.50
+                          : 0.74,
                     ),
-                    child: Icon(
-                      action.icon,
-                      color: action.accentColor,
-                      size: AppIconSizes.md,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.82),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          action.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body.copyWith(
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: compact ? 44 : 50,
+                        height: compact ? 44 : 50,
+                        decoration: BoxDecoration(
+                          color: action.accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          action.subtitle,
-                          maxLines: isEnabled ? 1 : 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        child: Icon(
+                          action.icon,
+                          color: action.accentColor,
+                          size: AppIconSizes.md,
                         ),
-                      ],
-                    ),
-                  ),
-                  if (!isEnabled)
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.sm),
-                      child: _TinyStatusPill(
-                        label: 'Soon',
-                        color: action.accentColor,
                       ),
-                    ),
-                ],
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              action.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              action.subtitle,
+                              maxLines: isEnabled ? 1 : 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (compact && statusPill != null) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              statusPill,
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (!compact && statusPill != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: AppSpacing.sm),
+                          child: statusPill,
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -762,72 +771,103 @@ class _RecentActivityRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Row(
-            children: [
-              PortfolioThumbnail(imagePath: item.imagePath, size: 60),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.xs,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 360;
+              return Row(
+                children: [
+                  PortfolioThumbnail(
+                    imagePath: item.imagePath,
+                    size: compact ? 54 : 60,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _ActivityBadge(label: item.category),
-                        _ActivityBadge(label: item.condition),
+                        Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleSmall?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            _ActivityBadge(label: item.category),
+                            _ActivityBadge(label: item.condition),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.xs,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              _formatSavedRelative(item.createdAt),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (compact)
+                              Text(
+                                _formatAud(item.estimatedValue),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.76,
+                                  ),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _formatSavedRelative(item.createdAt),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 88),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatAud(item.estimatedValue),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: textTheme.labelLarge?.copyWith(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.76,
+                              ),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Icon(
+                            Icons.chevron_right,
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.48,
+                            ),
+                            size: 17,
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 88),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      _formatAud(item.estimatedValue),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.76),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Icon(
-                      Icons.chevron_right,
-                      color: colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.48,
-                      ),
-                      size: 17,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),

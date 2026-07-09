@@ -420,10 +420,16 @@ class AppProfileSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final padding = width < 360
+        ? AppSpacing.md
+        : width < 600
+        ? AppSpacing.lg
+        : AppSpacing.xl;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(AppRadius.xl),

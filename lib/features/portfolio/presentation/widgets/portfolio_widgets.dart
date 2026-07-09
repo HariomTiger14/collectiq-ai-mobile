@@ -179,7 +179,7 @@ class _CompactMetricGrid extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: AppSpacing.sm,
             mainAxisSpacing: AppSpacing.sm,
-            childAspectRatio: columns == 4 ? 2.25 : 2.1,
+            childAspectRatio: columns == 4 ? 2.25 : 1.75,
           ),
           itemBuilder: (context, index) =>
               _CompactMetricTile(metric: metrics[index]),
@@ -462,7 +462,7 @@ class PortfolioGridTile extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 260;
+        final narrow = constraints.maxWidth < 320;
         return Material(
           color: Colors.transparent,
           child: InkWell(
@@ -971,24 +971,24 @@ class _PortfolioBadge extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Icon(icon, size: 13, color: color),
-          const SizedBox(width: AppSpacing.xs),
-          Flexible(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
             child: Text(
               label,
-              maxLines: 1,
+              softWrap: true,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: textTheme.labelSmall?.copyWith(
                 color: color,

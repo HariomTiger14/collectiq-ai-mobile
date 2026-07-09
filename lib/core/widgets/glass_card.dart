@@ -30,6 +30,12 @@ class _GlassCardState extends State<GlassCard> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final width = MediaQuery.sizeOf(context).width;
+    final padding = width < 360
+        ? AppSpacing.md
+        : width < 600
+        ? AppSpacing.lg
+        : AppSpacing.xl;
 
     return RepaintBoundary(
       child: GestureDetector(
@@ -63,7 +69,7 @@ class _GlassCardState extends State<GlassCard> {
           ),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
               color: isDark
                   ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.62)
