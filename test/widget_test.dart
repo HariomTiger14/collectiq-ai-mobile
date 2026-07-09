@@ -487,9 +487,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Home'));
@@ -1395,7 +1399,7 @@ void main() {
         ?.call();
     await tester.pumpAndSettle();
 
-    expect(find.text('Detected: Pokemon Card'), findsWidgets);
+    expect(find.text('Detected: Pokemon Card'), findsNothing);
     expect(find.text('Pokemon Card'), findsWidgets);
   });
 
@@ -1667,16 +1671,16 @@ void main() {
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Pokemon Card'), findsWidgets);
     expect(find.text(r'$1,850'), findsWidgets);
-    expect(find.text('Market pricing'), findsOneWidget);
-    expect(find.text('Market Summary'), findsWidgets);
+    expect(find.text('Market pricing'), findsNothing);
+    expect(find.text('Market Summary'), findsNothing);
     expect(find.text('Recent comparable sales'), findsNothing);
     expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(find.textContaining('94%'), findsWidgets);
-    expect(find.text('Near Mint'), findsWidgets);
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(find.text('Near Mint'), findsNothing);
+    expect(find.text('Analysis Complete'), findsOneWidget);
     expect(find.textContaining('Charizard'), findsWidgets);
-    expect(find.text('Condition notes'), findsOneWidget);
-    expect(find.text('Alternative Matches'), findsOneWidget);
+    expect(find.text('Condition notes'), findsNothing);
+    expect(find.text('Alternative Matches'), findsNothing);
     expect(find.text('1999 Pokemon Charizard Holo variant'), findsNothing);
     expect(find.textContaining('Mock confidence'), findsNothing);
     expect(find.textContaining('Sleeve it'), findsNothing);
@@ -1984,9 +1988,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('AI Enhanced'), findsOneWidget);
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();
@@ -2071,7 +2079,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Provider Test Collectible'), findsWidgets);
-    expect(find.text('Recommendation'), findsOneWidget);
+    expect(find.text('Recommendation'), findsNothing);
     expect(find.text('Provider recommendation.'), findsNothing);
     expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(find.text('Provider fixture'), findsNothing);
@@ -2342,7 +2350,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Gallery image'), findsOneWidget);
+    expect(find.text('Gallery image'), findsNothing);
     expect(find.text('Analysis Complete'), findsOneWidget);
   });
 
@@ -2375,30 +2383,33 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
 
-    await tester.reveal(find.text('AI Review'));
+    await tester.reveal(find.text('Analysis Complete'));
     await tester.pump();
 
-    expect(find.text('AI Review'), findsOneWidget);
+    expect(find.text('Analysis Complete'), findsOneWidget);
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Estimated value'), findsOneWidget);
     expect(find.textContaining(r'$'), findsWidgets);
-    expect(find.textContaining('High confidence'), findsWidgets);
-    expect(find.text('Category'), findsWidgets);
-    expect(find.text('Condition notes'), findsOneWidget);
-    expect(find.text('Valuation evidence'), findsOneWidget);
+    expect(find.textContaining('94% confidence'), findsWidgets);
+    expect(find.text('Pokemon Card'), findsWidgets);
+    expect(find.text('Condition notes'), findsNothing);
+    expect(find.text('Valuation evidence'), findsNothing);
     expect(find.text('Pricing source'), findsNothing);
     expect(find.text('Freshness'), findsNothing);
     expect(find.text('Pricing confidence'), findsNothing);
     expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(
       find.textContaining('AI estimates are a starting point'),
+      findsNothing,
+    );
+    expect(find.text('Identification details'), findsNothing);
+    expect(find.text('Metadata'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
       findsOneWidget,
     );
-    expect(find.text('Identification details'), findsOneWidget);
-    expect(find.text('Metadata'), findsOneWidget);
-    expect(find.text('Save to Portfolio'), findsOneWidget);
-    expect(find.text('Edit Details'), findsOneWidget);
-    expect(find.text('Retry Analysis'), findsOneWidget);
+    expect(find.text('Edit Details'), findsNothing);
+    expect(find.text('Retry Analysis'), findsNothing);
   });
 
   testWidgets('scan result missing value shows unavailable state', (
@@ -2443,9 +2454,8 @@ void main() {
       await tester.completeSampleScan();
 
       expect(find.text(entry.value), findsWidgets);
-      await tester.tap(find.text('Valuation evidence').first);
-      await tester.pumpAndSettle();
-      expect(find.text('Valuation status'), findsOneWidget);
+      expect(find.text('Valuation evidence'), findsNothing);
+      expect(find.text('Valuation status'), findsNothing);
       expect(tester.takeException(), isNull);
     }
   });
@@ -2458,57 +2468,34 @@ void main() {
     );
     await tester.completeSampleScan();
 
-    expect(find.textContaining('Needs review'), findsWidgets);
-    expect(find.text('Unknown'), findsWidgets);
-    expect(find.text('Not detected'), findsWidgets);
+    expect(find.textContaining('58% confidence'), findsWidgets);
+    expect(find.text('Unknown'), findsNothing);
+    expect(find.text('Not detected'), findsNothing);
   });
 
-  testWidgets('scan result edit bottom sheet updates visible fields', (
+  testWidgets('scan result is summary-only without edit controls', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp();
     await tester.completeSampleScan();
 
-    await tester.reveal(find.text('Edit Details'));
-    await tester.pump();
-    await tester.tap(find.text('Edit Details'));
-    await tester.pumpAndSettle();
     expect(
-      find.text('Review the AI result before saving it to your portfolio.'),
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
       findsOneWidget,
     );
-
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Name'),
-      'Reviewed Charizard',
-    );
-    await tester.enterText(find.widgetWithText(TextField, 'Category'), 'Card');
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Condition'),
-      'Near Mint',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Estimated value'),
-      '777',
-    );
-    await tester.tap(find.text('Apply Changes'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Reviewed Charizard'), findsWidgets);
-    expect(find.text(r'$777'), findsWidgets);
-    expect(find.text('Near Mint'), findsWidgets);
+    expect(find.text('Edit Details'), findsNothing);
+    expect(find.text('Apply Changes'), findsNothing);
+    expect(find.text('Identification details'), findsNothing);
   });
 
-  testWidgets('scan result retry action is safe', (WidgetTester tester) async {
+  testWidgets('scan result omits retry placeholder action', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpCollectIqApp();
     await tester.completeSampleScan();
 
-    await tester.reveal(find.text('Retry Analysis'));
-    await tester.pump();
-    await tester.tap(find.text('Retry Analysis'));
-    await tester.pump();
-
-    expect(find.text('Retry analysis coming soon'), findsOneWidget);
+    expect(find.text('Retry Analysis'), findsNothing);
+    expect(find.text('Retry analysis coming soon'), findsNothing);
   });
 
   testWidgets('scan analysis error renders useful recovery guidance', (
@@ -2597,9 +2584,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Scan Another'));
+    await tester.reveal(find.byKey(const ValueKey('result-scan-another')));
     await tester.pump();
-    await tester.tap(find.text('Scan Another'));
+    await tester.tap(find.byKey(const ValueKey('result-scan-another')));
     await tester.pumpAndSettle();
 
     expect(find.text('Analysis Result'), findsNothing);
@@ -2640,9 +2627,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Saved to portfolio'), findsOneWidget);
@@ -2662,11 +2653,18 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
     await tester.completeSampleScan();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
 
-    await tester.tap(find.text('Save to Portfolio'));
-    await tester.tap(find.text('Save to Portfolio'), warnIfMissed: false);
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
 
     final container = ProviderScope.containerOf(
@@ -2732,9 +2730,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Saved to portfolio'), findsOneWidget);
@@ -2775,9 +2777,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Saved to Portfolio'), findsOneWidget);
@@ -2833,7 +2839,7 @@ void main() {
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sample Sports Card'), findsOneWidget);
+    expect(find.text('Sample Sports Card'), findsNothing);
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Analysis Complete'), findsOneWidget);
   });
@@ -2923,9 +2929,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -2969,9 +2979,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
-    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.reveal(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+    );
     await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -4492,7 +4506,7 @@ extension on WidgetTester {
     await pump();
     await pump(const Duration(seconds: 2));
     await pump();
-    await reveal(find.text('AI Review'));
+    await reveal(find.text('Analysis Complete'));
     await pump();
   }
 

@@ -1,0 +1,482 @@
+import 'dart:io';
+
+import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
+import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:flutter/material.dart';
+
+class ScanWorkspaceScreen extends StatelessWidget {
+  const ScanWorkspaceScreen({
+    required this.photos,
+    required this.primaryImagePath,
+    required this.detectedCategory,
+    required this.confidence,
+    required this.nextBestRole,
+    required this.isBusy,
+    required this.errorMessage,
+    required this.onClose,
+    required this.onSelectPhoto,
+    required this.onCaptureNext,
+    required this.onAddPhoto,
+    required this.onAnalyze,
+    super.key,
+  });
+
+  final List<ScannerPhotoSlot> photos;
+  final String? primaryImagePath;
+  final String detectedCategory;
+  final double confidence;
+  final ScanCaptureRole nextBestRole;
+  final bool isBusy;
+  final String? errorMessage;
+  final VoidCallback onClose;
+  final ValueChanged<ScannerPhotoSlot> onSelectPhoto;
+  final VoidCallback onCaptureNext;
+  final VoidCallback onAddPhoto;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final activePhoto = _activePhoto;
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        title: const Text('Scan Workspace'),
+        leading: IconButton(
+          key: const ValueKey('workspace-close'),
+          onPressed: onClose,
+          icon: const Icon(Icons.close),
+          tooltip: 'Close',
+        ),
+      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _WorkspaceHero(photo: activePhoto),
+                  const SizedBox(height: AppSpacing.md),
+                  WorkspaceFilmstrip(
+                    photos: photos,
+                    selectedPath: activePhoto?.path,
+                    onSelectPhoto: onSelectPhoto,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  WorkspaceMetadata(
+                    detectedCategory: detectedCategory,
+                    confidence: confidence,
+                    photoCount: photos.length,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  WorkspaceActions(
+                    nextBestRole: nextBestRole,
+                    canAnalyze: photos.isNotEmpty && !isBusy,
+                    isBusy: isBusy,
+                    onCaptureNext: onCaptureNext,
+                    onAddPhoto: onAddPhoto,
+                    onAnalyze: onAnalyze,
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _WorkspaceError(message: errorMessage!),
+                  ],
+                ],
+              ),
+            ),
+            if (isBusy)
+              const Positioned.fill(
+                child: ColoredBox(
+                  key: ValueKey('scan-busy-overlay'),
+                  color: Color(0x33000000),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ScannerPhotoSlot? get _activePhoto {
+    if (photos.isEmpty) {
+      return null;
+    }
+    final primaryPath = primaryImagePath?.trim();
+    if (primaryPath != null && primaryPath.isNotEmpty) {
+      for (final photo in photos) {
+        if (photo.path == primaryPath) {
+          return photo;
+        }
+      }
+    }
+    return photos.last;
+  }
+}
+
+class WorkspaceFilmstrip extends StatelessWidget {
+  const WorkspaceFilmstrip({
+    required this.photos,
+    required this.selectedPath,
+    required this.onSelectPhoto,
+    super.key,
+  });
+
+  final List<ScannerPhotoSlot> photos;
+  final String? selectedPath;
+  final ValueChanged<ScannerPhotoSlot> onSelectPhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (photos.isEmpty) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: const SizedBox(
+          height: 104,
+          child: Center(child: Text('No photos yet')),
+        ),
+      );
+    }
+    return SizedBox(
+      key: const ValueKey('workspace-filmstrip'),
+      height: 112,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: photos.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final photo = photos[index];
+          return _WorkspaceThumbnail(
+            photo: photo,
+            selected: photo.path == selectedPath,
+            onTap: () => onSelectPhoto(photo),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class WorkspaceMetadata extends StatelessWidget {
+  const WorkspaceMetadata({
+    required this.detectedCategory,
+    required this.confidence,
+    required this.photoCount,
+    super.key,
+  });
+
+  final String detectedCategory;
+  final double confidence;
+  final int photoCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      key: const ValueKey('workspace-metadata'),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          children: [
+            _MetadataRow(
+              label: 'Auto Detect',
+              value: detectedCategory,
+              icon: Icons.auto_awesome_outlined,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _MetadataRow(
+              label: 'Confidence',
+              value: '${(confidence * 100).round()}%',
+              icon: Icons.verified_outlined,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _MetadataRow(
+              label: 'Photos',
+              value: photoCount == 1 ? '1 photo' : '$photoCount photos',
+              icon: Icons.photo_library_outlined,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class WorkspaceActions extends StatelessWidget {
+  const WorkspaceActions({
+    required this.nextBestRole,
+    required this.canAnalyze,
+    required this.isBusy,
+    required this.onCaptureNext,
+    required this.onAddPhoto,
+    required this.onAnalyze,
+    super.key,
+  });
+
+  final ScanCaptureRole nextBestRole;
+  final bool canAnalyze;
+  final bool isBusy;
+  final VoidCallback onCaptureNext;
+  final VoidCallback onAddPhoto;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      key: const ValueKey('workspace-actions'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Capture Guide',
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          nextBestRole.guidance,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        FilledButton.icon(
+          key: const ValueKey('workspace-capture-next'),
+          onPressed: isBusy ? null : onCaptureNext,
+          icon: Icon(nextBestRole.icon),
+          label: const Text('Capture Next Best Photo'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          key: const ValueKey('workspace-add-photo'),
+          onPressed: isBusy ? null : onAddPhoto,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: const Text('Add photo'),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        KeyedSubtree(
+          key: const ValueKey('workspace-analyze'),
+          child: FilledButton.icon(
+            key: const ValueKey('scan-primary-Analyze Image'),
+            onPressed: canAnalyze ? onAnalyze : null,
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Analyze'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkspaceHero extends StatelessWidget {
+  const _WorkspaceHero({required this.photo});
+
+  final ScannerPhotoSlot? photo;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final photo = this.photo;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),
+          child: photo == null
+              ? const Icon(Icons.photo_camera_outlined, size: 44)
+              : _PhotoImage(path: photo.path, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceThumbnail extends StatelessWidget {
+  const _WorkspaceThumbnail({
+    required this.photo,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ScannerPhotoSlot photo;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 92,
+      child: InkWell(
+        key: ValueKey('workspace-photo-${photo.path}'),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.md - 1),
+                  ),
+                  child: _PhotoImage(path: photo.path, fit: BoxFit.cover),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: 6,
+                ),
+                child: Text(
+                  _shortRole(photo.role),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetadataRow extends StatelessWidget {
+  const _MetadataRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, color: colorScheme.primary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            label,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkspaceError extends StatelessWidget {
+  const _WorkspaceError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: colorScheme.onErrorContainer,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoImage extends StatelessWidget {
+  const _PhotoImage({required this.path, required this.fit});
+
+  final String path;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (path.startsWith('sample://')) {
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        child: Icon(
+          Icons.style_outlined,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          size: 40,
+        ),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(file, fit: fit);
+    }
+    return const ColoredBox(
+      color: Color(0xFFE5E7EB),
+      child: Icon(Icons.broken_image_outlined),
+    );
+  }
+}
+
+String _shortRole(String role) {
+  final captureRole = ScanCaptureRole.fromId(role);
+  return switch (captureRole) {
+    ScanCaptureRole.front => 'Front',
+    ScanCaptureRole.back => 'Back',
+    ScanCaptureRole.baseUnderside => 'Base',
+    ScanCaptureRole.closeUp => 'Detail',
+    ScanCaptureRole.barcode => 'Barcode',
+    _ => captureRole.title.split('/').first.trim(),
+  };
+}
