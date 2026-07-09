@@ -268,18 +268,31 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
                               const SizedBox(height: AppSpacing.md),
-                              _ScanGoalSelector(
-                                selectedGoal: activeGoal,
-                                onGoalSelected: scannerController.selectGoal,
+                              _SmartScanSummary(
+                                categoryLabel: _scanCategoryStatus(
+                                  scannerState,
+                                ),
                               ),
                               const SizedBox(height: AppSpacing.sm),
-                              _CaptureCategorySelector(
-                                selectedCategory:
-                                    scannerState.hasManualCaptureCategory
-                                    ? scannerState.captureCategory
-                                    : null,
-                                onCategorySelected:
-                                    scannerController.selectCaptureCategory,
+                              _AdvancedScanOptions(
+                                child: _ScanGoalSelector(
+                                  selectedGoal: activeGoal,
+                                  onGoalSelected: scannerController.selectGoal,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              _CategoryOptions(
+                                categoryLabel: _scanCategoryStatus(
+                                  scannerState,
+                                ),
+                                child: _CaptureCategorySelector(
+                                  selectedCategory:
+                                      scannerState.hasManualCaptureCategory
+                                      ? scannerState.captureCategory
+                                      : null,
+                                  onCategorySelected:
+                                      scannerController.selectCaptureCategory,
+                                ),
                               ),
                               const SizedBox(height: AppSpacing.md),
                               CaptureWorkspace(
@@ -542,6 +555,167 @@ class _ScanGoalSelector extends StatelessWidget {
   }
 }
 
+class _SmartScanSummary extends StatelessWidget {
+  const _SmartScanSummary({required this.categoryLabel});
+
+  final String categoryLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      key: const ValueKey('scan-smart-scan-summary'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.auto_awesome_outlined, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Smart Scan',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Auto Detect - $categoryLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Start with one front or package photo. More photos can improve valuation.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdvancedScanOptions extends StatelessWidget {
+  const _AdvancedScanOptions({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CollapsedScanOptions(
+      key: const ValueKey('advanced-scan-options'),
+      tileKey: const ValueKey('advanced-scan-options-tile'),
+      title: 'Advanced scan options',
+      subtitle: 'Optional controls',
+      icon: Icons.tune_outlined,
+      child: child,
+    );
+  }
+}
+
+class _CategoryOptions extends StatelessWidget {
+  const _CategoryOptions({required this.categoryLabel, required this.child});
+
+  final String categoryLabel;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = categoryLabel.startsWith('Selected:');
+    return _CollapsedScanOptions(
+      key: const ValueKey('scan-category-options'),
+      tileKey: const ValueKey('scan-category-options-tile'),
+      title: selected ? 'Choose category' : 'Can\'t identify? Choose category',
+      subtitle: selected ? categoryLabel : 'Auto Detect - $categoryLabel',
+      icon: Icons.category_outlined,
+      child: child,
+    );
+  }
+}
+
+class _CollapsedScanOptions extends StatelessWidget {
+  const _CollapsedScanOptions({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+    this.tileKey,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget child;
+  final Key? tileKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: Material(
+          color: Colors.transparent,
+          child: ExpansionTile(
+            key: tileKey,
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            leading: Icon(icon, size: 19, color: colorScheme.primary),
+            title: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            subtitle: Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            children: [child],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CaptureCategorySelector extends StatelessWidget {
   const _CaptureCategorySelector({
     required this.selectedCategory,
@@ -695,6 +869,7 @@ class _RecentScanTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final thumbnailPath = item.thumbnailPath;
 
     return InkWell(
       key: ValueKey('scan-recent-${item.id}'),
@@ -708,37 +883,41 @@ class _RecentScanTile extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary.withValues(alpha: 0.16),
-                    colorScheme.secondary.withValues(alpha: 0.12),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.56),
                 ),
               ),
-              child: Icon(
-                item.icon,
-                color: colorScheme.primary,
-                size: AppIconSizes.md,
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: thumbnailPath == null
+                  ? Icon(
+                      item.icon,
+                      key: ValueKey('scan-recent-placeholder-${item.id}'),
+                      color: colorScheme.primary,
+                      size: AppIconSizes.md,
+                    )
+                  : ScanThumbnail(
+                      key: ValueKey('scan-recent-thumbnail-${item.id}'),
+                      imagePath: thumbnailPath,
+                    ),
             ),
-            const SizedBox(width: AppSpacing.lg),
+            if (thumbnailPath != null)
+              const SizedBox(width: AppSpacing.md)
+            else
+              const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     item.name,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.h3.copyWith(
                       color: colorScheme.onSurface,
                       fontWeight: FontWeight.w800,
+                      height: 1.12,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -868,9 +1047,28 @@ ScannerHistoryItem _historyItemForCollectible(
     estimatedValue: _formatAud(item.estimatedValue),
     date: _formatDate(item.createdAt),
     icon: _iconForCategory(item.category),
+    thumbnailPath: _thumbnailPathForCollectible(item),
     color: AppColors.accent,
     onTap: onTap,
   );
+}
+
+String? _thumbnailPathForCollectible(CollectibleItem item) {
+  final primaryPath = item.imagePath.trim();
+  if (primaryPath.isNotEmpty) {
+    return primaryPath;
+  }
+  for (final image in item.galleryImages) {
+    if (image.isPrimary && image.path.trim().isNotEmpty) {
+      return image.path.trim();
+    }
+  }
+  for (final image in item.galleryImages) {
+    if (image.path.trim().isNotEmpty) {
+      return image.path.trim();
+    }
+  }
+  return null;
 }
 
 IconData _iconForCategory(String category) {

@@ -36,6 +36,7 @@ class ScannerHistoryItem {
     required this.date,
     required this.icon,
     required this.color,
+    this.thumbnailPath,
     this.onTap,
   });
 
@@ -45,6 +46,7 @@ class ScannerHistoryItem {
   final String date;
   final IconData icon;
   final Color color;
+  final String? thumbnailPath;
   final VoidCallback? onTap;
 }
 

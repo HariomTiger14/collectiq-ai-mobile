@@ -144,35 +144,16 @@ class CaptureWorkspace extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _CaptureSetStatusCard(
-            goal: goal,
-            categoryLabel: categoryLabel ?? 'Not selected yet',
+          _CompactCaptureGuidance(
             imageCount: captureImages.length,
-            readinessScore: captureImages.isEmpty ? null : readinessScore,
-            identificationConfidence: captureImages.isEmpty
-                ? null
-                : _heuristicConfidence(
-                    requiredCompleted: requiredCompleted,
-                    requiredTotal: plan.requiredRoles.length,
-                    imageCount: captureImages.length,
-                    weight: 0.92,
-                  ),
-            valuationConfidence: captureImages.isEmpty
-                ? null
-                : _heuristicConfidence(
-                    requiredCompleted: requiredCompleted,
-                    requiredTotal: plan.requiredRoles.length + 1,
-                    imageCount: captureImages.length,
-                    weight: 0.76,
-                  ),
-            conditionConfidence: captureImages.isEmpty
-                ? null
-                : _heuristicConfidence(
-                    requiredCompleted: requiredCompleted,
-                    requiredTotal: plan.requiredRoles.length + 2,
-                    imageCount: captureImages.length,
-                    weight: 0.82,
-                  ),
+            analyzeReady: analyzeReady,
+            guidance: _guidedMessage(
+              plan: plan,
+              imageCount: captureImages.length,
+              requiredCompleted: requiredCompleted,
+              readinessScore: readinessScore,
+              captureImages: captureImages,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -194,17 +175,6 @@ class CaptureWorkspace extends StatelessWidget {
                     : primaryLabel,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _NextRecommendedBlock(
-            role: nextRole,
-            guidance: _guidedMessage(
-              plan: plan,
-              imageCount: captureImages.length,
-              requiredCompleted: requiredCompleted,
-              readinessScore: readinessScore,
-              captureImages: captureImages,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1128,210 +1098,69 @@ class _EmptyActivePreview extends StatelessWidget {
   }
 }
 
-class _CaptureSetStatusCard extends StatelessWidget {
-  const _CaptureSetStatusCard({
-    required this.goal,
-    required this.categoryLabel,
+class _CompactCaptureGuidance extends StatelessWidget {
+  const _CompactCaptureGuidance({
     required this.imageCount,
-    required this.readinessScore,
-    required this.identificationConfidence,
-    required this.valuationConfidence,
-    required this.conditionConfidence,
+    required this.analyzeReady,
+    required this.guidance,
   });
 
-  final ScanGoal goal;
-  final String categoryLabel;
   final int imageCount;
-  final int? readinessScore;
-  final double? identificationConfidence;
-  final double? valuationConfidence;
-  final double? conditionConfidence;
+  final bool analyzeReady;
+  final String guidance;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      key: const ValueKey('scan-workspace-status-card'),
+      key: const ValueKey('scan-workspace-compact-guidance'),
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _StatusChip(icon: goal.icon, label: goal.title),
-              const SizedBox(width: AppSpacing.xs),
-              _StatusChip(icon: Icons.category_outlined, label: categoryLabel),
-              const Spacer(),
-              Text(
-                '$imageCount photo${imageCount == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _WorkspaceReadinessScore(score: readinessScore),
-          const SizedBox(height: AppSpacing.xs),
-          _ConfidenceMeter(label: 'ID', value: identificationConfidence),
-          _ConfidenceMeter(label: 'Value', value: valuationConfidence),
-          _ConfidenceMeter(label: 'Condition', value: conditionConfidence),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: colorScheme.primary),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WorkspaceReadinessScore extends StatelessWidget {
-  const _WorkspaceReadinessScore({required this.score});
-
-  final int? score;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final value = score;
-    final label = value == null
-        ? 'Awaiting photos'
-        : value >= 84
-        ? 'Excellent'
-        : value >= 68
-        ? 'Good'
-        : 'Needs improvement';
-    return Container(
-      key: const ValueKey('scan-workspace-readiness'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.psychology_alt_outlined,
-            size: 16,
-            color: colorScheme.primary,
+            analyzeReady ? Icons.check_circle_outline : Icons.photo_camera,
+            color: analyzeReady ? colorScheme.primary : colorScheme.secondary,
+            size: 20,
           ),
-          const SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              'AI Readiness',
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
-            ),
-          ),
-          Text(
-            value == null ? '--' : '$value/100 - $label',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          PopupMenuButton<void>(
-            key: const ValueKey('scan-workspace-readiness-why'),
-            tooltip: 'Why?',
-            icon: const Icon(Icons.info_outline, size: 17),
-            itemBuilder: (context) => [
-              const PopupMenuItem<void>(
-                enabled: false,
-                child: Text(
-                  'Based on role coverage, photo count, and image quality checks.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  analyzeReady ? 'Ready to analyze' : 'Ready for first photo',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ConfidenceMeter extends StatelessWidget {
-  const _ConfidenceMeter({required this.label, required this.value});
-
-  final String label;
-  final double? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final bounded = value?.clamp(0.0, 1.0).toDouble();
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: bounded ?? 0, minHeight: 6),
+                const SizedBox(height: 2),
+                Text(
+                  guidance,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Text(
-            bounded == null ? '--' : '${(bounded * 100).round()}%',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            '$imageCount photo${imageCount == 1 ? '' : 's'}',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colorScheme.primary,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1481,57 +1310,6 @@ class _EnhancedBadge extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NextRecommendedBlock extends StatelessWidget {
-  const _NextRecommendedBlock({required this.role, required this.guidance});
-
-  final ScanCaptureRole? role;
-  final String guidance;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      key: const ValueKey('next-recommended-capture'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.20)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.auto_awesome_outlined, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Next recommended:',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  role == null ? guidance : guidance,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2058,20 +1836,6 @@ String _capturedTimeLabel(DateTime? capturedAt) {
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
-}
-
-double _heuristicConfidence({
-  required int requiredCompleted,
-  required int requiredTotal,
-  required int imageCount,
-  required double weight,
-}) {
-  if (requiredTotal <= 0) {
-    return 0;
-  }
-  final coverage = (requiredCompleted / requiredTotal).clamp(0.0, 1.0);
-  final imageBoost = (imageCount * 0.05).clamp(0.0, 0.18);
-  return (coverage * weight + imageBoost).clamp(0.0, 0.98).toDouble();
 }
 
 String _guidedMessage({

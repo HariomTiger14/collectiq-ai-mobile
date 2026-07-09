@@ -32,6 +32,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -1309,6 +1310,19 @@ void main() {
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
+    expect(find.text('Smart Scan'), findsOneWidget);
+    expect(find.textContaining('Auto Detect'), findsWidgets);
+    expect(find.text('Advanced scan options'), findsOneWidget);
+    expect(find.textContaining('Choose category'), findsOneWidget);
+    expect(find.text('Identify & Value'), findsNothing);
+    expect(find.text('Detailed Analysis'), findsNothing);
+    expect(find.text('Prepare for Sale'), findsNothing);
+    expect(find.byKey(const ValueKey('scan-category-toy_car')), findsNothing);
+    expect(find.textContaining('AI Readiness'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-workspace-compact-guidance')),
+      findsOneWidget,
+    );
     expect(find.text('Not selected yet'), findsWidgets);
     expect(find.text('0 photos'), findsWidgets);
     expect(find.text('--'), findsWidgets);
@@ -1320,6 +1334,23 @@ void main() {
     );
   });
 
+  testWidgets('advanced scan options reveal existing scan modes', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Identify & Value'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('advanced-scan-options-tile')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Identify & Value'), findsOneWidget);
+    expect(find.text('Detailed Analysis'), findsOneWidget);
+    expect(find.text('Prepare for Sale'), findsOneWidget);
+  });
+
   testWidgets('manual and detected scanner categories are labeled clearly', (
     WidgetTester tester,
   ) async {
@@ -1327,7 +1358,12 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('scan-category-toy_car')));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    container
+        .read(scannerControllerProvider.notifier)
+        .selectCaptureCategory(CollectibleCategory.toyCar);
     await tester.pumpAndSettle();
 
     expect(find.text('Selected: Toy car'), findsWidgets);
@@ -2377,7 +2413,7 @@ void main() {
     expect(find.textContaining(r'$'), findsWidgets);
     expect(find.textContaining('High confidence'), findsWidgets);
     expect(find.text('Category'), findsWidgets);
-    expect(find.text('Condition'), findsWidgets);
+    expect(find.text('Condition notes'), findsOneWidget);
     expect(find.text('Valuation evidence'), findsOneWidget);
     expect(find.text('Pricing source'), findsNothing);
     expect(find.text('Freshness'), findsNothing);
@@ -3552,6 +3588,75 @@ void main() {
             )
             .dx,
       ),
+    );
+  });
+
+  testWidgets('scan recent scans use images and gallery fallback thumbnails', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        {
+          'id': 'recent-primary',
+          'title': 'Recent Primary Thumbnail Item With Long Title',
+          'category': 'Toy Car',
+          'estimatedValue': 25,
+          'confidence': 0.91,
+          'condition': 'Packaged',
+          'recommendation': 'Hold.',
+          'imagePath': _fixturePath('persistent-camera-card.jpg'),
+          'createdAt': '2026-06-29T10:00:00.000',
+        },
+        {
+          'id': 'recent-gallery',
+          'title': 'Recent Gallery Fallback',
+          'category': 'Trading Card',
+          'estimatedValue': 80,
+          'confidence': 0.82,
+          'condition': 'Good',
+          'recommendation': 'Keep.',
+          'imagePath': '',
+          'galleryImages': [
+            {
+              'path': _fixturePath('persistent-gallery-card.jpg'),
+              'role': 'front',
+              'isPrimary': true,
+            },
+          ],
+          'createdAt': '2026-06-29T09:00:00.000',
+        },
+        {
+          'id': 'recent-empty',
+          'title': 'No Image Recent',
+          'category': 'Coin',
+          'estimatedValue': 5,
+          'confidence': 0.5,
+          'condition': 'Unknown',
+          'recommendation': 'Add photo.',
+          'imagePath': '',
+          'galleryImages': [],
+          'createdAt': '2026-06-29T08:00:00.000',
+        },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpAndSettle();
+    await tester.reveal(find.text('Recent Scans'));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('scan-recent-thumbnail-recent-primary')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-recent-thumbnail-recent-gallery')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-recent-placeholder-recent-empty')),
+      findsOneWidget,
     );
   });
 
