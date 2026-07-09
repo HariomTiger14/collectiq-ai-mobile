@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
@@ -11,8 +12,13 @@ import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart'
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_workspace_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/camera_overlay.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_suggestions.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/exposure_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({this.onViewPortfolio, super.key});
@@ -286,6 +292,19 @@ String _workspaceRoleLabel(String role) {
   };
 }
 
+String _shortScanRole(String role) {
+  final captureRole = ScanCaptureRole.fromId(role);
+  return switch (captureRole) {
+    ScanCaptureRole.front => 'Front',
+    ScanCaptureRole.back => 'Back',
+    ScanCaptureRole.baseUnderside => 'Base',
+    ScanCaptureRole.closeUp => 'Close-up',
+    ScanCaptureRole.barcode => 'Barcode',
+    ScanCaptureRole.angledReflective => 'Angle',
+    _ => captureRole.title.split('/').first.trim(),
+  };
+}
+
 ScanCaptureRole _nextWorkspaceRole(
   ScanCapturePlan activePlan,
   ScannerState scannerState,
@@ -349,7 +368,7 @@ double _workspaceConfidence(ScannerState state) {
   return confidence.clamp(0.55, 0.92).toDouble();
 }
 
-class _SnapchatScanSurface extends StatelessWidget {
+class _SnapchatScanSurface extends StatefulWidget {
   const _SnapchatScanSurface({
     required this.captureImages,
     required this.activeSlot,
@@ -381,12 +400,121 @@ class _SnapchatScanSurface extends StatelessWidget {
   final VoidCallback? onEnhance;
 
   @override
+  State<_SnapchatScanSurface> createState() => _SnapchatScanSurfaceState();
+}
+
+class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
+  Offset? _focusPoint;
+  Timer? _focusTimer;
+  Timer? _exposureTimer;
+  Timer? _flashTimer;
+  Timer? _suggestionTimer;
+  bool _showExposureSlider = false;
+  bool _showFlash = false;
+  bool _showGrid = false;
+  bool _showSuggestion = false;
+  double _exposure = 0.5;
+
+  @override
+  void didUpdateWidget(covariant _SnapchatScanSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.captureImages.length > oldWidget.captureImages.length) {
+      _showCaptureSuggestion();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusTimer?.cancel();
+    _exposureTimer?.cancel();
+    _flashTimer?.cancel();
+    _suggestionTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handlePreviewTap(TapUpDetails details) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _focusPoint = details.localPosition;
+      _showExposureSlider = true;
+    });
+    _focusTimer?.cancel();
+    _focusTimer = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        setState(() => _focusPoint = null);
+      }
+    });
+    _scheduleExposureHide();
+  }
+
+  void _scheduleExposureHide() {
+    _exposureTimer?.cancel();
+    _exposureTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _showExposureSlider = false);
+      }
+    });
+  }
+
+  void _setExposure(double value) {
+    setState(() {
+      _exposure = value;
+      _showExposureSlider = true;
+    });
+    _scheduleExposureHide();
+  }
+
+  void _capture() {
+    HapticFeedback.lightImpact();
+    setState(() => _showFlash = true);
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) {
+        setState(() => _showFlash = false);
+      }
+    });
+    _showCaptureSuggestion();
+    widget.onCapture();
+  }
+
+  void _showCaptureSuggestion() {
+    _suggestionTimer?.cancel();
+    setState(() => _showSuggestion = true);
+    _suggestionTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() => _showSuggestion = false);
+      }
+    });
+  }
+
+  String get _detectLabel {
+    if (widget.captureImages.length > 1) {
+      return 'Match found';
+    }
+    if (widget.captureImages.isNotEmpty) {
+      return 'Hot Wheels detected';
+    }
+    return 'Detecting...';
+  }
+
+  String get _suggestionLabel =>
+      '${_shortScanRole(widget.recommendedRole.id)} recommended';
+
+  @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
       child: Stack(
         children: [
-          Positioned.fill(child: _SnapCameraPreview(slot: activeSlot)),
+          Positioned.fill(
+            child: GestureDetector(
+              key: const ValueKey('scan-camera-preview-tap-target'),
+              behavior: HitTestBehavior.opaque,
+              onTapUp: _handlePreviewTap,
+              child: _SnapCameraPreview(slot: widget.activeSlot),
+            ),
+          ),
+          Positioned.fill(child: CameraGridOverlay(visible: _showGrid)),
           Positioned(
             top: AppSpacing.sm,
             left: AppSpacing.sm,
@@ -397,15 +525,17 @@ class _SnapchatScanSurface extends StatelessWidget {
                   key: const ValueKey('scan-close'),
                   icon: Icons.close,
                   tooltip: 'Close',
-                  onPressed: onClose,
+                  onPressed: widget.onClose,
                 ),
                 const Spacer(),
                 _GlassIconButton(
-                  key: const ValueKey('scan-flash-toggle'),
-                  icon: Icons.flash_off,
-                  tooltip: 'Flash',
-                  onPressed: () {},
+                  key: const ValueKey('scan-grid-toggle'),
+                  icon: _showGrid ? Icons.grid_on : Icons.grid_off,
+                  tooltip: 'Grid',
+                  onPressed: () => setState(() => _showGrid = !_showGrid),
                 ),
+                const SizedBox(width: AppSpacing.sm),
+                AutoDetectOverlay(label: _detectLabel),
               ],
             ),
           ),
@@ -414,39 +544,59 @@ class _SnapchatScanSurface extends StatelessWidget {
             top: 96,
             bottom: 132,
             child: _VerticalFilmstrip(
-              captureImages: captureImages,
-              activePath: activeSlot?.path,
-              onSelectPhoto: onSelectPhoto,
+              captureImages: widget.captureImages,
+              activePath: widget.activeSlot?.path,
+              onSelectPhoto: widget.onSelectPhoto,
             ),
           ),
           Positioned(
             left: AppSpacing.md,
             right: AppSpacing.md,
             top: 70,
-            child: Center(child: _RecommendedRolePill(role: recommendedRole)),
+            child: Center(
+              child: _RecommendedRolePill(role: widget.recommendedRole),
+            ),
+          ),
+          if (_focusPoint != null) CameraFocusRing(position: _focusPoint!),
+          Positioned(
+            right: AppSpacing.md,
+            top: 96,
+            child: ScanExposureSlider(
+              visible: _showExposureSlider,
+              value: _exposure,
+              onChanged: _setExposure,
+            ),
           ),
           Positioned(
             right: AppSpacing.md,
             top: 0,
             bottom: 0,
             child: Center(
-              child: _GlassIconButton(
-                key: const ValueKey('scan-live-enhance'),
-                icon: Icons.auto_fix_high,
-                tooltip: 'AI Enhance',
-                onPressed: onEnhance,
-                large: true,
+              child: EnhanceButton(
+                active: widget.activeSlot?.isEnhanced == true,
+                onPressed: widget.onEnhance,
               ),
             ),
           ),
-          if (errorMessage != null)
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: 116,
+            child: Center(
+              child: CaptureSuggestionBubble(
+                label: _suggestionLabel,
+                visible: _showSuggestion,
+              ),
+            ),
+          ),
+          if (widget.errorMessage != null)
             Positioned(
               left: AppSpacing.md,
               right: AppSpacing.md,
               bottom: 124,
-              child: _ScanErrorToast(message: errorMessage!),
+              child: _ScanErrorToast(message: widget.errorMessage!),
             ),
-          if (isBusy)
+          if (widget.isBusy)
             const Positioned.fill(
               key: ValueKey('scan-busy-overlay'),
               child: ColoredBox(
@@ -456,15 +606,16 @@ class _SnapchatScanSurface extends StatelessWidget {
                 ),
               ),
             ),
+          Positioned.fill(child: CaptureFlashOverlay(visible: _showFlash)),
           Positioned(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
             bottom: AppSpacing.xl,
             child: _SnapCaptureBar(
-              canAnalyze: canAnalyze,
-              onGallery: onGallery,
-              onCapture: onCapture,
-              onAnalyze: onAnalyze,
+              canAnalyze: widget.canAnalyze,
+              onGallery: widget.onGallery,
+              onCapture: _capture,
+              onAnalyze: widget.onAnalyze,
             ),
           ),
           Positioned(
@@ -475,7 +626,7 @@ class _SnapchatScanSurface extends StatelessWidget {
               child: IconButton(
                 key: const ValueKey('scan-secondary-Use Sample Scan'),
                 padding: EdgeInsets.zero,
-                onPressed: onSample,
+                onPressed: widget.onSample,
                 icon: const SizedBox.shrink(),
               ),
             ),
@@ -715,25 +866,22 @@ class _GlassIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.large = false,
     super.key,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
-  final bool large;
 
   @override
   Widget build(BuildContext context) {
-    final size = large ? 58.0 : 48.0;
     return Tooltip(
       message: tooltip,
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon, color: Colors.white),
         style: IconButton.styleFrom(
-          fixedSize: Size.square(size),
+          fixedSize: const Size.square(48),
           backgroundColor: Colors.black.withValues(alpha: 0.42),
           disabledBackgroundColor: Colors.black.withValues(alpha: 0.22),
           shape: const CircleBorder(),
