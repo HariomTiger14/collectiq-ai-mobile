@@ -487,16 +487,20 @@ class _PremiumDetailHero extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 150),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      child: _DetailImageSurface(
-                        key: ValueKey(
-                          'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                    _HeroImageUpdateAnimation(
+                      imageKey: selectedImage?.path ?? item.imagePath,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        reverseDuration: const Duration(milliseconds: 100),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: _DetailImageSurface(
+                          key: ValueKey(
+                            'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                          ),
+                          item: item,
+                          image: selectedImage,
                         ),
-                        item: item,
-                        image: selectedImage,
                       ),
                     ),
                     if (_isAiEnhanced(selectedImage))
@@ -520,31 +524,42 @@ class _PremiumDetailHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    _DetailChip(
-                      icon: Icons.category_outlined,
-                      label: _fallback(item.category),
-                    ),
-                    _DetailChip(
-                      icon: Icons.verified_outlined,
-                      label:
-                          '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppTwoLineTitle(
-                  item.title,
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1.12,
+                _AnimatedDetailMetadata(
+                  id: 'summary-chips',
+                  value: '${item.category}-${item.confidence}-${item.rarity}',
+                  child: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      _DetailChip(
+                        icon: Icons.category_outlined,
+                        label: _fallback(item.category),
+                      ),
+                      _DetailChip(
+                        icon: Icons.verified_outlined,
+                        label:
+                            '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
+                      ),
+                      _DetailRarityBadge(label: _rarityLabel(item)),
+                    ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                _HeroValuePill(value: _formatAud(item.estimatedValue)),
+                _AnimatedDetailMetadata(
+                  id: 'title',
+                  value: item.title,
+                  child: AppTwoLineTitle(
+                    item.title,
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _DetailConfidenceMeter(confidence: item.confidence),
+                const SizedBox(height: AppSpacing.md),
+                _PremiumDetailValueCard(value: item.estimatedValue),
               ],
             ),
           ),
@@ -667,71 +682,100 @@ class _DetailGalleryFilmstrip extends StatelessWidget {
         AppSpacing.xs,
       ),
       child: ListView.separated(
+        clipBehavior: Clip.none,
+        physics: const BouncingScrollPhysics(),
         scrollDirection: Axis.horizontal,
         itemCount: images.length,
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
           final image = images[index];
           final selected = image.path == selectedPath;
-          return SizedBox(
+          return TweenAnimationBuilder<double>(
             key: ValueKey('collectible-detail-gallery-${image.path}'),
-            width: 116,
-            child: InkWell(
-              onTap: () => onSelected(image),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(
-                    color: selected || image.isPrimary
-                        ? colorScheme.primary
-                        : colorScheme.outlineVariant,
-                    width: selected ? 2.5 : 1,
-                  ),
-                  boxShadow: selected ? AppElevation.level1 : null,
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.scale(
+                  scale: 0.98 + (value * 0.02),
+                  child: child,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadius.sm),
-                              child: _DetailGalleryImage(
-                                image: image,
-                                item: item,
+              );
+            },
+            child: SizedBox(
+              width: 116,
+              child: InkWell(
+                onTap: () => onSelected(image),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOut,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: selected || image.isPrimary
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
+                      width: selected ? 2.5 : 1,
+                    ),
+                    boxShadow: selected || image.isPrimary
+                        ? [
+                            BoxShadow(
+                              color: colorScheme.primary.withValues(
+                                alpha: selected ? 0.22 : 0.14,
                               ),
+                              blurRadius: selected ? 16 : 10,
+                              offset: const Offset(0, 8),
                             ),
-                            if (image.isPrimary)
-                              Positioned(
-                                top: 6,
-                                left: 6,
-                                child: _PrimaryImageBadge(compact: true),
+                          ]
+                        : AppElevation.level1,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                                child: _DetailGalleryImage(
+                                  image: image,
+                                  item: item,
+                                ),
                               ),
-                            if (_isAiEnhanced(image))
-                              const Positioned(
-                                right: 6,
-                                bottom: 6,
-                                child: _AiEnhancedDetailBadge(compact: true),
-                              ),
-                          ],
+                              if (image.isPrimary)
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: _PrimaryImageBadge(compact: true),
+                                ),
+                              if (_isAiEnhanced(image))
+                                const Positioned(
+                                  right: 6,
+                                  bottom: 6,
+                                  child: _AiEnhancedDetailBadge(compact: true),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _shortGalleryRoleLabel(image),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
+                        const SizedBox(height: 5),
+                        Text(
+                          _shortGalleryRoleLabel(image),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(fontWeight: FontWeight.w900),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -778,44 +822,267 @@ class _DetailGalleryImage extends StatelessWidget {
   }
 }
 
-class _HeroValuePill extends StatelessWidget {
-  const _HeroValuePill({required this.value});
+class _AnimatedDetailMetadata extends StatelessWidget {
+  const _AnimatedDetailMetadata({
+    required this.id,
+    required this.value,
+    required this.child,
+  });
 
-  final String value;
+  final String id;
+  final Object? value;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 150),
+      reverseDuration: const Duration(milliseconds: 100),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: KeyedSubtree(
+        key: ValueKey('collectible-detail-metadata-$id-$value'),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _HeroImageUpdateAnimation extends StatelessWidget {
+  const _HeroImageUpdateAnimation({
+    required this.imageKey,
+    required this.child,
+  });
+
+  final String imageKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('collectible-detail-hero-scale-$imageKey'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        final scale = value < 0.5
+            ? 1 + (value * 0.04)
+            : 1.02 - ((value - 0.5) * 0.04);
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: child,
+    );
+  }
+}
+
+class _PremiumDetailValueCard extends StatelessWidget {
+  const _PremiumDetailValueCard({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: const ValueKey('collectible-detail-value-card-animation'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) {
+        return Opacity(opacity: opacity, child: child);
+      },
+      child: DecoratedBox(
+        key: const ValueKey('collectible-detail-value-card'),
+        decoration: BoxDecoration(
+          gradient: AppGradients.premium,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: AppElevation.level2,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: _AnimatedDetailMetadata(
+            id: 'value',
+            value: value,
+            child: _ValueCardContent(value: value),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ValueCardContent extends StatelessWidget {
+  const _ValueCardContent({required this.value});
+
+  final double value;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: AppGradients.premium,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppElevation.level2,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Estimated value',
+          style: textTheme.labelLarge?.copyWith(
+            color: Colors.white.withValues(alpha: 0.86),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          _formatPortfolioValue(context, value),
+          key: const ValueKey('collectible-detail-value-card-value'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.headlineMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRarityBadge extends StatelessWidget {
+  const _DetailRarityBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('collectible-detail-rarity-badge-animation-$label'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) {
+        return Opacity(opacity: opacity, child: child);
+      },
+      child: DecoratedBox(
+        key: const ValueKey('collectible-detail-rarity-badge'),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.tertiary,
+              colorScheme.primary.withValues(alpha: 0.84),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: AppElevation.level1,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.diamond_outlined,
+                size: 14,
+                color: colorScheme.onPrimary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                key: const ValueKey('collectible-detail-rarity-badge-label'),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Estimated value',
-            style: textTheme.labelLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.86),
-              fontWeight: FontWeight.w700,
-            ),
+    );
+  }
+}
+
+class _DetailConfidenceMeter extends StatelessWidget {
+  const _DetailConfidenceMeter({required this.confidence});
+
+  final double confidence;
+
+  @override
+  Widget build(BuildContext context) {
+    final bounded = confidence.clamp(0.0, 1.0);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return _AnimatedDetailMetadata(
+      id: 'confidence-meter',
+      value: bounded,
+      child: DecoratedBox(
+        key: const ValueKey('collectible-detail-confidence-meter'),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Confidence',
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _confidencePercent(bounded),
+                    key: const ValueKey('collectible-detail-confidence-value'),
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: _confidenceMeterColor(context, bounded),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: SizedBox(
+                  height: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                    ),
+                    child: TweenAnimationBuilder<double>(
+                      key: const ValueKey('collectible-detail-confidence-fill'),
+                      tween: Tween(begin: 0, end: bounded),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      builder: (context, value, _) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: value,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: _confidenceMeterColor(context, bounded),
+                              ),
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1078,8 +1345,15 @@ class _AiEnhancedDetailBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return DecoratedBox(
+      key: ValueKey(
+        compact
+            ? 'collectible-detail-ai-enhanced-badge-compact'
+            : 'collectible-detail-ai-enhanced-badge-shell',
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF14B8A6).withValues(alpha: 0.92),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF14B8A6), Color(0xFF2563EB)],
+        ),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
         boxShadow: AppElevation.level1,
@@ -3014,6 +3288,60 @@ String _formatAud(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+String _formatPortfolioValue(BuildContext context, double value) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '${_currencySymbolForLocale(Localizations.localeOf(context))}$withCommas';
+}
+
+String _currencySymbolForLocale(Locale locale) {
+  final countryCode = locale.countryCode?.toUpperCase();
+  if (countryCode == 'GB') {
+    return '£';
+  }
+  if (countryCode == 'DE' ||
+      countryCode == 'ES' ||
+      countryCode == 'FR' ||
+      countryCode == 'IT' ||
+      countryCode == 'NL') {
+    return '€';
+  }
+  return '\$';
+}
+
+String _rarityLabel(CollectibleItem item) {
+  final explicit = _clean(item.rarity);
+  if (explicit != null) {
+    return explicit;
+  }
+  if (item.confidence >= 0.95) {
+    return 'Ultra Rare';
+  }
+  if (item.confidence >= 0.88) {
+    return 'Rare';
+  }
+  if (item.confidence >= 0.72) {
+    return 'Uncommon';
+  }
+  return 'Common';
+}
+
+Color _confidenceMeterColor(BuildContext context, double confidence) {
+  if (confidence >= 0.80) {
+    return const Color(0xFF16A34A);
+  }
+  if (confidence >= 0.60) {
+    return const Color(0xFFEAB308);
+  }
+  return Theme.of(context).colorScheme.error;
 }
 
 double _parseMoney(String value) {

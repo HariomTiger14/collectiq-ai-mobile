@@ -4301,6 +4301,90 @@ void main() {
     );
   });
 
+  testWidgets(
+    'portfolio detail premium summary renders animated value metadata',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          _portfolioGalleryItemJson(
+            rarity: 'Ultra Rare',
+            confidence: 0.91,
+            galleryImages: const [
+              {
+                'path': 'sample://front',
+                'role': 'front',
+                'source': 'sample',
+                'isPrimary': true,
+                'enhancementPreset': 'auto_enhance',
+              },
+              {
+                'path': 'sample://back',
+                'role': 'back',
+                'source': 'sample',
+                'isPrimary': false,
+              },
+            ],
+          ),
+        ]),
+      });
+
+      await tester.pumpCollectIqApp();
+      await _openGalleryDetail(tester);
+
+      expect(
+        find.byKey(const ValueKey('collectible-detail-value-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-value-card-value')),
+        findsOneWidget,
+      );
+      expect(find.text('\$25'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('collectible-detail-rarity-badge')),
+          matching: find.text('Ultra Rare'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-confidence-meter')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-confidence-fill')),
+        findsOneWidget,
+      );
+      expect(find.text('91%'), findsWidgets);
+      expect(
+        find.byKey(
+          const ValueKey('collectible-detail-ai-enhanced-badge-shell'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('collectible-detail-ai-enhanced-badge-compact'),
+        ),
+        findsOneWidget,
+      );
+
+      final valueCard = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('collectible-detail-value-card')),
+      );
+      expect((valueCard.decoration as BoxDecoration).gradient, isNotNull);
+
+      final rarityBadge = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
+      );
+      expect((rarityBadge.decoration as BoxDecoration).gradient, isNotNull);
+    },
+  );
+
   testWidgets('portfolio detail hero opens swipe gallery carousel', (
     WidgetTester tester,
   ) async {
@@ -5709,6 +5793,9 @@ Map<String, Object?> _portfolioGalleryItemJson({
   String id = 'gallery-detail',
   String title = 'Gallery Hot Wheels',
   String imagePath = 'sample://front',
+  double estimatedValue = 25,
+  double confidence = 0.91,
+  String? rarity,
   List<Map<String, Object?>> galleryImages = const [
     {
       'path': 'sample://front',
@@ -5734,8 +5821,8 @@ Map<String, Object?> _portfolioGalleryItemJson({
     'id': id,
     'title': title,
     'category': 'Toy Car',
-    'estimatedValue': 25,
-    'confidence': 0.91,
+    'estimatedValue': estimatedValue,
+    'confidence': confidence,
     'condition': 'Packaged',
     'recommendation': 'Keep complete photo set.',
     'imagePath': imagePath,
@@ -5744,6 +5831,7 @@ Map<String, Object?> _portfolioGalleryItemJson({
     'brand': 'Hot Wheels',
     'series': 'HW Euro',
     'year': '2026',
+    ...?rarity == null ? null : {'rarity': rarity},
     'primaryMatch': 'Hot Wheels Audi RS 6 Avant',
     'confidenceExplanation': 'Photos show the package and model clearly.',
   };
