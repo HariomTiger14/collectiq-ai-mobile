@@ -34,6 +34,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   late final ProviderSubscription<ScannerState> _scannerSubscription;
   bool _showCaptureLoopScan = false;
   String? _captureLoopRoleId;
+  bool _hasOpenedInitialCamera = false;
+  bool _isOpeningInitialCamera = false;
 
   @override
   void initState() {
@@ -48,9 +50,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         }
         final previousCount = previous?.captureImages.length ?? 0;
         final nextCount = next.captureImages.length;
-        if (_showCaptureLoopScan && nextCount > previousCount) {
+        if ((_showCaptureLoopScan || _isOpeningInitialCamera) &&
+            nextCount > previousCount) {
           setState(() {
-            _showCaptureLoopScan = false;
+            _showCaptureLoopScan = true;
             _captureLoopRoleId = null;
           });
         }
@@ -152,6 +155,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               ),
             ];
       final activeSlot = _activeScanSlot(workspacePhotos, selectedImagePath);
+      if (workspacePhotos.isEmpty &&
+          !scannerState.isLoading &&
+          !scannerState.isPreparingImage &&
+          !_hasOpenedInitialCamera &&
+          !_isOpeningInitialCamera) {
+        _openInitialCamera(nextRole);
+        return const Scaffold(
+          backgroundColor: Colors.black,
+          body: SizedBox.expand(),
+        );
+      }
       if (_showCaptureLoopScan && workspacePhotos.isNotEmpty) {
         final captureRole = _captureLoopRoleId ?? workspaceRole.id;
         return Scaffold(
@@ -258,6 +272,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       onScanAnother: scannerController.resetScan,
       onViewPortfolio: widget.onViewPortfolio,
     );
+  }
+
+  void _openInitialCamera(String imageRole) {
+    _hasOpenedInitialCamera = true;
+    _isOpeningInitialCamera = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+      await ref
+          .read(scannerControllerProvider.notifier)
+          .startCameraScan(context, imageRole: imageRole);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isOpeningInitialCamera = false;
+      });
+    });
   }
 }
 
