@@ -1514,7 +1514,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
-      expect(find.text('Hot Wheels detected'), findsOneWidget);
+      expect(find.text('Trading card detected'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('scan-recommended-role')),
         findsOneWidget,
@@ -2152,6 +2152,105 @@ void main() {
     );
     expect(provider.lastRequest?.metadata['enhancedImageCount'], 1);
   });
+
+  testWidgets(
+    'gallery import follows review workspace analyze result portfolio flow',
+    (WidgetTester tester) async {
+      final provider = _CapturingAiAnalysisProvider();
+      await tester.pumpCollectIqApp(
+        aiAnalysisProvider: provider,
+        galleryService: _SelectedGalleryService(),
+        imageEnhancementService: const _FakeImageEnhancementService(),
+        imageQualityAssessmentService:
+            const _FakeImageQualityAssessmentService(),
+      );
+
+      await tester.tap(find.text('Scan').last);
+      await tester.pump();
+      await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+      await tester.pumpUntilFound(
+        find.byKey(const ValueKey('enhancement-preview-surface')),
+      );
+
+      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsNothing);
+      await tester.acceptEnhancementPreview(
+        preset: ImageEnhancementPreset.autoEnhance,
+      );
+      await tester.pumpUntilFound(find.text('Scan Workspace'));
+
+      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+      expect(find.text('Trading card'), findsOneWidget);
+      expect(find.text('61%'), findsOneWidget);
+      expect(find.text('1 photo'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        findsOneWidget,
+      );
+
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('scan-primary-Analyze Image')),
+          )
+          .onPressed
+          ?.call();
+      await tester.pumpUntilFound(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+        timeout: const Duration(seconds: 10),
+      );
+
+      expect(provider.lastRequest, isNotNull);
+      expect(provider.lastRequest!.metadata['imageCount'], 1);
+      expect(provider.lastRequest!.metadata['imageRoles'], 'front');
+      expect(
+        provider.lastRequest!.metadata['activeSelectedEnhancement'],
+        'aiEnhance',
+      );
+      expect(
+        provider.lastRequest!.metadata['activeEnhancementPreset'],
+        'auto_enhance',
+      );
+      expect(provider.lastRequest!.metadata['activeReadinessScore'], 57);
+
+      expect(
+        find.byKey(const ValueKey('result-rarity-indicator')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('result-value-card')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('result-confidence-meter')),
+        findsOneWidget,
+      );
+      expect(find.text('AI Enhanced'), findsOneWidget);
+      expect(find.text('Captured Provider Collectible'), findsOneWidget);
+
+      await tester.reveal(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      );
+      await tester.pumpAndSettle();
+
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString('portfolio_items')!;
+      final item =
+          (jsonDecode(stored) as List<dynamic>).first as Map<String, dynamic>;
+      expect(item['title'], 'Captured Provider Collectible');
+      final gallery = item['galleryImages'] as List<dynamic>;
+      final firstImage = gallery.first as Map<String, dynamic>;
+      expect(firstImage['source'], 'gallery');
+      expect(firstImage['enhancementPreset'], 'auto_enhance');
+      expect(firstImage['originalPath'], isNotEmpty);
+      expect(
+        (firstImage['qualityMetadata']
+            as Map<String, dynamic>)['selectedEnhancement'],
+        'aiEnhance',
+      );
+    },
+  );
 
   testWidgets('enhancement preview shows only Original and AI Enhance', (
     WidgetTester tester,
