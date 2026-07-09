@@ -73,22 +73,35 @@ class _EnhanceButtonState extends State<EnhanceButton>
       animation: _pulseController,
       builder: (context, child) {
         final pulse = widget.active
-            ? 0.18 + (_pulseController.value * 0.10)
+            ? 0.12 + (_pulseController.value * 0.08)
             : 0.0;
+        final glowColor = Color.lerp(
+          const Color(0xFF14B8A6),
+          const Color(0xFF7DD3FC),
+          _pulseController.value,
+        )!;
         return AnimatedScale(
           key: const ValueKey('scan-enhance-scale'),
           scale: _pressed ? 0.94 : 1,
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
           child: DecoratedBox(
+            key: const ValueKey('scan-enhance-glow'),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: widget.active
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF14B8A6).withValues(alpha: pulse),
-                        blurRadius: 28,
-                        spreadRadius: 4,
+                        color: glowColor.withValues(alpha: pulse),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: const Color(
+                          0xFF2563EB,
+                        ).withValues(alpha: pulse * 0.55),
+                        blurRadius: 12,
+                        spreadRadius: 1,
                       ),
                     ]
                   : const [],

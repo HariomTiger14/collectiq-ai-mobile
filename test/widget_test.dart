@@ -1331,9 +1331,25 @@ void main() {
           .widget<AnimatedOpacity>(
             find.byKey(const ValueKey('scan-camera-grid')),
           )
+          .duration,
+      const Duration(milliseconds: 150),
+    );
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-camera-grid')),
+          )
           .opacity,
       0,
     );
+    final autoDetectOffset = tester
+        .widget<Transform>(
+          find.byKey(const ValueKey('scan-auto-detect-offset')),
+        )
+        .transform
+        .getTranslation();
+    expect(autoDetectOffset.y, 8);
+    expect(find.byType(BackdropFilter), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('scan-grid-toggle')));
     await tester.pump();
@@ -1413,8 +1429,32 @@ void main() {
           .widget<AnimatedOpacity>(
             find.byKey(const ValueKey('scan-capture-suggestion')),
           )
+          .duration,
+      const Duration(milliseconds: 150),
+    );
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-capture-suggestion')),
+          )
           .opacity,
       1,
+    );
+    expect(
+      tester
+          .widget<AnimatedSlide>(
+            find.byKey(const ValueKey('scan-capture-suggestion-slide')),
+          )
+          .offset,
+      Offset.zero,
+    );
+    expect(
+      tester
+          .widget<Positioned>(
+            find.byKey(const ValueKey('scan-capture-suggestion-position')),
+          )
+          .bottom,
+      140,
     );
     expect(find.text('Front recommended'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 150));
@@ -1444,6 +1484,25 @@ void main() {
 
     expect(find.byKey(const ValueKey('scan-enhance-pulse')), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-enhance-scale')), findsOneWidget);
+    var glowDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('scan-enhance-glow')),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(glowDecoration.boxShadow, hasLength(2));
+    expect(glowDecoration.boxShadow!.first.blurRadius, 18);
+    final initialGlowColor = glowDecoration.boxShadow!.first.color;
+    await tester.pump(const Duration(milliseconds: 1500));
+    glowDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('scan-enhance-glow')),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(glowDecoration.boxShadow!.first.color, isNot(initialGlowColor));
     await tester.tap(find.byKey(const ValueKey('scan-live-enhance')));
     await tester.pump();
 
@@ -1520,6 +1579,20 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Recommended:'), findsOneWidget);
+      final filmstripDecoration =
+          tester
+                  .widgetList<AnimatedContainer>(
+                    find.descendant(
+                      of: find.byKey(const ValueKey('scan-left-filmstrip')),
+                      matching: find.byType(AnimatedContainer),
+                    ),
+                  )
+                  .first
+                  .decoration
+              as BoxDecoration;
+      expect(filmstripDecoration.boxShadow, isNotNull);
+      expect(filmstripDecoration.boxShadow!.first.blurRadius, 18);
+      expect(filmstripDecoration.boxShadow!.first.offset.dy, 10);
     },
   );
 

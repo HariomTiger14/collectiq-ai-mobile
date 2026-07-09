@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
@@ -70,29 +72,41 @@ class AutoDetectOverlay extends StatelessWidget {
       duration: const Duration(milliseconds: 150),
       switchInCurve: Curves.easeOut,
       switchOutCurve: Curves.easeIn,
-      child: DecoratedBox(
-        key: ValueKey('scan-auto-detect-$label'),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.black.withValues(alpha: 0.50),
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.34),
-            ],
-          ),
+      child: Transform.translate(
+        key: const ValueKey('scan-auto-detect-offset'),
+        offset: const Offset(0, 8),
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          child: Text(
-            label,
-            key: const ValueKey('scan-auto-detect-label'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: DecoratedBox(
+              key: ValueKey('scan-auto-detect-$label'),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.08),
+                    Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.18),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Text(
+                  label,
+                  key: const ValueKey('scan-auto-detect-label'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
