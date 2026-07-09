@@ -1313,6 +1313,126 @@ void main() {
     );
   });
 
+  testWidgets(
+    'workspace capture next opens scan surface with existing photos',
+    (WidgetTester tester) async {
+      await tester.pumpCollectIqApp();
+
+      await tester.tap(find.text('Scan').last);
+      await tester.pump();
+      await tester.reveal(
+        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      );
+      await tester.pumpUntilFound(find.text('Scan Workspace'));
+
+      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+      expect(find.text('1 photo'), findsOneWidget);
+
+      await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Scan Workspace'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('scan-recommended-role')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Recommended:'), findsOneWidget);
+    },
+  );
+
+  testWidgets('capture review acceptance returns to updated workspace', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pumpUntilFound(find.text('Scan Workspace'));
+    expect(find.byKey(const ValueKey('workspace-metadata')), findsOneWidget);
+    expect(find.text('Capture the full back side.'), findsOneWidget);
+    await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
+    await tester.pumpUntilFound(find.text('Scan Workspace'));
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(scannerState.captureImages.length, 2);
+    expect(find.text('2 photos'), findsOneWidget);
+    expect(find.text('Capture the full back side.'), findsNothing);
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-metadata')), findsOneWidget);
+  });
+
+  testWidgets(
+    'full workspace scan review analyze loop uses updated photo list',
+    (WidgetTester tester) async {
+      final provider = _CapturingAiAnalysisProvider();
+      await tester.pumpCollectIqApp(
+        aiAnalysisProvider: provider,
+        cameraService: _SelectedCameraService(),
+      );
+
+      await tester.tap(find.text('Scan').last);
+      await tester.pump();
+      await tester.reveal(
+        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      );
+      await tester.pumpUntilFound(find.text('Scan Workspace'));
+      await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      );
+      await tester.pumpUntilFound(find.text('Scan Workspace'));
+      await tester.reveal(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Analysis Complete'), findsOneWidget);
+      expect(provider.lastRequest?.metadata['imageCount'], 2);
+      expect(
+        provider.lastRequest?.metadata['imageRoles'].toString(),
+        contains(','),
+      );
+    },
+  );
+
   testWidgets('empty scanner category stays awaiting scan state', (
     WidgetTester tester,
   ) async {

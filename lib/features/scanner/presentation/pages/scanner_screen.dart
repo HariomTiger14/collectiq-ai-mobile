@@ -27,6 +27,8 @@ class ScannerScreen extends ConsumerStatefulWidget {
 class _ScannerScreenState extends ConsumerState<ScannerScreen>
     with WidgetsBindingObserver {
   late final ProviderSubscription<ScannerState> _scannerSubscription;
+  bool _showCaptureLoopScan = false;
+  String? _captureLoopRoleId;
 
   @override
   void initState() {
@@ -38,6 +40,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       (previous, next) {
         if (previous?.scanResult != null && next.scanResult == null) {
           debugPrint('[ScannerScreen] result cleared');
+        }
+        final previousCount = previous?.captureImages.length ?? 0;
+        final nextCount = next.captureImages.length;
+        if (_showCaptureLoopScan && nextCount > previousCount) {
+          setState(() {
+            _showCaptureLoopScan = false;
+            _captureLoopRoleId = null;
+          });
         }
       },
     );
@@ -137,6 +147,41 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               ),
             ];
       final activeSlot = _activeScanSlot(workspacePhotos, selectedImagePath);
+      if (_showCaptureLoopScan && workspacePhotos.isNotEmpty) {
+        final captureRole = _captureLoopRoleId ?? workspaceRole.id;
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: _SnapchatScanSurface(
+            captureImages: workspacePhotos,
+            activeSlot: activeSlot,
+            isBusy: scannerState.isLoading || scannerState.isPreparingImage,
+            canAnalyze: workspacePhotos.isNotEmpty,
+            errorMessage: scannerState.errorMessage,
+            recommendedRole: ScanCaptureRole.fromId(captureRole),
+            onClose: () => setState(() {
+              _showCaptureLoopScan = false;
+              _captureLoopRoleId = null;
+            }),
+            onCapture: () => scannerController.startCameraScan(
+              context,
+              imageRole: captureRole,
+            ),
+            onGallery: () => scannerController.pickImageFromGallery(
+              context: context,
+              imageRole: captureRole,
+            ),
+            onAnalyze: scannerController.analyzeWithAi,
+            onSelectPhoto: scannerController.selectCapturedPhoto,
+            onSample: scannerController.useSampleScan,
+            onEnhance: activeSlot == null
+                ? null
+                : () => scannerController.applyEnhancementToPhoto(
+                    activeSlot,
+                    ImageEnhancementPreset.autoEnhance,
+                  ),
+          ),
+        );
+      }
       if (workspacePhotos.isNotEmpty) {
         return ScanWorkspaceScreen(
           photos: workspacePhotos,
@@ -148,10 +193,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           errorMessage: scannerState.errorMessage,
           onClose: scannerController.resetScan,
           onSelectPhoto: scannerController.selectCapturedPhoto,
-          onCaptureNext: () => scannerController.startCameraScan(
-            context,
-            imageRole: workspaceRole.id,
-          ),
+          onCaptureNext: () => setState(() {
+            _showCaptureLoopScan = true;
+            _captureLoopRoleId = workspaceRole.id;
+          }),
           onAddPhoto: () => scannerController.pickImageFromGallery(
             context: context,
             imageRole: workspaceRole.id,
@@ -167,6 +212,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           isBusy: scannerState.isLoading || scannerState.isPreparingImage,
           canAnalyze: scannerState.captureImages.isNotEmpty,
           errorMessage: scannerState.errorMessage,
+          recommendedRole: ScanCaptureRole.fromId(nextRole),
           onClose: scannerController.resetScan,
           onCapture: () =>
               scannerController.startCameraScan(context, imageRole: nextRole),
@@ -551,6 +597,7 @@ class _SnapchatScanSurface extends StatelessWidget {
     required this.isBusy,
     required this.canAnalyze,
     required this.errorMessage,
+    required this.recommendedRole,
     required this.onClose,
     required this.onCapture,
     required this.onGallery,
@@ -565,6 +612,7 @@ class _SnapchatScanSurface extends StatelessWidget {
   final bool isBusy;
   final bool canAnalyze;
   final String? errorMessage;
+  final ScanCaptureRole recommendedRole;
   final VoidCallback onClose;
   final VoidCallback onCapture;
   final VoidCallback onGallery;
@@ -611,6 +659,12 @@ class _SnapchatScanSurface extends StatelessWidget {
               activePath: activeSlot?.path,
               onSelectPhoto: onSelectPhoto,
             ),
+          ),
+          Positioned(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            top: 70,
+            child: Center(child: _RecommendedRolePill(role: recommendedRole)),
           ),
           Positioned(
             right: AppSpacing.md,
@@ -668,6 +722,37 @@ class _SnapchatScanSurface extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RecommendedRolePill extends StatelessWidget {
+  const _RecommendedRolePill({required this.role});
+
+  final ScanCaptureRole role;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const ValueKey('scan-recommended-role'),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: Text(
+          'Recommended: ${role.title}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }
