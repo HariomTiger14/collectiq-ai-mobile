@@ -68,8 +68,10 @@ void main() {
               ScanCaptureRole.front,
               ScanCaptureRole.back,
               ScanCaptureRole.closeUp,
+              ScanCaptureRole.barcode,
             ],
             requiredRoles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: slots,
             captureImages: slots.values.toList(),
             roleCounts: const {'front': 1, 'closeup': 1},
@@ -98,7 +100,8 @@ void main() {
     expect(find.byKey(const ValueKey('filmstrip-add-photo')), findsOneWidget);
     expect(find.text('Review'), findsOneWidget);
     expect(find.text('Captured'), findsOneWidget);
-    expect(find.text('Needed'), findsOneWidget);
+    expect(find.text('Recommended'), findsOneWidget);
+    expect(find.text('Optional'), findsOneWidget);
   });
 
   testWidgets('empty filmstrip tile captures the correct role', (
@@ -114,6 +117,7 @@ void main() {
           body: ScanImageFilmstrip(
             roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
             requiredRoles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: slots,
             captureImages: slots.values.toList(),
             roleCounts: const {'front': 1},
@@ -160,6 +164,7 @@ void main() {
           body: ScanImageFilmstrip(
             roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
             requiredRoles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: slots,
             captureImages: captureImages,
             roleCounts: const {'front': 2, 'back': 1},
@@ -217,6 +222,7 @@ void main() {
           body: ScanImageFilmstrip(
             roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
             requiredRoles: const [ScanCaptureRole.front],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: slots,
             captureImages: slots.values.toList(),
             roleCounts: const {'front': 1, 'back': 1},
@@ -252,6 +258,7 @@ void main() {
           body: ScanImageFilmstrip(
             roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
             requiredRoles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: slots,
             captureImages: slots.values.toList(),
             roleCounts: const {'front': 1, 'back': 1},
@@ -442,6 +449,7 @@ void main() {
           body: ScanImageFilmstrip(
             roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
             requiredRoles: const [ScanCaptureRole.front],
+            recommendedRoleId: ScanCaptureRole.back.id,
             slots: {
               ScanCaptureRole.front.id: captureImages[1],
               ScanCaptureRole.back.id: captureImages[2],
@@ -578,7 +586,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Next required photo needed'), findsOneWidget);
+      expect(find.text('Recommended next photo'), findsOneWidget);
       expect(find.textContaining('front/package'), findsWidgets);
       expect(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
@@ -731,8 +739,9 @@ void main() {
     );
 
     expect(quickPlan.requiredRoles, [ScanCaptureRole.front]);
+    expect(detailedPlan.requiredRoles, [ScanCaptureRole.front]);
     expect(
-      detailedPlan.requiredRoles,
+      detailedPlan.optionalRoles,
       containsAll([ScanCaptureRole.back, ScanCaptureRole.baseUnderside]),
     );
     expect(detailedPlan.nextRecommendedRole, ScanCaptureRole.back);

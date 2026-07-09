@@ -1219,7 +1219,7 @@ class ScannerController extends Notifier<ScannerState> {
           clearAiRecommendation: true,
           isSavedToPortfolio: false,
         ),
-        event: 'analyze blocked missing required roles',
+        event: 'analyze waiting for first recommended photo',
       );
       return;
     }
@@ -2182,9 +2182,9 @@ class ScannerController extends Notifier<ScannerState> {
         .where((role) => !state.photoSlots.containsKey(role.id))
         .toList();
     if (missingRequired.length == 1) {
-      return 'Add ${missingRequired.single.title.toLowerCase()} photo to continue.';
+      return 'Capture ${missingRequired.single.title.toLowerCase()} to start analysis.';
     }
-    return 'Add ${missingRequired.length} more required photos.';
+    return 'Capture a front/package photo to start analysis.';
   }
 
   String _selectedTitleForRole({

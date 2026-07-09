@@ -81,65 +81,7 @@ class ScanCapturePlanService {
     ScanGoal goal,
     CollectibleCategory category,
   ) {
-    return switch ((goal, category)) {
-      (ScanGoal.identifyValue, CollectibleCategory.tradingCard) => const [
-        ScanCaptureRole.front,
-      ],
-      (ScanGoal.identifyValue, CollectibleCategory.coin) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-      ],
-      (ScanGoal.identifyValue, _) => const [ScanCaptureRole.front],
-      (ScanGoal.detailedAnalysis, CollectibleCategory.toyCar) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.leftSide,
-        ScanCaptureRole.rightSide,
-        ScanCaptureRole.baseUnderside,
-      ],
-      (ScanGoal.detailedAnalysis, CollectibleCategory.tradingCard) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.cornerCondition,
-      ],
-      (ScanGoal.detailedAnalysis, CollectibleCategory.coin) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.edge,
-        ScanCaptureRole.dateMint,
-      ],
-      (ScanGoal.detailedAnalysis, CollectibleCategory.generic) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.closeUp,
-      ],
-      (ScanGoal.prepareForSale, CollectibleCategory.toyCar) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.leftSide,
-        ScanCaptureRole.rightSide,
-        ScanCaptureRole.top,
-        ScanCaptureRole.baseUnderside,
-      ],
-      (ScanGoal.prepareForSale, CollectibleCategory.tradingCard) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.cornerCondition,
-        ScanCaptureRole.surfaceGlare,
-      ],
-      (ScanGoal.prepareForSale, CollectibleCategory.coin) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.edge,
-        ScanCaptureRole.dateMint,
-      ],
-      (ScanGoal.prepareForSale, CollectibleCategory.generic) => const [
-        ScanCaptureRole.front,
-        ScanCaptureRole.back,
-        ScanCaptureRole.closeUp,
-        ScanCaptureRole.damageDetail,
-      ],
-    };
+    return const [ScanCaptureRole.front];
   }
 
   List<ScanCaptureRole> _optionalRoles(
@@ -165,30 +107,55 @@ class ScanCapturePlanService {
         ScanCaptureRole.closeUp,
       ],
       (ScanGoal.detailedAnalysis, CollectibleCategory.toyCar) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.leftSide,
+        ScanCaptureRole.rightSide,
+        ScanCaptureRole.baseUnderside,
         ScanCaptureRole.top,
         ScanCaptureRole.barcode,
       ],
       (ScanGoal.detailedAnalysis, CollectibleCategory.tradingCard) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.cornerCondition,
         ScanCaptureRole.surfaceGlare,
       ],
       (ScanGoal.detailedAnalysis, CollectibleCategory.coin) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.edge,
+        ScanCaptureRole.dateMint,
         ScanCaptureRole.angledReflective,
       ],
       (ScanGoal.detailedAnalysis, CollectibleCategory.generic) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.closeUp,
         ScanCaptureRole.damageDetail,
         ScanCaptureRole.angledReflective,
       ],
       (ScanGoal.prepareForSale, CollectibleCategory.toyCar) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.leftSide,
+        ScanCaptureRole.rightSide,
+        ScanCaptureRole.top,
+        ScanCaptureRole.baseUnderside,
         ScanCaptureRole.barcode,
         ScanCaptureRole.damageDetail,
       ],
       (ScanGoal.prepareForSale, CollectibleCategory.tradingCard) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.cornerCondition,
+        ScanCaptureRole.surfaceGlare,
         ScanCaptureRole.damageDetail,
       ],
       (ScanGoal.prepareForSale, CollectibleCategory.coin) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.edge,
+        ScanCaptureRole.dateMint,
         ScanCaptureRole.angledReflective,
       ],
       (ScanGoal.prepareForSale, CollectibleCategory.generic) => const [
+        ScanCaptureRole.back,
+        ScanCaptureRole.closeUp,
+        ScanCaptureRole.damageDetail,
         ScanCaptureRole.serialOrMark,
         ScanCaptureRole.angledReflective,
       ],
@@ -200,7 +167,7 @@ class ScanCapturePlanService {
       return switch (goal) {
         ScanGoal.prepareForSale =>
           'Minimum listing views are ready. Add optional details if needed.',
-        _ => 'Minimum photos are ready for analysis.',
+        _ => 'Ready to analyze. More photos are optional.',
       };
     }
     if (nextRole == ScanCaptureRole.baseUnderside) {

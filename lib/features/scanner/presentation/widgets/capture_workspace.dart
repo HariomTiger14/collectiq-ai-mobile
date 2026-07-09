@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/smart_scan_guidance_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
@@ -86,17 +88,19 @@ class CaptureWorkspace extends StatelessWidget {
         .toInt();
     final optionalCount = captureImages.length - boundedRequiredCompleted;
     final nextRole = plan.nextRecommendedRole;
-    final analyzeReady = plan.isMinimumReadyForAnalyze;
+    final smartGuidance = const SmartScanGuidanceService().buildGuidance(
+      category: category,
+      images: _capturedImagesForGuidance(captureImages),
+      goal: goal,
+      selectedCategoryLabel: categoryLabel,
+    );
+    final recommendedRole = smartGuidance.recommendedNextRole ?? nextRole;
+    final analyzeReady = smartGuidance.canAnalyze;
     final roles = [...plan.requiredRoles, ...plan.optionalRoles];
     final activeSlot = _activeSlot(captureImages, slots, selectedPath);
-    final readinessScore = _workspaceReadinessScore(
-      captureImages: captureImages,
-      requiredCompleted: requiredCompleted,
-      requiredTotal: plan.requiredRoles.length,
-    );
     final activeRole = activeSlot == null
         ? ScanCaptureRole.fromId(
-            activeRoleId ?? nextRole?.id ?? ScanCaptureRole.front.id,
+            activeRoleId ?? recommendedRole?.id ?? ScanCaptureRole.front.id,
           )
         : ScanCaptureRole.fromId(activeSlot.role);
     final primaryLabel = analyzeReady
@@ -146,14 +150,7 @@ class CaptureWorkspace extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _CompactCaptureGuidance(
             imageCount: captureImages.length,
-            analyzeReady: analyzeReady,
-            guidance: _guidedMessage(
-              plan: plan,
-              imageCount: captureImages.length,
-              requiredCompleted: requiredCompleted,
-              readinessScore: readinessScore,
-              captureImages: captureImages,
-            ),
+            guidance: smartGuidance,
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -198,13 +195,13 @@ class CaptureWorkspace extends StatelessWidget {
           ],
           ScanImageFilmstrip(
             roles: roles,
-            requiredRoles: plan.requiredRoles,
+            recommendedRoleId: recommendedRole?.id,
             slots: slots,
             captureImages: captureImages,
             roleCounts: roleCounts,
             selectedPath: selectedPath ?? activeSlot?.path,
             selectedRoleId: activeSlot == null ? activeRole.id : null,
-            canAddPhoto: nextRole != null,
+            canAddPhoto: recommendedRole != null,
             isBusy: isBusy,
             onTapImage: (slot) => _openPhotoReview(
               context,
@@ -227,8 +224,8 @@ class CaptureWorkspace extends StatelessWidget {
             requiredCompleted: requiredCompleted,
             requiredTotal: plan.requiredRoles.length,
             optionalCount: optionalCount < 0 ? 0 : optionalCount,
-            completionPercentage: plan.completionPercentage,
             analyzeReady: analyzeReady,
+            recommendedRole: recommendedRole,
           ),
           if (captureImages.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -342,7 +339,6 @@ class CaptureWorkspace extends StatelessWidget {
 class ScanImageFilmstrip extends StatefulWidget {
   const ScanImageFilmstrip({
     required this.roles,
-    required this.requiredRoles,
     required this.slots,
     required this.captureImages,
     required this.roleCounts,
@@ -352,6 +348,8 @@ class ScanImageFilmstrip extends StatefulWidget {
     required this.onRetake,
     required this.onDelete,
     super.key,
+    this.requiredRoles = const [],
+    this.recommendedRoleId,
     this.selectedPath,
     this.selectedRoleId,
     this.canAddPhoto = false,
@@ -361,6 +359,7 @@ class ScanImageFilmstrip extends StatefulWidget {
 
   final List<ScanCaptureRole> roles;
   final List<ScanCaptureRole> requiredRoles;
+  final String? recommendedRoleId;
   final Map<String, ScannerPhotoSlot> slots;
   final List<ScannerPhotoSlot> captureImages;
   final Map<String, int> roleCounts;
@@ -401,6 +400,7 @@ class _ScanImageFilmstripState extends State<ScanImageFilmstrip> {
           roles: widget.roles,
           roleCounts: widget.roleCounts,
           selectedRoleId: _selectedRoleId,
+          recommendedRoleId: widget.recommendedRoleId,
           onSelected: (roleId) {
             setState(() => _selectedRoleId = roleId);
             if (roleId != null) {
@@ -436,7 +436,7 @@ class _ScanImageFilmstripState extends State<ScanImageFilmstrip> {
               final role = item as ScanCaptureRole;
               return _FilmstripEmptyRoleTile(
                 role: role,
-                requiredRole: widget.requiredRoles.contains(role),
+                recommended: widget.recommendedRoleId == role.id,
                 selected:
                     widget.selectedPath == null &&
                     widget.selectedRoleId == role.id &&
@@ -570,12 +570,14 @@ class _PhotoSetFilterChips extends StatelessWidget {
     required this.roles,
     required this.roleCounts,
     required this.selectedRoleId,
+    required this.recommendedRoleId,
     required this.onSelected,
   });
 
   final List<ScanCaptureRole> roles;
   final Map<String, int> roleCounts;
   final String? selectedRoleId;
+  final String? recommendedRoleId;
   final void Function(String? roleId) onSelected;
 
   @override
@@ -603,6 +605,7 @@ class _PhotoSetFilterChips extends StatelessWidget {
             key: ValueKey('photo-set-chip-${role.id}'),
             label: '${_shortRoleLabel(role)} $count',
             selected: selectedRoleId == role.id,
+            recommended: recommendedRoleId == role.id,
             onTap: () => onSelected(role.id),
           );
         },
@@ -615,12 +618,14 @@ class _PhotoSetChip extends StatelessWidget {
   const _PhotoSetChip({
     required this.label,
     required this.selected,
+    this.recommended = false,
     required this.onTap,
     super.key,
   });
 
   final String label;
   final bool selected;
+  final bool recommended;
   final VoidCallback onTap;
 
   @override
@@ -631,13 +636,19 @@ class _PhotoSetChip extends StatelessWidget {
       onPressed: onTap,
       avatar: selected ? const Icon(Icons.check, size: 16) : null,
       side: BorderSide(
-        color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+        color: selected || recommended
+            ? colorScheme.primary
+            : colorScheme.outlineVariant,
       ),
       backgroundColor: selected
           ? colorScheme.primaryContainer.withValues(alpha: 0.62)
+          : recommended
+          ? colorScheme.primary.withValues(alpha: 0.08)
           : colorScheme.surface,
       labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-        color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        color: selected || recommended
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w900,
       ),
     );
@@ -1101,13 +1112,11 @@ class _EmptyActivePreview extends StatelessWidget {
 class _CompactCaptureGuidance extends StatelessWidget {
   const _CompactCaptureGuidance({
     required this.imageCount,
-    required this.analyzeReady,
     required this.guidance,
   });
 
   final int imageCount;
-  final bool analyzeReady;
-  final String guidance;
+  final SmartScanGuidance guidance;
 
   @override
   Widget build(BuildContext context) {
@@ -1128,8 +1137,12 @@ class _CompactCaptureGuidance extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            analyzeReady ? Icons.check_circle_outline : Icons.photo_camera,
-            color: analyzeReady ? colorScheme.primary : colorScheme.secondary,
+            guidance.canAnalyze
+                ? Icons.check_circle_outline
+                : Icons.photo_camera,
+            color: guidance.canAnalyze
+                ? colorScheme.primary
+                : colorScheme.secondary,
             size: 20,
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -1138,14 +1151,14 @@ class _CompactCaptureGuidance extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  analyzeReady ? 'Ready to analyze' : 'Ready for first photo',
+                  guidance.headline,
                   style: Theme.of(
                     context,
                   ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  guidance,
+                  guidance.guidance,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1153,6 +1166,18 @@ class _CompactCaptureGuidance extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
+                if (guidance.softWarning != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    guidance.softWarning!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colorScheme.tertiary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1320,15 +1345,15 @@ class _CaptureProgress extends StatelessWidget {
     required this.requiredCompleted,
     required this.requiredTotal,
     required this.optionalCount,
-    required this.completionPercentage,
     required this.analyzeReady,
+    required this.recommendedRole,
   });
 
   final int requiredCompleted;
   final int requiredTotal;
   final int optionalCount;
-  final double completionPercentage;
   final bool analyzeReady;
+  final ScanCaptureRole? recommendedRole;
 
   @override
   Widget build(BuildContext context) {
@@ -1341,34 +1366,24 @@ class _CaptureProgress extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                analyzeReady
-                    ? 'We can identify this already.'
-                    : 'Next required photo needed',
+                analyzeReady ? 'Ready when you are' : 'Recommended next photo',
                 style: textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ),
-            Text(
-              '${(completionPercentage * 100).round()}%',
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w900,
+            if (recommendedRole != null)
+              _RoleBadge(
+                label: _shortRoleLabel(recommendedRole!),
+                emphasized: true,
               ),
-            ),
           ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        LinearProgressIndicator(
-          value: completionPercentage,
-          minHeight: 7,
-          borderRadius: BorderRadius.circular(999),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           analyzeReady
-              ? 'Ready for AI analysis. More photos can improve confidence.'
-              : 'Add ${requiredTotal - requiredCompleted} more required photo${requiredTotal - requiredCompleted == 1 ? '' : 's'}',
+              ? 'Analyze is available. More photos are optional and can improve confidence.'
+              : 'Start with a front/package photo to unlock analysis.',
           style: textTheme.bodySmall?.copyWith(
             color: analyzeReady
                 ? colorScheme.primary
@@ -1566,14 +1581,14 @@ class _FilmstripPhotoTile extends StatelessWidget {
 class _FilmstripEmptyRoleTile extends StatelessWidget {
   const _FilmstripEmptyRoleTile({
     required this.role,
-    required this.requiredRole,
+    required this.recommended,
     required this.selected,
     required this.onTap,
     required this.onCapture,
   });
 
   final ScanCaptureRole role;
-  final bool requiredRole;
+  final bool recommended;
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onCapture;
@@ -1593,10 +1608,10 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
             color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.64),
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
-              color: selected
+              color: selected || recommended
                   ? colorScheme.primary
                   : colorScheme.outlineVariant,
-              width: selected ? 2 : 1,
+              width: selected || recommended ? 2 : 1,
             ),
           ),
           child: Padding(
@@ -1626,9 +1641,14 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        requiredRole ? 'Needed' : 'Optional',
+                        recommended ? 'Recommended' : 'Optional',
                         style: textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                          color: recommended
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          fontWeight: recommended
+                              ? FontWeight.w900
+                              : FontWeight.w600,
                         ),
                       ),
                     ),
@@ -1828,6 +1848,22 @@ Map<String, int> _roleCounts(List<ScannerPhotoSlot> slots) {
   return counts;
 }
 
+List<CapturedScanImage> _capturedImagesForGuidance(
+  List<ScannerPhotoSlot> slots,
+) {
+  return [
+    for (final slot in slots)
+      CapturedScanImage(
+        path: slot.path,
+        role: ScanCaptureRole.fromId(slot.role),
+        source: slot.source,
+        originalPath: slot.originalPath,
+        enhancementPreset: slot.enhancementPreset.id,
+        qualityMetadata: slot.qualityMetadata,
+      ),
+  ];
+}
+
 String _capturedTimeLabel(DateTime? capturedAt) {
   if (capturedAt == null) {
     return 'Just captured';
@@ -1836,91 +1872,6 @@ String _capturedTimeLabel(DateTime? capturedAt) {
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
-}
-
-String _guidedMessage({
-  required ScanCapturePlan plan,
-  required int imageCount,
-  required int requiredCompleted,
-  required int readinessScore,
-  required List<ScannerPhotoSlot> captureImages,
-}) {
-  final nextRole = plan.nextRecommendedRole;
-  final warnings = captureImages
-      .expand((slot) => _warningLabels(slot.qualityMetadata))
-      .toList(growable: false);
-  if (warnings.isNotEmpty && readinessScore < 68) {
-    return 'Retake recommended: ${warnings.first.toLowerCase()}. You can still use this photo.';
-  }
-  if (plan.isMinimumReadyForAnalyze && nextRole == null) {
-    return readinessScore >= 82
-        ? 'Great. We can identify this already.'
-        : 'Ready to analyze. One clearer angle can improve confidence.';
-  }
-  if (plan.isMinimumReadyForAnalyze) {
-    if (nextRole == ScanCaptureRole.baseUnderside) {
-      return 'Great. Next best photo: capture the base/underside to improve exact model and year.';
-    }
-    if (nextRole == ScanCaptureRole.barcode) {
-      return 'Add a barcode/package photo to improve valuation.';
-    }
-    return 'We can identify this already. Next best photo: ${nextRole!.guidance.toLowerCase()}';
-  }
-  if (imageCount == 0) {
-    return 'Next best photo: capture the front/package to start identification.';
-  }
-  if (nextRole == ScanCaptureRole.baseUnderside) {
-    return 'Next best photo: capture the base/underside to improve exact model and year.';
-  }
-  if (nextRole == ScanCaptureRole.barcode) {
-    return 'One more packaging photo may improve valuation.';
-  }
-  return nextRole == null
-      ? 'Ready for AI analysis. More photos can improve confidence.'
-      : 'Next best photo: ${nextRole.guidance.toLowerCase()}';
-}
-
-int _workspaceReadinessScore({
-  required List<ScannerPhotoSlot> captureImages,
-  required int requiredCompleted,
-  required int requiredTotal,
-}) {
-  if (captureImages.isEmpty) {
-    return 0;
-  }
-  final qualityScores = [
-    for (final slot in captureImages) _readinessScore(slot.qualityMetadata),
-  ];
-  final averageQuality =
-      qualityScores.fold<int>(0, (sum, score) => sum + score) /
-      qualityScores.length;
-  final coverage = requiredTotal <= 0
-      ? 1.0
-      : (requiredCompleted / requiredTotal).clamp(0.0, 1.0);
-  final countBoost = (captureImages.length * 4).clamp(0, 14);
-  return ((averageQuality * 0.62) + (coverage * 24) + countBoost).round().clamp(
-    0,
-    100,
-  );
-}
-
-int _readinessScore(Map<String, Object?> metadata) {
-  final raw = metadata['readinessScore'];
-  if (raw is num) {
-    return raw.round().clamp(0, 100);
-  }
-  return _hasWarning(metadata) ? 62 : 78;
-}
-
-List<String> _warningLabels(Map<String, Object?> metadata) {
-  final raw = metadata['qualityWarnings'];
-  if (raw is Iterable) {
-    return raw
-        .whereType<String>()
-        .where((label) => label.trim().isNotEmpty)
-        .toList();
-  }
-  return _hasWarning(metadata) ? const ['Image quality warning'] : const [];
 }
 
 String _photoCountLabel(int count, bool analyzeReady) {

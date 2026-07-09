@@ -6,6 +6,7 @@ import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/smart_scan_guidance_service.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
@@ -30,6 +31,12 @@ final scanCapturePlanServiceProvider = Provider<ScanCapturePlanService>((ref) {
 
 final scanQualityGateServiceProvider = Provider<ScanQualityGateService>((ref) {
   return const ScanQualityGateService();
+});
+
+final smartScanGuidanceServiceProvider = Provider<SmartScanGuidanceService>((
+  ref,
+) {
+  return const SmartScanGuidanceService();
 });
 
 final imageEnhancementServiceProvider = Provider<ImageEnhancementService>((
