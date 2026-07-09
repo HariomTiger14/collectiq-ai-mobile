@@ -15,6 +15,7 @@ class AnalyzerService {
     AnalyzerRequest request, {
     AnalyzerProgressCallback? onProgress,
   }) async {
+    final normalizedRequest = _withAnalyzerMediaMetadata(request);
     final cancellationToken = request.cancellationToken;
     var attempt = 0;
     AnalyzerException? lastError;
@@ -31,7 +32,7 @@ class AnalyzerService {
 
       try {
         final response = await provider
-            .analyze(request, onProgress: onProgress)
+            .analyze(normalizedRequest, onProgress: onProgress)
             .timeout(
               config.timeout,
               onTimeout: () => throw const AnalyzerException(
@@ -70,5 +71,50 @@ class AnalyzerService {
           type: AnalyzerErrorType.unknown,
           message: 'AI analysis is not available right now. Please try again.',
         );
+  }
+
+  AnalyzerRequest _withAnalyzerMediaMetadata(AnalyzerRequest request) {
+    final selectedEnhancement =
+        request.metadata['activeSelectedEnhancement']?.toString() ??
+        request.metadata['selectedEnhancement']?.toString() ??
+        'original';
+    final enhancedPath = request.metadata['activeEnhancedImagePath']
+        ?.toString();
+    final originalPath = request.metadata['originalImagePath']?.toString();
+    final primaryImage = selectedEnhancement == 'aiEnhance'
+        ? _usablePath(enhancedPath, request.imagePath)
+        : _usablePath(originalPath, request.imagePath);
+    final photos = [
+      for (final image in request.images)
+        {
+          'path': image.path,
+          'role': image.role,
+          'source': image.source,
+          'hasFile': image.image != null,
+        },
+    ];
+
+    return AnalyzerRequest(
+      imagePath: primaryImage,
+      image: request.image,
+      images: request.images,
+      metadata: {
+        ...request.metadata,
+        'photos': photos,
+        'primaryImage': primaryImage,
+        'category': request.metadata['captureCategory'],
+        'confidence': request.metadata['activeReadinessScore'],
+        'enhancement': selectedEnhancement,
+      },
+      cancellationToken: request.cancellationToken,
+    );
+  }
+
+  String _usablePath(String? candidate, String fallback) {
+    final trimmed = candidate?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == 'null') {
+      return fallback;
+    }
+    return trimmed;
   }
 }

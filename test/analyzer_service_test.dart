@@ -220,6 +220,47 @@ void main() {
         ),
       );
     });
+
+    test(
+      'normalizes primary enhanced image metadata before provider call',
+      () async {
+        final provider = _CapturingAnalyzerProvider();
+        final service = AnalyzerService(
+          provider: provider,
+          config: const AnalyzerConfig(
+            retryPolicy: AnalyzerRetryPolicy(maxAttempts: 1),
+          ),
+        );
+
+        await service.analyze(
+          const AnalyzerRequest(
+            imagePath: '/tmp/original.jpg',
+            images: [
+              AnalyzerImageInput(
+                path: '/tmp/enhanced.jpg',
+                role: 'front',
+                source: 'camera',
+              ),
+            ],
+            metadata: {
+              'captureCategory': 'toy_car',
+              'originalImagePath': '/tmp/original.jpg',
+              'activeEnhancedImagePath': '/tmp/enhanced.jpg',
+              'activeSelectedEnhancement': 'aiEnhance',
+              'activeReadinessScore': 0.82,
+            },
+          ),
+        );
+
+        final request = provider.lastRequest!;
+        expect(request.imagePath, '/tmp/enhanced.jpg');
+        expect(request.metadata['primaryImage'], '/tmp/enhanced.jpg');
+        expect(request.metadata['category'], 'toy_car');
+        expect(request.metadata['confidence'], 0.82);
+        expect(request.metadata['enhancement'], 'aiEnhance');
+        expect(request.metadata['photos'], isA<List<Map<String, Object?>>>());
+      },
+    );
   });
 
   group('MockAnalyzerProvider', () {
@@ -489,6 +530,19 @@ class _NeverCompletesAnalyzerProvider implements AnalyzerProvider {
     AnalyzerProgressCallback? onProgress,
   }) {
     return Completer<AnalyzerResponse>().future;
+  }
+}
+
+class _CapturingAnalyzerProvider extends _SuccessfulAnalyzerProvider {
+  AnalyzerRequest? lastRequest;
+
+  @override
+  Future<AnalyzerResponse> analyze(
+    AnalyzerRequest request, {
+    AnalyzerProgressCallback? onProgress,
+  }) {
+    lastRequest = request;
+    return super.analyze(request, onProgress: onProgress);
   }
 }
 

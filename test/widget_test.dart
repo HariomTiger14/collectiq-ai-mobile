@@ -28,6 +28,7 @@ import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
@@ -1458,11 +1459,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Analysis Complete'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('result-primary-image')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('result-value-card')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('result-confidence-meter')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+        findsOneWidget,
+      );
       expect(provider.lastRequest?.metadata['imageCount'], 2);
       expect(
         provider.lastRequest?.metadata['imageRoles'].toString(),
         contains(','),
       );
+      await tester.reveal(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saved to portfolio'), findsOneWidget);
     },
   );
 
@@ -2499,11 +2523,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Gallery image'), findsNothing);
-    expect(find.byKey(const ValueKey('scan-busy-overlay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('analyze-blur-overlay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('analyze-silhouette')), findsOneWidget);
+    expect(find.byKey(const ValueKey('analyze-progress-ring')), findsOneWidget);
 
     await tester.pumpAndSettle();
 
     expect(find.text('Gallery image'), findsNothing);
+    expect(find.byKey(const ValueKey('analyze-blur-overlay')), findsNothing);
     expect(find.text('Analysis Complete'), findsOneWidget);
   });
 
@@ -2540,11 +2567,25 @@ void main() {
     await tester.pump();
 
     expect(find.text('Analysis Complete'), findsOneWidget);
+    expect(find.byKey(const ValueKey('result-primary-image')), findsOneWidget);
     expect(find.textContaining('Charizard'), findsWidgets);
+    expect(find.byKey(const ValueKey('result-value-card')), findsOneWidget);
     expect(find.text('Estimated value'), findsOneWidget);
     expect(find.textContaining(r'$'), findsWidgets);
-    expect(find.textContaining('94% confidence'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('result-confidence-meter')),
+      findsOneWidget,
+    );
+    expect(find.text('94%'), findsOneWidget);
     expect(find.text('Pokemon Card'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('result-rarity-indicator')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('result-add-button-slide-animation')),
+      findsOneWidget,
+    );
     expect(find.text('Condition notes'), findsNothing);
     expect(find.text('Valuation evidence'), findsNothing);
     expect(find.text('Pricing source'), findsNothing);
@@ -2563,6 +2604,81 @@ void main() {
     );
     expect(find.text('Edit Details'), findsNothing);
     expect(find.text('Retry Analysis'), findsNothing);
+  });
+
+  testWidgets('premium result shows AI Enhanced badge when photo is enhanced', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.parse('2026-07-09T00:00:00Z');
+    final imagePath =
+        '${Directory.current.path}/test/fixtures/persistent-camera-card.jpg';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ScanResultScreen(
+          result: ScanResult(
+            id: 'enhanced-result',
+            title: 'Enhanced Test Collectible',
+            category: 'Trading Card',
+            estimatedValue: 88,
+            confidence: 0.9,
+            condition: 'Excellent',
+            thumbnail: imagePath,
+            scanDate: now,
+            primaryMatch: 'Enhanced Test Collectible',
+            alternativeMatches: const [],
+            confidenceExplanation: 'Clear enhanced image.',
+            detectionQuality: 'Good',
+            aiReasoning: 'Enhanced preview improved readability.',
+            rarity: 'Rare',
+            pricing: PricingInfo(
+              estimatedMarketValue: 88,
+              lowEstimate: 70,
+              highEstimate: 105,
+              currency: 'AUD',
+              pricingSource: 'Fixture',
+              pricingConfidence: 0.8,
+              lastUpdated: now,
+            ),
+          ),
+          activeSlot: ScannerPhotoSlot(
+            role: 'front',
+            label: 'Front',
+            path: imagePath,
+            source: 'camera',
+            originalPath: imagePath,
+            enhancedImagePath: imagePath,
+            enhancementPreset: ImageEnhancementPreset.autoEnhance,
+          ),
+          isSaved: false,
+          isSaving: false,
+          onSave: () async {},
+          onScanAnother: () {},
+          onViewPortfolio: null,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(
+      find.byKey(const ValueKey('scan-result-analyzed-with-enhancement')),
+      findsOneWidget,
+    );
+    expect(find.text('AI Enhanced'), findsOneWidget);
+    expect(find.byKey(const ValueKey('result-primary-image')), findsOneWidget);
+    expect(find.byKey(const ValueKey('result-value-card')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('result-confidence-meter')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('result-rarity-indicator')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('result-add-button-slide-animation')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('scan result missing value shows unavailable state', (
@@ -2594,9 +2710,9 @@ void main() {
   ) async {
     const cases = <ValuationStatus, String>{
       ValuationStatus.providerNotConfigured:
-          'Market value unavailable — pricing source not connected yet',
+          'Market value unavailable - pricing source not connected yet',
       ValuationStatus.noMarketMatch: 'No reliable market match found yet',
-      ValuationStatus.lookupFailed: 'Value lookup failed — try again',
+      ValuationStatus.lookupFailed: 'Value lookup failed - try again',
     };
 
     for (final entry in cases.entries) {
@@ -2621,7 +2737,7 @@ void main() {
     );
     await tester.completeSampleScan();
 
-    expect(find.textContaining('58% confidence'), findsWidgets);
+    expect(find.text('58%'), findsWidgets);
     expect(find.text('Unknown'), findsNothing);
     expect(find.text('Not detected'), findsNothing);
   });

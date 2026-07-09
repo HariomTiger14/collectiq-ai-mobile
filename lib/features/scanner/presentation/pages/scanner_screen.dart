@@ -6,12 +6,11 @@ import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_workspace_screen.dart';
-import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -233,7 +232,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       );
     }
 
-    return _MinimalScanResultScreen(
+    return ScanResultScreen(
       result: scanResult,
       activeSlot: _activeScanSlot(
         scannerState.captureImages,
@@ -254,19 +253,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       onViewPortfolio: widget.onViewPortfolio,
     );
   }
-}
-
-String _formatScanValue(double value, ValuationStatus status) {
-  if (value <= 0) {
-    return _valuationStatusMessage(status);
-  }
-
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  return '\$$withCommas';
 }
 
 ScannerPhotoSlot? _activeScanSlot(
@@ -361,233 +347,6 @@ double _workspaceConfidence(ScannerState state) {
       (roleCount > 1 ? 0.08 : 0) +
       (enhancedCount > 0 ? 0.06 : 0);
   return confidence.clamp(0.55, 0.92).toDouble();
-}
-
-class _MinimalScanResultScreen extends StatelessWidget {
-  const _MinimalScanResultScreen({
-    required this.result,
-    required this.activeSlot,
-    required this.isSaved,
-    required this.isSaving,
-    required this.onSave,
-    required this.onScanAnother,
-    required this.onViewPortfolio,
-  });
-
-  final ScanResult result;
-  final ScannerPhotoSlot? activeSlot;
-  final bool isSaved;
-  final bool isSaving;
-  final Future<void> Function() onSave;
-  final VoidCallback onScanAnother;
-  final VoidCallback? onViewPortfolio;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final imagePath = result.thumbnail.isNotEmpty
-        ? result.thumbnail
-        : activeSlot?.path ?? '';
-    final isEnhanced = activeSlot?.isEnhanced == true;
-    return Scaffold(
-      key: ValueKey('scan-result-${result.id}'),
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: const Text('Analysis Complete'),
-        actions: [
-          IconButton(
-            key: const ValueKey('result-scan-another'),
-            onPressed: onScanAnother,
-            icon: const Icon(Icons.close),
-            tooltip: 'Scan another',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _ResultImage(path: imagePath),
-                      if (isEnhanced)
-                        const Positioned(
-                          left: AppSpacing.sm,
-                          top: AppSpacing.sm,
-                          child: _AiEnhancedBadge(),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                result.title,
-                key: const ValueKey('result-item-name'),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  _ResultChip(
-                    icon: Icons.category_outlined,
-                    label: result.category,
-                  ),
-                  _ResultChip(
-                    icon: Icons.verified_outlined,
-                    label: '${(result.confidence * 100).round()}% confidence',
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'Estimated value',
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                _formatScanValue(result.estimatedValue, result.valuationStatus),
-                key: const ValueKey('result-estimated-value'),
-                style: textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FilledButton.icon(
-                key: const ValueKey('result-primary-add-to-portfolio'),
-                onPressed: isSaved || isSaving ? null : onSave,
-                icon: Icon(
-                  isSaving
-                      ? Icons.hourglass_top_outlined
-                      : isSaved
-                      ? Icons.check_circle_outline
-                      : Icons.bookmark_add_outlined,
-                ),
-                label: Text(
-                  isSaving
-                      ? 'Saving...'
-                      : isSaved
-                      ? 'Saved to Portfolio'
-                      : 'Add to Portfolio',
-                ),
-              ),
-              if (isSaved && onViewPortfolio != null) ...[
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: onViewPortfolio,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('View Portfolio'),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultImage extends StatelessWidget {
-  const _ResultImage({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    if (path.startsWith('sample://')) {
-      return ColoredBox(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        child: Icon(
-          Icons.style_outlined,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
-          size: 56,
-        ),
-      );
-    }
-    final file = File(path);
-    if (file.existsSync()) {
-      return Image.file(file, fit: BoxFit.cover);
-    }
-    return const ColoredBox(
-      color: Color(0xFFE5E7EB),
-      child: Icon(Icons.broken_image_outlined, size: 42),
-    );
-  }
-}
-
-class _AiEnhancedBadge extends StatelessWidget {
-  const _AiEnhancedBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      key: const ValueKey('scan-result-analyzed-with-enhancement'),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
-        child: Text(
-          'AI Enhanced',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultChip extends StatelessWidget {
-  const _ResultChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 8,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: colorScheme.primary),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _SnapchatScanSurface extends StatelessWidget {
@@ -1010,16 +769,4 @@ class _ScanErrorToast extends StatelessWidget {
       ),
     );
   }
-}
-
-String _valuationStatusMessage(ValuationStatus status) {
-  return switch (status) {
-    ValuationStatus.providerNotConfigured =>
-      'Market value unavailable — pricing source not connected yet',
-    ValuationStatus.noMarketMatch => 'No reliable market match found yet',
-    ValuationStatus.lookupFailed => 'Value lookup failed — try again',
-    ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
-    ValuationStatus.marketEstimated => 'Value unavailable',
-    ValuationStatus.unavailable => 'Value unavailable',
-  };
 }
