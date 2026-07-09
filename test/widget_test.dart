@@ -1331,6 +1331,22 @@ void main() {
 
       expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
       expect(find.text('1 photo'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ListView && widget.physics is BouncingScrollPhysics,
+        ),
+        findsWidgets,
+      );
+      expect(find.text('Back recommended'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((widget) => widget is AnimatedSwitcher),
+        findsAtLeastNWidgets(4),
+      );
 
       await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
       await tester.pump();
@@ -1384,6 +1400,23 @@ void main() {
     expect(scannerState.captureImages.length, 2);
     expect(find.text('2 photos'), findsOneWidget);
     expect(find.text('Capture the full back side.'), findsNothing);
+    expect(find.text('Base recommended'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TweenAnimationBuilder<double> &&
+            widget.duration == const Duration(milliseconds: 150),
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.byWidgetPredicate((widget) => widget is AnimatedSwitcher),
+      findsAtLeastNWidgets(4),
+    );
     expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
     expect(find.byKey(const ValueKey('workspace-metadata')), findsOneWidget);
   });
