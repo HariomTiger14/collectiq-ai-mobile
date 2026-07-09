@@ -56,6 +56,64 @@ void main() {
     expect(cameraService.openCount, 0);
   });
 
+  testWidgets('camera page has no close button', (WidgetTester tester) async {
+    final cameraService = _ReadyCameraService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [cameraServiceProvider.overrideWithValue(cameraService)],
+        child: const MaterialApp(home: CameraCapturePage(imageRole: 'front')),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byIcon(Icons.close), findsNothing);
+    expect(find.byTooltip('Close camera'), findsNothing);
+  });
+
+  testWidgets('system back returns to previous screen', (
+    WidgetTester tester,
+  ) async {
+    final cameraService = _ReadyCameraService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [cameraServiceProvider.overrideWithValue(cameraService)],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              const CameraCapturePage(imageRole: 'front'),
+                        ),
+                      );
+                    },
+                    child: const Text('Open camera'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open camera'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CameraCapturePage), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open camera'), findsOneWidget);
+    expect(find.byType(CameraCapturePage), findsNothing);
+  });
+
   testWidgets('camera denied UI shows friendly message', (
     WidgetTester tester,
   ) async {

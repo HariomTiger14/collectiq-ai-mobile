@@ -596,7 +596,15 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Analyze with AI'), findsNothing);
-    expect(find.byKey(const ValueKey('scan-live-enhance')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-live-enhance')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-empty-placeholder-preview')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('scan-flip-camera')), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
   });
@@ -1525,6 +1533,52 @@ void main() {
           )
           .scale,
       1,
+    );
+  });
+
+  testWidgets('enhance overlay is skipped when workspace is empty', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-empty-placeholder-preview')),
+    );
+
+    final preview = find.byKey(
+      const ValueKey('scan-camera-preview-tap-target'),
+    );
+    expect(
+      find.descendant(
+        of: preview,
+        matching: find.byKey(
+          const ValueKey('scan-active-preview-enhance-overlay'),
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: preview, matching: find.byType(BackdropFilter)),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('scan-live-enhance')), findsNothing);
+  });
+
+  testWidgets('enhance overlay appears when active photo exists', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+
+    expect(find.byKey(const ValueKey('scan-live-enhance')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
+      findsOneWidget,
     );
   });
 

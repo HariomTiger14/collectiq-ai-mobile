@@ -604,17 +604,18 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
               onChanged: _setExposure,
             ),
           ),
-          Positioned(
-            right: AppSpacing.md,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: EnhanceButton(
-                active: widget.activeSlot?.isEnhanced == true,
-                onPressed: widget.onEnhance,
+          if (widget.activeSlot != null)
+            Positioned(
+              right: AppSpacing.md,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: EnhanceButton(
+                  active: widget.activeSlot?.isEnhanced == true,
+                  onPressed: widget.onEnhance,
+                ),
               ),
             ),
-          ),
           Positioned(
             key: const ValueKey('scan-capture-suggestion-position'),
             left: AppSpacing.lg,
@@ -716,9 +717,28 @@ class _SnapCameraPreview extends StatelessWidget {
     final path = slot?.path.trim();
     final file = path == null || path.isEmpty ? null : File(path);
     if (file != null && file.existsSync()) {
-      return Image.file(file, fit: BoxFit.cover);
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.file(file, fit: BoxFit.cover),
+          if (slot != null)
+            const IgnorePointer(
+              child: DecoratedBox(
+                key: ValueKey('scan-active-preview-enhance-overlay'),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x1400E5FF), Color(0x1A14B8A6)],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
     }
     return DecoratedBox(
+      key: const ValueKey('scan-empty-placeholder-preview'),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
