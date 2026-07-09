@@ -70,11 +70,7 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     _enhancementService = ref.read(imageEnhancementServiceProvider);
     _assessmentService = ref.read(imageQualityAssessmentServiceProvider);
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _initializeCamera();
-      }
-    });
+    _initializeCamera();
   }
 
   @override
@@ -110,7 +106,6 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
       }
 
       await cameraService.initializeCamera();
-      await cameraService.openCamera();
 
       if (!mounted) {
         return;
@@ -436,15 +431,16 @@ class _CameraPreviewBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeController = controller;
-    if (activeController != null) {
+    if (activeController != null && activeController.value.isInitialized) {
       return Center(
         child: CameraPreview(activeController, child: const SizedBox.expand()),
       );
     }
 
     if (isInitializing) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+      return const ColoredBox(
+        key: ValueKey('camera-preview-initializing-black'),
+        color: Colors.black,
       );
     }
 
@@ -492,6 +488,7 @@ class _CaptureButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      key: const ValueKey('camera-capture-button'),
       onTap: isCapturing ? null : onPressed,
       child: Container(
         width: 76,
