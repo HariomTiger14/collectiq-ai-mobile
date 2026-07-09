@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class HomeHeroHeader extends StatelessWidget {
   const HomeHeroHeader({
     super.key,
+    this.greeting = 'Welcome back',
     this.itemCount = 0,
-    this.estimatedValue = 'AUD 0',
+    this.estimatedValue = r'$0',
     this.lastScanStatus = 'Ready to scan',
   });
 
+  final String greeting;
   final int itemCount;
   final String estimatedValue;
   final String lastScanStatus;
@@ -68,35 +70,11 @@ class HomeHeroHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                right: AppSpacing.xl,
-                top: AppSpacing.lg,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.20),
-                    ),
-                  ),
-                  child: Text(
-                    'PackLox',
-                    style: AppTextStyles.caption.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
               Positioned.fill(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isCompactWidth = constraints.maxWidth < 340;
-                    final isCompactHeight = constraints.maxHeight < 232;
+                    final isCompactHeight = constraints.maxHeight < 202;
                     final isCompactText = textScale > 1.1;
                     final useCompactLayout =
                         isCompactWidth || isCompactHeight || isCompactText;
@@ -104,11 +82,11 @@ class HomeHeroHeader extends StatelessWidget {
                         ? AppSpacing.lg
                         : AppSpacing.xl;
                     final topPadding = useCompactLayout
-                        ? AppSpacing.lg
-                        : AppSpacing.xl;
-                    final bottomPadding = useCompactLayout
                         ? AppSpacing.md
                         : AppSpacing.lg;
+                    final bottomPadding = useCompactLayout
+                        ? AppSpacing.sm
+                        : AppSpacing.md;
                     final titleStyle =
                         (useCompactLayout
                                 ? Theme.of(context).textTheme.headlineSmall
@@ -139,6 +117,46 @@ class HomeHeroHeader extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.end,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  greeting,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: colorScheme.onPrimary.withValues(
+                                      alpha: 0.76,
+                                    ),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.xs,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.pill,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                  ),
+                                ),
+                                child: Text(
+                                  'PackLox',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: colorScheme.onPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             'Your Collection Hub',
                             maxLines: useCompactLayout ? 1 : 2,
@@ -151,7 +169,7 @@ class HomeHeroHeader extends StatelessWidget {
                                 : AppSpacing.sm,
                           ),
                           Text(
-                            'Your smart collection hub for scans, value, and portfolio momentum.',
+                            'Scan, value, and track your collectibles.',
                             maxLines: useCompactLayout ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                             style: bodyStyle,
@@ -159,37 +177,63 @@ class HomeHeroHeader extends StatelessWidget {
                           SizedBox(
                             height: useCompactLayout
                                 ? AppSpacing.md
-                                : AppSpacing.lg,
+                                : AppSpacing.md,
                           ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: _HeroMetric(
+                          if (useCompactLayout)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: _HeroMetric(
+                                    label: 'Items',
+                                    value:
+                                        '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                                    compact: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _HeroMetric(
+                                    label: 'Value',
+                                    value: estimatedValue,
+                                    compact: true,
+                                    emphasized: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _HeroMetric(
+                                    label: 'Last scan',
+                                    value: lastScanStatus,
+                                    compact: true,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: AppSpacing.xs,
+                              children: [
+                                _HeroMetric(
                                   label: 'Items',
                                   value:
                                       '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
-                                  compact: useCompactLayout,
+                                  width: 108,
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _HeroMetric(
+                                _HeroMetric(
                                   label: 'Value',
                                   value: estimatedValue,
-                                  compact: useCompactLayout,
+                                  width: 136,
+                                  emphasized: true,
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _HeroMetric(
+                                _HeroMetric(
                                   label: 'Last scan',
                                   value: lastScanStatus,
-                                  compact: useCompactLayout,
+                                  width: 128,
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
                         ],
                       ),
                     );
@@ -209,26 +253,42 @@ class _HeroMetric extends StatelessWidget {
     required this.label,
     required this.value,
     this.compact = false,
+    this.emphasized = false,
+    this.width,
   });
 
   final String label;
   final String value;
   final bool compact;
+  final bool emphasized;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      constraints: BoxConstraints(minHeight: compact ? 54 : 64),
+      width: width,
+      constraints: BoxConstraints(minHeight: compact ? 48 : 56),
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? AppSpacing.sm : AppSpacing.md,
-        vertical: compact ? 6 : AppSpacing.sm,
+        horizontal: compact ? AppSpacing.sm : 10,
+        vertical: compact ? 5 : 7,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: emphasized ? 0.34 : 0.18),
+        ),
+        boxShadow: emphasized
+            ? [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,7 +311,7 @@ class _HeroMetric extends StatelessWidget {
             style: (compact ? AppTextStyles.caption : AppTextStyles.body)
                 .copyWith(
                   color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: emphasized ? FontWeight.w900 : FontWeight.w800,
                 ),
           ),
         ],
