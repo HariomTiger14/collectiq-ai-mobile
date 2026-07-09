@@ -4,7 +4,6 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
-import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,23 +52,20 @@ class CameraCapturePage extends ConsumerStatefulWidget {
 
 class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     with WidgetsBindingObserver {
-  late final ScanImageProcessor _imageProcessor;
   late final ImageEnhancementService _enhancementService;
   late final ImageQualityAssessmentService _assessmentService;
   CameraService? _cameraService;
   XFile? _capturedImage;
-  ScanImageQualityReport? _qualityReport;
   bool _isInitializing = true;
   bool _isCapturing = false;
-  bool _isInspecting = false;
   bool _isFlashEnabled = false;
+  bool _liveEnhanceEnabled = false;
   bool _isPermissionPermanentlyDenied = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _imageProcessor = const ScanImageProcessor();
     _enhancementService = ref.read(imageEnhancementServiceProvider);
     _assessmentService = ref.read(imageQualityAssessmentServiceProvider);
     WidgetsBinding.instance.addObserver(this);
@@ -149,7 +145,6 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
       _errorMessage = message;
       _isInitializing = false;
       _isCapturing = false;
-      _isInspecting = false;
     });
   }
 
@@ -172,15 +167,6 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
       setState(() {
         _capturedImage = image;
         _isCapturing = false;
-        _isInspecting = true;
-      });
-      final report = await _imageProcessor.inspect(image.path);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _qualityReport = report;
-        _isInspecting = false;
       });
     } catch (_) {
       _setError('Unable to capture image. Please try again.');
@@ -215,11 +201,31 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
   void _retake() {
     setState(() {
       _capturedImage = null;
-      _qualityReport = null;
       _errorMessage = null;
-      _isInspecting = false;
       _isCapturing = false;
     });
+  }
+
+  Future<void> _flipCamera() async {
+    final cameraService = _cameraService;
+    if (cameraService == null) {
+      return;
+    }
+    try {
+      await cameraService.switchCameras();
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Camera flip unavailable')),
+        );
+    }
   }
 
   void _usePhoto(ImageEnhancementPreviewResult result) {
@@ -262,20 +268,25 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
                 isFlashEnabled: _isFlashEnabled,
                 errorMessage: _errorMessage,
                 isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
-                roleTitle: _roleTitle(widget.imageRole),
-                guidanceText: _guidanceText(widget.imageRole),
+                liveEnhanceEnabled: _liveEnhanceEnabled,
                 onBack: () => Navigator.of(context).maybePop(),
                 onCapture: _captureImage,
                 onFlash: _toggleFlash,
                 onGallery: _openGalleryFallback,
+                onFlip: _flipCamera,
+                onEnhanceToggle: () => setState(() {
+                  _liveEnhanceEnabled = !_liveEnhanceEnabled;
+                }),
                 onRetryPermission: _initializeCamera,
                 onOpenSettings: _cameraService?.openSettings,
               )
             : ImageEnhancementPreviewSurface(
                 image: capturedImage,
-                initialPreset: ImageEnhancementPreset.original,
-                title: _qualityTitle(_qualityReport),
-                subtitle: _qualitySubtitle(_qualityReport, _isInspecting),
+                initialPreset: _liveEnhanceEnabled
+                    ? ImageEnhancementPreset.autoEnhance
+                    : ImageEnhancementPreset.original,
+                title: 'Review Photo',
+                subtitle: '',
                 enhancementService: _enhancementService,
                 assessmentService: _assessmentService,
                 onRetake: _retake,
@@ -284,22 +295,6 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
               ),
       ),
     );
-  }
-
-  String _qualityTitle(ScanImageQualityReport? report) {
-    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
-    return warnings.isEmpty ? 'Review photo' : 'Quality warning';
-  }
-
-  String _qualitySubtitle(ScanImageQualityReport? report, bool isInspecting) {
-    if (isInspecting) {
-      return 'Checking image quality...';
-    }
-    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
-    if (warnings.isEmpty) {
-      return 'Choose the clearest version for analysis.';
-    }
-    return warnings.map((warning) => warning.message).join(' ');
   }
 }
 
@@ -311,12 +306,13 @@ class _CameraLiveView extends StatelessWidget {
     required this.isFlashEnabled,
     required this.errorMessage,
     required this.isPermissionPermanentlyDenied,
-    required this.roleTitle,
-    required this.guidanceText,
+    required this.liveEnhanceEnabled,
     required this.onBack,
     required this.onCapture,
     required this.onFlash,
     required this.onGallery,
+    required this.onFlip,
+    required this.onEnhanceToggle,
     required this.onRetryPermission,
     required this.onOpenSettings,
   });
@@ -327,12 +323,13 @@ class _CameraLiveView extends StatelessWidget {
   final bool isFlashEnabled;
   final String? errorMessage;
   final bool isPermissionPermanentlyDenied;
-  final String roleTitle;
-  final String guidanceText;
+  final bool liveEnhanceEnabled;
   final VoidCallback onBack;
   final VoidCallback onCapture;
   final VoidCallback onFlash;
   final VoidCallback onGallery;
+  final VoidCallback onFlip;
+  final VoidCallback onEnhanceToggle;
   final VoidCallback onRetryPermission;
   final Future<bool> Function()? onOpenSettings;
 
@@ -353,7 +350,6 @@ class _CameraLiveView extends StatelessWidget {
             onOpenSettings: onOpenSettings,
           ),
         ),
-        if (isReady) const Positioned.fill(child: _GuideOverlayFrame()),
         Positioned(
           top: 12,
           left: 12,
@@ -373,12 +369,27 @@ class _CameraLiveView extends StatelessWidget {
               tooltip: 'Toggle flash',
             ),
           ),
-        Positioned(
-          left: 24,
-          right: 24,
-          top: 72,
-          child: _CameraGuidanceCard(title: roleTitle, body: guidanceText),
-        ),
+        if (isReady)
+          Positioned(
+            right: 18,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IconButton.filled(
+                key: const ValueKey('camera-live-enhance'),
+                onPressed: onEnhanceToggle,
+                icon: const Icon(Icons.auto_fix_high),
+                tooltip: 'AI Enhance',
+                style: IconButton.styleFrom(
+                  fixedSize: const Size.square(58),
+                  backgroundColor: liveEnhanceEnabled
+                      ? Colors.white.withValues(alpha: 0.24)
+                      : Colors.black.withValues(alpha: 0.46),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
         if (isReady)
           Positioned(
             left: 20,
@@ -399,7 +410,11 @@ class _CameraLiveView extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 48),
+                IconButton.filledTonal(
+                  onPressed: onFlip,
+                  icon: const Icon(Icons.cameraswitch_outlined),
+                  tooltip: 'Flip camera',
+                ),
               ],
             ),
           ),
@@ -475,69 +490,6 @@ class _CameraPreviewBody extends StatelessWidget {
   }
 }
 
-class _GuideOverlayFrame extends StatelessWidget {
-  const _GuideOverlayFrame();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Center(
-        child: FractionallySizedBox(
-          widthFactor: 0.82,
-          heightFactor: 0.48,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CameraGuidanceCard extends StatelessWidget {
-  const _CameraGuidanceCard({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.white70),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CaptureButton extends StatelessWidget {
   const _CaptureButton({required this.isCapturing, required this.onPressed});
 
@@ -574,29 +526,4 @@ class _CaptureButton extends StatelessWidget {
       ),
     );
   }
-}
-
-String _roleTitle(String role) {
-  return switch (_normalizeRole(role)) {
-    'back' => 'Capture back / reverse',
-    'closeup' => 'Capture close-up',
-    _ => 'Capture front / obverse',
-  };
-}
-
-String _guidanceText(String role) {
-  return switch (_normalizeRole(role)) {
-    'back' => 'Flip the item and capture the reverse side.',
-    'closeup' => 'Move closer to the year, mark, damage, label, or serial.',
-    _ => 'Place the item clearly inside the guide.',
-  };
-}
-
-String _normalizeRole(String role) {
-  final normalized = role.trim().toLowerCase();
-  return switch (normalized) {
-    'reverse' || 'back' => 'back',
-    'close-up' || 'closeup' || 'detail' || 'serial' || 'damage' => 'closeup',
-    _ => 'front',
-  };
 }
