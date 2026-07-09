@@ -33,19 +33,20 @@ class _HeroSurface extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = _colorsFor(context, gradientStyle);
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(
         bottom: Radius.circular(AppRadius.xxl),
       ),
       child: Container(
-        height: 184,
+        height: 168 + topInset,
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xxl,
-          AppSpacing.xxl,
-          AppSpacing.xxl,
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.xl,
+          topInset + AppSpacing.lg,
+          AppSpacing.xl,
+          AppSpacing.lg,
         ),
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.vertical(
@@ -97,9 +98,9 @@ class _HeroSurface extends StatelessWidget {
                       height: 1.05,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    'PackLox Portfolio Overview',
+                    'Track, organize and grow your collection',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodyLarge?.copyWith(
@@ -107,7 +108,7 @@ class _HeroSurface extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Your collectible library',
                     maxLines: 1,
@@ -132,11 +133,13 @@ class PortfolioActionTile extends StatefulWidget {
     super.key,
     required this.icon,
     required this.title,
+    this.isPrimary = false,
     this.onTap,
   });
 
   final IconData icon;
   final String title;
+  final bool isPrimary;
   final VoidCallback? onTap;
 
   @override
@@ -150,6 +153,9 @@ class _PortfolioActionTileState extends State<PortfolioActionTile> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foregroundColor = widget.isPrimary
+        ? colorScheme.onPrimary
+        : colorScheme.primary;
 
     return Expanded(
       child: MouseRegion(
@@ -160,42 +166,59 @@ class _PortfolioActionTileState extends State<PortfolioActionTile> {
           child: AnimatedContainer(
             duration: PackLoxMotionTheme.medium,
             curve: PackLoxMotionTheme.hoverCurve,
-            height: 82,
-            padding: const EdgeInsets.all(AppSpacing.md),
+            key: ValueKey(
+              'portfolio-action-${widget.title.toLowerCase().replaceAll(' ', '-')}',
+            ),
+            height: 54,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
             decoration: BoxDecoration(
-              color: isDark
+              color: widget.isPrimary
+                  ? colorScheme.primary
+                  : isDark
                   ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
                   : colorScheme.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(AppRadius.xl),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
-                color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
+                color: widget.isPrimary
+                    ? colorScheme.primary.withValues(alpha: 0.82)
+                    : Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
               ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withValues(
-                    alpha: _hovered ? 0.14 : (isDark ? 0.06 : 0.08),
+                    alpha: widget.isPrimary
+                        ? (_hovered ? 0.28 : 0.18)
+                        : _hovered
+                        ? 0.14
+                        : (isDark ? 0.06 : 0.08),
                   ),
-                  blurRadius: _hovered ? 30 : 22,
-                  offset: const Offset(0, 14),
+                  blurRadius: _hovered ? 20 : 14,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   widget.icon,
-                  color: colorScheme.primary,
-                  size: AppIconSizes.md,
+                  color: foregroundColor,
+                  size: AppIconSizes.sm,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: widget.isPrimary ? colorScheme.onPrimary : null,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -339,20 +362,20 @@ class PortfolioSectionCard extends StatelessWidget {
       },
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: isDark
               ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
               : colorScheme.surface.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppRadius.xl),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.58),
           ),
           boxShadow: [
             BoxShadow(
               color: colorScheme.shadow.withValues(alpha: isDark ? 0.16 : 0.10),
-              blurRadius: 38,
-              offset: const Offset(0, 22),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
           gradient: LinearGradient(
@@ -369,7 +392,7 @@ class PortfolioSectionCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: textTheme.titleLarge?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -382,7 +405,7 @@ class PortfolioSectionCard extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             child,
           ],
         ),

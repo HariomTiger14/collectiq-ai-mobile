@@ -12,11 +12,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum _PortfolioSortMode {
-  newest(label: 'Newest first'),
-  value(label: 'Value high to low'),
-  confidence(label: 'Confidence high to low');
+  newest(label: 'Newest'),
+  value(label: 'Highest value'),
+  confidence(label: 'Highest confidence'),
+  name(label: 'Name A-Z');
 
   const _PortfolioSortMode({required this.label});
+
+  final String label;
+}
+
+enum _PortfolioConfidenceFilter {
+  all(label: 'All'),
+  high(label: '80%+'),
+  low(label: 'Below 80%');
+
+  const _PortfolioConfidenceFilter({required this.label});
+
+  final String label;
+}
+
+enum _PortfolioTrendFilter {
+  all(label: 'All'),
+  rising(label: 'Rising'),
+  stable(label: 'Stable'),
+  cooling(label: 'Cooling');
+
+  const _PortfolioTrendFilter({required this.label});
 
   final String label;
 }
@@ -48,6 +70,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   String _searchQuery = '';
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
+  _PortfolioConfidenceFilter _confidenceFilter = _PortfolioConfidenceFilter.all;
+  _PortfolioTrendFilter _trendFilter = _PortfolioTrendFilter.all;
 
   @override
   void initState() {
@@ -94,7 +118,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
             child: PortfolioHeroHeader(scrollController: _scrollController),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
             sliver: SliverToBoxAdapter(
               child: Center(
                 child: ConstrainedBox(
@@ -109,37 +136,31 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             title: 'Sort',
                             onTap: () => _showSortSheet(context),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           PortfolioActionTile(
                             icon: Icons.filter_alt,
                             title: 'Filter',
                             onTap: () => _showFilterSheet(context),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           PortfolioActionTile(
                             icon: Icons.add,
                             title: 'Add Item',
+                            isPrimary: true,
                             onTap: widget.onScanPressed,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       if (portfolioState.items.isNotEmpty) ...[
                         PortfolioSectionCard(
                           title: 'Find Items',
-                          subtitle: 'Search and refine your saved collectibles',
                           child: _PortfolioControls(
                             searchQuery: _searchQuery,
-                            sortMode: _sortMode,
                             categoryFilter: _categoryFilter,
                             onSearchChanged: (value) {
                               setState(() {
                                 _searchQuery = value;
-                              });
-                            },
-                            onSortChanged: (value) {
-                              setState(() {
-                                _sortMode = value;
                               });
                             },
                             onCategoryFilterChanged: (value) {
@@ -149,18 +170,19 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: AppSpacing.md),
                       ],
                       PortfolioSectionCard(
                         title: 'Portfolio Snapshot',
-                        subtitle: 'PackLox collection value and confidence',
                         child: PortfolioSummaryCard(
                           totalValue: portfolioState.totalValue,
                           itemCount: portfolioState.itemCount,
                           averageConfidence: _averageConfidence(orderedItems),
+                          categoryCount: _categoryCount(orderedItems),
+                          topAssetTitle: _topAssetTitle(orderedItems),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: AppSpacing.lg),
                       if (portfolioState.isLoading &&
                           portfolioState.items.isEmpty)
                         const SizedBox.shrink()
@@ -175,7 +197,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
                 if (portfolioState.isLoading && portfolioState.items.isEmpty) {
@@ -214,6 +241,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           setState(() {
                             _searchQuery = '';
                             _categoryFilter = _PortfolioCategoryFilter.all;
+                            _confidenceFilter = _PortfolioConfidenceFilter.all;
+                            _trendFilter = _PortfolioTrendFilter.all;
+                            _sortMode = _PortfolioSortMode.newest;
                           });
                         },
                       ),
@@ -225,39 +255,79 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     ? 3
                     : 2;
 
-                return SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: crossAxisCount == 3 ? 0.60 : 0.46,
-                  ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final item = visibleItems[index];
-
-                    return MotionReveal(
-                      key: ValueKey('portfolio-grid-motion-${item.id}'),
-                      offset: 12,
-                      delay: Duration(milliseconds: 24 * (index % 8)),
-                      child: PortfolioGridTile(
-                        key: ValueKey('portfolio-grid-item-${item.id}'),
-                        item: item,
-                        wishlistStatusLabel: _wishlistStatusLabel(
-                          wishlistStatusByItemId[item.id],
-                        ),
-                        onTap: () =>
-                            _openItem(context, item, portfolioController),
-                        onEdit: () =>
-                            _openItem(context, item, portfolioController),
-                        onShare: () => _showShareMessage(context, item),
-                        onDelete: () => _confirmDelete(
-                          context,
-                          item.id,
-                          portfolioController,
+                return SliverMainAxisGroup(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Collection Items',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Text(
+                                  '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    );
-                  }, childCount: visibleItems.length),
+                    ),
+                    SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: AppSpacing.md,
+                        crossAxisSpacing: AppSpacing.md,
+                        childAspectRatio: crossAxisCount == 3 ? 0.80 : 0.70,
+                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final item = visibleItems[index];
+
+                        return MotionReveal(
+                          key: ValueKey('portfolio-grid-motion-${item.id}'),
+                          offset: 12,
+                          delay: Duration(milliseconds: 24 * (index % 8)),
+                          child: PortfolioGridTile(
+                            key: ValueKey('portfolio-grid-item-${item.id}'),
+                            item: item,
+                            wishlistStatusLabel: _wishlistStatusLabel(
+                              wishlistStatusByItemId[item.id],
+                            ),
+                            onTap: () =>
+                                _openItem(context, item, portfolioController),
+                            onViewDetails: () =>
+                                _openItem(context, item, portfolioController),
+                            onEdit: () => _showEditComingSoon(context),
+                            onDelete: () => _confirmDelete(
+                              context,
+                              item.id,
+                              portfolioController,
+                            ),
+                          ),
+                        );
+                      }, childCount: visibleItems.length),
+                    ),
+                  ],
                 );
               },
             ),
@@ -277,6 +347,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
           }).toList();
     final filteredItems = queryFilteredItems
         .where((item) => _matchesCategoryFilter(item, _categoryFilter))
+        .where((item) => _matchesConfidenceFilter(item, _confidenceFilter))
+        .where((item) => _matchesTrendFilter(item, _trendFilter))
         .toList();
 
     filteredItems.sort((left, right) {
@@ -290,6 +362,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         ),
         _PortfolioSortMode.confidence => right.confidence.compareTo(
           left.confidence,
+        ),
+        _PortfolioSortMode.name => left.title.toLowerCase().compareTo(
+          right.title.toLowerCase(),
         ),
       };
     });
@@ -323,6 +398,27 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     };
   }
 
+  bool _matchesConfidenceFilter(
+    CollectibleItem item,
+    _PortfolioConfidenceFilter filter,
+  ) {
+    return switch (filter) {
+      _PortfolioConfidenceFilter.all => true,
+      _PortfolioConfidenceFilter.high => item.confidence >= 0.80,
+      _PortfolioConfidenceFilter.low => item.confidence < 0.80,
+    };
+  }
+
+  bool _matchesTrendFilter(CollectibleItem item, _PortfolioTrendFilter filter) {
+    final trend = _normalizedTrend(item);
+    return switch (filter) {
+      _PortfolioTrendFilter.all => true,
+      _PortfolioTrendFilter.rising => trend == 'Rising',
+      _PortfolioTrendFilter.stable => trend == 'Stable',
+      _PortfolioTrendFilter.cooling => trend == 'Cooling',
+    };
+  }
+
   double _averageConfidence(List<CollectibleItem> items) {
     if (items.isEmpty) {
       return 0;
@@ -330,6 +426,24 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
     return items.fold<double>(0, (sum, item) => sum + item.confidence) /
         items.length;
+  }
+
+  int _categoryCount(List<CollectibleItem> items) {
+    return {
+      for (final item in items)
+        if (item.category.trim().isNotEmpty) item.category.trim().toLowerCase(),
+    }.length;
+  }
+
+  String _topAssetTitle(List<CollectibleItem> items) {
+    if (items.isEmpty) {
+      return 'None yet';
+    }
+    final sorted = [...items]
+      ..sort(
+        (left, right) => right.estimatedValue.compareTo(left.estimatedValue),
+      );
+    return sorted.first.title;
   }
 
   Future<bool> _confirmDelete(
@@ -392,10 +506,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     );
   }
 
-  void _showShareMessage(BuildContext context, CollectibleItem item) {
+  void _showEditComingSoon(BuildContext context) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Share ready for ${item.title}')));
+    ).showSnackBar(const SnackBar(content: Text('Edit coming soon')));
   }
 
   Future<void> _showSortSheet(BuildContext context) async {
@@ -403,7 +517,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       context: context,
       showDragHandle: true,
       builder: (context) => _PortfolioPickerSheet<_PortfolioSortMode>(
-        title: 'Sort Collections',
+        title: 'Sort portfolio',
         selectedValue: _sortMode,
         values: _PortfolioSortMode.values,
         labelFor: (value) => value.label,
@@ -418,14 +532,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   }
 
   Future<void> _showFilterSheet(BuildContext context) async {
-    final selected = await showModalBottomSheet<_PortfolioCategoryFilter>(
+    final selected = await showModalBottomSheet<_PortfolioFilterSelection>(
       context: context,
       showDragHandle: true,
-      builder: (context) => _PortfolioPickerSheet<_PortfolioCategoryFilter>(
-        title: 'Filter Collections',
-        selectedValue: _categoryFilter,
-        values: _PortfolioCategoryFilter.values,
-        labelFor: (value) => value.label,
+      isScrollControlled: true,
+      builder: (context) => _PortfolioFilterSheet(
+        categoryFilter: _categoryFilter,
+        confidenceFilter: _confidenceFilter,
+        trendFilter: _trendFilter,
       ),
     );
 
@@ -433,7 +547,173 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       return;
     }
 
-    setState(() => _categoryFilter = selected);
+    setState(() {
+      _categoryFilter = selected.category;
+      _confidenceFilter = selected.confidence;
+      _trendFilter = selected.trend;
+    });
+  }
+}
+
+String _normalizedTrend(CollectibleItem item) {
+  final raw = item.marketSummary?.trendLabel.trim().toLowerCase() ?? '';
+  if (raw.contains('ris') || raw.contains('up') || raw.contains('gain')) {
+    return 'Rising';
+  }
+  if (raw.contains('cool') || raw.contains('fall') || raw.contains('down')) {
+    return 'Cooling';
+  }
+  return 'Stable';
+}
+
+class _PortfolioFilterSelection {
+  const _PortfolioFilterSelection({
+    required this.category,
+    required this.confidence,
+    required this.trend,
+  });
+
+  final _PortfolioCategoryFilter category;
+  final _PortfolioConfidenceFilter confidence;
+  final _PortfolioTrendFilter trend;
+}
+
+class _PortfolioFilterSheet extends StatefulWidget {
+  const _PortfolioFilterSheet({
+    required this.categoryFilter,
+    required this.confidenceFilter,
+    required this.trendFilter,
+  });
+
+  final _PortfolioCategoryFilter categoryFilter;
+  final _PortfolioConfidenceFilter confidenceFilter;
+  final _PortfolioTrendFilter trendFilter;
+
+  @override
+  State<_PortfolioFilterSheet> createState() => _PortfolioFilterSheetState();
+}
+
+class _PortfolioFilterSheetState extends State<_PortfolioFilterSheet> {
+  late _PortfolioCategoryFilter _category;
+  late _PortfolioConfidenceFilter _confidence;
+  late _PortfolioTrendFilter _trend;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.categoryFilter;
+    _confidence = widget.confidenceFilter;
+    _trend = widget.trendFilter;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Filter portfolio',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _FilterChoiceGroup<_PortfolioCategoryFilter>(
+              title: 'Category',
+              values: _PortfolioCategoryFilter.values,
+              selectedValue: _category,
+              labelFor: (value) => value.label,
+              onChanged: (value) => setState(() => _category = value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _FilterChoiceGroup<_PortfolioConfidenceFilter>(
+              title: 'Confidence range',
+              values: _PortfolioConfidenceFilter.values,
+              selectedValue: _confidence,
+              labelFor: (value) => value.label,
+              onChanged: (value) => setState(() => _confidence = value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _FilterChoiceGroup<_PortfolioTrendFilter>(
+              title: 'Trend',
+              values: _PortfolioTrendFilter.values,
+              selectedValue: _trend,
+              labelFor: (value) => value.label,
+              onChanged: (value) => setState(() => _trend = value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(
+                  _PortfolioFilterSelection(
+                    category: _category,
+                    confidence: _confidence,
+                    trend: _trend,
+                  ),
+                ),
+                child: const Text('Apply filters'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChoiceGroup<T> extends StatelessWidget {
+  const _FilterChoiceGroup({
+    required this.title,
+    required this.values,
+    required this.selectedValue,
+    required this.labelFor,
+    required this.onChanged,
+  });
+
+  final String title;
+  final List<T> values;
+  final T selectedValue;
+  final String Function(T value) labelFor;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final value in values)
+              ChoiceChip(
+                label: Text(labelFor(value)),
+                selected: selectedValue == value,
+                onSelected: (_) => onChanged(value),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 }
 
@@ -457,30 +737,32 @@ class _PortfolioPickerSheet<T> extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            for (final value in values)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(labelFor(value)),
-                trailing: selectedValue == value
-                    ? Icon(
-                        Icons.check_circle,
-                        color: Theme.of(context).colorScheme.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.of(context).pop(value),
-              ),
-          ],
+              const SizedBox(height: 12),
+              for (final value in values)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(labelFor(value)),
+                  trailing: selectedValue == value
+                      ? Icon(
+                          Icons.check_circle,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : null,
+                  onTap: () => Navigator.of(context).pop(value),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -515,18 +797,14 @@ String? _wishlistStatusLabel(WishlistStatus? status) {
 class _PortfolioControls extends StatelessWidget {
   const _PortfolioControls({
     required this.searchQuery,
-    required this.sortMode,
     required this.categoryFilter,
     required this.onSearchChanged,
-    required this.onSortChanged,
     required this.onCategoryFilterChanged,
   });
 
   final String searchQuery;
-  final _PortfolioSortMode sortMode;
   final _PortfolioCategoryFilter categoryFilter;
   final ValueChanged<String> onSearchChanged;
-  final ValueChanged<_PortfolioSortMode> onSortChanged;
   final ValueChanged<_PortfolioCategoryFilter> onCategoryFilterChanged;
 
   @override
@@ -537,37 +815,19 @@ class _PortfolioControls extends StatelessWidget {
           key: const ValueKey('portfolio-search-field'),
           initialValue: searchQuery,
           onChanged: onSearchChanged,
+          textInputAction: TextInputAction.search,
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.search),
-            labelText: 'Search portfolio',
+            hintText: 'Search items',
+            isDense: true,
           ),
         );
-        final sortSelector = _PortfolioSortSelector(
-          sortMode: sortMode,
-          onSortChanged: onSortChanged,
-        );
-
-        final searchAndSort = constraints.maxWidth >= 680
-            ? Row(
-                children: [
-                  Expanded(child: searchField),
-                  const SizedBox(width: AppSpacing.lg),
-                  SizedBox(width: 360, child: sortSelector),
-                ],
-              )
-            : Column(
-                children: [
-                  searchField,
-                  const SizedBox(height: AppSpacing.md),
-                  sortSelector,
-                ],
-              );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            searchAndSort,
-            const SizedBox(height: AppSpacing.md),
+            searchField,
+            const SizedBox(height: AppSpacing.sm),
             _PortfolioCategoryFilterChips(
               selectedFilter: categoryFilter,
               onChanged: onCategoryFilterChanged,
@@ -590,48 +850,27 @@ class _PortfolioCategoryFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const visibleFilters = [
+      _PortfolioCategoryFilter.all,
+      _PortfolioCategoryFilter.cards,
+      _PortfolioCategoryFilter.coins,
+      _PortfolioCategoryFilter.comics,
+    ];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final filter in _PortfolioCategoryFilter.values) ...[
+          for (final filter in visibleFilters) ...[
             ChoiceChip(
               key: ValueKey('portfolio-filter-${filter.name}'),
               label: Text(filter.label),
               selected: selectedFilter == filter,
               onSelected: (_) => onChanged(filter),
             ),
-            if (filter != _PortfolioCategoryFilter.values.last)
-              const SizedBox(width: AppSpacing.sm),
+            if (filter != visibleFilters.last) const SizedBox(width: 6),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _PortfolioSortSelector extends StatelessWidget {
-  const _PortfolioSortSelector({
-    required this.sortMode,
-    required this.onSortChanged,
-  });
-
-  final _PortfolioSortMode sortMode;
-  final ValueChanged<_PortfolioSortMode> onSortChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppStableSegmentedSelector<_PortfolioSortMode>(
-      selectedValue: sortMode,
-      onChanged: onSortChanged,
-      options: const [
-        AppSegmentOption(value: _PortfolioSortMode.newest, label: 'Newest'),
-        AppSegmentOption(value: _PortfolioSortMode.value, label: 'Value'),
-        AppSegmentOption(
-          value: _PortfolioSortMode.confidence,
-          label: 'Confidence',
-        ),
-      ],
     );
   }
 }
