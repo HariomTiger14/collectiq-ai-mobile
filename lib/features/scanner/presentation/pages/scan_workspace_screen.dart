@@ -56,7 +56,7 @@ class ScanWorkspaceScreen extends StatelessWidget {
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
-                AppSpacing.sm,
+                AppSpacing.lg,
                 AppSpacing.lg,
                 AppSpacing.xl,
               ),
@@ -75,6 +75,7 @@ class ScanWorkspaceScreen extends StatelessWidget {
                     detectedCategory: detectedCategory,
                     confidence: confidence,
                     photoCount: photos.length,
+                    nextBestRole: nextBestRole,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   WorkspaceActions(
@@ -152,17 +153,34 @@ class WorkspaceFilmstrip extends StatelessWidget {
     }
     return SizedBox(
       key: const ValueKey('workspace-filmstrip'),
-      height: 112,
+      height: 124,
       child: ListView.separated(
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
         scrollDirection: Axis.horizontal,
         itemCount: photos.length,
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
           final photo = photos[index];
-          return _WorkspaceThumbnail(
-            photo: photo,
-            selected: photo.path == selectedPath,
-            onTap: () => onSelectPhoto(photo),
+          return TweenAnimationBuilder<double>(
+            key: ValueKey('workspace-thumbnail-entry-${photo.path}'),
+            tween: Tween<double>(begin: 1, end: 0),
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: 1 - value,
+                child: Transform.translate(
+                  offset: Offset(28 * value, 0),
+                  child: child,
+                ),
+              );
+            },
+            child: _WorkspaceThumbnail(
+              photo: photo,
+              selected: photo.path == selectedPath,
+              onTap: () => onSelectPhoto(photo),
+            ),
           );
         },
       ),
@@ -175,12 +193,14 @@ class WorkspaceMetadata extends StatelessWidget {
     required this.detectedCategory,
     required this.confidence,
     required this.photoCount,
+    required this.nextBestRole,
     super.key,
   });
 
   final String detectedCategory;
   final double confidence;
   final int photoCount;
+  final ScanCaptureRole nextBestRole;
 
   @override
   Widget build(BuildContext context) {
@@ -196,22 +216,30 @@ class WorkspaceMetadata extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _RecommendedAngleBadge(role: nextBestRole),
+            ),
+            const SizedBox(height: AppSpacing.md),
             _MetadataRow(
               label: 'Auto Detect',
               value: detectedCategory,
               icon: Icons.auto_awesome_outlined,
+              valueKey: 'workspace-metadata-category-value',
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             _MetadataRow(
               label: 'Confidence',
               value: '${(confidence * 100).round()}%',
               icon: Icons.verified_outlined,
+              valueKey: 'workspace-metadata-confidence-value',
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             _MetadataRow(
               label: 'Photos',
               value: photoCount == 1 ? '1 photo' : '$photoCount photos',
               icon: Icons.photo_library_outlined,
+              valueKey: 'workspace-metadata-photo-count-value',
             ),
           ],
         ),
@@ -272,7 +300,7 @@ class WorkspaceActions extends StatelessWidget {
           icon: const Icon(Icons.add_photo_alternate_outlined),
           label: const Text('Add photo'),
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: 20),
         KeyedSubtree(
           key: const ValueKey('workspace-analyze'),
           child: FilledButton.icon(
@@ -325,50 +353,119 @@ class _WorkspaceThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 92,
-      child: InkWell(
-        key: ValueKey('workspace-photo-${photo.path}'),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: selected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
-              width: selected ? 2 : 1,
+    final glowColor = colorScheme.primary.withValues(alpha: 0.28);
+    return AnimatedScale(
+      key: selected
+          ? const ValueKey('workspace-primary-photo-highlight')
+          : null,
+      scale: selected ? 1.05 : 1,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      child: SizedBox(
+        width: 96,
+        child: InkWell(
+          key: ValueKey('workspace-photo-${photo.path}'),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant,
+                width: selected ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: selected
+                      ? glowColor
+                      : Colors.black.withValues(alpha: 0.10),
+                  blurRadius: selected ? 22 : 14,
+                  spreadRadius: selected ? 1 : 0,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.md - 1),
+                    ),
+                    child: _PhotoImage(path: photo.path, fit: BoxFit.cover),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    _shortRole(photo.role),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppRadius.md - 1),
-                  ),
-                  child: _PhotoImage(path: photo.path, fit: BoxFit.cover),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                  vertical: 6,
-                ),
-                child: Text(
-                  _shortRole(photo.role),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendedAngleBadge extends StatelessWidget {
+  const _RecommendedAngleBadge({required this.role});
+
+  final ScanCaptureRole role;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 150),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: DecoratedBox(
+        key: ValueKey('workspace-recommended-badge-${role.id}'),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+              Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.14),
             ],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.22),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Text(
+            '${_shortRole(role.id)} recommended',
+            key: const ValueKey('workspace-recommended-badge-label'),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
           ),
         ),
       ),
@@ -381,11 +478,13 @@ class _MetadataRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    required this.valueKey,
   });
 
   final String label;
   final String value;
   final IconData icon;
+  final String valueKey;
 
   @override
   Widget build(BuildContext context) {
@@ -404,9 +503,19 @@ class _MetadataRow extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          reverseDuration: const Duration(milliseconds: 100),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: Text(
+            value,
+            key: ValueKey('$valueKey-$value'),
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
         ),
       ],
     );
