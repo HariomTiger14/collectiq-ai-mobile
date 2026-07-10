@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -9,9 +7,10 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
-import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_role_guide.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_goal_card.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -187,6 +186,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         .toList();
     final selectedImagePath = scannerState.selectedImagePath;
     final scanResult = scannerState.scanResult;
+    final activeGoal =
+        scannerState.scanSession?.scanGoal ?? ScanGoal.identifyValue;
+    final activePlan =
+        scannerState.scanSession?.capturePlan ??
+        const ScanCapturePlanService().buildPlan(
+          activeGoal,
+          null,
+          scannerState.scanSession?.capturedImages ?? const [],
+        );
     final showPickerShell =
         selectedImagePath == null &&
         (scannerState.isLoading || scannerState.isPreparingImage);
@@ -253,26 +261,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ScanPreviewFrame(
-                                key: _previewKey,
-                                isAnalyzing: scannerState.isLoading,
-                                scrollOffset: _scrollController.hasClients
-                                    ? _scrollController.offset
-                                    : 0,
-                                child: _ScanPreviewSurface(
-                                  imagePath: selectedImagePath,
-                                  title:
-                                      scannerState.selectedItemTitle ??
-                                      'Captured image',
-                                  status:
-                                      scannerState.selectedItemStatus ??
-                                      'Ready for AI analysis',
-                                  isBusy:
-                                      scannerState.isLoading ||
-                                      scannerState.isPreparingImage,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xl),
                               ScanStatusBar(
                                 status: _scanStatusFor(scannerState),
                                 confidence: scanResult?.confidence,
@@ -281,39 +269,50 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _ScanGoalSelector(
-                                selectedGoal:
-                                    scannerState.scanSession?.scanGoal ??
-                                    ScanGoal.identifyValue,
+                                selectedGoal: activeGoal,
                                 onGoalSelected: scannerController.selectGoal,
                               ),
                               const SizedBox(height: AppSpacing.lg),
-                              _MultiPhotoAnalysisPanel(
-                                state: scannerState,
+                              CaptureWorkspace(
+                                key: _previewKey,
+                                goal: activeGoal,
+                                plan: activePlan,
+                                slots: scannerState.photoSlots,
+                                selectedItemTitle:
+                                    scannerState.selectedItemTitle,
+                                selectedItemStatus:
+                                    scannerState.selectedItemStatus,
+                                isBusy:
+                                    scannerState.isLoading ||
+                                    scannerState.isPreparingImage,
+                                hasResult: scanResult != null,
+                                onPrimaryCapture: () {
+                                  final role =
+                                      activePlan.nextRecommendedRole ??
+                                      ScanCaptureRole.front;
+                                  scannerController.startCameraScan(
+                                    context,
+                                    imageRole: role.id,
+                                  );
+                                },
+                                onAnalyze: scannerController.analyzeWithAi,
                                 onCamera: (role) => scannerController
                                     .startCameraScan(context, imageRole: role),
                                 onGallery: (role) => scannerController
                                     .pickImageFromGallery(imageRole: role),
-                              ),
-                              const SizedBox(height: AppSpacing.xl),
-                              ScanActionRow(
-                                isBusy:
-                                    scannerState.isLoading ||
-                                    scannerState.isPreparingImage,
-                                hasImage: selectedImagePath != null,
-                                hasResult: scanResult != null,
-                                cameraLabel: 'Camera',
-                                galleryLabel: 'Gallery',
-                                sampleLabel: 'Use Sample Scan',
-                                onCamera: () =>
-                                    scannerController.startCameraScan(context),
-                                onGallery:
-                                    scannerController.pickImageFromGallery,
+                                onPreview: (slot) => _showCapturedImagePreview(
+                                  context,
+                                  slot: slot,
+                                  onRetake: () =>
+                                      scannerController.startCameraScan(
+                                        context,
+                                        imageRole: slot.role,
+                                      ),
+                                  onDelete: () => scannerController
+                                      .deleteRoleImage(slot.role),
+                                ),
                                 onSample: scannerController.useSampleScan,
-                                onAnalyze: scannerController.analyzeWithAi,
-                                onRetake: () =>
-                                    scannerController.startCameraScan(context),
-                                onChooseAnother:
-                                    scannerController.pickImageFromGallery,
+                                onDelete: scannerController.deleteRoleImage,
                                 onReset: scannerController.resetScan,
                               ),
                               if (showPickerShell) ...[
@@ -494,326 +493,6 @@ class _ScanGoalSelector extends StatelessWidget {
   }
 }
 
-class _ScanPreviewSurface extends StatelessWidget {
-  const _ScanPreviewSurface({
-    required this.imagePath,
-    required this.title,
-    required this.status,
-    required this.isBusy,
-  });
-
-  final String? imagePath;
-  final String title;
-  final String status;
-  final bool isBusy;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: AspectRatio(
-        aspectRatio: 1.28,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.62),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (imagePath == null)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primary.withValues(alpha: 0.12),
-                        colorScheme.tertiary.withValues(alpha: 0.10),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                )
-              else
-                _ScanPreviewImage(imagePath: imagePath!),
-              if (imagePath == null)
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primary.withValues(alpha: 0.12),
-                        ),
-                        child: Icon(
-                          Icons.document_scanner_outlined,
-                          color: colorScheme.primary,
-                          size: 34,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Ready to scan with PackLox',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface.withValues(alpha: 0.78),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(
-                          alpha: 0.28,
-                        ),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            status,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              if (isBusy)
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: colorScheme.surface.withValues(alpha: 0.18),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            color: colorScheme.primary,
-                            strokeWidth: 2.4,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Analyzing image',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MultiPhotoAnalysisPanel extends StatelessWidget {
-  const _MultiPhotoAnalysisPanel({
-    required this.state,
-    required this.onCamera,
-    required this.onGallery,
-  });
-
-  final ScannerState state;
-  final Future<void> Function(String role) onCamera;
-  final Future<void> Function(String role) onGallery;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final isBusy = state.isLoading || state.isPreparingImage;
-    final slots = state.photoSlots;
-    final session = state.scanSession;
-    final plan = session?.capturePlan;
-    final suppliedLabel = plan == null
-        ? 'Photos used: ${slots.length}'
-        : '${(plan.completionPercentage * 100).round()}% ready';
-    final roles = plan == null
-        ? const [
-            ScanCaptureRole.front,
-            ScanCaptureRole.back,
-            ScanCaptureRole.closeUp,
-          ]
-        : [...plan.requiredRoles, ...plan.optionalRoles];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.photo_library_outlined, color: colorScheme.primary),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  'Photos for analysis',
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                suppliedLabel,
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            plan?.userGuidance ??
-                'Start with the front. Add back and detail photos when useful.',
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          for (final role in roles) ...[
-            _PhotoSlotRow(
-              role: role,
-              requiredSlot: plan?.requiredRoles.contains(role) ?? false,
-              value: slots[role.id],
-              isBusy: isBusy,
-              onCamera: onCamera,
-              onGallery: onGallery,
-            ),
-            if (role != roles.last) const SizedBox(height: AppSpacing.sm),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PhotoSlotRow extends StatelessWidget {
-  const _PhotoSlotRow({
-    required this.role,
-    required this.requiredSlot,
-    required this.value,
-    required this.isBusy,
-    required this.onCamera,
-    required this.onGallery,
-  });
-
-  final ScanCaptureRole role;
-  final bool requiredSlot;
-  final ScannerPhotoSlot? value;
-  final bool isBusy;
-  final Future<void> Function(String role) onCamera;
-  final Future<void> Function(String role) onGallery;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final hasPhoto = value != null;
-
-    return Row(
-      children: [
-        Icon(
-          hasPhoto
-              ? Icons.check_circle_outline
-              : Icons.add_photo_alternate_outlined,
-          color: hasPhoto ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          size: 22,
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                role.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                hasPhoto
-                    ? '${value!.source} photo added'
-                    : requiredSlot
-                    ? 'Recommended'
-                    : 'Optional',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (!hasPhoto) ...[
-                const SizedBox(height: 2),
-                CaptureRoleGuide(role: role, compact: true),
-              ],
-            ],
-          ),
-        ),
-        IconButton(
-          tooltip: 'Use camera for ${role.title}',
-          onPressed: isBusy ? null : () => onCamera(role.id),
-          icon: const Icon(Icons.photo_camera_outlined),
-        ),
-        IconButton(
-          tooltip: 'Import photo for ${role.title}',
-          onPressed: isBusy ? null : () => onGallery(role.id),
-          icon: const Icon(Icons.photo_library_outlined),
-        ),
-      ],
-    );
-  }
-}
-
 class _ScanResultGoalSummary extends StatelessWidget {
   const _ScanResultGoalSummary({
     required this.goal,
@@ -867,67 +546,6 @@ class _ScanResultGoalSummary extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _ScanPreviewImage extends StatelessWidget {
-  const _ScanPreviewImage({required this.imagePath});
-
-  final String imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (imagePath.startsWith('sample://')) {
-      return ColoredBox(
-        color: colorScheme.primaryContainer,
-        child: Icon(Icons.style_outlined, color: colorScheme.primary, size: 42),
-      );
-    }
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return Image.network(
-        imagePath,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) {
-          return _PreviewFallback(colorScheme: colorScheme);
-        },
-      );
-    }
-    if (imagePath.startsWith('assets/')) {
-      return Image.asset(
-        imagePath,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) {
-          return _PreviewFallback(colorScheme: colorScheme);
-        },
-      );
-    }
-
-    return Image.file(
-      File(imagePath),
-      fit: BoxFit.contain,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) {
-        return _PreviewFallback(colorScheme: colorScheme);
-      },
-    );
-  }
-}
-
-class _PreviewFallback extends StatelessWidget {
-  const _PreviewFallback({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: colorScheme.surfaceContainerHighest,
-      child: Icon(Icons.broken_image_outlined, color: colorScheme.primary),
     );
   }
 }
@@ -1085,6 +703,108 @@ String _modelStatusFor(ScannerState state) {
   }
 
   return 'Standby';
+}
+
+void _showCapturedImagePreview(
+  BuildContext context, {
+  required ScannerPhotoSlot slot,
+  required VoidCallback onRetake,
+  required VoidCallback onDelete,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
+      final message =
+          slot.qualityMetadata['userMessage'] as String? ?? 'Image accepted.';
+      final warning = slot.qualityMetadata['severity'] == 'WARNING';
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                slot.label,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: ScanThumbnail(imagePath: slot.path),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Icon(
+                    warning
+                        ? Icons.warning_amber_outlined
+                        : Icons.check_circle_outline,
+                    color: warning ? colorScheme.tertiary : colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onRetake();
+                      },
+                      icon: const Icon(Icons.refresh_outlined),
+                      label: const Text('Retake'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onDelete();
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  IconButton.filledTonal(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {

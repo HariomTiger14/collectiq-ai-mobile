@@ -1315,6 +1315,94 @@ void main() {
       expect(partial.nextRecommendedRole, ScanCaptureRole.back);
     });
 
+    test('goal capture plans expose v1 analyze readiness rules', () {
+      const service = ScanCapturePlanService();
+
+      final identifyReady = service
+          .buildPlan(ScanGoal.identifyValue, null, const [
+            CapturedScanImage(
+              path: 'front.jpg',
+              role: ScanCaptureRole.front,
+              source: 'camera',
+            ),
+          ]);
+      final detailedReady = service
+          .buildPlan(ScanGoal.detailedAnalysis, null, const [
+            CapturedScanImage(
+              path: 'front.jpg',
+              role: ScanCaptureRole.front,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'back.jpg',
+              role: ScanCaptureRole.back,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'close.jpg',
+              role: ScanCaptureRole.closeUp,
+              source: 'camera',
+            ),
+          ]);
+      final saleReady = service.buildPlan(ScanGoal.prepareForSale, null, const [
+        CapturedScanImage(
+          path: 'front.jpg',
+          role: ScanCaptureRole.front,
+          source: 'camera',
+        ),
+        CapturedScanImage(
+          path: 'back.jpg',
+          role: ScanCaptureRole.back,
+          source: 'camera',
+        ),
+      ]);
+
+      expect(identifyReady.isMinimumReadyForAnalyze, isTrue);
+      expect(identifyReady.nextRecommendedRole, ScanCaptureRole.back);
+      expect(detailedReady.isMinimumReadyForAnalyze, isTrue);
+      expect(detailedReady.nextRecommendedRole, ScanCaptureRole.edge);
+      expect(saleReady.isMinimumReadyForAnalyze, isTrue);
+      expect(saleReady.requiredRoles, [
+        ScanCaptureRole.front,
+        ScanCaptureRole.back,
+      ]);
+      expect(saleReady.optionalRoles, [
+        ScanCaptureRole.closeUp,
+        ScanCaptureRole.damageDetail,
+        ScanCaptureRole.serialOrMark,
+      ]);
+    });
+
+    test('capture plan updates next role after delete-like removal', () {
+      const service = ScanCapturePlanService();
+
+      final withFrontBack = service
+          .buildPlan(ScanGoal.prepareForSale, null, const [
+            CapturedScanImage(
+              path: 'front.jpg',
+              role: ScanCaptureRole.front,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'back.jpg',
+              role: ScanCaptureRole.back,
+              source: 'camera',
+            ),
+          ]);
+      final afterBackDelete = service
+          .buildPlan(ScanGoal.prepareForSale, null, const [
+            CapturedScanImage(
+              path: 'front.jpg',
+              role: ScanCaptureRole.front,
+              source: 'camera',
+            ),
+          ]);
+
+      expect(withFrontBack.isMinimumReadyForAnalyze, isTrue);
+      expect(afterBackDelete.isMinimumReadyForAnalyze, isFalse);
+      expect(afterBackDelete.nextRecommendedRole, ScanCaptureRole.back);
+    });
+
     test('quality gates pass valid image and block undecodable bytes', () {
       const service = ScanQualityGateService(
         minimumDimension: 1,
