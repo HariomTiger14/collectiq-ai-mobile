@@ -1,4 +1,6 @@
 import 'package:camera/camera.dart';
+import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
@@ -62,6 +64,7 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
   bool _isFlashEnabled = false;
   bool _liveEnhanceEnabled = false;
   bool _isPermissionPermanentlyDenied = false;
+  bool _isExiting = false;
   String? _errorMessage;
 
   @override
@@ -157,6 +160,7 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
 
     try {
       final image = await cameraService.captureImage();
+      await _disposeCameraForExit();
       if (!mounted) {
         return;
       }
@@ -194,12 +198,13 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     }
   }
 
-  void _retake() {
+  Future<void> _retake() async {
     setState(() {
       _capturedImage = null;
       _errorMessage = null;
       _isCapturing = false;
     });
+    await _initializeCamera();
   }
 
   Future<void> _flipCamera() async {
@@ -224,12 +229,40 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     }
   }
 
-  void _usePhoto(ImageEnhancementPreviewResult result) {
+  Future<void> _disposeCameraForExit() async {
+    final cameraService = _cameraService;
+    _cameraService = null;
+    await cameraService?.disposeCamera();
+  }
+
+  Future<void> _closeCamera() async {
+    if (_isExiting) {
+      return;
+    }
+    _isExiting = true;
+    await _disposeCameraForExit();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _popWithResult(CameraCaptureFlowResult result) async {
+    if (_isExiting) {
+      return;
+    }
+    _isExiting = true;
+    await _disposeCameraForExit();
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
+  }
+
+  Future<void> _usePhoto(ImageEnhancementPreviewResult result) async {
     final image = _capturedImage;
     if (image == null) {
       return;
     }
-    Navigator.of(context).pop(
+    await _popWithResult(
       CameraCaptureFlowResult.image(
         result.activeImage,
         originalImage: result.originalImage,
@@ -239,8 +272,8 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     );
   }
 
-  void _openGalleryFallback() {
-    Navigator.of(context).pop(const CameraCaptureFlowResult.galleryFallback());
+  Future<void> _openGalleryFallback() async {
+    await _popWithResult(const CameraCaptureFlowResult.galleryFallback());
   }
 
   @override
@@ -253,41 +286,51 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
   @override
   Widget build(BuildContext context) {
     final capturedImage = _capturedImage;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: capturedImage == null
-            ? _CameraLiveView(
-                cameraService: _cameraService,
-                isInitializing: _isInitializing,
-                isCapturing: _isCapturing,
-                isFlashEnabled: _isFlashEnabled,
-                errorMessage: _errorMessage,
-                isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
-                liveEnhanceEnabled: _liveEnhanceEnabled,
-                onCapture: _captureImage,
-                onFlash: _toggleFlash,
-                onGallery: _openGalleryFallback,
-                onFlip: _flipCamera,
-                onEnhanceToggle: () => setState(() {
-                  _liveEnhanceEnabled = !_liveEnhanceEnabled;
-                }),
-                onRetryPermission: _initializeCamera,
-                onOpenSettings: _cameraService?.openSettings,
-              )
-            : ImageEnhancementPreviewSurface(
-                image: capturedImage,
-                initialPreset: _liveEnhanceEnabled
-                    ? ImageEnhancementPreset.autoEnhance
-                    : ImageEnhancementPreset.original,
-                title: 'Review Photo',
-                subtitle: '',
-                enhancementService: _enhancementService,
-                assessmentService: _assessmentService,
-                onRetake: _retake,
-                onCancel: () => Navigator.of(context).pop(),
-                onUsePhoto: _usePhoto,
-              ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        await _closeCamera();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: capturedImage == null
+              ? _CameraLiveView(
+                  cameraService: _cameraService,
+                  isInitializing: _isInitializing,
+                  isCapturing: _isCapturing,
+                  isFlashEnabled: _isFlashEnabled,
+                  errorMessage: _errorMessage,
+                  isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
+                  liveEnhanceEnabled: _liveEnhanceEnabled,
+                  onClose: _closeCamera,
+                  onCapture: _captureImage,
+                  onFlash: _toggleFlash,
+                  onGallery: _openGalleryFallback,
+                  onFlip: _flipCamera,
+                  onEnhanceToggle: () => setState(() {
+                    _liveEnhanceEnabled = !_liveEnhanceEnabled;
+                  }),
+                  onRetryPermission: _initializeCamera,
+                  onOpenSettings: _cameraService?.openSettings,
+                )
+              : ImageEnhancementPreviewSurface(
+                  image: capturedImage,
+                  initialPreset: _liveEnhanceEnabled
+                      ? ImageEnhancementPreset.autoEnhance
+                      : ImageEnhancementPreset.original,
+                  title: 'Review Photo',
+                  subtitle: '',
+                  enhancementService: _enhancementService,
+                  assessmentService: _assessmentService,
+                  onRetake: _retake,
+                  onCancel: _closeCamera,
+                  onUsePhoto: _usePhoto,
+                ),
+        ),
       ),
     );
   }
@@ -302,6 +345,7 @@ class _CameraLiveView extends StatelessWidget {
     required this.errorMessage,
     required this.isPermissionPermanentlyDenied,
     required this.liveEnhanceEnabled,
+    required this.onClose,
     required this.onCapture,
     required this.onFlash,
     required this.onGallery,
@@ -318,6 +362,7 @@ class _CameraLiveView extends StatelessWidget {
   final String? errorMessage;
   final bool isPermissionPermanentlyDenied;
   final bool liveEnhanceEnabled;
+  final VoidCallback onClose;
   final VoidCallback onCapture;
   final VoidCallback onFlash;
   final VoidCallback onGallery;
@@ -341,6 +386,14 @@ class _CameraLiveView extends StatelessWidget {
             isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
             onRetryPermission: onRetryPermission,
             onOpenSettings: onOpenSettings,
+          ),
+        ),
+        Positioned(
+          top: AppSpacing.sm,
+          left: AppSpacing.lg,
+          child: MotionReveal(
+            offset: AppSpacing.sm,
+            child: _CameraCloseButton(onPressed: onClose),
           ),
         ),
         if (isReady && (cameraService?.canToggleFlash ?? false))
@@ -395,6 +448,53 @@ class _CameraLiveView extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CameraCloseButton extends StatelessWidget {
+  const _CameraCloseButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return MotionTapScale(
+      onTap: onPressed,
+      child: Tooltip(
+        message: 'Close camera',
+        child: Semantics(
+          button: true,
+          label: 'Close camera',
+          child: DecoratedBox(
+            key: const ValueKey('camera-close-button'),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.24),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Icon(
+                Icons.close,
+                size: 20,
+                color: colorScheme.onSurface.withValues(alpha: 0.86),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

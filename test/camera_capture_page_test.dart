@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 // ignore: depend_on_referenced_packages
 import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -52,11 +53,15 @@ void main() {
     await tester.pump();
 
     expect(cameraService.captureCount, 1);
+    expect(cameraService.disposeCount, 1);
+    expect(cameraService.isAlive, isFalse);
     expect(cameraService.initializeCount, 1);
     expect(cameraService.openCount, 0);
   });
 
-  testWidgets('camera page has no close button', (WidgetTester tester) async {
+  testWidgets('camera page shows premium close button', (
+    WidgetTester tester,
+  ) async {
     final cameraService = _ReadyCameraService();
     await tester.pumpWidget(
       ProviderScope(
@@ -68,11 +73,62 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byIcon(Icons.close), findsNothing);
-    expect(find.byTooltip('Close camera'), findsNothing);
+    expect(find.byKey(const ValueKey('camera-close-button')), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byTooltip('Close camera'), findsOneWidget);
+    expect(find.byType(MotionReveal), findsWidgets);
+    expect(find.byType(MotionTapScale), findsWidgets);
   });
 
-  testWidgets('system back returns to previous screen', (
+  testWidgets('close button disposes camera and returns to scan hub', (
+    WidgetTester tester,
+  ) async {
+    final cameraService = _ReadyCameraService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [cameraServiceProvider.overrideWithValue(cameraService)],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              const CameraCapturePage(imageRole: 'front'),
+                        ),
+                      );
+                    },
+                    child: const Text('Open camera'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open camera'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CameraCapturePage), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close camera'));
+    await tester.pumpAndSettle();
+
+    expect(cameraService.disposeCount, 1);
+    expect(cameraService.isAlive, isFalse);
+    expect(find.text('Open camera'), findsOneWidget);
+    expect(find.byType(CameraCapturePage), findsNothing);
+    expect(
+      find.byKey(const ValueKey('camera-preview-initializing-black')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('system back disposes camera and returns to previous screen', (
     WidgetTester tester,
   ) async {
     final cameraService = _ReadyCameraService();
@@ -110,6 +166,8 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
+    expect(cameraService.disposeCount, 1);
+    expect(cameraService.isAlive, isFalse);
     expect(find.text('Open camera'), findsOneWidget);
     expect(find.byType(CameraCapturePage), findsNothing);
   });
@@ -156,6 +214,8 @@ class _ReadyCameraService extends CameraService {
   int initializeCount = 0;
   int openCount = 0;
   int captureCount = 0;
+  int disposeCount = 0;
+  bool isAlive = true;
 
   @override
   CameraController? get controller => _controller;
@@ -185,7 +245,10 @@ class _ReadyCameraService extends CameraService {
   }
 
   @override
-  Future<void> disposeCamera() async {}
+  Future<void> disposeCamera() async {
+    disposeCount += 1;
+    isAlive = false;
+  }
 }
 
 class _FakeCameraController extends ValueNotifier<CameraValue>
