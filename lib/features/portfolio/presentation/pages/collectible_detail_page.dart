@@ -86,7 +86,10 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           controller: _scrollController,
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: EdgeInsets.symmetric(
+                horizontal: _responsiveDetailPadding(context),
+                vertical: AppSpacing.lg,
+              ),
               sliver: SliverToBoxAdapter(
                 child: Center(
                   child: ConstrainedBox(
@@ -446,6 +449,17 @@ void _showImageViewer(
   );
 }
 
+double _responsiveDetailPadding(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  if (width < 360) {
+    return AppSpacing.md;
+  }
+  if (width < 600) {
+    return AppSpacing.lg;
+  }
+  return 20;
+}
+
 class _PremiumDetailHero extends StatelessWidget {
   const _PremiumDetailHero({
     required this.item,
@@ -519,49 +533,56 @@ class _PremiumDetailHero extends StatelessWidget {
             selectedPath: selectedImage?.path,
             onSelected: onImageSelected,
           ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AnimatedDetailMetadata(
-                  id: 'summary-chips',
-                  value: '${item.category}-${item.confidence}-${item.rarity}',
-                  child: Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      _DetailChip(
-                        icon: Icons.category_outlined,
-                        label: _fallback(item.category),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final dense = constraints.maxWidth < 380;
+              final contentPadding = dense ? AppSpacing.md : AppSpacing.lg;
+              return Padding(
+                padding: EdgeInsets.all(contentPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AnimatedDetailMetadata(
+                      id: 'summary-chips',
+                      value:
+                          '${item.category}-${item.confidence}-${item.rarity}',
+                      child: Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          _DetailChip(
+                            icon: Icons.category_outlined,
+                            label: _fallback(item.category),
+                          ),
+                          _DetailChip(
+                            icon: Icons.verified_outlined,
+                            label:
+                                '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
+                          ),
+                          _DetailRarityBadge(label: _rarityLabel(item)),
+                        ],
                       ),
-                      _DetailChip(
-                        icon: Icons.verified_outlined,
-                        label:
-                            '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
-                      ),
-                      _DetailRarityBadge(label: _rarityLabel(item)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _AnimatedDetailMetadata(
-                  id: 'title',
-                  value: item.title,
-                  child: AppTwoLineTitle(
-                    item.title,
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      height: 1.12,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    _AnimatedDetailMetadata(
+                      id: 'title',
+                      value: item.title,
+                      child: AppTwoLineTitle(
+                        item.title,
+                        style: textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          height: 1.12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _DetailConfidenceMeter(confidence: item.confidence),
+                    const SizedBox(height: AppSpacing.md),
+                    _PremiumDetailValueCard(value: item.estimatedValue),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                _DetailConfidenceMeter(confidence: item.confidence),
-                const SizedBox(height: AppSpacing.md),
-                _PremiumDetailValueCard(value: item.estimatedValue),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -977,19 +998,23 @@ class _DetailRarityBadge extends StatelessWidget {
           boxShadow: AppElevation.level1,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          child: Wrap(
+            spacing: 4,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Icon(
                 Icons.diamond_outlined,
                 size: 14,
                 color: colorScheme.onPrimary,
               ),
-              const SizedBox(width: 6),
               Text(
                 label,
                 key: const ValueKey('collectible-detail-rarity-badge-label'),
+                softWrap: true,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: colorScheme.onPrimary,
                   fontWeight: FontWeight.w900,
@@ -1363,8 +1388,11 @@ class _AiEnhancedDetailBadge extends StatelessWidget {
           horizontal: compact ? 7 : 10,
           vertical: compact ? 4 : 6,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.center,
           children: [
             Icon(
               Icons.auto_fix_high,
@@ -1372,10 +1400,12 @@ class _AiEnhancedDetailBadge extends StatelessWidget {
               color: colorScheme.onPrimary,
             ),
             if (!compact) ...[
-              const SizedBox(width: 6),
               Text(
                 'AI Enhanced',
                 key: const ValueKey('collectible-detail-ai-enhanced-badge'),
+                softWrap: true,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: colorScheme.onPrimary,
                   fontWeight: FontWeight.w900,
@@ -1421,12 +1451,14 @@ class _LowConfidenceBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: colorScheme.error.withValues(alpha: 0.22)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Wrap(
+        spacing: AppSpacing.md,
+        runSpacing: AppSpacing.sm,
+        crossAxisAlignment: WrapCrossAlignment.start,
         children: [
           Icon(Icons.report_problem_outlined, color: colorScheme.error),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 0, maxWidth: 280),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1669,15 +1701,18 @@ class _DetailChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Icon(icon, size: AppIconSizes.sm, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.xs),
-          Flexible(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
             child: Text(
               label,
-              maxLines: 1,
+              softWrap: true,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: colorScheme.primary,
@@ -2043,13 +2078,19 @@ class _WishlistStatusOption extends StatelessWidget {
               color: selected ? color : colorScheme.outlineVariant,
             ),
           ),
-          child: Row(
+          child: Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Icon(_wishlistStatusIcon(status), color: color),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 220),
                 child: Text(
                   status.label,
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -2426,24 +2467,32 @@ class _ComparableSaleVisualRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
                 child: Text(
                   comp.title,
-                  maxLines: 1,
+                  softWrap: true,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                _formatMoney(comp.soldPrice, comp.currency),
-                style: textTheme.labelLarge?.copyWith(
-                  color: _valueGold,
-                  fontWeight: FontWeight.w900,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _formatMoney(comp.soldPrice, comp.currency),
+                  style: textTheme.labelLarge?.copyWith(
+                    color: _valueGold,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -2528,9 +2577,13 @@ class _AlternativeMatchRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
                 child: AppTwoLineTitle(
                   match.title,
                   style: textTheme.titleSmall?.copyWith(
@@ -2538,12 +2591,14 @@ class _AlternativeMatchRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                '${(match.confidence * 100).toStringAsFixed(0)}%',
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w800,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '${(match.confidence * 100).toStringAsFixed(0)}%',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -2697,43 +2752,64 @@ class _ItemValueSummaryVisual extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: _valueGold.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: const Icon(
-                    Icons.stacked_line_chart_outlined,
-                    color: _valueGold,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Item Value Summary',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final dense = constraints.maxWidth < 360;
+                return Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _valueGold.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        _formatMoney(current, pricing?.currency ?? 'AUD'),
-                        style: textTheme.titleLarge?.copyWith(
-                          color: _valueGold,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      child: const Icon(
+                        Icons.stacked_line_chart_outlined,
+                        color: _valueGold,
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: dense
+                            ? (constraints.maxWidth - 58).clamp(
+                                180.0,
+                                constraints.maxWidth,
+                              )
+                            : 520,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Item Value Summary',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _formatMoney(current, pricing?.currency ?? 'AUD'),
+                              style: textTheme.titleLarge?.copyWith(
+                                color: _valueGold,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             ClipRRect(
@@ -2747,9 +2823,13 @@ class _ItemValueSummaryVisual extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Row(
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.xs,
+              alignment: WrapAlignment.spaceBetween,
               children: [
-                Expanded(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
                   child: Text(
                     'Low ${_formatMoney(low, pricing?.currency ?? 'AUD')}',
                     maxLines: 1,
@@ -2759,8 +2839,8 @@ class _ItemValueSummaryVisual extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
                   child: Text(
                     'High ${_formatMoney(high, pricing?.currency ?? 'AUD')}',
                     maxLines: 1,
@@ -3050,7 +3130,10 @@ class _PriceAlertRow extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Icon(
                 triggered
@@ -3058,13 +3141,16 @@ class _PriceAlertRow extends ConsumerWidget {
                     : Icons.notifications_none_outlined,
                 color: color,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _alertRuleLabel(alert.rule),
+                      softWrap: true,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -3072,6 +3158,9 @@ class _PriceAlertRow extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       alert.message ?? alert.status.label,
+                      softWrap: true,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -3079,33 +3168,35 @@ class _PriceAlertRow extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                alert.status.label,
-                style: textTheme.labelLarge?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w900,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Text(
+                  alert.status.label,
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
               if (triggered) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _resetAlert(context, ref, alert),
-                    child: const Text('Reset'),
-                  ),
+                OutlinedButton(
+                  onPressed: () => _resetAlert(context, ref, alert),
+                  child: const Text('Reset'),
                 ),
-                const SizedBox(width: AppSpacing.sm),
               ],
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _deleteAlert(context, ref, alert),
-                  child: const Text('Delete'),
-                ),
+              OutlinedButton(
+                onPressed: () => _deleteAlert(context, ref, alert),
+                child: const Text('Delete'),
               ),
             ],
           ),

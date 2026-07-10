@@ -4796,6 +4796,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(360, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpCollectIqApp();
+    expectNoFlutterError(tester);
     await _openGalleryDetail(tester, itemId: 'legacy-one');
 
     expect(find.text('Legacy One Image'), findsWidgets);
@@ -5200,7 +5201,7 @@ void main() {
   });
 
   for (final viewport in const [
-    ('small phone', Size(360, 640)),
+    ('small phone', Size(320, 640)),
     ('large phone', Size(430, 932)),
   ]) {
     testWidgets('responsive smoke renders key screens on ${viewport.$1}', (
@@ -5246,14 +5247,58 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Collectible Details'), findsOneWidget);
+      final detailWidth = viewport.$2.width;
+      final heroSize = tester.getSize(
+        find.byKey(const ValueKey('collectible-detail-image-preview')),
+      );
+      expect(heroSize.width, lessThanOrEqualTo(detailWidth));
+      expect(heroSize.height, lessThan(heroSize.width));
+      expect(
+        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('collectible-detail-rarity-badge')),
+            )
+            .width,
+        lessThanOrEqualTo(detailWidth),
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-confidence-meter')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('collectible-detail-confidence-meter')),
+            )
+            .width,
+        lessThanOrEqualTo(detailWidth),
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-value-card')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('collectible-detail-value-card')),
+            )
+            .width,
+        lessThanOrEqualTo(detailWidth),
+      );
       expectNoFlutterError(tester);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
+      expectNoFlutterError(tester);
       expect(find.text('Account'), findsOneWidget);
       await tester.reveal(find.text('Backup & Sync'));
+      expectNoFlutterError(tester);
       expect(find.text('Backup & Sync'), findsWidgets);
       expectNoFlutterError(tester);
     });

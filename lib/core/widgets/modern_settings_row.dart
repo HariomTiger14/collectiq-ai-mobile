@@ -78,6 +78,11 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final dense = width < 360;
+    final iconSize = dense ? 46.0 : 52.0;
+    final rowPadding = dense ? AppSpacing.xs : AppSpacing.sm;
+    final contentGap = dense ? AppSpacing.md : AppSpacing.lg;
     final trailing = widget.trailing ?? _buildTrailingText(context);
 
     return TweenAnimationBuilder<double>(
@@ -112,7 +117,7 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
               curve: Curves.easeOutCubic,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: EdgeInsets.all(rowPadding),
                 decoration: BoxDecoration(
                   color: _hovered
                       ? colorScheme.primary.withValues(alpha: 0.08)
@@ -126,8 +131,8 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       builder: (context, child) {
                         final pulse = _pulseController.value;
                         return Container(
-                          width: 52,
-                          height: 52,
+                          width: iconSize,
+                          height: iconSize,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -166,14 +171,14 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                         );
                       },
                     ),
-                    const SizedBox(width: AppSpacing.lg),
+                    SizedBox(width: contentGap),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             widget.title,
-                            maxLines: 1,
+                            maxLines: dense ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
@@ -192,8 +197,8 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       ),
                     ),
                     if (trailing != null) ...[
-                      const SizedBox(width: AppSpacing.md),
-                      trailing,
+                      SizedBox(width: dense ? AppSpacing.sm : AppSpacing.md),
+                      Flexible(child: trailing),
                     ],
                   ],
                 ),
@@ -214,7 +219,9 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
     final textTheme = Theme.of(context).textTheme;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 118),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width < 360 ? 86 : 118,
+      ),
       child: Text(
         text,
         maxLines: 1,

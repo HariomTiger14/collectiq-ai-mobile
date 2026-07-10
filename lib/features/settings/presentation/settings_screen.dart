@@ -352,8 +352,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 AnimatedBuilder(
                   animation: _scrollController,
                   builder: (context, child) {
+                    final compact = MediaQuery.sizeOf(context).width < 360;
                     return MotionElasticHero(
-                      baseHeight: 160,
+                      baseHeight: compact ? 176 : 160,
                       scrollOffset: _scrollController.hasClients
                           ? _scrollController.offset
                           : 0,
@@ -883,6 +884,7 @@ class SettingsHeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final compact = MediaQuery.sizeOf(context).width < 360;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -932,11 +934,11 @@ class SettingsHeroHeader extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.xl,
-                  AppSpacing.xl,
-                  AppSpacing.lg,
+                padding: EdgeInsets.fromLTRB(
+                  compact ? AppSpacing.lg : AppSpacing.xl,
+                  compact ? AppSpacing.lg : AppSpacing.xl,
+                  compact ? AppSpacing.lg : AppSpacing.xl,
+                  compact ? AppSpacing.md : AppSpacing.lg,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -944,9 +946,8 @@ class SettingsHeroHeader extends StatelessWidget {
                   children: [
                     Text(
                       'Settings',
-                      style: AppTextStyles.h1.copyWith(
-                        color: colorScheme.onPrimary,
-                      ),
+                      style: (compact ? AppTextStyles.h2 : AppTextStyles.h1)
+                          .copyWith(color: colorScheme.onPrimary),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(

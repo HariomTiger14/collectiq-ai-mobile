@@ -251,9 +251,16 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   );
                 }
 
-                final crossAxisCount = constraints.crossAxisExtent >= 720
+                final crossAxisCount = constraints.crossAxisExtent < 360
+                    ? 1
+                    : constraints.crossAxisExtent >= 720
                     ? 3
                     : 2;
+                final childAspectRatio = switch (crossAxisCount) {
+                  1 => 0.90,
+                  2 => 0.64,
+                  _ => 0.80,
+                };
 
                 return SliverMainAxisGroup(
                   slivers: [
@@ -298,7 +305,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: AppSpacing.md,
                         crossAxisSpacing: AppSpacing.md,
-                        childAspectRatio: crossAxisCount == 3 ? 0.80 : 0.70,
+                        childAspectRatio: childAspectRatio,
                       ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = visibleItems[index];
