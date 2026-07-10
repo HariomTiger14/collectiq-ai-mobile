@@ -29,6 +29,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhanceme
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
@@ -77,7 +78,8 @@ void main() {
     expectNoFlutterError(tester);
 
     await tester.tap(find.text('Scan').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -1314,6 +1316,157 @@ void main() {
     );
   });
 
+  testWidgets('scan camera surface shows focus, exposure, detect, and grid', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Detecting...'), findsOneWidget);
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-camera-grid')),
+          )
+          .opacity,
+      0,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('scan-grid-toggle')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-camera-grid')),
+          )
+          .opacity,
+      1,
+    );
+    await tester.tap(find.byKey(const ValueKey('scan-grid-toggle')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-camera-grid')),
+          )
+          .opacity,
+      0,
+    );
+
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const ValueKey('scan-camera-preview-tap-target')),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('scan-focus-ring')), findsOneWidget);
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-exposure-slider')),
+          )
+          .opacity,
+      1,
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('scan-focus-ring')), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-exposure-slider')),
+          )
+          .opacity,
+      0,
+    );
+  });
+
+  testWidgets('scan capture flashes and shows next capture suggestion', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(
+      cameraService: _DelayedPersistCameraService(),
+    );
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-capture-flash')),
+          )
+          .opacity,
+      0.40,
+    );
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-capture-suggestion')),
+          )
+          .opacity,
+      1,
+    );
+    expect(find.text('Front recommended'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('scan-capture-flash')),
+          )
+          .opacity,
+      0,
+    );
+  });
+
+  testWidgets('enhance button has pulse, glow, and tap scale animation', (
+    WidgetTester tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: EnhanceButton(active: true, onPressed: () => taps++),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('scan-enhance-pulse')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-enhance-scale')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('scan-live-enhance')));
+    await tester.pump();
+
+    expect(taps, 1);
+    expect(
+      tester
+          .widget<AnimatedScale>(
+            find.byKey(const ValueKey('scan-enhance-scale')),
+          )
+          .scale,
+      0.94,
+    );
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(
+      tester
+          .widget<AnimatedScale>(
+            find.byKey(const ValueKey('scan-enhance-scale')),
+          )
+          .scale,
+      1,
+    );
+  });
+
   testWidgets(
     'workspace capture next opens scan surface with existing photos',
     (WidgetTester tester) async {
@@ -1352,7 +1505,8 @@ void main() {
       await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Scan Workspace'), findsNothing);
       expect(
@@ -1360,6 +1514,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
+      expect(find.text('Hot Wheels detected'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('scan-recommended-role')),
         findsOneWidget,
@@ -1388,7 +1543,8 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
@@ -1444,7 +1600,8 @@ void main() {
       await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(
         find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       );
