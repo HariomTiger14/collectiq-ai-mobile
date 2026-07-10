@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
@@ -47,7 +48,6 @@ import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -573,7 +573,9 @@ void main() {
     await tester.pumpCollectIqApp();
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
 
     expect(find.text('AI Scanner'), findsNothing);
     expect(find.text('Ready to Scan'), findsNothing);
@@ -1602,53 +1604,31 @@ void main() {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-    );
-    await tester.pumpUntilFound(find.text('Scan Workspace'));
-    expect(find.byKey(const ValueKey('workspace-metadata')), findsOneWidget);
-    expect(find.text('Capture the full back side.'), findsOneWidget);
-    await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
-    await tester.pumpUntilFound(find.text('Scan Workspace'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MaterialApp)),
     );
     final scannerState = container.read(scannerControllerProvider);
     expect(scannerState.captureImages.length, 2);
-    expect(find.text('2 photos'), findsOneWidget);
-    expect(find.text('Capture the full back side.'), findsNothing);
-    expect(find.text('Base recommended'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+      find.byKey(const ValueKey('scan-camera-preview-tap-target')),
       findsOneWidget,
     );
+    expect(find.textContaining('Recommended:'), findsOneWidget);
     expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TweenAnimationBuilder<double> &&
-            widget.duration == const Duration(milliseconds: 150),
-      ),
-      findsWidgets,
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
     );
-    expect(
-      find.byWidgetPredicate((widget) => widget is AnimatedSwitcher),
-      findsAtLeastNWidgets(4),
-    );
-    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
-    expect(find.byKey(const ValueKey('workspace-metadata')), findsOneWidget);
   });
 
   testWidgets(
@@ -1661,24 +1641,15 @@ void main() {
       );
 
       await tester.tap(find.text('Scan').last);
-      await tester.pump();
-      await tester.reveal(
-        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      await tester.pumpUntilFound(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
       );
-      await tester.pump();
-      await tester.tap(
-        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-      );
-      await tester.pumpUntilFound(find.text('Scan Workspace'));
-      await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(
         find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       );
-      await tester.pumpUntilFound(find.text('Scan Workspace'));
+      await tester.pumpUntilFound(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      );
       await tester.reveal(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
       );
@@ -1883,6 +1854,37 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('scan tab opens camera capture page directly', (
+    WidgetTester tester,
+  ) async {
+    final cameraService = _RouteHoldingCameraService();
+    await tester.pumpCollectIqApp(cameraService: cameraService);
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpUntilFound(find.text('CameraCapturePage route'));
+
+    expect(cameraService.openedCount, 1);
+    expect(find.text('CameraCapturePage route'), findsOneWidget);
+  });
+
+  testWidgets('captured camera photo lands in workspace as active slot', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+
+    expect(
+      find.byKey(const ValueKey('scan-camera-preview-tap-target')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
+    expect(find.byType(CameraPreview), findsNothing);
   });
 
   testWidgets('camera completion remains on Scan tab', (
@@ -5222,8 +5224,9 @@ extension on WidgetTester {
             usageLimitConfigProvider.overrideWithValue(usageLimitConfig),
           if (usageRepository != null)
             usageRepositoryProvider.overrideWithValue(usageRepository),
-          if (cameraService != null)
-            cameraServiceProvider.overrideWithValue(cameraService),
+          cameraServiceProvider.overrideWithValue(
+            cameraService ?? _CancelledCameraService(),
+          ),
           if (galleryService != null)
             galleryServiceProvider.overrideWithValue(galleryService),
           if (imageEnhancementService != null)
@@ -5978,6 +5981,27 @@ class _CancelledCameraService extends CameraService {
   @override
   Future<XFile?> pickImageFromCamera() async {
     return null;
+  }
+}
+
+class _RouteHoldingCameraService extends CameraService {
+  int openedCount = 0;
+
+  @override
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) {
+    openedCount += 1;
+    return Navigator.of(context).push<CameraCaptureFlowResult?>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(child: Text('CameraCapturePage route')),
+        ),
+      ),
+    );
   }
 }
 
