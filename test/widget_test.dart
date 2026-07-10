@@ -24,10 +24,13 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -519,6 +522,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.acceptEnhancementPreview();
 
     expect(find.text('AI Scanner'), findsOneWidget);
     await tester.pumpUntilFound(find.text('Gallery image'));
@@ -1475,6 +1479,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(find.text('Gallery image'));
 
     expect(find.text('Gallery image'), findsOneWidget);
@@ -1551,6 +1556,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(
       find.text(
         'Selected image could not be found. Please choose another image.',
@@ -1620,35 +1626,50 @@ void main() {
     expect(find.textContaining('Sleeve it'), findsNothing);
   });
 
-  testWidgets('scanner enhancement updates active photo metadata', (
+  testWidgets('gallery import confirms enhancement before adding photo', (
     WidgetTester tester,
   ) async {
     final provider = _CapturingAiAnalysisProvider();
-    await tester.pumpCollectIqApp(aiAnalysisProvider: provider);
+    await tester.pumpCollectIqApp(
+      aiAnalysisProvider: provider,
+      galleryService: _SelectedGalleryService(),
+      imageEnhancementService: const _FakeImageEnhancementService(),
+    );
 
     await tester.tap(find.text('Scan').last);
     await tester.pump();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-    );
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('enhancement-preview-presets')),
     );
-    await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('scan-enhance-active-photo')),
+      find.byKey(const ValueKey('enhancement-preview-presets')),
       findsOneWidget,
     );
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    expect(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsNothing,
     );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('enhancement-preset-brighten')));
-    await tester.pumpAndSettle();
+    tester
+        .widget<ChoiceChip>(
+          find.byKey(const ValueKey('enhancement-preview-brighten')).last,
+        )
+        .onSelected
+        ?.call(true);
+    await tester.pump(const Duration(seconds: 1));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpUntilFound(
+      find.text('Brighten applied'),
+      timeout: const Duration(seconds: 10),
+    );
 
     expect(find.text('Brighten applied'), findsOneWidget);
     final container = ProviderScope.containerOf(
@@ -1657,28 +1678,63 @@ void main() {
     final controller = container.read(scannerControllerProvider);
     expect(controller.captureImages.single.enhancementPreset.id, 'brighten');
     expect(controller.captureImages.single.qualityMetadata['enhanced'], isTrue);
-
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    expect(
+      controller.captureImages.single.qualityMetadata['originalImagePath'],
+      isNotEmpty,
     );
+
+    tester
+        .widget<InkWell>(
+          find.byKey(const ValueKey('scan-active-capture-preview')),
+        )
+        .onTap
+        ?.call();
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('enhancement-preset-original')));
-    await tester.pumpAndSettle();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('photo-review-enhance')),
+    );
+    tester
+        .widget<OutlinedButton>(
+          find.byKey(const ValueKey('photo-review-enhance')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('enhancement-preview-presets')),
+    );
+    tester
+        .widget<ChoiceChip>(
+          find.byKey(const ValueKey('enhancement-preview-original')).last,
+        )
+        .onSelected
+        ?.call(true);
+    await tester.pump(const Duration(milliseconds: 300));
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('photo-review-enhance')),
+    );
 
     final reverted = container.read(scannerControllerProvider);
     expect(reverted.captureImages.single.enhancementPreset.id, 'original');
     expect(reverted.captureImages.single.qualityMetadata['enhanced'], isFalse);
 
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    await container
+        .read(scannerControllerProvider.notifier)
+        .applyEnhancementToPhoto(
+          reverted.captureImages.single,
+          ImageEnhancementPreset.brighten,
+        );
+    await tester.pumpUntilFound(
+      find.text('Brighten applied'),
+      timeout: const Duration(seconds: 10),
     );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('enhancement-preset-brighten')));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('photo-review-close')));
+    await tester.pump(const Duration(seconds: 2));
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -1698,29 +1754,69 @@ void main() {
     expect(provider.lastRequest?.metadata['enhancedImageCount'], 1);
   });
 
+  testWidgets('enhancement preview retake and cancel do not add photos', (
+    WidgetTester tester,
+  ) async {
+    ImageEnhancementPreviewResult? accepted;
+    var retakes = 0;
+    var cancels = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ImageEnhancementPreviewSurface(
+            image: XFile(_fixturePath('persistent-gallery-card.jpg')),
+            initialPreset: ImageEnhancementPreset.original,
+            title: 'Review photo',
+            subtitle: 'Choose the clearest version for analysis.',
+            onCancel: () => cancels += 1,
+            onRetake: () => retakes += 1,
+            onUsePhoto: (result) => accepted = result,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-auto_enhance')),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(accepted, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('enhancement-preview-retake')));
+    expect(retakes, 1);
+    expect(accepted, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('enhancement-preview-cancel')));
+    expect(cancels, 1);
+  });
+
   testWidgets('saving enhanced scan preserves portfolio gallery metadata', (
     WidgetTester tester,
   ) async {
-    await tester.pumpCollectIqApp();
+    await tester.pumpCollectIqApp(
+      galleryService: _SelectedGalleryService(),
+      imageEnhancementService: const _FakeImageEnhancementService(),
+    );
 
     await tester.tap(find.text('Scan').last);
     await tester.pump();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-    );
+    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('enhancement-preview-presets')),
+    );
     await tester.tap(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+      find.byKey(const ValueKey('enhancement-preview-contrast')),
     );
-    await tester.pumpAndSettle();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-enhance-active-photo')),
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
     );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-enhance-active-photo')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('enhancement-preset-contrast')));
-    await tester.pumpAndSettle();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      timeout: const Duration(seconds: 10),
+    );
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -1744,7 +1840,7 @@ void main() {
     final gallery = item['galleryImages'] as List<dynamic>;
     final firstImage = gallery.first as Map<String, dynamic>;
     expect(firstImage['enhancementPreset'], 'contrast');
-    expect(firstImage['originalPath'], firstImage['path']);
+    expect(firstImage['originalPath'], isNotEmpty);
   });
 
   testWidgets('scanner backend failure shows friendly message', (
@@ -1760,6 +1856,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -2056,6 +2153,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(find.text('Gallery image'));
 
     expect(find.text('Gallery image'), findsOneWidget);
@@ -2640,6 +2738,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -4031,6 +4130,7 @@ extension on WidgetTester {
     UsageRepository? usageRepository,
     CameraService? cameraService,
     GalleryService? galleryService,
+    ImageEnhancementService? imageEnhancementService,
     EnvironmentConfig? environmentConfig,
     bool onboardingCompleted = true,
     OnboardingRepository? onboardingRepository,
@@ -4072,6 +4172,10 @@ extension on WidgetTester {
             cameraServiceProvider.overrideWithValue(cameraService),
           if (galleryService != null)
             galleryServiceProvider.overrideWithValue(galleryService),
+          if (imageEnhancementService != null)
+            imageEnhancementServiceProvider.overrideWithValue(
+              imageEnhancementService,
+            ),
           if (environmentConfig != null)
             environmentConfigProvider.overrideWithValue(environmentConfig),
           if (demoSeedEnabled != null)
@@ -4129,6 +4233,24 @@ extension on WidgetTester {
       }
     }
     throw TestFailure('Timed out waiting for $finder');
+  }
+
+  Future<void> acceptEnhancementPreview({
+    ImageEnhancementPreset preset = ImageEnhancementPreset.original,
+  }) async {
+    await pumpUntilFound(
+      find.byKey(const ValueKey('enhancement-preview-presets')),
+    );
+    if (preset != ImageEnhancementPreset.original) {
+      widget<ChoiceChip>(
+        find.byKey(ValueKey('enhancement-preview-${preset.id}')).last,
+      ).onSelected?.call(true);
+      await pump(const Duration(milliseconds: 500));
+    }
+    widget<FilledButton>(
+      find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+    ).onPressed?.call();
+    await pump();
   }
 
   Future<void> openSettings() async {
@@ -4921,6 +5043,23 @@ class _SelectedGalleryService extends GalleryService {
   @override
   Future<XFile> persistSelectedImage(XFile image) async {
     return XFile(_fixturePath('persistent-gallery-card.jpg'));
+  }
+}
+
+class _FakeImageEnhancementService extends ImageEnhancementService {
+  const _FakeImageEnhancementService();
+
+  @override
+  Future<ImageEnhancementResult> enhance({
+    required String originalPath,
+    required ImageEnhancementPreset preset,
+  }) async {
+    return ImageEnhancementResult(
+      originalPath: originalPath,
+      activePath: originalPath,
+      preset: preset,
+      createdEnhancedFile: false,
+    );
   }
 }
 

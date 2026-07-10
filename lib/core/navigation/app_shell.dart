@@ -58,6 +58,25 @@ class _AppShellState extends ConsumerState<AppShell>
     _selectTab(_scanTabIndex, reason: 'start-new-scan');
   }
 
+  void _startGalleryImport() {
+    ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
+    _selectTab(_scanTabIndex, reason: 'home-import-photo');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        ref
+            .read(scannerControllerProvider.notifier)
+            .pickImageFromGallery(context: context),
+      );
+    });
+  }
+
+  void _openPortfolio() {
+    _selectTab(AppShellTabController.portfolioTab, reason: 'home-portfolio');
+  }
+
   Future<void> _completeOnboardingAndStartScan() async {
     await ref.read(onboardingControllerProvider.notifier).complete();
     if (!mounted) {
@@ -87,7 +106,11 @@ class _AppShellState extends ConsumerState<AppShell>
 
   Widget _buildActiveTab(int index) {
     return switch (index) {
-      AppShellTabController.homeTab => HomeScreen(onScanPressed: _startNewScan),
+      AppShellTabController.homeTab => HomeScreen(
+        onScanPressed: _startNewScan,
+        onImportPhotoPressed: _startGalleryImport,
+        onPortfolioPressed: _openPortfolio,
+      ),
       AppShellTabController.portfolioTab => PortfolioScreen(
         onScanPressed: _startNewScan,
       ),
@@ -98,7 +121,11 @@ class _AppShellState extends ConsumerState<AppShell>
         ),
       ),
       AppShellTabController.settingsTab => const SettingsScreen(),
-      _ => HomeScreen(onScanPressed: _startNewScan),
+      _ => HomeScreen(
+        onScanPressed: _startNewScan,
+        onImportPhotoPressed: _startGalleryImport,
+        onPortfolioPressed: _openPortfolio,
+      ),
     };
   }
 

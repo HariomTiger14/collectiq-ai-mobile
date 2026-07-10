@@ -8,6 +8,7 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_
 import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the scanner camera service.
@@ -28,6 +29,12 @@ final scanCapturePlanServiceProvider = Provider<ScanCapturePlanService>((ref) {
 
 final scanQualityGateServiceProvider = Provider<ScanQualityGateService>((ref) {
   return const ScanQualityGateService();
+});
+
+final imageEnhancementServiceProvider = Provider<ImageEnhancementService>((
+  ref,
+) {
+  return const ImageEnhancementService();
 });
 
 final marketProviderProvider = Provider<MarketProvider>((ref) {

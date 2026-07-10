@@ -31,6 +31,7 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scanner_constants.
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -279,7 +280,7 @@ class ScannerController extends Notifier<ScannerState> {
     _galleryService = ref.watch(galleryServiceProvider);
     _analyzerService = ref.watch(analyzerServiceProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
-    _imageEnhancementService = const ImageEnhancementService();
+    _imageEnhancementService = ref.watch(imageEnhancementServiceProvider);
     _capturePlanService = ref.watch(scanCapturePlanServiceProvider);
     _qualityGateService = ref.watch(scanQualityGateServiceProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
@@ -630,6 +631,8 @@ class ScannerController extends Notifier<ScannerState> {
         return;
       }
       final capturedImage = captureResult?.image;
+      final originalCaptureImage =
+          captureResult?.originalImage ?? capturedImage;
       debugPrint(
         '[Scanner] camera picker returned on tab '
         '${ref.read(appShellTabControllerProvider)}',
@@ -639,7 +642,10 @@ class ScannerController extends Notifier<ScannerState> {
         details: {'source': 'camera', 'path': capturedImage?.path},
       );
       _keepScanSelected('camera-picker-return');
-      if (capturedImage == null || capturedImage.path.isEmpty) {
+      if (capturedImage == null ||
+          capturedImage.path.isEmpty ||
+          originalCaptureImage == null ||
+          originalCaptureImage.path.isEmpty) {
         _setState(
           state.copyWith(isPreparingImage: false, clearErrorMessage: true),
           event: 'camera capture cancelled',
@@ -659,7 +665,12 @@ class ScannerController extends Notifier<ScannerState> {
         ),
         event: 'image copy started',
       );
-      final image = await _cameraService.persistCapturedImage(capturedImage);
+      final originalImage = await _cameraService.persistCapturedImage(
+        originalCaptureImage,
+      );
+      final image = capturedImage.path == originalCaptureImage.path
+          ? originalImage
+          : await _cameraService.persistCapturedImage(capturedImage);
       copyStopwatch.stop();
       debugPrint('[Scanner] camera image copy completed: ${image.path}');
       _logFlow(
@@ -670,54 +681,14 @@ class ScannerController extends Notifier<ScannerState> {
           'elapsedMs': copyStopwatch.elapsedMilliseconds,
         },
       );
-      final selectedImagePath = _displayPathFor(image);
-      await _ensureLocalImageExists(selectedImagePath, source: 'camera');
-      final quality = await _evaluateImageQuality(selectedImagePath);
-      if (!quality.passed) {
-        throw ScannerException(
-          message: quality.userMessage,
-          code: 'scanner.camera.quality_blocked',
-        );
-      }
-      debugPrint(
-        '[Scanner] selectedImagePath after camera capture: '
-        '$selectedImagePath',
-      );
-      debugPrint(
-        '[Scanner] Supabase sync triggered after camera selection: false',
-      );
-      final capturedSlot = _photoSlotFor(
+      await _acceptPreparedImage(
         imageRole: imageRole,
-        path: selectedImagePath,
         source: 'camera',
-        image: image,
-        qualityMetadata: quality.toMetadataJson(),
-      );
-      final captureImages = _appendCaptureImage(capturedSlot);
-      _setState(
-        state.copyWith(
-          selectedImage: image,
-          selectedImagePath: selectedImagePath,
-          selectedItemTitle: _selectedTitleForRole(
-            imageRole: imageRole,
-            source: 'camera',
-          ),
-          selectedItemStatus: 'Ready for AI analysis',
-          photoSlots: _latestSlotsFromImages(captureImages),
-          captureImages: captureImages,
-          activeCaptureRole: capturedSlot.role,
-          scanSession: _updatedSessionWithImage(
-            imageRole: imageRole,
-            path: selectedImagePath,
-            source: 'camera',
-            quality: quality,
-          ),
-          isPreparingImage: false,
-          clearScanResult: true,
-          clearAiRecommendation: true,
-          isSavedToPortfolio: false,
-        ),
-        event: 'selected image state emitted',
+        activeImage: image,
+        originalImage: originalImage,
+        enhancementPreset:
+            captureResult?.enhancementPreset ?? ImageEnhancementPreset.original,
+        enhancementMetadata: captureResult?.enhancementMetadata ?? const {},
       );
       _trackTelemetry(
         TelemetryEventNames.imageSelected,
@@ -812,7 +783,10 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   /// Opens the gallery and stores a validated selected image.
-  Future<void> pickImageFromGallery({String imageRole = 'front'}) async {
+  Future<void> pickImageFromGallery({
+    BuildContext? context,
+    String imageRole = 'front',
+  }) async {
     _logFlow('gallery button tapped');
     _setState(
       state.copyWith(
@@ -867,6 +841,31 @@ class ScannerController extends Notifier<ScannerState> {
       }
 
       await _galleryService.validateImage(image);
+      if (context != null && !context.mounted) {
+        return;
+      }
+      final previewResult = context == null
+          ? null
+          : await ImageEnhancementPreviewPage.show(
+              context,
+              image: image,
+              title: 'Review import',
+              subtitle: 'Choose the clearest version for analysis.',
+            );
+      if (_isDisposed) {
+        return;
+      }
+      if (context != null && previewResult == null) {
+        _setState(
+          state.copyWith(isPreparingImage: false, clearErrorMessage: true),
+          event: 'gallery enhancement cancelled',
+        );
+        return;
+      }
+      final originalGalleryImage = previewResult?.originalImage ?? image;
+      final activeGalleryImage = previewResult?.activeImage ?? image;
+      final selectedPreset =
+          previewResult?.preset ?? ImageEnhancementPreset.original;
       debugPrint('[Scanner] gallery image copy started');
       final copyStopwatch = Stopwatch()..start();
       _setState(
@@ -879,7 +878,13 @@ class ScannerController extends Notifier<ScannerState> {
         ),
         event: 'image copy started',
       );
-      final persistedImage = await _galleryService.persistSelectedImage(image);
+      final persistedOriginalImage = await _galleryService.persistSelectedImage(
+        originalGalleryImage,
+      );
+      final persistedImage =
+          activeGalleryImage.path == originalGalleryImage.path
+          ? persistedOriginalImage
+          : await _galleryService.persistSelectedImage(activeGalleryImage);
       copyStopwatch.stop();
       debugPrint(
         '[Scanner] gallery image copy completed: ${persistedImage.path}',
@@ -892,60 +897,28 @@ class ScannerController extends Notifier<ScannerState> {
           'elapsedMs': copyStopwatch.elapsedMilliseconds,
         },
       );
-      final selectedImagePath = _displayPathFor(persistedImage);
-      await _ensureLocalImageExists(selectedImagePath, source: 'gallery');
-      final quality = await _evaluateImageQuality(selectedImagePath);
-      if (!quality.passed) {
-        throw ScannerException(
-          message: quality.userMessage,
-          code: 'scanner.gallery.quality_blocked',
-        );
-      }
       debugPrint('[Scanner] gallery picker returned path: ${image.path}');
       debugPrint(
-        '[Scanner] copied persistent gallery path: $selectedImagePath',
+        '[Scanner] copied persistent gallery path: ${persistedImage.path}',
       );
       debugPrint(
         '[Scanner] Supabase sync triggered after gallery selection: false',
       );
-      final capturedSlot = _photoSlotFor(
+      await _acceptPreparedImage(
         imageRole: imageRole,
-        path: selectedImagePath,
         source: 'gallery',
-        image: persistedImage,
-        qualityMetadata: quality.toMetadataJson(),
-      );
-      final captureImages = _appendCaptureImage(capturedSlot);
-      _setState(
-        state.copyWith(
-          selectedImage: persistedImage,
-          selectedImagePath: selectedImagePath,
-          selectedItemTitle: _selectedTitleForRole(
-            imageRole: imageRole,
-            source: 'gallery',
-          ),
-          selectedItemStatus: 'Ready for AI analysis',
-          photoSlots: _latestSlotsFromImages(captureImages),
-          captureImages: captureImages,
-          activeCaptureRole: capturedSlot.role,
-          scanSession: _updatedSessionWithImage(
-            imageRole: imageRole,
-            path: selectedImagePath,
-            source: 'gallery',
-            quality: quality,
-          ),
-          isPreparingImage: false,
-          clearScanResult: true,
-          clearAiRecommendation: true,
-          isSavedToPortfolio: false,
-        ),
-        event: 'selected image state emitted',
+        activeImage: persistedImage,
+        originalImage: persistedOriginalImage,
+        enhancementPreset: selectedPreset,
+        enhancementMetadata: previewResult?.metadata ?? const {},
       );
       _trackTelemetry(
         TelemetryEventNames.imageSelected,
         properties: const {'source': 'gallery'},
       );
-      unawaited(_logPersistentGalleryDiagnostics(selectedImagePath));
+      unawaited(
+        _logPersistentGalleryDiagnostics(_displayPathFor(persistedImage)),
+      );
     } on ScannerException catch (error) {
       debugPrint('[Scanner] gallery picker scanner error: ${error.code}');
       _logFlow('gallery picker scanner error', error: error);
@@ -992,6 +965,100 @@ class ScannerController extends Notifier<ScannerState> {
         event: 'gallery loading shell cleared',
       );
     }
+  }
+
+  Future<void> _acceptPreparedImage({
+    required String imageRole,
+    required String source,
+    required XFile activeImage,
+    required XFile originalImage,
+    required ImageEnhancementPreset enhancementPreset,
+    required Map<String, Object?> enhancementMetadata,
+  }) async {
+    final selectedImagePath = _displayPathFor(activeImage);
+    final originalImagePath = _displayPathFor(originalImage);
+    await _ensureLocalImageExists(selectedImagePath, source: source);
+    final quality = await _evaluateImageQuality(selectedImagePath);
+    if (!quality.passed) {
+      throw ScannerException(
+        message: quality.userMessage,
+        code: 'scanner.$source.quality_blocked',
+      );
+    }
+    debugPrint(
+      '[Scanner] selectedImagePath after $source capture: $selectedImagePath',
+    );
+    debugPrint(
+      '[Scanner] Supabase sync triggered after $source selection: false',
+    );
+    final qualityMetadata = {
+      ...quality.toMetadataJson(),
+      ..._persistedEnhancementMetadata(
+        enhancementMetadata,
+        originalPath: originalImagePath,
+        activePath: selectedImagePath,
+        preset: enhancementPreset,
+      ),
+    };
+    final capturedSlot = _photoSlotFor(
+      imageRole: imageRole,
+      path: selectedImagePath,
+      source: source,
+      image: activeImage,
+      originalPath: originalImagePath,
+      enhancementPreset: enhancementPreset,
+      enhancedImagePath: enhancementPreset.isEnhanced
+          ? selectedImagePath
+          : null,
+      qualityMetadata: qualityMetadata,
+    );
+    final captureImages = _appendCaptureImage(capturedSlot);
+    _setState(
+      state.copyWith(
+        selectedImage: activeImage,
+        selectedImagePath: selectedImagePath,
+        selectedItemTitle: _selectedTitleForRole(
+          imageRole: imageRole,
+          source: source,
+        ),
+        selectedItemStatus: enhancementPreset.isEnhanced
+            ? '${enhancementPreset.label} applied'
+            : 'Ready for AI analysis',
+        photoSlots: _latestSlotsFromImages(captureImages),
+        captureImages: captureImages,
+        activeCaptureRole: capturedSlot.role,
+        scanSession: _updatedSessionWithImage(
+          imageRole: imageRole,
+          path: selectedImagePath,
+          source: source,
+          quality: quality,
+          originalPath: originalImagePath,
+          enhancementPreset: enhancementPreset,
+          qualityMetadata: qualityMetadata,
+        ),
+        isPreparingImage: false,
+        clearScanResult: true,
+        clearAiRecommendation: true,
+        isSavedToPortfolio: false,
+      ),
+      event: 'selected image state emitted',
+    );
+  }
+
+  Map<String, Object?> _persistedEnhancementMetadata(
+    Map<String, Object?> metadata, {
+    required String originalPath,
+    required String activePath,
+    required ImageEnhancementPreset preset,
+  }) {
+    return {
+      ...metadata,
+      'originalImagePath': originalPath,
+      'activeImagePath': activePath,
+      'enhancementPreset': preset.id,
+      'enhancementLabel': preset.label,
+      'enhanced': preset.isEnhanced,
+    };
   }
 
   /// Recovers an Android picker result if MainActivity was killed mid-capture.
@@ -1741,6 +1808,9 @@ class ScannerController extends Notifier<ScannerState> {
     required String path,
     required String source,
     XFile? image,
+    String? originalPath,
+    ImageEnhancementPreset enhancementPreset = ImageEnhancementPreset.original,
+    String? enhancedImagePath,
     Map<String, Object?> qualityMetadata = const {},
   }) {
     final normalizedRole = _normalizeImageRole(imageRole);
@@ -1750,7 +1820,9 @@ class ScannerController extends Notifier<ScannerState> {
       path: path,
       source: source,
       image: image,
-      originalPath: path,
+      originalPath: originalPath ?? path,
+      enhancementPreset: enhancementPreset,
+      enhancedImagePath: enhancedImagePath,
       qualityMetadata: qualityMetadata,
       capturedAt: DateTime.now(),
     );
@@ -1858,24 +1930,31 @@ class ScannerController extends Notifier<ScannerState> {
     required String path,
     required String source,
     required ScanQualityEvaluation quality,
+    String? originalPath,
+    ImageEnhancementPreset enhancementPreset = ImageEnhancementPreset.original,
+    Map<String, Object?>? qualityMetadata,
   }) {
     final session = _ensureSession();
+    final effectiveOriginalPath = originalPath ?? path;
+    final effectiveMetadata =
+        qualityMetadata ??
+        {
+          ...quality.toMetadataJson(),
+          'originalImagePath': effectiveOriginalPath,
+          'activeImagePath': path,
+          'enhancementPreset': enhancementPreset.id,
+          'enhancementLabel': enhancementPreset.label,
+          'enhanced': enhancementPreset.isEnhanced,
+        };
     final capturedImages = [
       for (final image in session.capturedImages) image,
       CapturedScanImage(
         path: path,
         role: ScanCaptureRole.fromId(imageRole),
         source: source,
-        originalPath: path,
-        enhancementPreset: ImageEnhancementPreset.original.id,
-        qualityMetadata: {
-          ...quality.toMetadataJson(),
-          'originalImagePath': path,
-          'activeImagePath': path,
-          'enhancementPreset': ImageEnhancementPreset.original.id,
-          'enhancementLabel': ImageEnhancementPreset.original.label,
-          'enhanced': false,
-        },
+        originalPath: effectiveOriginalPath,
+        enhancementPreset: enhancementPreset.id,
+        qualityMetadata: effectiveMetadata,
       ),
     ];
     final plan = _capturePlanService.buildPlan(

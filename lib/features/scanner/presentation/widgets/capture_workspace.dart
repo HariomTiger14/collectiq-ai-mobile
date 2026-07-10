@@ -6,8 +6,10 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 enum CaptureRoleCardStatus { missing, captured, warning }
 
@@ -211,11 +213,6 @@ class CaptureWorkspace extends StatelessWidget {
                 onRetake: (slot) => onCamera(slot.role),
                 onDelete: (slot) => onDelete(slot.path),
                 onUseAsPrimary: onUseAsPrimary,
-                onEnhance: onEnhance,
-              ),
-              onEnhance: () => _showEnhancementSheet(
-                context,
-                slot: activeSlot,
                 onEnhance: onEnhance,
               ),
             ),
@@ -490,14 +487,12 @@ class _ActiveCapturePreview extends StatelessWidget {
     required this.activeRole,
     required this.roleCount,
     this.onOpenReview,
-    this.onEnhance,
   });
 
   final ScannerPhotoSlot? slot;
   final ScanCaptureRole activeRole;
   final int roleCount;
   final VoidCallback? onOpenReview;
-  final VoidCallback? onEnhance;
 
   @override
   Widget build(BuildContext context) {
@@ -573,15 +568,13 @@ class _ActiveCapturePreview extends StatelessWidget {
                       ),
                     )
                   else
-                    TextButton.icon(
-                      key: const ValueKey('scan-enhance-active-photo'),
-                      onPressed: onEnhance,
-                      icon: const Icon(Icons.auto_fix_high_outlined, size: 16),
-                      label: const Text('Enhance'),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                    Text(
+                      capturedSlot.isEnhanced
+                          ? capturedSlot.enhancementPreset.label
+                          : 'review',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                 ],
@@ -859,13 +852,21 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                 children: [
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-enhance'),
-                    onPressed: () => _showEnhancementSheet(
-                      context,
-                      slot: active,
-                      onEnhance: widget.onEnhance,
-                    ),
+                    onPressed: () async {
+                      final originalPath = active.originalPath ?? active.path;
+                      final result = await ImageEnhancementPreviewPage.show(
+                        context,
+                        image: XFile(originalPath),
+                        initialPreset: active.enhancementPreset,
+                        title: 'Edit enhancement',
+                        subtitle: 'Choose the clearest version for analysis.',
+                      );
+                      if (result != null) {
+                        await widget.onEnhance(active, result.preset);
+                      }
+                    },
                     icon: const Icon(Icons.auto_fix_high_outlined),
-                    label: const Text('Enhance'),
+                    label: const Text('Enhance/Edit'),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-retake'),
@@ -1403,85 +1404,6 @@ class _EnhancedBadge extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<void> _showEnhancementSheet(
-  BuildContext context, {
-  required ScannerPhotoSlot slot,
-  required Future<void> Function(
-    ScannerPhotoSlot slot,
-    ImageEnhancementPreset preset,
-  )
-  onEnhance,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) {
-      final colorScheme = Theme.of(context).colorScheme;
-      final textTheme = Theme.of(context).textTheme;
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.auto_fix_high_outlined,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'Enhance',
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  if (slot.isEnhanced) const _EnhancedBadge(compact: true),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Improve clarity for AI analysis. Original photos stay preserved.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  for (final preset in ImageEnhancementPreset.values)
-                    ChoiceChip(
-                      key: ValueKey('enhancement-preset-${preset.id}'),
-                      selected: slot.enhancementPreset == preset,
-                      label: Text(preset.label),
-                      onSelected: (_) async {
-                        await onEnhance(slot, preset);
-                        if (context.mounted) {
-                          Navigator.of(context).pop();
-                        }
-                      },
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
 }
 
 class _NextRecommendedBlock extends StatelessWidget {
