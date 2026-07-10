@@ -462,98 +462,115 @@ class PortfolioGridTile extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 320;
+        final compact = constraints.maxWidth < 190;
         return Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             child: Ink(
+              key: ValueKey('portfolio-grid-premium-surface-${item.id}'),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: colorScheme.outlineVariant),
-                boxShadow: AppElevation.level1,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+                ),
+                boxShadow: AppElevation.level2,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: EdgeInsets.all(
+                  compact ? AppSpacing.md : AppSpacing.lg,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _PortfolioGridThumbnail(
-                      item: item,
-                      aspectRatio: narrow ? 1.95 : 1.78,
-                    ),
-                    const SizedBox(height: 6),
+                    _PortfolioGridThumbnail(item: item),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       item.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w900,
-                        height: 1.12,
+                        height: 1.14,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    if (narrow)
-                      Text(
-                        item.category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    else
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _PortfolioBadge(
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      key: ValueKey('portfolio-grid-badges-${item.id}'),
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        _PremiumBadge(
                           label: item.category,
                           icon: _categoryIcon(item.category),
-                          color: colorScheme.onSurfaceVariant,
+                          backgroundColor: colorScheme.secondaryContainer,
+                          foregroundColor: colorScheme.onSecondaryContainer,
                         ),
-                      ),
-                    const SizedBox(height: 4),
-                    if (!narrow)
-                      Wrap(
-                        spacing: AppSpacing.xs,
-                        runSpacing: AppSpacing.xs,
-                        children: [
-                          _PortfolioBadge(
-                            label:
-                                '${(item.confidence * 100).toStringAsFixed(0)}%',
-                            icon: Icons.verified_outlined,
-                            color: colorScheme.primary,
+                        _PremiumBadge(
+                          label:
+                              '${(item.confidence * 100).toStringAsFixed(0)}%',
+                          icon: Icons.verified_outlined,
+                          backgroundColor: colorScheme.primaryContainer,
+                          foregroundColor: colorScheme.onPrimaryContainer,
+                        ),
+                        _PremiumBadge(
+                          label: _trendLabel(item),
+                          icon: _trendIcon(item),
+                          backgroundColor: colorScheme.tertiaryContainer,
+                          foregroundColor: colorScheme.onTertiaryContainer,
+                        ),
+                        if (wishlistStatusLabel != null &&
+                            wishlistStatusLabel!.trim().isNotEmpty)
+                          _PremiumBadge(
+                            label: wishlistStatusLabel!,
+                            icon: Icons.bookmark_border_outlined,
+                            backgroundColor: colorScheme.primaryContainer,
+                            foregroundColor: colorScheme.onPrimaryContainer,
                           ),
-                          _PortfolioBadge(
-                            label: _trendLabel(item),
-                            icon: _trendIcon(item),
-                            color: AppColors.secondaryAccent,
-                          ),
-                          if (wishlistStatusLabel != null &&
-                              wishlistStatusLabel!.trim().isNotEmpty)
-                            _PortfolioBadge(
-                              label: wishlistStatusLabel!,
-                              icon: Icons.bookmark_border_outlined,
-                              color: AppColors.success,
-                            ),
-                        ],
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
                     const Spacer(),
                     Row(
+                      key: ValueKey('portfolio-grid-value-row-${item.id}'),
                       children: [
                         Expanded(
                           child: Text(
-                            _formatAud(item.estimatedValue),
+                            'Est. value',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleMedium?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w900,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              _formatAud(item.estimatedValue),
+                              maxLines: 1,
+                              style: textTheme.titleSmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.62,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
                         _PortfolioOverflowMenu(
                           onViewDetails: onViewDetails ?? onTap,
                           onEdit: onEdit,
@@ -573,10 +590,9 @@ class PortfolioGridTile extends StatelessWidget {
 }
 
 class _PortfolioGridThumbnail extends StatelessWidget {
-  const _PortfolioGridThumbnail({required this.item, this.aspectRatio = 1.78});
+  const _PortfolioGridThumbnail({required this.item});
 
   final CollectibleItem item;
-  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -587,28 +603,117 @@ class _PortfolioGridThumbnail extends StatelessWidget {
         !normalizedPath.startsWith('sample://') &&
         !normalizedPath.startsWith('selected-image');
 
-    return AspectRatio(
-      aspectRatio: aspectRatio,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+    return MotionReveal(
+      key: ValueKey('portfolio-grid-thumbnail-reveal-${item.id}'),
+      offset: 8,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: AspectRatio(
+        key: ValueKey('portfolio-grid-thumbnail-aspect-${item.id}'),
+        aspectRatio: 1,
         child: DecoratedBox(
+          key: ValueKey('portfolio-grid-thumbnail-frame-${item.id}'),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: colorScheme.outlineVariant),
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.10),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          child: hasImage
-              ? _PortfolioItemImage(
-                  key: ValueKey('portfolio-grid-image-${item.id}'),
-                  imagePath: normalizedPath,
-                  size: double.infinity,
-                )
-              : Icon(
-                  _categoryIcon(item.category),
-                  color: colorScheme.primary,
-                  size: AppIconSizes.lg,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                hasImage
+                    ? _PortfolioItemImage(
+                        key: ValueKey('portfolio-grid-image-${item.id}'),
+                        imagePath: normalizedPath,
+                        size: double.infinity,
+                      )
+                    : DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.08),
+                        ),
+                        child: Icon(
+                          _categoryIcon(item.category),
+                          color: colorScheme.primary,
+                          size: AppIconSizes.lg,
+                        ),
+                      ),
+                DecoratedBox(
+                  key: ValueKey('portfolio-grid-thumbnail-gradient-${item.id}'),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.10),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.10),
+                      ],
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _PremiumBadge extends StatelessWidget {
+  const _PremiumBadge({
+    required this.label,
+    required this.icon,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      key: ValueKey('portfolio-premium-badge-$label'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: foregroundColor),
+          const SizedBox(width: 3),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 104),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: foregroundColor,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -630,8 +735,19 @@ class _PortfolioOverflowMenu extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return PopupMenuButton<_PortfolioMenuAction>(
+      key: const ValueKey('portfolio-premium-overflow-menu'),
       tooltip: 'Item actions',
-      icon: const Icon(Icons.more_vert),
+      color: colorScheme.surfaceContainerHighest,
+      elevation: 12,
+      shadowColor: colorScheme.shadow.withValues(alpha: 0.22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      icon: Icon(
+        Icons.more_horiz,
+        color: colorScheme.onSurfaceVariant,
+        size: 20,
+      ),
       iconSize: 20,
       padding: EdgeInsets.zero,
       onSelected: (value) {
@@ -691,12 +807,19 @@ class _PortfolioMenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveColor = color ?? Theme.of(context).colorScheme.onSurface;
+    final textTheme = Theme.of(context).textTheme;
 
     return Row(
       children: [
-        Icon(icon, color: effectiveColor, size: 18),
-        const SizedBox(width: AppSpacing.md),
-        Text(label, style: TextStyle(color: effectiveColor)),
+        Icon(icon, color: effectiveColor, size: 20),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(
+            color: effectiveColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }

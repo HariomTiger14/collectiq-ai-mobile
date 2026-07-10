@@ -3859,8 +3859,41 @@ void main() {
     );
     expect(titleText.maxLines, 2);
     final tileSize = tester.getSize(gridItem);
-    expect(tileSize.height, lessThan(320));
-    expect(tileSize.width / tileSize.height, greaterThan(0.52));
+    expect(tileSize.width / tileSize.height, greaterThan(0.45));
+    expect(
+      find.ancestor(of: gridItem, matching: find.byType(MotionReveal)),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-premium-surface-local-thumb')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-thumbnail-frame-local-thumb')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('portfolio-grid-thumbnail-gradient-local-thumb'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-badges-local-thumb')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-premium-badge-Trading Card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-value-row-local-thumb')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: gridItem, matching: find.text('Est. value')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('portfolio-grid-image-local-thumb')),
       findsOneWidget,
@@ -3875,8 +3908,70 @@ void main() {
 
     expect(find.text('View details'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-premium-overflow-menu')),
+      findsWidgets,
+    );
     expect(find.text('Share'), findsNothing);
     expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('portfolio grid premium cards fit at 320px', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        {
+          'id': 'narrow-premium',
+          'title': 'Very Long Premium Portfolio Collectible Title',
+          'category': 'Trading Card',
+          'estimatedValue': 12850,
+          'confidence': 0.91,
+          'condition': 'Near Mint',
+          'recommendation': 'Track it.',
+          'imagePath': _fixturePath('persistent-camera-card.jpg'),
+          'createdAt': '2026-06-27T00:00:00.000',
+        },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-narrow-premium')),
+    );
+
+    final gridItem = find.byKey(
+      const ValueKey('portfolio-grid-item-narrow-premium'),
+    );
+    expect(gridItem, findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('portfolio-grid-thumbnail-aspect-narrow-premium'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-badges-narrow-premium')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Wrap>(
+            find.byKey(const ValueKey('portfolio-grid-badges-narrow-premium')),
+          )
+          .runSpacing,
+      greaterThan(0),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-value-row-narrow-premium')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('portfolio grid falls back to gallery thumbnail image', (

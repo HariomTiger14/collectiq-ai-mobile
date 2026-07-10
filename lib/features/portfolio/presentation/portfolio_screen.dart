@@ -257,9 +257,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     ? 3
                     : 2;
                 final childAspectRatio = switch (crossAxisCount) {
-                  1 => 0.90,
-                  2 => 0.64,
-                  _ => 0.80,
+                  1 => 0.58,
+                  2 => 0.52,
+                  _ => 0.62,
                 };
 
                 return SliverMainAxisGroup(
@@ -303,8 +303,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: AppSpacing.md,
-                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisSpacing: AppSpacing.xl,
+                        crossAxisSpacing: AppSpacing.lg,
                         childAspectRatio: childAspectRatio,
                       ),
                       delegate: SliverChildBuilderDelegate((context, index) {
@@ -313,7 +313,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         return MotionReveal(
                           key: ValueKey('portfolio-grid-motion-${item.id}'),
                           offset: 12,
-                          delay: Duration(milliseconds: 24 * (index % 8)),
+                          delay: Duration(milliseconds: index * 40),
+                          curve: Curves.easeOutCubic,
                           child: PortfolioGridTile(
                             key: ValueKey('portfolio-grid-item-${item.id}'),
                             item: item,
