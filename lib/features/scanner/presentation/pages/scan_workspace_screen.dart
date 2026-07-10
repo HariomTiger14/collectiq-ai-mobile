@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class ScanWorkspaceScreen extends StatelessWidget {
+class ScanWorkspaceScreen extends StatefulWidget {
   const ScanWorkspaceScreen({
     required this.photos,
     required this.primaryImagePath,
@@ -36,16 +38,41 @@ class ScanWorkspaceScreen extends StatelessWidget {
   final VoidCallback onAnalyze;
 
   @override
+  State<ScanWorkspaceScreen> createState() => _ScanWorkspaceScreenState();
+}
+
+class _ScanWorkspaceScreenState extends State<ScanWorkspaceScreen> {
+  bool _showAnalyzeAnimation = false;
+
+  @override
+  void didUpdateWidget(covariant ScanWorkspaceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isBusy && !widget.isBusy && _showAnalyzeAnimation) {
+      setState(() => _showAnalyzeAnimation = false);
+    }
+  }
+
+  void _handleAnalyze() {
+    if (widget.isBusy || widget.photos.isEmpty) {
+      return;
+    }
+    HapticFeedback.lightImpact();
+    setState(() => _showAnalyzeAnimation = true);
+    widget.onAnalyze();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final activePhoto = _activePhoto;
+    final isAnalyzing = _showAnalyzeAnimation || widget.isBusy;
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Scan Workspace'),
         leading: IconButton(
           key: const ValueKey('workspace-close'),
-          onPressed: onClose,
+          onPressed: widget.onClose,
           icon: const Icon(Icons.close),
           tooltip: 'Close',
         ),
@@ -53,52 +80,76 @@ class ScanWorkspaceScreen extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _WorkspaceHero(photo: activePhoto),
-                  const SizedBox(height: AppSpacing.md),
-                  WorkspaceFilmstrip(
-                    photos: photos,
-                    selectedPath: activePhoto?.path,
-                    onSelectPhoto: onSelectPhoto,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  WorkspaceMetadata(
-                    detectedCategory: detectedCategory,
-                    confidence: confidence,
-                    photoCount: photos.length,
-                    nextBestRole: nextBestRole,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  WorkspaceActions(
-                    nextBestRole: nextBestRole,
-                    canAnalyze: photos.isNotEmpty && !isBusy,
-                    isBusy: isBusy,
-                    onCaptureNext: onCaptureNext,
-                    onAddPhoto: onAddPhoto,
-                    onAnalyze: onAnalyze,
-                  ),
-                  if (errorMessage != null) ...[
+            AnimatedOpacity(
+              key: const ValueKey('workspace-analyze-dimmed-content'),
+              opacity: isAnalyzing ? 0.4 : 1,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _WorkspaceHero(photo: activePhoto),
                     const SizedBox(height: AppSpacing.md),
-                    _WorkspaceError(message: errorMessage!),
+                    WorkspaceFilmstrip(
+                      photos: widget.photos,
+                      selectedPath: activePhoto?.path,
+                      onSelectPhoto: widget.onSelectPhoto,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    WorkspaceMetadata(
+                      detectedCategory: widget.detectedCategory,
+                      confidence: widget.confidence,
+                      photoCount: widget.photos.length,
+                      nextBestRole: widget.nextBestRole,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    WorkspaceActions(
+                      nextBestRole: widget.nextBestRole,
+                      canAnalyze: widget.photos.isNotEmpty && !isAnalyzing,
+                      isBusy: isAnalyzing,
+                      onCaptureNext: widget.onCaptureNext,
+                      onAddPhoto: widget.onAddPhoto,
+                      onAnalyze: _handleAnalyze,
+                    ),
+                    if (widget.errorMessage != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _WorkspaceError(message: widget.errorMessage!),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-            if (isBusy)
-              const Positioned.fill(
-                child: ColoredBox(
-                  key: ValueKey('scan-busy-overlay'),
-                  color: Color(0x33000000),
-                  child: Center(child: CircularProgressIndicator()),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              reverseDuration: const Duration(milliseconds: 150),
+              child: isAnalyzing && activePhoto != null
+                  ? AnalyzeAnimationOverlay(
+                      key: const ValueKey('analyze-animation-overlay'),
+                      imagePath: activePhoto.path,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            if (isAnalyzing)
+              const Positioned(
+                bottom: AppSpacing.xl,
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
+                child: Center(
+                  child: Text(
+                    'Analyzing collectible',
+                    key: ValueKey('analyze-animation-label'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -108,18 +159,18 @@ class ScanWorkspaceScreen extends StatelessWidget {
   }
 
   ScannerPhotoSlot? get _activePhoto {
-    if (photos.isEmpty) {
+    if (widget.photos.isEmpty) {
       return null;
     }
-    final primaryPath = primaryImagePath?.trim();
+    final primaryPath = widget.primaryImagePath?.trim();
     if (primaryPath != null && primaryPath.isNotEmpty) {
-      for (final photo in photos) {
+      for (final photo in widget.photos) {
         if (photo.path == primaryPath) {
           return photo;
         }
       }
     }
-    return photos.last;
+    return widget.photos.last;
   }
 }
 
