@@ -22,7 +22,10 @@ import 'package:collectiq_ai/features/home/presentation/widgets/portfolio_visual
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -38,6 +41,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -49,8 +53,8 @@ void main() {
     await tester.pumpCollectIqApp();
 
     expect(find.text('Home'), findsWidgets);
-    expect(find.text('Scan'), findsOneWidget);
-    expect(find.text('Portfolio'), findsOneWidget);
+    expect(find.text('Scan'), findsWidgets);
+    expect(find.text('Portfolio'), findsWidgets);
     expect(find.text('Settings'), findsOneWidget);
   });
 
@@ -61,12 +65,12 @@ void main() {
 
     expect(find.text('Your Collection Hub'), findsOneWidget);
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
     expect(find.text('Total collection value'), findsOneWidget);
     expectNoFlutterError(tester);
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsOneWidget);
     expect(
@@ -251,43 +255,50 @@ void main() {
     expect(find.text('PackLox'), findsOneWidget);
     expect(find.text('Your Collection Hub'), findsOneWidget);
     expect(find.text('0 items'), findsOneWidget);
-    expect(find.text('AUD 0'), findsWidgets);
+    expect(find.text(r'$0'), findsWidgets);
     expect(find.text('Ready to scan'), findsOneWidget);
-    expect(find.text('Scan Item'), findsOneWidget);
-    expect(find.text('Add Manually'), findsOneWidget);
-    expect(find.text('Search Database'), findsOneWidget);
-    expect(find.text('Import Collection'), findsOneWidget);
-    expect(find.text('Soon'), findsWidgets);
-    expect(find.text('Quick Actions'), findsOneWidget);
-    await tester.reveal(find.text('Portfolio Snapshot'));
-    expect(find.text('Portfolio Snapshot'), findsWidgets);
     expect(
-      find.text('Your collection starts with your first scan.'),
-      findsWidgets,
-    );
-    await tester.reveal(find.text('Recent Activity'));
-    expect(
-      find.text('Your latest discoveries will appear here.'),
-      findsWidgets,
-    );
-    await tester.reveal(find.text('Starter Categories'));
-    expect(find.text('Starter Categories'), findsWidgets);
-    expect(find.text('Cards'), findsOneWidget);
-    expect(find.text('Coins'), findsOneWidget);
-    expect(find.text('Comics'), findsOneWidget);
-    expect(find.text('Figures'), findsOneWidget);
-    expect(find.text('Watches'), findsOneWidget);
-    expect(find.text('Stamps'), findsOneWidget);
-    await tester.reveal(find.text('AI Insight'));
-    expect(find.text('AI Insight'), findsWidgets);
-    expect(
-      find.text(
-        'Scan one collectible to unlock valuation, rarity clues, and collection recommendations.',
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.data == 'Good morning' ||
+                widget.data == 'Good afternoon' ||
+                widget.data == 'Good evening' ||
+                widget.data == 'Welcome back'),
       ),
       findsOneWidget,
     );
-    await tester.reveal(find.text('System Status'));
-    expect(find.text('System Status'), findsWidgets);
+    expect(find.text('Scan'), findsWidgets);
+    expect(find.text('Import Photo'), findsOneWidget);
+    expect(find.text('Choose from gallery'), findsOneWidget);
+    expect(find.text('Portfolio'), findsWidgets);
+    expect(find.text('Trends'), findsOneWidget);
+    expect(find.text('Coming soon'), findsOneWidget);
+    expect(find.text('Soon'), findsOneWidget);
+    expect(find.text('Quick Actions'), findsOneWidget);
+    await tester.reveal(find.text('Portfolio Overview'));
+    expect(find.text('Portfolio Overview'), findsWidgets);
+    expect(
+      find.text('Start with one scan to build your collection timeline.'),
+      findsOneWidget,
+    );
+    await tester.reveal(find.text('Recent Activity'));
+    expect(
+      find.text('No recent activity yet. Scan your first collectible.'),
+      findsOneWidget,
+    );
+    await tester.reveal(find.text('AI Insights'));
+    expect(find.text('AI Insights'), findsWidgets);
+    expect(find.text('Portfolio Confidence • Learning'), findsOneWidget);
+    expect(
+      find.text(
+        'Scan one collectible to unlock valuation, rarity clues, and recommendations.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Starter Categories'), findsNothing);
+    expect(find.text('Collection Value'), findsNothing);
+    expect(find.text('System Status'), findsNothing);
     expect(find.text('Start PackLox Scan'), findsNothing);
     expect(find.text('Start First Scan'), findsNothing);
     expect(find.text('Dashboard Insights'), findsNothing);
@@ -308,11 +319,11 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Portfolio Snapshot'), findsWidgets);
+    expect(find.text('Portfolio Overview'), findsWidgets);
     await tester.reveal(find.byKey(const ValueKey('home-recent-alert-card')));
     expect(find.text('Alert Charizard'), findsWidgets);
-    await tester.reveal(find.text('Collection Value'));
-    expect(find.text('Collection Value'), findsWidgets);
+    expect(find.text('Collection Value'), findsNothing);
+    expect(find.text('System Status'), findsNothing);
   });
 
   testWidgets('home dashboard analytics render from portfolio data', (
@@ -330,20 +341,114 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Portfolio Snapshot'));
-    expect(find.text('Portfolio Snapshot'), findsWidgets);
+    await tester.reveal(find.text('Portfolio Overview'));
+    expect(find.text('Portfolio Overview'), findsWidgets);
     expect(find.text('Dashboard Charizard'), findsWidgets);
     expect(find.text('Dashboard Silver Eagle'), findsWidgets);
     expect(find.text('Categories'), findsWidgets);
+    expect(find.text('3 types'), findsOneWidget);
     expect(find.text('Top asset'), findsWidgets);
-    await tester.reveal(find.text('AI Insight'));
-    expect(find.text('AI Insight'), findsWidgets);
-    await tester.reveal(find.text('Collection Value'));
-    expect(find.text('Collection Value'), findsWidgets);
-    expect(find.text('AUD 2,750'), findsWidgets);
-    expect(find.text('Top asset: Dashboard Charizard'), findsOneWidget);
-    await tester.reveal(find.text('System Status'));
-    expect(find.text('System Status'), findsWidgets);
+    expect(find.text('Trend'), findsWidgets);
+    expect(find.text('Ready to grow your collection?'), findsNothing);
+    await tester.reveal(find.text('AI Insights'));
+    expect(find.text('AI Insights'), findsWidgets);
+    expect(find.text('Portfolio Confidence • Excellent (84%)'), findsOneWidget);
+    expect(
+      find.text(
+        'Dashboard Charizard is currently your highest value collectible.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(r'$2,750'), findsWidgets);
+    expect(find.text('Collection Value'), findsNothing);
+    expect(find.text('System Status'), findsNothing);
+  });
+
+  testWidgets('small portfolio CTA appears only below three items', (
+    WidgetTester tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(430, 1400)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpCollectIqApp();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('home-small-portfolio-cta')),
+      findsOneWidget,
+    );
+    expect(find.text('Ready to grow your collection?'), findsOneWidget);
+    expect(find.text('Scan New Collectible'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"item-1","title":"Item One","category":"Trading Card","estimatedValue":100,"confidence":0.80,"condition":"Good","recommendation":"Hold.","imagePath":"sample://card","createdAt":"2026-07-06T10:00:00.000"},{"id":"item-2","title":"Item Two","category":"Coin","estimatedValue":200,"confidence":0.82,"condition":"Fine","recommendation":"Hold.","imagePath":"sample://coin","createdAt":"2026-07-06T09:00:00.000"},{"id":"item-3","title":"Item Three","category":"Comic","estimatedValue":300,"confidence":0.84,"condition":"Fine","recommendation":"Hold.","imagePath":"sample://comic","createdAt":"2026-07-06T08:00:00.000"}]',
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('home-small-portfolio-cta')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('home recent activity uses relative saved labels', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final twoDaysAgo = now.subtract(const Duration(days: 2));
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        {
+          'id': 'saved-today',
+          'title': 'Saved Today Card',
+          'category': 'Trading Card',
+          'estimatedValue': 100,
+          'confidence': 0.80,
+          'condition': 'Good',
+          'recommendation': 'Hold.',
+          'imagePath': 'sample://card',
+          'createdAt': now.toIso8601String(),
+        },
+        {
+          'id': 'saved-yesterday',
+          'title': 'Saved Yesterday Coin',
+          'category': 'Coin',
+          'estimatedValue': 200,
+          'confidence': 0.82,
+          'condition': 'Fine',
+          'recommendation': 'Hold.',
+          'imagePath': 'sample://coin',
+          'createdAt': yesterday.toIso8601String(),
+        },
+        {
+          'id': 'saved-two-days',
+          'title': 'Saved Two Days Comic',
+          'category': 'Comic',
+          'estimatedValue': 300,
+          'confidence': 0.84,
+          'condition': 'Fine',
+          'recommendation': 'Hold.',
+          'imagePath': 'sample://comic',
+          'createdAt': twoDaysAgo.toIso8601String(),
+        },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.pumpAndSettle();
+
+    await tester.reveal(find.text('Recent Activity'));
+    expect(find.text('Saved today'), findsOneWidget);
+    expect(find.text('Saved yesterday'), findsOneWidget);
+    expect(find.text('Saved 2 days ago'), findsOneWidget);
   });
 
   testWidgets('home dashboard updates after saving a scan', (
@@ -351,7 +456,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -382,21 +487,19 @@ void main() {
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Portfolio Snapshot'));
-    expect(find.text('Portfolio Snapshot'), findsWidgets);
+    await tester.reveal(find.text('Portfolio Overview'));
+    expect(find.text('Portfolio Overview'), findsWidgets);
     await tester.reveal(find.text('Recent Activity'));
     expect(find.text('Recent Activity'), findsWidgets);
     expect(find.textContaining('Charizard'), findsWidgets);
-    await tester.reveal(find.text('Collection Value'));
-    expect(find.text('Collection Value'), findsWidgets);
-    await tester.reveal(find.text('System Status'));
-    expect(find.text('System Status'), findsWidgets);
+    expect(find.text('Collection Value'), findsNothing);
+    expect(find.text('System Status'), findsNothing);
   });
 
   testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan Item').first);
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsOneWidget);
@@ -406,12 +509,28 @@ void main() {
     );
   });
 
+  testWidgets('home import photo quick action opens gallery flow', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
+
+    await tester.tap(
+      find.byKey(const ValueKey('home-quick-action-Import Photo')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('AI Scanner'), findsOneWidget);
+    await tester.pumpUntilFound(find.text('Gallery image'));
+    expect(find.text('Gallery image'), findsOneWidget);
+  });
+
   testWidgets('shell recreation returns to Home and Scan still works', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan Item').first);
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsOneWidget);
 
@@ -423,7 +542,7 @@ void main() {
     expect(find.text('AI Scanner'), findsNothing);
     expect(find.text('Quick Actions'), findsOneWidget);
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsOneWidget);
@@ -436,7 +555,7 @@ void main() {
   testWidgets('shows scanner experience content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
 
     expect(find.text('AI Scanner'), findsOneWidget);
@@ -465,7 +584,7 @@ void main() {
   testWidgets('shows portfolio empty state', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
     await tester.pump();
 
@@ -1124,7 +1243,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
 
     expect(find.text('Portfolio'), findsWidgets);
@@ -1135,7 +1254,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _FakeGalleryService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -1152,7 +1271,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1177,13 +1296,53 @@ void main() {
     );
   });
 
+  testWidgets('scanner slot updates after captured front image', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    );
+    await tester.pumpUntilFound(find.text('Captured image'));
+
+    expect(find.text('Captured image'), findsOneWidget);
+  });
+
+  testWidgets('camera denied UI shows friendly message', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          cameraServiceProvider.overrideWithValue(_DeniedCameraService()),
+        ],
+        child: const MaterialApp(home: CameraCapturePage(imageRole: 'front')),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('Camera permission is required to capture scans.'),
+      findsOneWidget,
+    );
+    expect(find.text('Try Again'), findsOneWidget);
+  });
+
   testWidgets('camera return shows preparing image bridge before preview', (
     WidgetTester tester,
   ) async {
     final cameraService = _DelayedPersistCameraService();
     await tester.pumpCollectIqApp(cameraService: cameraService);
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1212,7 +1371,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.tap(find.text('Scan Item').first);
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1239,7 +1398,7 @@ void main() {
       galleryService: _SelectedGalleryService(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.pumpUntilFound(find.text('Recovered image'));
 
@@ -1257,7 +1416,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
-    await tester.tap(find.text('Scan Item').first);
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -1277,7 +1436,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _CancelledCameraService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1291,7 +1450,7 @@ void main() {
     expect(find.text('Camera capture cancelled.'), findsNothing);
     expect(find.text('Scan interrupted'), findsNothing);
     expect(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
   });
@@ -1301,7 +1460,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _MissingCameraService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1323,7 +1482,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
   });
@@ -1333,7 +1492,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _MissingGalleryService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -1351,7 +1510,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
   });
@@ -1361,7 +1520,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1391,18 +1550,18 @@ void main() {
 
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Pokemon Card'), findsWidgets);
-    expect(find.text('AUD 1,850'), findsWidgets);
+    expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('Market Value'), findsWidgets);
     expect(find.text('Market Summary'), findsWidgets);
     expect(find.text('Recent comparable sales'), findsOneWidget);
     expect(find.textContaining('TCGplayer'), findsWidgets);
-    expect(find.text('AUD 1,443 - AUD 2,257'), findsWidgets);
+    expect(find.text(r'$1,443 - $2,257'), findsWidgets);
     expect(find.textContaining('Mock pricing blend'), findsWidgets);
     expect(find.text('69%'), findsWidgets);
     expect(find.textContaining('94%'), findsWidgets);
     expect(find.text('Near Mint'), findsWidgets);
     expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Base Set'), findsOneWidget);
+    expect(find.text('Base Set'), findsWidgets);
     expect(find.text('4/102'), findsOneWidget);
     expect(find.text('Charizard'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
@@ -1420,7 +1579,7 @@ void main() {
       galleryService: _SelectedGalleryService(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -1451,7 +1610,7 @@ void main() {
       aiAnalysisProvider: const _CustomAiAnalysisProvider(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1484,7 +1643,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1527,7 +1686,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1566,7 +1725,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1604,7 +1763,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1641,7 +1800,7 @@ void main() {
       aiAnalysisProvider: const _FailingAiAnalysisProvider(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1676,7 +1835,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1715,7 +1874,7 @@ void main() {
       galleryService: _SelectedGalleryService(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -1750,7 +1909,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1774,13 +1933,16 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
 
-    await tester.reveal(find.text('Analysis Result'));
+    await tester.reveal(find.text('AI Review'));
     await tester.pump();
 
-    expect(find.text('Analysis Result'), findsOneWidget);
+    expect(find.text('AI Review'), findsOneWidget);
     expect(find.textContaining('Charizard'), findsWidgets);
-    expect(find.text('Estimated market value'), findsOneWidget);
-    expect(find.textContaining('Estimated value range'), findsOneWidget);
+    expect(find.text('Estimated value'), findsOneWidget);
+    expect(find.textContaining(r'$'), findsWidgets);
+    expect(find.textContaining('High confidence'), findsWidgets);
+    expect(find.text('Category'), findsWidgets);
+    expect(find.text('Condition'), findsWidgets);
     expect(find.text('Trust summary'), findsOneWidget);
     expect(find.text('Pricing source'), findsOneWidget);
     expect(find.text('Freshness'), findsOneWidget);
@@ -1790,10 +1952,157 @@ void main() {
       find.textContaining('AI estimates are a starting point'),
       findsOneWidget,
     );
+    expect(find.text('AI Explanation'), findsOneWidget);
     expect(find.text('Key Attributes'), findsOneWidget);
-    expect(find.textContaining('Market trend:'), findsOneWidget);
     expect(find.text('Save to Portfolio'), findsOneWidget);
-    expect(find.text('Scan Another'), findsOneWidget);
+    expect(find.text('Edit Details'), findsOneWidget);
+    expect(find.text('Retry Analysis'), findsOneWidget);
+  });
+
+  testWidgets('scan result missing value shows unavailable state', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+    await tester.completeSampleScan();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final result = container.read(scannerControllerProvider).scanResult!;
+    container
+        .read(scannerControllerProvider.notifier)
+        .applyResultReviewEdits(
+          title: result.title,
+          category: result.category,
+          condition: result.condition,
+          estimatedValue: 0,
+          notes: result.notes,
+        );
+    await tester.pump();
+
+    expect(find.text('Value unavailable'), findsWidgets);
+  });
+
+  testWidgets('scan result low confidence shows needs review', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(
+      aiAnalysisProvider: const _LowConfidenceAiAnalysisProvider(),
+    );
+    await tester.completeSampleScan();
+
+    expect(find.textContaining('Needs review'), findsWidgets);
+    expect(find.text('Unknown'), findsWidgets);
+    expect(find.text('Not detected'), findsWidgets);
+  });
+
+  testWidgets('scan result edit bottom sheet updates visible fields', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+    await tester.completeSampleScan();
+
+    await tester.reveal(find.text('Edit Details'));
+    await tester.pump();
+    await tester.tap(find.text('Edit Details'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Review the AI result before saving it to your portfolio.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name'),
+      'Reviewed Charizard',
+    );
+    await tester.enterText(find.widgetWithText(TextField, 'Category'), 'Card');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Condition'),
+      'Near Mint',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Estimated value'),
+      '777',
+    );
+    await tester.tap(find.text('Apply Changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reviewed Charizard'), findsWidgets);
+    expect(find.text(r'$777'), findsWidgets);
+    expect(find.text('Near Mint'), findsWidgets);
+  });
+
+  testWidgets('scan result retry action is safe', (WidgetTester tester) async {
+    await tester.pumpCollectIqApp();
+    await tester.completeSampleScan();
+
+    await tester.reveal(find.text('Retry Analysis'));
+    await tester.pump();
+    await tester.tap(find.text('Retry Analysis'));
+    await tester.pump();
+
+    expect(find.text('Retry analysis coming soon'), findsOneWidget);
+  });
+
+  testWidgets('scan analysis error renders useful recovery guidance', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp(
+      aiAnalysisProvider: const _FailingAiAnalysisProvider(),
+    );
+
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.pump();
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('scan-primary-Analyze Image')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpAndSettle();
+
+    expect(find.text('We need a clearer photo'), findsOneWidget);
+    expect(
+      find.text('Try better lighting or include the full item.'),
+      findsOneWidget,
+    );
+    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Choose Another Photo'), findsOneWidget);
+    expect(find.text('Back to Home'), findsOneWidget);
+  });
+
+  testWidgets('scan result long title is safe on small Android width', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpCollectIqApp(
+      aiAnalysisProvider: const _LongTitleAiAnalysisProvider(),
+    );
+    await tester.completeSampleScan();
+
+    expect(
+      find.textContaining('Extremely Long Collector Variant'),
+      findsWidgets,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('scan again clears selected image and result', (
@@ -1801,7 +2110,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1832,7 +2141,7 @@ void main() {
     expect(find.text('Analysis Result'), findsNothing);
     expect(find.text('Sample Sports Card'), findsNothing);
     expect(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
     expect(
@@ -1844,7 +2153,7 @@ void main() {
   testWidgets('saves scanner result to portfolio', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1874,14 +2183,33 @@ void main() {
 
     expect(find.text('Saved to portfolio'), findsOneWidget);
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
     await tester.reveal(find.textContaining('Charizard'));
 
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Total collection value'), findsOneWidget);
     expect(find.text('Items'), findsOneWidget);
-    expect(find.text('AUD 1,850'), findsWidgets);
+    expect(find.text(r'$1,850'), findsWidgets);
+  });
+
+  testWidgets('scan result save prevents duplicate portfolio items', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpCollectIqApp();
+    await tester.completeSampleScan();
+    await tester.reveal(find.text('Save to Portfolio'));
+    await tester.pump();
+
+    await tester.tap(find.text('Save to Portfolio'));
+    await tester.tap(find.text('Save to Portfolio'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    expect(container.read(portfolioControllerProvider).items.length, 1);
+    expect(find.text('Saved to Portfolio'), findsOneWidget);
   });
 
   testWidgets('local portfolio save works when auth and cloud fail', (
@@ -1892,7 +2220,7 @@ void main() {
       syncService: const _FailingSyncService(),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1922,12 +2250,12 @@ void main() {
 
     expect(find.text('Saved to portfolio'), findsOneWidget);
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
     await tester.reveal(find.textContaining('Charizard'));
 
     expect(find.textContaining('Charizard'), findsWidgets);
-    expect(find.text('AUD 1,850'), findsWidgets);
+    expect(find.text(r'$1,850'), findsWidgets);
   });
 
   testWidgets('saved scan resets after navigating away from Scan', (
@@ -1935,7 +2263,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1967,13 +2295,13 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsNothing);
     expect(find.text('Analysis Complete'), findsNothing);
     expect(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
     expect(
@@ -1987,7 +2315,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -2013,7 +2341,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsOneWidget);
@@ -2026,7 +2354,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -2052,7 +2380,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan Item').first);
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsNothing);
@@ -2080,7 +2408,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -2124,7 +2452,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -2175,18 +2503,35 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
 
+    expect(find.text('Your Collections'), findsWidgets);
+    expect(
+      find.text('Track, organize and grow your collection'),
+      findsOneWidget,
+    );
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
     );
-    expect(find.text('Persisted Charizard'), findsOneWidget);
-    expect(find.text('AUD 1,850'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
+        matching: find.text('Persisted Charizard'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('Trading Card'), findsOneWidget);
     expect(find.text('94%'), findsWidgets);
     expect(find.text('Stable'), findsWidgets);
+    expect(find.text('Categories'), findsWidgets);
+    expect(find.text('Top asset'), findsWidgets);
   });
 
   testWidgets('portfolio empty state renders when no items exist', (
@@ -2194,7 +2539,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
 
@@ -2213,14 +2558,31 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-local-thumb')),
     );
 
-    expect(find.text('Local Thumbnail Charizard'), findsOneWidget);
+    final gridItem = find.byKey(
+      const ValueKey('portfolio-grid-item-local-thumb'),
+    );
+    expect(gridItem, findsOneWidget);
+    expect(
+      find.descendant(
+        of: gridItem,
+        matching: find.text('Local Thumbnail Charizard'),
+      ),
+      findsOneWidget,
+    );
+    final titleText = tester.widget<Text>(
+      find.descendant(
+        of: gridItem,
+        matching: find.text('Local Thumbnail Charizard'),
+      ),
+    );
+    expect(titleText.maxLines, 2);
     expect(
       find.byKey(const ValueKey('portfolio-grid-image-local-thumb')),
       findsOneWidget,
@@ -2233,8 +2595,9 @@ void main() {
     await tester.tap(find.byTooltip('Item actions'));
     await tester.pumpAndSettle();
 
+    expect(find.text('View details'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
-    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Share'), findsNothing);
     expect(find.text('Delete'), findsOneWidget);
   });
 
@@ -2288,7 +2651,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
 
@@ -2316,7 +2679,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
@@ -2344,20 +2707,30 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.enterText(find.byType(TextFormField).first, 'coin');
     await tester.pump();
 
-    await tester.reveal(find.text('Silver Eagle'));
-    expect(find.text('Silver Eagle'), findsOneWidget);
-    expect(find.text('Charizard Holo'), findsNothing);
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-coin-1')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-coin-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
+      findsNothing,
+    );
 
     await tester.enterText(find.byType(TextFormField).first, 'watch');
     await tester.pump();
 
-    expect(find.text('No matching collectibles'), findsOneWidget);
+    expect(find.text('No collectibles found'), findsOneWidget);
+    expect(find.text('Try adjusting your search or filters.'), findsOneWidget);
+    expect(find.text('Clear filters'), findsOneWidget);
   });
 
   testWidgets('category filter limits portfolio items', (
@@ -2370,9 +2743,19 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
+
+    final chipScrollViews = tester.widgetList<SingleChildScrollView>(
+      find.byType(SingleChildScrollView),
+    );
+    expect(
+      chipScrollViews.any(
+        (scrollView) => scrollView.scrollDirection == Axis.horizontal,
+      ),
+      isTrue,
+    );
 
     tester
         .widget<ChoiceChip>(
@@ -2381,10 +2764,21 @@ void main() {
         .onSelected!(true);
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Charizard Holo'));
-    expect(find.text('Charizard Holo'), findsOneWidget);
-    expect(find.text('Silver Eagle'), findsNothing);
-    expect(find.text('Amazing Spider-Man'), findsNothing);
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-coin-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-comic-1')),
+      findsNothing,
+    );
 
     await tester.scrollToTop();
     tester
@@ -2394,9 +2788,79 @@ void main() {
         .onSelected!(true);
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Silver Eagle'));
-    expect(find.text('Silver Eagle'), findsOneWidget);
-    expect(find.text('Charizard Holo'), findsNothing);
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-coin-1')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-coin-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('portfolio filter sheet filters by confidence and trend', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"rising-high","title":"Rising High Card","category":"Trading Card","estimatedValue":900,"confidence":0.91,"condition":"Near Mint","recommendation":"Hold.","imagePath":"sample://card","createdAt":"2026-06-27T00:00:00.000","marketSummary":{"averagePrice":900,"medianPrice":880,"lowPrice":750,"highPrice":950,"salesCount":4,"trendLabel":"Rising","confidence":0.82,"lastUpdated":"2026-06-29T00:00:00Z","sources":[],"comps":[]}},{"id":"cool-low","title":"Cooling Low Coin","category":"Coin","estimatedValue":90,"confidence":0.62,"condition":"Good","recommendation":"Hold.","imagePath":"sample://coin","createdAt":"2026-06-26T00:00:00.000","marketSummary":{"averagePrice":90,"medianPrice":90,"lowPrice":80,"highPrice":100,"salesCount":3,"trendLabel":"Cooling","confidence":0.64,"lastUpdated":"2026-06-29T00:00:00Z","sources":[],"comps":[]}},{"id":"stable-high","title":"Stable High Comic","category":"Comic","estimatedValue":300,"confidence":0.84,"condition":"Fine","recommendation":"Hold.","imagePath":"sample://comic","createdAt":"2026-06-25T00:00:00.000","marketSummary":{"averagePrice":300,"medianPrice":300,"lowPrice":250,"highPrice":350,"salesCount":5,"trendLabel":"Stable","confidence":0.75,"lastUpdated":"2026-06-29T00:00:00Z","sources":[],"comps":[]}}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    expect(find.text('Filter portfolio'), findsOneWidget);
+    expect(find.text('Confidence range'), findsOneWidget);
+    expect(find.text('Trend'), findsOneWidget);
+
+    await tester.tap(find.text('80%+'));
+    await tester.tap(find.text('Rising'));
+    await tester.tap(find.text('Apply filters'));
+    await tester.pumpAndSettle();
+
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-rising-high')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-rising-high')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-cool-low')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-stable-high')),
+      findsNothing,
+    );
+
+    await tester.scrollToTop();
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Below 80%'));
+    await tester.tap(find.text('Cooling'));
+    await tester.tap(find.text('Apply filters'));
+    await tester.pumpAndSettle();
+
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-cool-low')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-cool-low')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-rising-high')),
+      findsNothing,
+    );
   });
 
   testWidgets('sorts portfolio items by value and confidence', (
@@ -2409,37 +2873,82 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
 
-    await tester.reveal(find.text('Newest Low'));
-    await tester.reveal(find.text('Old High Value'));
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-new-low')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+    );
     expect(
-      tester.getTopLeft(find.text('Newest Low')).dx,
-      lessThan(tester.getTopLeft(find.text('Old High Value')).dx),
+      tester
+          .getTopLeft(find.byKey(const ValueKey('portfolio-grid-item-new-low')))
+          .dx,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+            )
+            .dx,
+      ),
     );
 
     await tester.scrollToTop();
-    await tester.tap(find.text('Value'));
+    await tester.tap(find.text('Sort'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sort portfolio'), findsOneWidget);
+    await tester.tap(find.text('Highest value'));
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Old High Value'));
-    await tester.reveal(find.text('Newest Low'));
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-new-low')),
+    );
     expect(
-      tester.getTopLeft(find.text('Old High Value')).dx,
-      lessThan(tester.getTopLeft(find.text('Newest Low')).dx),
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+          )
+          .dx,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('portfolio-grid-item-new-low')),
+            )
+            .dx,
+      ),
     );
 
     await tester.scrollToTop();
-    await tester.tap(find.text('Confidence').first);
+    await tester.tap(find.text('Sort'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Highest confidence'));
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Best Confidence'));
-    await tester.reveal(find.text('Old High Value'));
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-confident')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+    );
     expect(
-      tester.getTopLeft(find.text('Best Confidence')).dx,
-      lessThan(tester.getTopLeft(find.text('Old High Value')).dx),
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('portfolio-grid-item-confident')),
+          )
+          .dx,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('portfolio-grid-item-old-high')),
+            )
+            .dx,
+      ),
     );
   });
 
@@ -2453,20 +2962,46 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
 
-    await tester.reveal(find.text('Newer Gallery Save'));
-    await tester.reveal(find.text('Older Camera Save'));
-    await tester.reveal(find.text('Missing Timestamp Import'));
-    expect(
-      tester.getTopLeft(find.text('Newer Gallery Save')).dx,
-      lessThan(tester.getTopLeft(find.text('Older Camera Save')).dx),
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-gallery-new')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-camera-old')),
+    );
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-missing-date')),
     );
     expect(
-      tester.getTopLeft(find.text('Older Camera Save')).dx,
-      lessThan(tester.getTopLeft(find.text('Missing Timestamp Import')).dx),
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('portfolio-grid-item-gallery-new')),
+          )
+          .dx,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('portfolio-grid-item-camera-old')),
+            )
+            .dx,
+      ),
+    );
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('portfolio-grid-item-camera-old')),
+          )
+          .dx,
+      lessThan(
+        tester
+            .getTopLeft(
+              find.byKey(const ValueKey('portfolio-grid-item-missing-date')),
+            )
+            .dx,
+      ),
     );
   });
 
@@ -2495,7 +3030,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
     await tester.reveal(find.text('Recent Scans'));
     await tester.pump();
@@ -2510,7 +3045,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-gallery-new')),
@@ -2546,7 +3081,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
@@ -2554,13 +3089,29 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Wanted'), findsOneWidget);
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collectible Details'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Item actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit coming soon'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+
     await tester.tap(
       find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Estimated market value'), findsOneWidget);
+    expect(find.text('Estimated value'), findsOneWidget);
     expect(find.text('Wishlist Status'), findsOneWidget);
     expect(find.text('Why this match?'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
@@ -2571,12 +3122,12 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'portfolio_items':
-          '[{"id":"minimal-detail","title":"Minimal Silver Coin","category":"Coin","estimatedValue":120,"confidence":0.72,"condition":"Good","recommendation":"Store safely.","imagePath":"","createdAt":"2026-06-27T00:00:00.000"}]',
+          '[{"id":"minimal-detail","title":"Minimal Silver Coin","category":"Coin","estimatedValue":0,"confidence":0.62,"condition":"","recommendation":"Store safely.","imagePath":"","createdAt":"2026-06-27T00:00:00.000"}]',
     });
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
@@ -2590,9 +3141,18 @@ void main() {
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Minimal Silver Coin'), findsWidgets);
-    expect(find.text('AUD 120'), findsWidgets);
+    expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
-    expect(find.text('72% confidence'), findsOneWidget);
+    expect(find.text('Needs Review'), findsOneWidget);
+    expect(find.text('62%'), findsWidgets);
+    expect(find.text('Unknown'), findsWidgets);
+    expect(find.text('AI Summary'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Confidence is lower because some details may be unclear',
+      ),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('collectible-detail-edit-button')),
       findsOneWidget,
@@ -2612,7 +3172,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
@@ -2679,10 +3239,10 @@ void main() {
     expect(find.text('Collectible updated'), findsOneWidget);
     expect(find.text('Edited Silver Eagle'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
-    expect(find.text('AUD 300'), findsWidgets);
+    expect(find.text(r'$300'), findsWidgets);
     expect(find.text('US Mint'), findsOneWidget);
-    expect(find.text('American Eagle'), findsOneWidget);
-    expect(find.text('Edited local notes.'), findsOneWidget);
+    expect(find.text('American Eagle'), findsWidgets);
+    expect(find.text('Edited local notes.'), findsWidgets);
 
     final preferences = await SharedPreferences.getInstance();
     final encodedItems = preferences.getString('portfolio_items');
@@ -2696,15 +3256,79 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('Edited Silver Eagle'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-edit-card')),
+        matching: find.text('Edited Silver Eagle'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Coin'), findsWidgets);
-    expect(find.text('AUD 300'), findsWidgets);
+    expect(find.text(r'$300'), findsWidgets);
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Collection Value'));
-    expect(find.text('Collection Value'), findsWidgets);
-    expect(find.text('AUD 300'), findsWidgets);
+    await tester.reveal(find.text('Portfolio Overview'));
+    expect(find.text('Portfolio Overview'), findsWidgets);
+    expect(find.text('Collection Value'), findsNothing);
+    expect(find.text(r'$300'), findsWidgets);
+  });
+
+  testWidgets('collectible detail image preview and notes editing are safe', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items':
+          '[{"id":"notes-card","title":"Preview Notes Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.88,"condition":"Near Mint","recommendation":"Keep protected.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","year":"1999","brand":"Pokemon","rarity":"Holo Rare","notes":"Original note."}]',
+    });
+
+    await tester.pumpCollectIqApp();
+
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-notes-card')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-notes-card')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collectible Details'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-image-preview')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Close image preview'), findsOneWidget);
+    await tester.tap(
+      find.byTooltip('Close image preview'),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.reveal(
+      find.byKey(const ValueKey('collectible-detail-notes-field')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('collectible-detail-notes-field')),
+      'Sleeved and stored in a hard case.',
+    );
+    tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('collectible-detail-notes-save-button')),
+        )
+        .onPressed
+        ?.call();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notes saved'), findsOneWidget);
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getString('portfolio_items'),
+      contains('Sleeved and stored in a hard case.'),
+    );
   });
 
   testWidgets('home recent activity tap opens detail page', (
@@ -2726,7 +3350,7 @@ void main() {
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Home Detail Charizard'), findsWidgets);
-    expect(find.text('Market trend: Stable'), findsOneWidget);
+    expect(find.text('Portfolio Information'), findsOneWidget);
   });
 
   testWidgets('scan recent scans tap opens detail page', (
@@ -2739,7 +3363,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
     await tester.reveal(find.text('Recent Scans'));
     await tester.pump();
@@ -2750,7 +3374,7 @@ void main() {
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Scan Detail Charizard'), findsWidgets);
-    expect(find.text('Market trend: Stable'), findsOneWidget);
+    expect(find.text('Portfolio Information'), findsOneWidget);
   });
 
   testWidgets('opens portfolio item detail page actions', (
@@ -2763,7 +3387,7 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio'));
+    await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
     await tester.reveal(
@@ -2776,18 +3400,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Estimated market value'), findsOneWidget);
-    expect(find.text('94% confidence'), findsOneWidget);
-    expect(find.text('Saved 27/06/2026'), findsOneWidget);
-    expect(find.text('Key Attributes'), findsOneWidget);
-    expect(find.text('Base Set'), findsOneWidget);
-    expect(find.text('4/102'), findsOneWidget);
-    expect(find.text('Charizard'), findsOneWidget);
+    expect(find.text('Estimated value'), findsOneWidget);
+    expect(find.text(r'$1,850'), findsWidgets);
+    expect(find.text('High confidence (94%)'), findsOneWidget);
+    expect(find.text('Primary Metadata'), findsOneWidget);
+    expect(find.text('AI Summary'), findsOneWidget);
+    expect(find.text('Portfolio Information'), findsOneWidget);
+    expect(find.text('Date Added'), findsOneWidget);
+    expect(find.text('27/06/2026'), findsWidgets);
+    expect(find.text('Key Attributes'), findsWidgets);
+    expect(find.text('Base Set'), findsWidgets);
+    expect(find.text('4/102'), findsWidgets);
+    expect(find.text('Charizard'), findsWidgets);
     expect(find.text('Market Pricing'), findsOneWidget);
     expect(find.text('Market Summary'), findsOneWidget);
-    expect(find.text('Market trend: Stable'), findsOneWidget);
+    expect(find.text('Trend'), findsOneWidget);
+    expect(find.text('Stable'), findsWidgets);
     expect(find.text('Recent comparable sales'), findsOneWidget);
-    expect(find.text('AUD 1,443 - AUD 2,257'), findsWidgets);
+    expect(find.text(r'$1,443 - $2,257'), findsWidgets);
     expect(find.text('Mock market blend'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
 
@@ -2811,7 +3441,7 @@ void main() {
     expect(find.text('6-month Change'), findsOneWidget);
     expect(find.text('Highest Value'), findsOneWidget);
     expect(find.text('Lowest Value'), findsOneWidget);
-    expect(find.text('AUD 1,200'), findsWidgets);
+    expect(find.text(r'$1,200'), findsWidgets);
     expect(find.text('Jan'), findsOneWidget);
     expect(find.text('Jun'), findsOneWidget);
 
@@ -2828,12 +3458,33 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.reveal(find.text('Re-analyze'));
+    await tester.reveal(
+      find.byKey(const ValueKey('collectible-detail-share-action')),
+    );
     await tester.pump();
-    await tester.tap(find.text('Re-analyze'));
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-share-action')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Re-analysis coming next'), findsOneWidget);
+    expect(find.text('Sharing coming soon'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-favorite-action')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Added to favorites'), findsOneWidget);
+    expect(find.text('Favorited'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-delete-action')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Delete collectible?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Collectible Details'), findsOneWidget);
 
     await tester.reveal(find.text('Price Alerts'));
     await tester.pump();
@@ -2849,11 +3500,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Increases by 10%'), findsOneWidget);
 
-    await tester.reveal(find.text('Sell Item'));
+    await tester.reveal(find.text('Similar Collectibles'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sell Item'));
-    await tester.pumpAndSettle();
-    expect(find.text('Marketplace listing coming next'), findsOneWidget);
+    expect(find.text('Similar Collectibles'), findsOneWidget);
   });
 
   for (final viewport in const [
@@ -2878,7 +3527,7 @@ void main() {
       expect(find.text('Your Collection Hub'), findsOneWidget);
       expectNoFlutterError(tester);
 
-      await tester.tap(find.text('Scan'));
+      await tester.tap(find.text('Scan').last);
       await tester.pumpAndSettle();
       expect(find.text('AI Scanner'), findsOneWidget);
       expect(
@@ -2887,12 +3536,15 @@ void main() {
       );
       expectNoFlutterError(tester);
 
-      await tester.tap(find.text('Portfolio'));
+      await tester.tap(find.text('Portfolio').last);
       await tester.pumpAndSettle();
       await tester.reveal(
         find.byKey(const ValueKey('portfolio-grid-item-responsive-card')),
       );
-      expect(find.text('Responsive Charizard'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-responsive-card')),
+        findsOneWidget,
+      );
       expectNoFlutterError(tester);
 
       await tester.tap(
@@ -2992,6 +3644,25 @@ extension on WidgetTester {
     await pump();
     await pump(const Duration(milliseconds: 50));
     await pump(const Duration(milliseconds: 50));
+  }
+
+  Future<void> completeSampleScan() async {
+    await tap(find.text('Scan').last);
+    await pump();
+    await reveal(find.byKey(const ValueKey('scan-secondary-Use Sample Scan')));
+    await pump();
+    await tap(find.byKey(const ValueKey('scan-secondary-Use Sample Scan')));
+    await pump();
+    await reveal(find.byKey(const ValueKey('scan-primary-Analyze Image')));
+    await pump();
+    widget<FilledButton>(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    ).onPressed?.call();
+    await pump();
+    await pump(const Duration(seconds: 2));
+    await pump();
+    await reveal(find.text('AI Review'));
+    await pump();
   }
 
   Future<void> pumpVisualAnalytics(Widget child) {
@@ -3134,6 +3805,84 @@ class _FailingAiAnalysisProvider implements AiAnalysisProvider {
   @override
   Future<AiAnalysisResult> analyze(AiAnalysisRequest request) {
     throw const AiAnalysisException('Provider failed safely.');
+  }
+}
+
+class _LowConfidenceAiAnalysisProvider implements AiAnalysisProvider {
+  const _LowConfidenceAiAnalysisProvider();
+
+  @override
+  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
+    final now = DateTime.now();
+
+    return AiAnalysisResult(
+      recommendation: 'Review before saving.',
+      scanResult: ScanResult(
+        id: 'low-${now.microsecondsSinceEpoch}',
+        title: '',
+        category: '',
+        estimatedValue: 0,
+        confidence: 0.58,
+        condition: '',
+        thumbnail: request.imagePath,
+        scanDate: now,
+        primaryMatch: '',
+        alternativeMatches: const [],
+        confidenceExplanation: 'Image details are unclear.',
+        detectionQuality: 'Needs clearer photo.',
+        aiReasoning: 'Not enough visible detail for a strong match.',
+        pricing: PricingInfo(
+          estimatedMarketValue: 0,
+          lowEstimate: 0,
+          highEstimate: 0,
+          currency: 'AUD',
+          pricingSource: 'Provider fixture',
+          pricingConfidence: 0.2,
+          lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+      ),
+    );
+  }
+}
+
+class _LongTitleAiAnalysisProvider implements AiAnalysisProvider {
+  const _LongTitleAiAnalysisProvider();
+
+  @override
+  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
+    final now = DateTime.now();
+
+    return AiAnalysisResult(
+      recommendation: 'Review long title display.',
+      scanResult: ScanResult(
+        id: 'long-${now.microsecondsSinceEpoch}',
+        title:
+            'Extremely Long Collector Variant With Multiple Editions And Packaging Notes',
+        category: 'Trading Card',
+        estimatedValue: 485,
+        confidence: 0.86,
+        condition: 'Excellent',
+        thumbnail: request.imagePath,
+        scanDate: now,
+        primaryMatch:
+            'Extremely Long Collector Variant With Multiple Editions And Packaging Notes',
+        alternativeMatches: const [],
+        confidenceExplanation: 'Visible details support the match.',
+        detectionQuality: 'Good',
+        aiReasoning: 'Identified from visible category and edition details.',
+        pricing: PricingInfo(
+          estimatedMarketValue: 485,
+          lowEstimate: 420,
+          highEstimate: 540,
+          currency: 'AUD',
+          pricingSource: 'Provider fixture',
+          pricingConfidence: 0.82,
+          lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
+        ),
+        year: '2024',
+        brand: 'PackLox',
+      ),
+    );
   }
 }
 
@@ -3391,6 +4140,16 @@ class _MemoryUsageRepository implements UsageRepository {
 
 class _SelectedCameraService extends CameraService {
   @override
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) async {
+    return CameraCaptureFlowResult.image(
+      XFile(_fixturePath('persistent-camera-card.jpg')),
+    );
+  }
+
+  @override
   Future<XFile?> pickImageFromCamera() async {
     return XFile(_fixturePath('persistent-camera-card.jpg'));
   }
@@ -3403,6 +4162,16 @@ class _SelectedCameraService extends CameraService {
 
 class _DelayedPersistCameraService extends CameraService {
   final Completer<XFile> _persistCompleter = Completer<XFile>();
+
+  @override
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) async {
+    return CameraCaptureFlowResult.image(
+      XFile(_fixturePath('persistent-camera-card.jpg')),
+    );
+  }
 
   @override
   Future<XFile?> pickImageFromCamera() async {
@@ -3427,12 +4196,37 @@ class _DelayedPersistCameraService extends CameraService {
 
 class _CancelledCameraService extends CameraService {
   @override
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) async {
+    return null;
+  }
+
+  @override
   Future<XFile?> pickImageFromCamera() async {
     return null;
   }
 }
 
+class _DeniedCameraService extends CameraService {
+  @override
+  Future<PermissionStatus> requestPermissionStatus() async {
+    return PermissionStatus.denied;
+  }
+}
+
 class _MissingCameraService extends CameraService {
+  @override
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) async {
+    return CameraCaptureFlowResult.image(
+      XFile(_fixturePath('missing-camera-card.jpg')),
+    );
+  }
+
   @override
   Future<XFile?> pickImageFromCamera() async {
     return XFile(_fixturePath('missing-camera-card.jpg'));

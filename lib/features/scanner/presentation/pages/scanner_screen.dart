@@ -11,7 +11,6 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
-import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_goal_card.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -235,7 +234,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                           : 0.0;
 
                       return MotionElasticHero(
-                        baseHeight: 180,
+                        baseHeight: 158,
                         scrollOffset: scrollOffset,
                         child: MotionParallax(
                           scrollOffset: scrollOffset,
@@ -249,9 +248,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    AppSpacing.xl,
+                    AppSpacing.lg,
                     horizontalPadding,
-                    AppSpacing.xxl,
+                    AppSpacing.xl,
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
@@ -267,12 +266,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 category: scanResult?.category,
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.md),
                               _ScanGoalSelector(
                                 selectedGoal: activeGoal,
                                 onGoalSelected: scannerController.selectGoal,
                               ),
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.md),
                               CaptureWorkspace(
                                 key: _previewKey,
                                 goal: activeGoal,
@@ -408,9 +407,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   ),
                                 ),
                               ],
-                              const SizedBox(height: AppSpacing.xxl),
+                              const SizedBox(height: AppSpacing.xl),
                               const ScanSectionHeader('Recent Scans'),
-                              const SizedBox(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.sm),
                               ScanCardGroup(
                                 children: [
                                   for (final item in recentScans)
@@ -461,34 +460,76 @@ class _ScanGoalSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 720;
-    final cards = [
-      for (final goal in ScanGoal.values)
-        ScanGoalCard(
-          goal: goal,
-          selected: goal == selectedGoal,
-          onTap: () => onGoalSelected(goal),
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: ScanGoal.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final goal = ScanGoal.values[index];
+          return _CompactGoalChip(
+            goal: goal,
+            selected: goal == selectedGoal,
+            onTap: () => onGoalSelected(goal),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CompactGoalChip extends StatelessWidget {
+  const _CompactGoalChip({
+    required this.goal,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ScanGoal goal;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected
+          ? colorScheme.primary.withValues(alpha: 0.10)
+          : colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+          width: selected ? 1.4 : 1,
         ),
-    ];
-
-    if (isWide) {
-      final children = <Widget>[];
-      for (var index = 0; index < cards.length; index += 1) {
-        if (index > 0) {
-          children.add(const SizedBox(width: AppSpacing.sm));
-        }
-        children.add(Expanded(child: cards[index]));
-      }
-      return Row(children: children);
-    }
-
-    return Column(
-      children: [
-        for (final card in cards) ...[
-          card,
-          if (card != cards.last) const SizedBox(height: AppSpacing.sm),
-        ],
-      ],
+      ),
+      child: InkWell(
+        key: ValueKey('scan-goal-${goal.id}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(goal.icon, color: colorScheme.primary, size: 20),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                goal.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -681,8 +722,13 @@ String _scanStatusFor(ScannerState state) {
   if (state.scanResult != null) {
     return 'Ready to Save';
   }
-  if (state.selectedImagePath != null) {
-    return 'Ready to Scan';
+  final photoCount = state.photoSlots.length;
+  if (photoCount > 0) {
+    final plan = state.scanSession?.capturePlan;
+    if (plan?.isMinimumReadyForAnalyze ?? false) {
+      return '$photoCount photo${photoCount == 1 ? '' : 's'} ready';
+    }
+    return '$photoCount photo${photoCount == 1 ? '' : 's'} captured';
   }
 
   return 'Ready to Scan';
@@ -698,11 +744,16 @@ String _modelStatusFor(ScannerState state) {
   if (state.scanResult != null) {
     return 'Result ready';
   }
-  if (state.selectedImagePath != null) {
-    return 'Image queued';
+  final plan = state.scanSession?.capturePlan;
+  final nextRole = plan?.nextRecommendedRole;
+  if (state.photoSlots.isNotEmpty) {
+    if (plan?.isMinimumReadyForAnalyze ?? false) {
+      return 'Ready for analysis';
+    }
+    return nextRole == null ? 'Keep capturing' : 'Next: ${nextRole.title}';
   }
 
-  return 'Standby';
+  return 'Start with the front photo';
 }
 
 void _showCapturedImagePreview(

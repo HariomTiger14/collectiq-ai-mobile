@@ -405,13 +405,17 @@ class ScanStatusBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _StatusPill(
-                      icon: Icons.memory_outlined,
-                      label: modelLabel,
-                      color: colorScheme.primary,
+                    Flexible(
+                      flex: 3,
+                      child: _StatusPill(
+                        icon: Icons.memory_outlined,
+                        label: modelLabel,
+                        color: colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
+                      flex: 2,
                       child: Text(
                         status,
                         maxLines: 1,
@@ -868,13 +872,15 @@ class _StatusPill extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: AppIconSizes.sm),
           const SizedBox(width: AppSpacing.sm),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

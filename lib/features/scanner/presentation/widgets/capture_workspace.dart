@@ -56,11 +56,21 @@ class CaptureWorkspace extends StatelessWidget {
     final nextRole = plan.nextRecommendedRole;
     final analyzeReady = plan.isMinimumReadyForAnalyze;
     final roles = [...plan.requiredRoles, ...plan.optionalRoles];
+    final primaryLabel = analyzeReady
+        ? 'Analyze ${slots.length} photo${slots.length == 1 ? '' : 's'}'
+        : 'Capture ${nextRole?.title ?? ScanCaptureRole.front.title}';
+    final primaryIcon = analyzeReady
+        ? Icons.auto_awesome_outlined
+        : Icons.photo_camera_outlined;
+    final primaryAction = analyzeReady ? onAnalyze : onPrimaryCapture;
+    final primaryKey = analyzeReady
+        ? const ValueKey('scan-primary-Analyze Image')
+        : const ValueKey('scan-primary-Scan with Camera');
 
     return Container(
       key: const ValueKey('capture-workspace'),
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -90,9 +100,45 @@ class CaptureWorkspace extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           _NextRecommendedBlock(role: nextRole, guidance: plan.userGuidance),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: primaryKey,
+              onPressed: isBusy ? null : primaryAction,
+              icon: isBusy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(primaryIcon),
+              label: Text(
+                isBusy
+                    ? analyzeReady
+                          ? 'Analyzing scan'
+                          : 'Working'
+                    : primaryLabel,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ScanImageFilmstrip(
+            roles: roles,
+            requiredRoles: plan.requiredRoles,
+            slots: slots,
+            selectedPath: slots.values.lastOrNull?.path,
+            canAddPhoto: nextRole != null,
+            isBusy: isBusy,
+            onTapImage: onPreview,
+            onCaptureRole: onCamera,
+            onRetake: (slot) => onCamera(slot.role),
+            onDelete: (slot) => onDelete(slot.role),
+            onAddPhoto: isBusy ? null : onPrimaryCapture,
+          ),
+          const SizedBox(height: AppSpacing.sm),
           _CaptureProgress(
             requiredCompleted: requiredCompleted,
             requiredTotal: plan.requiredRoles.length,
@@ -101,110 +147,81 @@ class CaptureWorkspace extends StatelessWidget {
             analyzeReady: analyzeReady,
           ),
           if (slots.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             _SelectedImageSummary(
               slot: slots.values.last,
               title: selectedItemTitle,
               status: selectedItemStatus,
             ),
           ],
-          const SizedBox(height: AppSpacing.md),
-          ScanImageFilmstrip(
-            images: slots.values.toList(growable: false),
-            selectedPath: slots.values.lastOrNull?.path,
-            canAddPhoto: nextRole != null,
-            onTapImage: onPreview,
-            onRetake: (slot) => onCamera(slot.role),
-            onDelete: (slot) => onDelete(slot.role),
-            onAddPhoto: isBusy ? null : onPrimaryCapture,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          for (final role in roles) ...[
-            CaptureRoleCard(
-              role: role,
-              requiredRole: plan.requiredRoles.contains(role),
-              slot: slots[role.id],
-              isBusy: isBusy,
-              onCapture: () => onCamera(role.id),
-              onGallery: () => onGallery(role.id),
-              onPreview: () {
-                final slot = slots[role.id];
-                if (slot != null) {
-                  onPreview(slot);
-                }
-              },
-              onDelete: () => onDelete(role.id),
-            ),
-            if (role != roles.last) const SizedBox(height: AppSpacing.sm),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              key: const ValueKey('scan-primary-Scan with Camera'),
-              onPressed: isBusy ? null : onPrimaryCapture,
-              icon: Icon(
-                hasResult
-                    ? Icons.refresh_outlined
-                    : Icons.photo_camera_outlined,
-              ),
-              label: Text(
-                hasResult
-                    ? 'Add more guided photos'
-                    : nextRole == null
-                    ? 'Add Optional Photo'
-                    : 'Capture ${nextRole.title}',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
           const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              key: const ValueKey('scan-primary-Analyze Image'),
-              onPressed: isBusy || !analyzeReady ? null : onAnalyze,
-              icon: isBusy
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.auto_awesome_outlined),
-              label: Text(
-                isBusy
-                    ? 'Analyzing scan'
-                    : analyzeReady
-                    ? 'Analyze ${slots.length} photo${slots.length == 1 ? '' : 's'}'
-                    : _disabledAnalyzeText(plan, slots),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
+          Row(
             children: [
-              OutlinedButton.icon(
-                key: const ValueKey('scan-secondary-Gallery'),
-                onPressed: isBusy
-                    ? null
-                    : () => onGallery((nextRole ?? ScanCaptureRole.front).id),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Gallery'),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey('scan-secondary-Gallery'),
+                  onPressed: isBusy
+                      ? null
+                      : () => onGallery((nextRole ?? ScanCaptureRole.front).id),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Gallery'),
+                ),
               ),
-              OutlinedButton.icon(
+              const SizedBox(width: AppSpacing.sm),
+              if (analyzeReady && nextRole != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('scan-secondary-Add more photos'),
+                    onPressed: isBusy ? null : onPrimaryCapture,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: Text(
+                      'Add ${nextRole.title}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+              else if (slots.isNotEmpty || hasResult)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('scan-secondary-New Scan'),
+                    onPressed: isBusy ? null : onReset,
+                    icon: const Icon(Icons.refresh_outlined),
+                    label: const Text('New Scan'),
+                  ),
+                )
+              else
+                Expanded(
+                  child: TextButton.icon(
+                    key: const ValueKey('scan-secondary-Use Sample Scan'),
+                    onPressed: isBusy ? null : onSample,
+                    icon: const Icon(Icons.science_outlined, size: 18),
+                    label: const Text('Sample'),
+                  ),
+                ),
+            ],
+          ),
+          if (slots.isNotEmpty || hasResult || analyzeReady) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
                 key: const ValueKey('scan-secondary-Use Sample Scan'),
                 onPressed: isBusy ? null : onSample,
-                icon: const Icon(Icons.science_outlined),
+                icon: const Icon(Icons.science_outlined, size: 16),
                 label: const Text('Use Sample Scan'),
               ),
-              OutlinedButton.icon(
-                onPressed: isBusy || slots.isEmpty ? null : onReset,
-                icon: const Icon(Icons.refresh_outlined),
-                label: const Text('New Scan'),
-              ),
-            ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xs),
+          _RoleChecklist(
+            roles: roles,
+            requiredRoles: plan.requiredRoles,
+            slots: slots,
+            isBusy: isBusy,
+            onCapture: onCamera,
+            onGallery: onGallery,
+            onPreview: onPreview,
+            onDelete: onDelete,
           ),
           _GoalHint(goal: goal),
         ],
@@ -215,21 +232,29 @@ class CaptureWorkspace extends StatelessWidget {
 
 class ScanImageFilmstrip extends StatelessWidget {
   const ScanImageFilmstrip({
-    required this.images,
+    required this.roles,
+    required this.requiredRoles,
+    required this.slots,
     required this.onTapImage,
+    required this.onCaptureRole,
     required this.onRetake,
     required this.onDelete,
     super.key,
     this.selectedPath,
     this.canAddPhoto = false,
+    this.isBusy = false,
     this.onAddPhoto,
   });
 
-  final List<ScannerPhotoSlot> images;
+  final List<ScanCaptureRole> roles;
+  final List<ScanCaptureRole> requiredRoles;
+  final Map<String, ScannerPhotoSlot> slots;
   final String? selectedPath;
   final bool canAddPhoto;
+  final bool isBusy;
   final VoidCallback? onAddPhoto;
   final void Function(ScannerPhotoSlot slot) onTapImage;
+  final Future<void> Function(String role) onCaptureRole;
   final void Function(ScannerPhotoSlot slot) onRetake;
   final void Function(ScannerPhotoSlot slot) onDelete;
 
@@ -237,22 +262,29 @@ class ScanImageFilmstrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       key: const ValueKey('scan-image-filmstrip'),
-      height: 138,
+      height: 158,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: images.length + (canAddPhoto ? 1 : 0),
+        itemCount: roles.length + (canAddPhoto ? 1 : 0),
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
-          if (index >= images.length) {
+          if (index >= roles.length) {
             return _AddPhotoTile(onTap: onAddPhoto);
           }
-          final slot = images[index];
+          final role = roles[index];
+          final slot = slots[role.id];
           return _FilmstripTile(
+            role: role,
+            requiredRole: requiredRoles.contains(role),
             slot: slot,
-            selected: slot.path == selectedPath,
-            onTap: () => onTapImage(slot),
-            onRetake: () => onRetake(slot),
-            onDelete: () => onDelete(slot),
+            selected: slot?.path == selectedPath,
+            onTap: slot == null
+                ? isBusy
+                      ? null
+                      : () => onCaptureRole(role.id)
+                : () => onTapImage(slot),
+            onRetake: slot == null ? null : () => onRetake(slot),
+            onDelete: slot == null ? null : () => onDelete(slot),
           );
         },
       ),
@@ -271,6 +303,7 @@ class CaptureRoleCard extends StatelessWidget {
     required this.onDelete,
     super.key,
     this.slot,
+    this.compact = false,
   });
 
   final ScanCaptureRole role;
@@ -281,6 +314,7 @@ class CaptureRoleCard extends StatelessWidget {
   final VoidCallback onGallery;
   final VoidCallback onPreview;
   final VoidCallback onDelete;
+  final bool compact;
 
   CaptureRoleCardStatus get status {
     if (slot == null) {
@@ -360,15 +394,17 @@ class CaptureRoleCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  role.guidance,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                if (!compact) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    role.guidance,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -402,6 +438,73 @@ class CaptureRoleCard extends StatelessWidget {
               padding: EdgeInsets.zero,
               visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.delete_outline, size: 18),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleChecklist extends StatelessWidget {
+  const _RoleChecklist({
+    required this.roles,
+    required this.requiredRoles,
+    required this.slots,
+    required this.isBusy,
+    required this.onCapture,
+    required this.onGallery,
+    required this.onPreview,
+    required this.onDelete,
+  });
+
+  final List<ScanCaptureRole> roles;
+  final List<ScanCaptureRole> requiredRoles;
+  final Map<String, ScannerPhotoSlot> slots;
+  final bool isBusy;
+  final Future<void> Function(String role) onCapture;
+  final Future<void> Function(String role) onGallery;
+  final void Function(ScannerPhotoSlot slot) onPreview;
+  final void Function(String role) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: ExpansionTile(
+        key: const ValueKey('photo-checklist'),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        initiallyExpanded: false,
+        title: Text(
+          'Photo checklist',
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text(
+          '${slots.length} of ${roles.length} photos captured',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        children: [
+          for (final role in roles)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: CaptureRoleCard(
+                role: role,
+                requiredRole: requiredRoles.contains(role),
+                slot: slots[role.id],
+                isBusy: isBusy,
+                compact: true,
+                onCapture: () => onCapture(role.id),
+                onGallery: () => onGallery(role.id),
+                onPreview: () {
+                  final slot = slots[role.id];
+                  if (slot != null) {
+                    onPreview(slot);
+                  }
+                },
+                onDelete: () => onDelete(role.id),
+              ),
             ),
         ],
       ),
@@ -609,6 +712,8 @@ class _SelectedImageSummary extends StatelessWidget {
 
 class _FilmstripTile extends StatelessWidget {
   const _FilmstripTile({
+    required this.role,
+    required this.requiredRole,
     required this.slot,
     required this.selected,
     required this.onTap,
@@ -616,26 +721,32 @@ class _FilmstripTile extends StatelessWidget {
     required this.onDelete,
   });
 
-  final ScannerPhotoSlot slot;
+  final ScanCaptureRole role;
+  final bool requiredRole;
+  final ScannerPhotoSlot? slot;
   final bool selected;
-  final VoidCallback onTap;
-  final VoidCallback onRetake;
-  final VoidCallback onDelete;
+  final VoidCallback? onTap;
+  final VoidCallback? onRetake;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final warning = _hasWarning(slot.qualityMetadata);
+    final textTheme = Theme.of(context).textTheme;
+    final hasPhoto = slot != null;
+    final warning = hasPhoto && _hasWarning(slot!.qualityMetadata);
     return SizedBox(
-      key: ValueKey('filmstrip-${slot.role}'),
-      width: 104,
+      key: ValueKey('filmstrip-${role.id}'),
+      width: 122,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
-          padding: const EdgeInsets.all(5),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: colorScheme.surface,
+            color: hasPhoto
+                ? colorScheme.surface
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.52),
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: selected
@@ -652,58 +763,85 @@ class _FilmstripTile extends StatelessWidget {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.sm),
-                  child: ScanThumbnail(imagePath: slot.path),
+                  child: hasPhoto
+                      ? ScanThumbnail(imagePath: slot!.path)
+                      : ColoredBox(
+                          color: colorScheme.primary.withValues(alpha: 0.08),
+                          child: Center(
+                            child: Icon(
+                              role.icon,
+                              color: colorScheme.primary,
+                              size: AppIconSizes.lg,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                slot.label,
+                role.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800),
+                style: textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               Row(
                 children: [
                   Icon(
                     warning
                         ? Icons.warning_amber_outlined
-                        : Icons.check_circle_outline,
+                        : hasPhoto
+                        ? Icons.check_circle_outline
+                        : Icons.radio_button_unchecked,
                     size: 14,
-                    color: warning ? colorScheme.tertiary : colorScheme.primary,
+                    color: warning
+                        ? colorScheme.tertiary
+                        : hasPhoto
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 2),
                   Expanded(
                     child: Text(
-                      warning ? 'Warning' : 'Accepted',
+                      warning
+                          ? 'Warning'
+                          : hasPhoto
+                          ? 'Captured'
+                          : requiredRole
+                          ? 'Required'
+                          : 'Optional',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      style: textTheme.labelSmall?.copyWith(
                         color: warning
                             ? colorScheme.tertiary
-                            : colorScheme.primary,
+                            : hasPhoto
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                  SizedBox.square(
-                    dimension: 24,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      tooltip: 'Retake ${slot.label}',
-                      onPressed: onRetake,
-                      icon: const Icon(Icons.refresh_outlined, size: 15),
+                  if (hasPhoto) ...[
+                    SizedBox.square(
+                      dimension: 24,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Retake ${role.title}',
+                        onPressed: onRetake,
+                        icon: const Icon(Icons.refresh_outlined, size: 15),
+                      ),
                     ),
-                  ),
-                  SizedBox.square(
-                    dimension: 24,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      tooltip: 'Delete ${slot.label}',
-                      onPressed: onDelete,
-                      icon: const Icon(Icons.close, size: 15),
+                    SizedBox.square(
+                      dimension: 24,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Delete ${role.title}',
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.close, size: 15),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -787,19 +925,6 @@ class _GoalHint extends StatelessWidget {
       ),
     );
   }
-}
-
-String _disabledAnalyzeText(
-  ScanCapturePlan plan,
-  Map<String, ScannerPhotoSlot> slots,
-) {
-  final missingRequired = plan.requiredRoles
-      .where((role) => !slots.containsKey(role.id))
-      .toList();
-  if (missingRequired.length == 1) {
-    return 'Add ${missingRequired.single.title.toLowerCase()} photo to continue';
-  }
-  return 'Add ${missingRequired.length} more required photos';
 }
 
 String _statusLabel(CaptureRoleCardStatus status) {
