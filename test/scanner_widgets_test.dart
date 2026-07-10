@@ -184,9 +184,11 @@ void main() {
     );
     expect(find.text('2'), findsWidgets);
 
-    await tester.tap(
-      find.byKey(const ValueKey('filmstrip-photo-front-sample://front-1')),
+    final frontPhoto = find.byKey(
+      const ValueKey('filmstrip-photo-front-sample://front-1'),
     );
+    await tester.ensureVisible(frontPhoto);
+    await tester.tap(frontPhoto);
     expect(selectedSlot?.path, 'sample://front-1');
 
     await tester.tap(
@@ -272,6 +274,210 @@ void main() {
     );
     expect(deletedRole, ScanCaptureRole.back.id);
     expect(slots.length, 2);
+  });
+
+  testWidgets('tapping a captured photo opens full-screen carousel', (
+    WidgetTester tester,
+  ) async {
+    final captureImages = [
+      _slot(role: ScanCaptureRole.front, path: 'sample://front-1'),
+      _slot(role: ScanCaptureRole.back, path: 'sample://back-1'),
+    ];
+    final plan = const ScanCapturePlanService().buildPlan(
+      ScanGoal.detailedAnalysis,
+      CollectibleCategory.toyCar,
+      const [
+        CapturedScanImage(
+          path: 'sample://front-1',
+          role: ScanCaptureRole.front,
+          source: 'sample',
+        ),
+        CapturedScanImage(
+          path: 'sample://back-1',
+          role: ScanCaptureRole.back,
+          source: 'sample',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: CaptureWorkspace(
+              goal: ScanGoal.detailedAnalysis,
+              category: CollectibleCategory.toyCar,
+              plan: plan,
+              slots: _slots(captureImages),
+              captureImages: captureImages,
+              selectedPath: 'sample://front-1',
+              isBusy: false,
+              hasResult: false,
+              onPrimaryCapture: () {},
+              onAnalyze: () {},
+              onCamera: (_) async {},
+              onGallery: (_) async {},
+              onSelectRole: (_) {},
+              onPreview: (_) {},
+              onUseAsPrimary: (_) {},
+              onDelete: (_) {},
+              onSample: () {},
+              onReset: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final frontPhoto = find.byKey(
+      const ValueKey('filmstrip-photo-front-sample://front-1'),
+    );
+    await tester.ensureVisible(frontPhoto);
+    await tester.tap(frontPhoto);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('photo-review-carousel')), findsOneWidget);
+    expect(find.text('Photo 1 of 2'), findsOneWidget);
+    expect(find.textContaining('Front'), findsWidgets);
+  });
+
+  testWidgets('carousel can navigate and delete only selected photo', (
+    WidgetTester tester,
+  ) async {
+    final captureImages = [
+      _slot(role: ScanCaptureRole.front, path: 'sample://front-1'),
+      _slot(role: ScanCaptureRole.back, path: 'sample://back-1'),
+    ];
+    var selectedPath = '';
+    var deletedPath = '';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: _PhotoReviewTestHost(
+            photos: captureImages,
+            onSelect: (slot) => selectedPath = slot.path,
+            onDelete: (slot) => deletedPath = slot.path,
+            onUseAsPrimary: (_) {},
+          ),
+        ),
+      ),
+    );
+    final frontPhoto = find.byKey(
+      const ValueKey('filmstrip-photo-front-sample://front-1'),
+    );
+    await tester.ensureVisible(frontPhoto);
+    await tester.tap(frontPhoto);
+    await tester.pumpAndSettle();
+
+    await tester.fling(
+      find.byKey(const ValueKey('photo-review-page-view')),
+      const Offset(-500, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Photo 2 of 2'), findsOneWidget);
+    expect(selectedPath, 'sample://back-1');
+
+    await tester.tap(find.byKey(const ValueKey('photo-review-delete')));
+    await tester.pumpAndSettle();
+
+    expect(deletedPath, 'sample://back-1');
+    expect(find.text('Photo 1 of 1'), findsOneWidget);
+  });
+
+  testWidgets('use as primary action reports selected carousel photo', (
+    WidgetTester tester,
+  ) async {
+    final captureImages = [
+      _slot(role: ScanCaptureRole.front, path: 'sample://front-1'),
+      _slot(role: ScanCaptureRole.closeUp, path: 'sample://detail-1'),
+    ];
+    var primaryPath = '';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: _PhotoReviewTestHost(
+            photos: captureImages,
+            onSelect: (_) {},
+            onDelete: (_) {},
+            onUseAsPrimary: (slot) => primaryPath = slot.path,
+          ),
+        ),
+      ),
+    );
+    final frontPhoto = find.byKey(
+      const ValueKey('filmstrip-photo-front-sample://front-1'),
+    );
+    await tester.ensureVisible(frontPhoto);
+    await tester.tap(frontPhoto);
+    await tester.pumpAndSettle();
+    await tester.fling(
+      find.byKey(const ValueKey('photo-review-page-view')),
+      const Offset(-500, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('photo-review-primary')));
+
+    expect(primaryPath, 'sample://detail-1');
+  });
+
+  testWidgets('group chips filter photo strip by role', (
+    WidgetTester tester,
+  ) async {
+    final captureImages = [
+      _slot(role: ScanCaptureRole.front, path: 'sample://front-1'),
+      _slot(role: ScanCaptureRole.front, path: 'sample://front-2'),
+      _slot(role: ScanCaptureRole.back, path: 'sample://back-1'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ScanImageFilmstrip(
+            roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            requiredRoles: const [ScanCaptureRole.front],
+            slots: {
+              ScanCaptureRole.front.id: captureImages[1],
+              ScanCaptureRole.back.id: captureImages[2],
+            },
+            captureImages: captureImages,
+            roleCounts: const {'front': 2, 'back': 1},
+            selectedPath: 'sample://front-1',
+            onSelectRole: (_) {},
+            onCaptureRole: (_) async {},
+            onTapImage: (_) {},
+            onRetake: (_) {},
+            onDelete: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('filmstrip-photo-front-sample://front-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('filmstrip-photo-back-sample://back-1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('photo-set-chip-back')));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('filmstrip-photo-front-sample://front-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('filmstrip-photo-back-sample://back-1')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('CaptureRoleCard renders missing captured and warning states', (
@@ -360,6 +566,7 @@ void main() {
                 onGallery: (_) async {},
                 onSelectRole: (_) {},
                 onPreview: (_) {},
+                onUseAsPrimary: (_) {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -379,7 +586,7 @@ void main() {
         find.byKey(const ValueKey('scan-primary-Scan with Camera')),
         findsOneWidget,
       );
-      expect(find.text('Capture Front / Obverse'), findsOneWidget);
+      expect(find.text('Capture Next Best Photo'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('scan-secondary-New Scan')),
         findsNothing,
@@ -420,6 +627,7 @@ void main() {
                 onGallery: (_) async {},
                 onSelectRole: (_) {},
                 onPreview: (_) {},
+                onUseAsPrimary: (_) {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -472,6 +680,7 @@ void main() {
                 onGallery: (_) async {},
                 onSelectRole: (_) {},
                 onPreview: (_) {},
+                onUseAsPrimary: (_) {},
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -481,7 +690,11 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const ValueKey('photo-checklist')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('capture-guide-expansion')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('photo-checklist')), findsNothing);
       expect(
         find.byKey(const ValueKey('capture-role-card-front')),
         findsNothing,
@@ -594,6 +807,12 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      findsOneWidget,
+    );
+    expect(find.text('Valuation evidence'), findsOneWidget);
+    expect(find.text('Valuation status'), findsNothing);
+    expect(
       find.byKey(const ValueKey('scan-result-hero-sample://front')),
       findsOneWidget,
     );
@@ -684,4 +903,60 @@ CollectibleItem _itemWithGallery() {
       CollectibleImage(path: 'sample://back', role: 'back', source: 'sample'),
     ],
   );
+}
+
+class _PhotoReviewTestHost extends StatelessWidget {
+  const _PhotoReviewTestHost({
+    required this.photos,
+    required this.onSelect,
+    required this.onDelete,
+    required this.onUseAsPrimary,
+  });
+
+  final List<ScannerPhotoSlot> photos;
+  final void Function(ScannerPhotoSlot slot) onSelect;
+  final void Function(ScannerPhotoSlot slot) onDelete;
+  final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    final capturedImages = [
+      for (final photo in photos)
+        CapturedScanImage(
+          path: photo.path,
+          role: ScanCaptureRole.fromId(photo.role),
+          source: photo.source,
+        ),
+    ];
+    final plan = const ScanCapturePlanService().buildPlan(
+      ScanGoal.detailedAnalysis,
+      CollectibleCategory.toyCar,
+      capturedImages,
+    );
+    return SingleChildScrollView(
+      child: CaptureWorkspace(
+        goal: ScanGoal.detailedAnalysis,
+        category: CollectibleCategory.toyCar,
+        plan: plan,
+        slots: _slots(photos),
+        captureImages: photos,
+        selectedPath: photos.first.path,
+        isBusy: false,
+        hasResult: false,
+        onPrimaryCapture: () {},
+        onAnalyze: () {},
+        onCamera: (_) async {},
+        onGallery: (_) async {},
+        onSelectRole: (_) {},
+        onPreview: onSelect,
+        onUseAsPrimary: onUseAsPrimary,
+        onDelete: (path) {
+          final slot = photos.firstWhere((photo) => photo.path == path);
+          onDelete(slot);
+        },
+        onSample: () {},
+        onReset: () {},
+      ),
+    );
+  }
 }

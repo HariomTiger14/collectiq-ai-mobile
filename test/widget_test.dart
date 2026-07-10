@@ -1551,24 +1551,19 @@ void main() {
     expect(find.textContaining('Charizard'), findsWidgets);
     expect(find.text('Pokemon Card'), findsWidgets);
     expect(find.text(r'$1,850'), findsWidgets);
-    expect(find.text('Market Value'), findsWidgets);
+    expect(find.text('Market pricing'), findsOneWidget);
     expect(find.text('Market Summary'), findsWidgets);
-    expect(find.text('Recent comparable sales'), findsOneWidget);
-    expect(find.textContaining('TCGplayer'), findsWidgets);
-    expect(find.text(r'$1,443 - $2,257'), findsWidgets);
-    expect(find.textContaining('Mock pricing blend'), findsWidgets);
-    expect(find.text('69%'), findsWidgets);
+    expect(find.text('Recent comparable sales'), findsNothing);
+    expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(find.textContaining('94%'), findsWidgets);
     expect(find.text('Near Mint'), findsWidgets);
     expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Base Set'), findsWidgets);
-    expect(find.text('4/102'), findsOneWidget);
-    expect(find.text('Charizard'), findsOneWidget);
-    expect(find.text('Why this match?'), findsOneWidget);
+    expect(find.textContaining('Charizard'), findsWidgets);
+    expect(find.text('Condition notes'), findsOneWidget);
     expect(find.text('Alternative Matches'), findsOneWidget);
-    expect(find.text('1999 Pokemon Charizard Holo variant'), findsOneWidget);
-    expect(find.textContaining('Mock confidence'), findsOneWidget);
-    expect(find.textContaining('Sleeve it'), findsOneWidget);
+    expect(find.text('1999 Pokemon Charizard Holo variant'), findsNothing);
+    expect(find.textContaining('Mock confidence'), findsNothing);
+    expect(find.textContaining('Sleeve it'), findsNothing);
   });
 
   testWidgets('scanner backend failure shows friendly message', (
@@ -1633,8 +1628,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Provider Test Collectible'), findsWidgets);
-    expect(find.text('Provider recommendation.'), findsOneWidget);
-    expect(find.textContaining('Mock pricing blend'), findsWidgets);
+    expect(find.text('Recommendation'), findsOneWidget);
+    expect(find.text('Provider recommendation.'), findsNothing);
+    expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(find.text('Provider fixture'), findsNothing);
   });
 
@@ -1943,17 +1939,17 @@ void main() {
     expect(find.textContaining('High confidence'), findsWidgets);
     expect(find.text('Category'), findsWidgets);
     expect(find.text('Condition'), findsWidgets);
-    expect(find.text('Trust summary'), findsOneWidget);
-    expect(find.text('Pricing source'), findsOneWidget);
-    expect(find.text('Freshness'), findsOneWidget);
-    expect(find.text('Pricing confidence'), findsOneWidget);
-    expect(find.textContaining('Mock pricing blend'), findsWidgets);
+    expect(find.text('Valuation evidence'), findsOneWidget);
+    expect(find.text('Pricing source'), findsNothing);
+    expect(find.text('Freshness'), findsNothing);
+    expect(find.text('Pricing confidence'), findsNothing);
+    expect(find.textContaining('Mock pricing blend'), findsNothing);
     expect(
       find.textContaining('AI estimates are a starting point'),
       findsOneWidget,
     );
-    expect(find.text('AI Explanation'), findsOneWidget);
-    expect(find.text('Key Attributes'), findsOneWidget);
+    expect(find.text('Identification details'), findsOneWidget);
+    expect(find.text('Metadata'), findsOneWidget);
     expect(find.text('Save to Portfolio'), findsOneWidget);
     expect(find.text('Edit Details'), findsOneWidget);
     expect(find.text('Retry Analysis'), findsOneWidget);
@@ -2001,6 +1997,8 @@ void main() {
       await tester.completeSampleScan();
 
       expect(find.text(entry.value), findsWidgets);
+      await tester.tap(find.text('Valuation evidence').first);
+      await tester.pumpAndSettle();
       expect(find.text('Valuation status'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
