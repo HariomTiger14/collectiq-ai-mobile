@@ -305,7 +305,6 @@ void main() {
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('PackLox'), findsOneWidget);
     expect(find.text('Your Collection Hub'), findsOneWidget);
     expect(find.text('0 items'), findsOneWidget);
     expect(find.text(r'$0'), findsWidgets);
@@ -313,7 +312,7 @@ void main() {
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 260);
+    expect(heroMotion.baseHeight, 320);
     expect(
       find.byWidgetPredicate(
         (widget) =>

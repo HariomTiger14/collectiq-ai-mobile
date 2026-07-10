@@ -183,7 +183,7 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 260,
+          baseHeight: 320,
           scrollOffset: scrollOffset,
           child: MotionParallax(
             scrollOffset: scrollOffset,
@@ -198,99 +198,70 @@ class _PremiumHomeHero extends StatelessWidget {
                 ],
               ),
               child: Container(
+                constraints: const BoxConstraints(minHeight: 320),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.94,
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colorScheme.surfaceContainerHighest,
+                      colorScheme.surfaceContainerHighest,
+                      colorScheme.primaryContainer.withValues(alpha: 0.18),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                   boxShadow: AppElevation.level2,
                 ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.08),
-                              Colors.white.withValues(alpha: 0.02),
-                              colorScheme.primary.withValues(alpha: 0.10),
-                            ],
+                child: SafeArea(
+                  top: true,
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xl,
+                      horizontal: AppSpacing.lg,
+                    ),
+                    child: MotionReveal(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Good evening',
+                            style: textTheme.titleSmall?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: -26,
-                      top: -34,
-                      child: HeroDecorativeCircle(
-                        diameter: 136,
-                        strokeWidth: 22,
-                        opacity: 0.16,
-                      ),
-                    ),
-                    Positioned(
-                      left: AppSpacing.xl,
-                      top: AppSpacing.lg,
-                      child: Text(
-                        'PackLox',
-                        style: textTheme.labelLarge?.copyWith(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.90),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: MotionReveal(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Good evening',
-                                style: textTheme.titleSmall?.copyWith(
-                                  color: colorScheme.onPrimary.withValues(
-                                    alpha: 0.78,
-                                  ),
-                                  fontWeight: FontWeight.w700,
-                                ),
+                          const SizedBox(height: AppSpacing.sm),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Your Collection Hub',
+                              style: textTheme.displayLarge?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                height: 1.06,
+                                letterSpacing: 0,
                               ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                'Your Collection Hub',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.displayLarge?.copyWith(
-                                  color: colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.02,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.md),
-                              Text(
-                                'Scan, value, and track your collectibles.',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: colorScheme.onPrimary.withValues(
-                                    alpha: 0.78,
-                                  ),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'Scan, value, and track your collectibles.',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

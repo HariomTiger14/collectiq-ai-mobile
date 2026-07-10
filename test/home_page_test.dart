@@ -61,7 +61,22 @@ void main() {
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 260);
+    expect(heroMotion.baseHeight, greaterThanOrEqualTo(280));
+    expect(
+      tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
+      greaterThanOrEqualTo(280),
+    );
+    expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
+    expect(
+      tester.getRect(find.text('Your Collection Hub')).height,
+      greaterThan(0),
+    );
+    expect(
+      tester
+          .getRect(find.text('Scan, value, and track your collectibles.'))
+          .height,
+      greaterThan(0),
+    );
     expect(tester.takeException(), isNull);
   });
 
