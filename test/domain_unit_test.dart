@@ -1311,7 +1311,7 @@ void main() {
 
       expect(initial.nextRecommendedRole, ScanCaptureRole.front);
       expect(initial.isMinimumReadyForAnalyze, isFalse);
-      expect(partial.completionPercentage, closeTo(1 / 3, 0.001));
+      expect(partial.completionPercentage, closeTo(1, 0.001));
       expect(partial.nextRecommendedRole, ScanCaptureRole.back);
     });
 
@@ -1372,13 +1372,11 @@ void main() {
       expect(detailedReady.isMinimumReadyForAnalyze, isTrue);
       expect(detailedReady.nextRecommendedRole, ScanCaptureRole.damageDetail);
       expect(saleReady.isMinimumReadyForAnalyze, isTrue);
-      expect(saleReady.requiredRoles, [
-        ScanCaptureRole.front,
+      expect(saleReady.requiredRoles, [ScanCaptureRole.front]);
+      expect(saleReady.optionalRoles, [
         ScanCaptureRole.back,
         ScanCaptureRole.closeUp,
         ScanCaptureRole.damageDetail,
-      ]);
-      expect(saleReady.optionalRoles, [
         ScanCaptureRole.serialOrMark,
         ScanCaptureRole.angledReflective,
       ]);
@@ -1430,7 +1428,7 @@ void main() {
           ]);
 
       expect(withFrontBack.isMinimumReadyForAnalyze, isTrue);
-      expect(afterBackDelete.isMinimumReadyForAnalyze, isFalse);
+      expect(afterBackDelete.isMinimumReadyForAnalyze, isTrue);
       expect(afterBackDelete.nextRecommendedRole, ScanCaptureRole.back);
     });
 

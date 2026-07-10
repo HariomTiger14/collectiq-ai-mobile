@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/scan/scan_ui.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
@@ -12,6 +13,7 @@ import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart'
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -195,6 +197,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           null,
           scannerState.scanSession?.capturedImages ?? const [],
         );
+    final smartGuidance = ref
+        .watch(smartScanGuidanceServiceProvider)
+        .buildGuidance(
+          category: scannerState.captureCategory,
+          images: _guidanceImagesFromSlots(scannerState.captureImages),
+          goal: activeGoal,
+        );
     final showPickerShell =
         selectedImagePath == null &&
         (scannerState.isLoading || scannerState.isPreparingImage);
@@ -272,6 +281,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 categoryLabel: _scanCategoryStatus(
                                   scannerState,
                                 ),
+                                headline: smartGuidance.headline,
+                                guidance: smartGuidance.guidance,
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               _AdvancedScanOptions(
@@ -556,9 +567,15 @@ class _ScanGoalSelector extends StatelessWidget {
 }
 
 class _SmartScanSummary extends StatelessWidget {
-  const _SmartScanSummary({required this.categoryLabel});
+  const _SmartScanSummary({
+    required this.categoryLabel,
+    required this.headline,
+    required this.guidance,
+  });
 
   final String categoryLabel;
+  final String headline;
+  final String guidance;
 
   @override
   Widget build(BuildContext context) {
@@ -590,6 +607,16 @@ class _SmartScanSummary extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
+                  headline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                   'Auto Detect - $categoryLabel',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -600,7 +627,7 @@ class _SmartScanSummary extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Start with one front or package photo. More photos can improve valuation.',
+                  guidance,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.bodySmall?.copyWith(
@@ -922,11 +949,12 @@ class _RecentScanTile extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    item.date,
+                    item.activityLabel ?? item.date,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.caption.copyWith(
                       color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -1046,11 +1074,63 @@ ScannerHistoryItem _historyItemForCollectible(
     name: item.title,
     estimatedValue: _formatAud(item.estimatedValue),
     date: _formatDate(item.createdAt),
+    activityLabel: _recentScanActivityLabel(item),
     icon: _iconForCategory(item.category),
     thumbnailPath: _thumbnailPathForCollectible(item),
     color: AppColors.accent,
     onTap: onTap,
   );
+}
+
+String _recentScanActivityLabel(CollectibleItem item) {
+  final parts = <String>[_scannedWhenLabel(item.createdAt)];
+  if (_hasEnhancedGalleryImage(item)) {
+    parts.add('Analyzed with AI Enhance');
+  }
+  if (item.confidence > 0) {
+    parts.add('${(item.confidence * 100).round()}% confidence');
+  }
+  return parts.join(' - ');
+}
+
+String _scannedWhenLabel(DateTime createdAt) {
+  final now = DateTime.now();
+  final localCreated = createdAt.toLocal();
+  final today = DateTime(now.year, now.month, now.day);
+  final createdDay = DateTime(
+    localCreated.year,
+    localCreated.month,
+    localCreated.day,
+  );
+  final days = today.difference(createdDay).inDays;
+  if (days == 0) {
+    return 'Scanned today';
+  }
+  if (days == 1) {
+    return 'Scanned yesterday';
+  }
+  return 'Scanned ${_formatDate(createdAt)}';
+}
+
+bool _hasEnhancedGalleryImage(CollectibleItem item) {
+  return item.galleryImages.any((image) {
+    final preset = image.enhancementPreset?.trim().toLowerCase();
+    return preset != null && preset.isNotEmpty && preset != 'original';
+  });
+}
+
+List<CapturedScanImage> _guidanceImagesFromSlots(List<ScannerPhotoSlot> slots) {
+  return [
+    for (final slot in slots)
+      CapturedScanImage(
+        path: slot.path,
+        role: ScanCaptureRole.fromId(slot.role),
+        source: slot.source,
+        originalPath: slot.originalPath,
+        enhancementPreset: slot.enhancementPreset.id,
+        qualityMetadata: slot.qualityMetadata,
+      ),
+  ];
 }
 
 String? _thumbnailPathForCollectible(CollectibleItem item) {

@@ -3162,6 +3162,7 @@ void main() {
             {
               'path': _fixturePath('persistent-gallery-card.jpg'),
               'role': 'front',
+              'enhancementPreset': 'auto_enhance',
               'isPrimary': true,
             },
           ],
@@ -3682,6 +3683,7 @@ void main() {
             {
               'path': _fixturePath('persistent-gallery-card.jpg'),
               'role': 'front',
+              'enhancementPreset': 'auto_enhance',
               'isPrimary': true,
             },
           ],
@@ -3720,6 +3722,9 @@ void main() {
       find.byKey(const ValueKey('scan-recent-placeholder-recent-empty')),
       findsOneWidget,
     );
+    expect(find.textContaining('Scanned'), findsWidgets);
+    expect(find.textContaining('Analyzed with AI Enhance'), findsOneWidget);
+    expect(find.textContaining('82% confidence'), findsOneWidget);
   });
 
   testWidgets('portfolio item tap opens detail page', (
