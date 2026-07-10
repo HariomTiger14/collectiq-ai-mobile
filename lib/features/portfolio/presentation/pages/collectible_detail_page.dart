@@ -6,12 +6,16 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.d
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends ConsumerStatefulWidget {
@@ -104,6 +108,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                                   initialImage: selectedImage,
                                   onUseAsPrimary: _setPrimaryImage,
                                   onDelete: _deleteGalleryImage,
+                                  onEdit: _editGalleryImage,
                                 ),
                         ),
                         if (currentItem.confidence < 0.70) ...[
@@ -212,6 +217,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           source: candidate.source,
           originalPath: candidate.originalPath,
           enhancementPreset: candidate.enhancementPreset,
+          qualityMetadata: candidate.qualityMetadata,
           isPrimary: candidate.path == nextPrimary.path,
         ),
     ];
@@ -225,6 +231,78 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     if (mounted) {
       _showDetailSnackBar(context, 'Photo removed');
     }
+  }
+
+  Future<CollectibleImage?> _editGalleryImage(
+    CollectibleItem item,
+    CollectibleImage image,
+  ) async {
+    final originalPath = _originalImagePathForEdit(image);
+    if (originalPath.isEmpty) {
+      _showDetailSnackBar(context, 'Original image unavailable');
+      return null;
+    }
+
+    final result = await ImageEnhancementPreviewPage.show(
+      context,
+      image: XFile(originalPath),
+      initialPreset: _presetForPortfolioImage(image),
+      title: 'Edit Photo',
+      subtitle: 'Choose the clearest version for this portfolio image.',
+      enhancementService: ref.read(imageEnhancementServiceProvider),
+      assessmentService: ref.read(imageQualityAssessmentServiceProvider),
+    );
+    if (!mounted || result == null) {
+      return null;
+    }
+
+    final images = item.effectiveGalleryImages;
+    final editedIndex = images.indexWhere(
+      (candidate) => candidate.path == image.path,
+    );
+    if (editedIndex < 0) {
+      _showDetailSnackBar(context, 'Photo no longer available');
+      return null;
+    }
+
+    final activePath = result.activeImage.path;
+    final updatedImage = CollectibleImage(
+      path: activePath,
+      role: image.role,
+      source: image.source,
+      originalPath: result.originalImage.path,
+      enhancementPreset: result.preset.id,
+      qualityMetadata: {
+        ...image.qualityMetadata,
+        ...result.metadata,
+        'originalImagePath': result.originalImage.path,
+        'activeImagePath': activePath,
+        'enhancementPreset': result.preset.id,
+        'selectedEnhancement': result.preset.isEnhanced
+            ? 'aiEnhance'
+            : 'original',
+        'enhancementLabel': result.preset.label,
+        'enhanced': result.preset.isEnhanced,
+      },
+      isPrimary: image.isPrimary,
+    );
+    final updatedImages = [
+      for (var index = 0; index < images.length; index += 1)
+        if (index == editedIndex) updatedImage else images[index],
+    ];
+    final updatedItem = item.copyWith(
+      imagePath: image.isPrimary ? activePath : item.imagePath,
+      galleryImages: updatedImages,
+    );
+
+    setState(() => _selectedGalleryPath = activePath);
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .updateItem(updatedItem);
+    if (mounted) {
+      _showDetailSnackBar(context, 'Photo updated');
+    }
+    return updatedImage;
   }
 }
 
@@ -310,9 +388,35 @@ List<CollectibleImage> _normalizedGalleryWithPrimary(
         source: image.source,
         originalPath: image.originalPath,
         enhancementPreset: image.enhancementPreset,
+        qualityMetadata: image.qualityMetadata,
         isPrimary: image.path == primaryPath,
       ),
   ];
+}
+
+String _originalImagePathForEdit(CollectibleImage image) {
+  final original = image.originalPath?.trim();
+  if (original != null && original.isNotEmpty) {
+    return original;
+  }
+  return image.path.trim();
+}
+
+ImageEnhancementPreset _presetForPortfolioImage(CollectibleImage image) {
+  final preset = image.enhancementPreset?.trim();
+  if (preset == ImageEnhancementPreset.autoEnhance.id ||
+      image.qualityMetadata['selectedEnhancement'] == 'aiEnhance' ||
+      image.qualityMetadata['enhanced'] == true) {
+    return ImageEnhancementPreset.autoEnhance;
+  }
+  return ImageEnhancementPreset.original;
+}
+
+bool _isAiEnhanced(CollectibleImage? image) {
+  if (image == null) {
+    return false;
+  }
+  return _presetForPortfolioImage(image).isEnhanced;
 }
 
 void _showImageViewer(
@@ -323,6 +427,11 @@ void _showImageViewer(
   onUseAsPrimary,
   required Future<void> Function(CollectibleItem item, CollectibleImage image)
   onDelete,
+  required Future<CollectibleImage?> Function(
+    CollectibleItem item,
+    CollectibleImage image,
+  )
+  onEdit,
 }) {
   showDialog<void>(
     context: context,
@@ -332,6 +441,7 @@ void _showImageViewer(
       initialImage: initialImage,
       onUseAsPrimary: onUseAsPrimary,
       onDelete: onDelete,
+      onEdit: onEdit,
     ),
   );
 }
@@ -374,12 +484,28 @@ class _PremiumDetailHero extends StatelessWidget {
               onTap: onImageTap,
               child: AspectRatio(
                 aspectRatio: 16 / 11,
-                child: _DetailImageSurface(
-                  key: ValueKey(
-                    'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
-                  ),
-                  item: item,
-                  image: selectedImage,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: _DetailImageSurface(
+                        key: ValueKey(
+                          'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                        ),
+                        item: item,
+                        image: selectedImage,
+                      ),
+                    ),
+                    if (_isAiEnhanced(selectedImage))
+                      const Positioned(
+                        left: AppSpacing.md,
+                        top: AppSpacing.md,
+                        child: _AiEnhancedDetailBadge(),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -587,6 +713,12 @@ class _DetailGalleryFilmstrip extends StatelessWidget {
                                 left: 6,
                                 child: _PrimaryImageBadge(compact: true),
                               ),
+                            if (_isAiEnhanced(image))
+                              const Positioned(
+                                right: 6,
+                                bottom: 6,
+                                child: _AiEnhancedDetailBadge(compact: true),
+                              ),
                           ],
                         ),
                       ),
@@ -695,6 +827,7 @@ class _PortfolioGalleryReview extends StatefulWidget {
     required this.initialImage,
     required this.onUseAsPrimary,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final CollectibleItem item;
@@ -703,6 +836,11 @@ class _PortfolioGalleryReview extends StatefulWidget {
   onUseAsPrimary;
   final Future<void> Function(CollectibleItem item, CollectibleImage image)
   onDelete;
+  final Future<CollectibleImage?> Function(
+    CollectibleItem item,
+    CollectibleImage image,
+  )
+  onEdit;
 
   @override
   State<_PortfolioGalleryReview> createState() =>
@@ -777,6 +915,8 @@ class _PortfolioGalleryReviewState extends State<_PortfolioGalleryReview> {
                         ),
                         _ReviewPill(label: _shortGalleryRoleLabel(image)),
                         if (image.isPrimary) const _PrimaryImageBadge(),
+                        if (_isAiEnhanced(image))
+                          const _AiEnhancedDetailBadge(compact: true),
                       ],
                     ),
                   ),
@@ -817,6 +957,7 @@ class _PortfolioGalleryReviewState extends State<_PortfolioGalleryReview> {
                                     originalPath: candidate.originalPath,
                                     enhancementPreset:
                                         candidate.enhancementPreset,
+                                    qualityMetadata: candidate.qualityMetadata,
                                     isPrimary: candidate.path == image.path,
                                   ),
                               ];
@@ -824,6 +965,20 @@ class _PortfolioGalleryReviewState extends State<_PortfolioGalleryReview> {
                           },
                     icon: const Icon(Icons.star_outline),
                     label: const Text('Use as Primary'),
+                  ),
+                  FilledButton.icon(
+                    key: const ValueKey('portfolio-gallery-edit-photo'),
+                    onPressed: () async {
+                      final edited = await widget.onEdit(widget.item, image);
+                      if (!mounted || edited == null) {
+                        return;
+                      }
+                      setState(() {
+                        _images[_index] = edited;
+                      });
+                    },
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: const Text('Edit Photo'),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('portfolio-gallery-delete'),
@@ -908,6 +1063,52 @@ class _PrimaryImageBadge extends StatelessWidget {
             color: Theme.of(context).colorScheme.onPrimary,
             fontWeight: FontWeight.w900,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AiEnhancedDetailBadge extends StatelessWidget {
+  const _AiEnhancedDetailBadge({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF14B8A6).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : 10,
+          vertical: compact ? 4 : 6,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_fix_high,
+              size: compact ? 12 : 14,
+              color: colorScheme.onPrimary,
+            ),
+            if (!compact) ...[
+              const SizedBox(width: 6),
+              Text(
+                'AI Enhanced',
+                key: const ValueKey('collectible-detail-ai-enhanced-badge'),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

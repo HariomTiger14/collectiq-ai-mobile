@@ -4445,6 +4445,80 @@ void main() {
     expect(find.text('Keep final photo'), findsOneWidget);
   });
 
+  testWidgets('portfolio carousel edit updates image enhancement metadata', (
+    WidgetTester tester,
+  ) async {
+    final originalPath = _fixturePath('persistent-gallery-card.jpg');
+    final enhancedPath = _fixturePath('persistent-camera-card.jpg');
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        _portfolioGalleryItemJson(
+          id: 'editable-gallery',
+          title: 'Editable Gallery Item',
+          imagePath: originalPath,
+          galleryImages: [
+            {
+              'path': originalPath,
+              'role': 'front',
+              'source': 'gallery',
+              'originalPath': originalPath,
+              'enhancementPreset': 'original',
+              'qualityMetadata': const {
+                'selectedEnhancement': 'original',
+                'activeImagePath': 'original',
+              },
+              'isPrimary': true,
+            },
+          ],
+        ),
+      ]),
+    });
+
+    await tester.pumpCollectIqApp(
+      imageEnhancementService: _PortfolioEditImageEnhancementService(
+        enhancedPath,
+      ),
+      imageQualityAssessmentService: const _FakeImageQualityAssessmentService(),
+    );
+    await _openGalleryDetail(tester, itemId: 'editable-gallery');
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-image-preview')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-gallery-edit-photo')),
+    );
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('enhancement-preview-surface')),
+    );
+    await tester.acceptEnhancementPreview(
+      preset: ImageEnhancementPreset.autoEnhance,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Enhanced'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('collectible-detail-hero-$enhancedPath')),
+      findsOneWidget,
+    );
+
+    final preferences = await SharedPreferences.getInstance();
+    final items =
+        jsonDecode(preferences.getString('portfolio_items')!) as List<dynamic>;
+    final item = items.single as Map<String, dynamic>;
+    expect(item['imagePath'], enhancedPath);
+    final gallery = item['galleryImages'] as List<dynamic>;
+    final firstImage = gallery.single as Map<String, dynamic>;
+    expect(firstImage['path'], enhancedPath);
+    expect(firstImage['originalPath'], originalPath);
+    expect(firstImage['enhancementPreset'], 'auto_enhance');
+    final metadata = firstImage['qualityMetadata'] as Map<String, dynamic>;
+    expect(metadata['selectedEnhancement'], 'aiEnhance');
+    expect(metadata['activeImagePath'], enhancedPath);
+    expect(metadata['originalImagePath'], originalPath);
+  });
+
   testWidgets('legacy one-image portfolio detail renders without overflow', (
     WidgetTester tester,
   ) async {
@@ -5887,6 +5961,25 @@ class _FakeImageEnhancementService extends ImageEnhancementService {
       activePath: originalPath,
       preset: preset,
       createdEnhancedFile: false,
+    );
+  }
+}
+
+class _PortfolioEditImageEnhancementService extends ImageEnhancementService {
+  const _PortfolioEditImageEnhancementService(this.enhancedPath);
+
+  final String enhancedPath;
+
+  @override
+  Future<ImageEnhancementResult> enhance({
+    required String originalPath,
+    required ImageEnhancementPreset preset,
+  }) async {
+    return ImageEnhancementResult(
+      originalPath: originalPath,
+      activePath: enhancedPath,
+      preset: preset,
+      createdEnhancedFile: true,
     );
   }
 }
