@@ -15,6 +15,112 @@ enum GradientStyle {
   tealEmerald,
 }
 
+class PackLoxGradients {
+  const PackLoxGradients._();
+
+  static List<Color> build(GradientStyle style, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return switch (style) {
+      GradientStyle.blueIndigo =>
+        isDark
+            ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
+            : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
+      GradientStyle.purpleDeepBlue =>
+        isDark
+            ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
+            : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
+      GradientStyle.tealEmerald =>
+        isDark
+            ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
+            : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
+    };
+  }
+}
+
+class HeroDecorativeCircle extends StatelessWidget {
+  const HeroDecorativeCircle({
+    required this.diameter,
+    required this.strokeWidth,
+    required this.opacity,
+    super.key,
+  });
+
+  final double diameter;
+  final double strokeWidth;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: colorScheme.onPrimary.withValues(alpha: opacity),
+          width: strokeWidth,
+        ),
+      ),
+    );
+  }
+}
+
+class HeroSurfaceContainerHighest extends StatelessWidget {
+  const HeroSurfaceContainerHighest({
+    required this.height,
+    required this.padding,
+    required this.gradientStyle,
+    required this.child,
+    this.decorativeChildren = const [],
+    super.key,
+  });
+
+  final double height;
+  final EdgeInsetsGeometry padding;
+  final GradientStyle gradientStyle;
+  final Widget child;
+  final List<Widget> decorativeChildren;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final gradientColors = PackLoxGradients.build(gradientStyle, context);
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        bottom: Radius.circular(AppRadius.xxl),
+      ),
+      child: Container(
+        height: height,
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppRadius.xxl),
+          ),
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: gradientColors.last.withValues(
+                alpha: isDark ? 0.20 : 0.26,
+              ),
+              blurRadius: 36,
+              offset: const Offset(0, 20),
+            ),
+          ],
+        ),
+        child: Stack(children: [...decorativeChildren, child]),
+      ),
+    );
+  }
+}
+
 /// Compact rounded gradient header for settings sections.
 class GradientHeader extends StatefulWidget {
   /// Creates a gradient header.
