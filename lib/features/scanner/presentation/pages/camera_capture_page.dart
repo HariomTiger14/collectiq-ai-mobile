@@ -265,7 +265,6 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
                 errorMessage: _errorMessage,
                 isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
                 liveEnhanceEnabled: _liveEnhanceEnabled,
-                onBack: () => Navigator.of(context).maybePop(),
                 onCapture: _captureImage,
                 onFlash: _toggleFlash,
                 onGallery: _openGalleryFallback,
@@ -303,7 +302,6 @@ class _CameraLiveView extends StatelessWidget {
     required this.errorMessage,
     required this.isPermissionPermanentlyDenied,
     required this.liveEnhanceEnabled,
-    required this.onBack,
     required this.onCapture,
     required this.onFlash,
     required this.onGallery,
@@ -320,7 +318,6 @@ class _CameraLiveView extends StatelessWidget {
   final String? errorMessage;
   final bool isPermissionPermanentlyDenied;
   final bool liveEnhanceEnabled;
-  final VoidCallback onBack;
   final VoidCallback onCapture;
   final VoidCallback onFlash;
   final VoidCallback onGallery;
@@ -344,15 +341,6 @@ class _CameraLiveView extends StatelessWidget {
             isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
             onRetryPermission: onRetryPermission,
             onOpenSettings: onOpenSettings,
-          ),
-        ),
-        Positioned(
-          top: 4,
-          left: 12,
-          child: IconButton.filled(
-            onPressed: onBack,
-            icon: const Icon(Icons.close),
-            tooltip: 'Close camera',
           ),
         ),
         if (isReady && (cameraService?.canToggleFlash ?? false))
