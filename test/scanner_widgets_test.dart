@@ -751,7 +751,7 @@ void main() {
       find.byKey(const ValueKey('collectible-detail-gallery-filmstrip')),
       findsOneWidget,
     );
-    expect(find.text('Front'), findsOneWidget);
+    expect(find.text('Front'), findsWidgets);
     expect(find.text('Back'), findsOneWidget);
   });
 

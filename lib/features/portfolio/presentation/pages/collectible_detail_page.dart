@@ -32,6 +32,7 @@ class CollectibleDetailPage extends ConsumerStatefulWidget {
 class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
   bool _isFavorited = false;
+  String? _selectedGalleryPath;
 
   @override
   void initState() {
@@ -53,6 +54,9 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
             .where((portfolioItem) => portfolioItem.id == widget.item.id)
             .firstOrNull ??
         widget.item;
+    final galleryImages = currentItem.effectiveGalleryImages;
+    final selectedImage = _selectedImageFor(currentItem, _selectedGalleryPath);
+    _selectedGalleryPath ??= selectedImage?.path;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -88,22 +92,33 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                       children: [
                         _PremiumDetailHero(
                           item: currentItem,
-                          onImageTap: () =>
-                              _showImageViewer(context, currentItem),
+                          selectedImage: selectedImage,
+                          onImageSelected: (image) {
+                            setState(() => _selectedGalleryPath = image.path);
+                          },
+                          onImageTap: selectedImage == null
+                              ? null
+                              : () => _showImageViewer(
+                                  context,
+                                  item: currentItem,
+                                  initialImage: selectedImage,
+                                  onUseAsPrimary: _setPrimaryImage,
+                                  onDelete: _deleteGalleryImage,
+                                ),
                         ),
                         if (currentItem.confidence < 0.70) ...[
                           const SizedBox(height: AppSpacing.lg),
                           const _LowConfidenceBanner(),
                         ],
                         const SizedBox(height: AppSpacing.lg),
-                        _PrimaryMetadataSection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
                         _AiSummarySection(item: currentItem),
                         const SizedBox(height: AppSpacing.lg),
                         _KeyAttributeChipsSection(item: currentItem),
                         const SizedBox(height: AppSpacing.lg),
-                        _PortfolioInformationSection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
+                        if (galleryImages.length == 1)
+                          _SingleImageHint(image: galleryImages.single),
+                        if (galleryImages.length == 1)
+                          const SizedBox(height: AppSpacing.lg),
                         _NotesCard(item: currentItem),
                         const SizedBox(height: AppSpacing.lg),
                         _DetailActionSection(
@@ -151,6 +166,64 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       ),
     );
   }
+
+  Future<void> _setPrimaryImage(
+    CollectibleItem item,
+    CollectibleImage image,
+  ) async {
+    final normalized = _normalizedGalleryWithPrimary(item, image.path);
+    if (normalized.isEmpty) {
+      return;
+    }
+    setState(() => _selectedGalleryPath = image.path);
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .updateItem(
+          item.copyWith(imagePath: image.path, galleryImages: normalized),
+        );
+    if (mounted) {
+      _showDetailSnackBar(context, 'Primary image updated');
+    }
+  }
+
+  Future<void> _deleteGalleryImage(
+    CollectibleItem item,
+    CollectibleImage image,
+  ) async {
+    final existing = item.effectiveGalleryImages;
+    if (existing.length <= 1) {
+      if (mounted) {
+        _showDetailSnackBar(context, 'Keep at least one portfolio image');
+      }
+      return;
+    }
+
+    final remaining = existing
+        .where((candidate) => candidate.path != image.path)
+        .toList(growable: false);
+    final nextPrimary = remaining.any((candidate) => candidate.isPrimary)
+        ? remaining.firstWhere((candidate) => candidate.isPrimary)
+        : remaining.first;
+    final normalized = [
+      for (final candidate in remaining)
+        CollectibleImage(
+          path: candidate.path,
+          role: candidate.role,
+          source: candidate.source,
+          isPrimary: candidate.path == nextPrimary.path,
+        ),
+    ];
+
+    setState(() => _selectedGalleryPath = nextPrimary.path);
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .updateItem(
+          item.copyWith(imagePath: nextPrimary.path, galleryImages: normalized),
+        );
+    if (mounted) {
+      _showDetailSnackBar(context, 'Photo removed');
+    }
+  }
 }
 
 void _shareItem(BuildContext context, CollectibleItem item) {
@@ -195,19 +268,82 @@ Future<void> _confirmDetailDelete(
   }
 }
 
-void _showImageViewer(BuildContext context, CollectibleItem item) {
+CollectibleImage? _selectedImageFor(
+  CollectibleItem item,
+  String? selectedPath,
+) {
+  final images = item.effectiveGalleryImages;
+  if (images.isEmpty) {
+    return null;
+  }
+  final normalizedPath = selectedPath?.trim();
+  if (normalizedPath != null && normalizedPath.isNotEmpty) {
+    for (final image in images) {
+      if (image.path == normalizedPath) {
+        return image;
+      }
+    }
+  }
+  for (final image in images) {
+    if (image.isPrimary || image.path == item.imagePath) {
+      return image;
+    }
+  }
+  return images.first;
+}
+
+List<CollectibleImage> _normalizedGalleryWithPrimary(
+  CollectibleItem item,
+  String primaryPath,
+) {
+  final images = item.effectiveGalleryImages;
+  if (images.isEmpty) {
+    return const [];
+  }
+  return [
+    for (final image in images)
+      CollectibleImage(
+        path: image.path,
+        role: image.role,
+        source: image.source,
+        isPrimary: image.path == primaryPath,
+      ),
+  ];
+}
+
+void _showImageViewer(
+  BuildContext context, {
+  required CollectibleItem item,
+  required CollectibleImage initialImage,
+  required Future<void> Function(CollectibleItem item, CollectibleImage image)
+  onUseAsPrimary,
+  required Future<void> Function(CollectibleItem item, CollectibleImage image)
+  onDelete,
+}) {
   showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.92),
-    builder: (_) => _FullscreenImageViewer(item: item),
+    builder: (_) => _PortfolioGalleryReview(
+      item: item,
+      initialImage: initialImage,
+      onUseAsPrimary: onUseAsPrimary,
+      onDelete: onDelete,
+    ),
   );
 }
 
 class _PremiumDetailHero extends StatelessWidget {
-  const _PremiumDetailHero({required this.item, required this.onImageTap});
+  const _PremiumDetailHero({
+    required this.item,
+    required this.selectedImage,
+    required this.onImageSelected,
+    required this.onImageTap,
+  });
 
   final CollectibleItem item;
-  final VoidCallback onImageTap;
+  final CollectibleImage? selectedImage;
+  final ValueChanged<CollectibleImage> onImageSelected;
+  final VoidCallback? onImageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -234,12 +370,21 @@ class _PremiumDetailHero extends StatelessWidget {
               onTap: onImageTap,
               child: AspectRatio(
                 aspectRatio: 16 / 11,
-                child: _DetailImageSurface(item: item),
+                child: _DetailImageSurface(
+                  key: ValueKey(
+                    'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                  ),
+                  item: item,
+                  image: selectedImage,
+                ),
               ),
             ),
           ),
-          if (item.effectiveGalleryImages.length > 1)
-            _DetailGalleryFilmstrip(item: item),
+          _DetailGalleryFilmstrip(
+            item: item,
+            selectedPath: selectedImage?.path,
+            onSelected: onImageSelected,
+          ),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
@@ -280,14 +425,16 @@ class _PremiumDetailHero extends StatelessWidget {
 }
 
 class _DetailImageSurface extends StatelessWidget {
-  const _DetailImageSurface({required this.item});
+  const _DetailImageSurface({required this.item, super.key, this.image});
 
   final CollectibleItem item;
+  final CollectibleImage? image;
 
   @override
   Widget build(BuildContext context) {
-    final imagePath = (item.cloudImageUrl ?? item.imagePath).trim();
-    final placeholder = _DetailImagePlaceholder(item: item);
+    final imagePath = (image?.path ?? item.cloudImageUrl ?? item.imagePath)
+        .trim();
+    final placeholder = _DetailImagePlaceholder(item: item, image: image);
     if (imagePath.isEmpty || imagePath.startsWith('sample://')) {
       return placeholder;
     }
@@ -314,9 +461,10 @@ class _DetailImageSurface extends StatelessWidget {
 }
 
 class _DetailImagePlaceholder extends StatelessWidget {
-  const _DetailImagePlaceholder({required this.item});
+  const _DetailImagePlaceholder({required this.item, this.image});
 
   final CollectibleItem item;
+  final CollectibleImage? image;
 
   @override
   Widget build(BuildContext context) {
@@ -347,7 +495,9 @@ class _DetailImagePlaceholder extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              _fallback(item.category, fallback: 'Collectible image'),
+              image == null
+                  ? _fallback(item.category, fallback: 'Collectible image')
+                  : _galleryRoleLabel(image!),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.titleMedium?.copyWith(
@@ -363,9 +513,15 @@ class _DetailImagePlaceholder extends StatelessWidget {
 }
 
 class _DetailGalleryFilmstrip extends StatelessWidget {
-  const _DetailGalleryFilmstrip({required this.item});
+  const _DetailGalleryFilmstrip({
+    required this.item,
+    required this.selectedPath,
+    required this.onSelected,
+  });
 
   final CollectibleItem item;
+  final String? selectedPath;
+  final ValueChanged<CollectibleImage> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -373,12 +529,12 @@ class _DetailGalleryFilmstrip extends StatelessWidget {
     final images = item.effectiveGalleryImages;
     return Container(
       key: const ValueKey('collectible-detail-gallery-filmstrip'),
-      height: 112,
+      height: 132,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
         AppSpacing.md,
-        0,
+        AppSpacing.xs,
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -386,41 +542,61 @@ class _DetailGalleryFilmstrip extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
           final image = images[index];
+          final selected = image.path == selectedPath;
           return SizedBox(
             key: ValueKey('collectible-detail-gallery-${image.path}'),
-            width: 92,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(
-                  color: image.isPrimary
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant,
-                  width: image.isPrimary ? 2 : 1,
+            width: 116,
+            child: InkWell(
+              onTap: () => onSelected(image),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(
+                    color: selected || image.isPrimary
+                        ? colorScheme.primary
+                        : colorScheme.outlineVariant,
+                    width: selected ? 2.5 : 1,
+                  ),
+                  boxShadow: selected ? AppElevation.level1 : null,
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(5),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        child: _DetailGalleryImage(image: image, item: item),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              child: _DetailGalleryImage(
+                                image: image,
+                                item: item,
+                              ),
+                            ),
+                            if (image.isPrimary)
+                              Positioned(
+                                top: 6,
+                                left: 6,
+                                child: _PrimaryImageBadge(compact: true),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _galleryRoleLabel(image),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
+                      const SizedBox(height: 5),
+                      Text(
+                        _shortGalleryRoleLabel(image),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -509,34 +685,240 @@ class _HeroValuePill extends StatelessWidget {
   }
 }
 
-class _FullscreenImageViewer extends StatelessWidget {
-  const _FullscreenImageViewer({required this.item});
+class _PortfolioGalleryReview extends StatefulWidget {
+  const _PortfolioGalleryReview({
+    required this.item,
+    required this.initialImage,
+    required this.onUseAsPrimary,
+    required this.onDelete,
+  });
 
   final CollectibleItem item;
+  final CollectibleImage initialImage;
+  final Future<void> Function(CollectibleItem item, CollectibleImage image)
+  onUseAsPrimary;
+  final Future<void> Function(CollectibleItem item, CollectibleImage image)
+  onDelete;
+
+  @override
+  State<_PortfolioGalleryReview> createState() =>
+      _PortfolioGalleryReviewState();
+}
+
+class _PortfolioGalleryReviewState extends State<_PortfolioGalleryReview> {
+  late final PageController _pageController;
+  late List<CollectibleImage> _images;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _images = widget.item.effectiveGalleryImages.toList(growable: true);
+    _index = _images.indexWhere(
+      (image) => image.path == widget.initialImage.path,
+    );
+    if (_index < 0) {
+      _index = 0;
+    }
+    _pageController = PageController(initialPage: _index);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final image = _images[_index];
+    final canDelete = _images.length > 1;
     return Dialog.fullscreen(
       backgroundColor: Colors.black,
-      child: Stack(
-        children: [
-          Center(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: _DetailImageSurface(item: item),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              key: const ValueKey('portfolio-gallery-page-view'),
+              controller: _pageController,
+              itemCount: _images.length,
+              onPageChanged: (value) => setState(() => _index = value),
+              itemBuilder: (context, index) {
+                return Center(
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: _DetailImageSurface(
+                      item: widget.item,
+                      image: _images[index],
+                    ),
+                  ),
+                );
+              },
             ),
-          ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + AppSpacing.sm,
-            right: AppSpacing.sm,
-            child: IconButton.filledTonal(
-              tooltip: 'Close image preview',
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
+            Positioned(
+              top: AppSpacing.md,
+              left: AppSpacing.md,
+              right: AppSpacing.md,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _ReviewPill(
+                          label: 'Photo ${_index + 1} of ${_images.length}',
+                        ),
+                        _ReviewPill(label: _shortGalleryRoleLabel(image)),
+                        if (image.isPrimary) const _PrimaryImageBadge(),
+                      ],
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    key: const ValueKey('portfolio-gallery-close'),
+                    tooltip: 'Close image preview',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             ),
+            Positioned(
+              left: AppSpacing.md,
+              right: AppSpacing.md,
+              bottom: AppSpacing.md,
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                alignment: WrapAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    key: const ValueKey('portfolio-gallery-primary'),
+                    onPressed: image.isPrimary
+                        ? null
+                        : () async {
+                            await widget.onUseAsPrimary(widget.item, image);
+                            if (!mounted) {
+                              return;
+                            }
+                            setState(() {
+                              _images = [
+                                for (final candidate in _images)
+                                  CollectibleImage(
+                                    path: candidate.path,
+                                    role: candidate.role,
+                                    source: candidate.source,
+                                    isPrimary: candidate.path == image.path,
+                                  ),
+                              ];
+                            });
+                          },
+                    icon: const Icon(Icons.star_outline),
+                    label: const Text('Use as Primary'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('portfolio-gallery-delete'),
+                    onPressed: canDelete
+                        ? () async {
+                            final deleting = _images[_index];
+                            await widget.onDelete(widget.item, deleting);
+                            if (!mounted) {
+                              return;
+                            }
+                            setState(() {
+                              _images.removeAt(_index);
+                              if (_index >= _images.length) {
+                                _index = _images.length - 1;
+                              }
+                            });
+                            _pageController.jumpToPage(_index);
+                          }
+                        : null,
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(
+                      canDelete ? 'Delete photo' : 'Keep final photo',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewPill extends StatelessWidget {
+  const _ReviewPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryImageBadge extends StatelessWidget {
+  const _PrimaryImageBadge({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 6 : 9,
+          vertical: compact ? 3 : 5,
+        ),
+        child: Text(
+          compact ? 'Primary' : 'Primary image',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SingleImageHint extends StatelessWidget {
+  const _SingleImageHint({required this.image});
+
+  final CollectibleImage image;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '${_shortGalleryRoleLabel(image)} image saved',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
@@ -589,43 +971,6 @@ class _LowConfidenceBanner extends StatelessWidget {
   }
 }
 
-class _PrimaryMetadataSection extends StatelessWidget {
-  const _PrimaryMetadataSection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppProfileSection(
-      title: 'Primary Metadata',
-      children: [
-        AppCompactMetadata(
-          items: [
-            AppMetadataItem(label: 'Category', value: _fallback(item.category)),
-            AppMetadataItem(
-              label: 'Brand / Manufacturer',
-              value: _fallback(item.brand),
-            ),
-            AppMetadataItem(label: 'Year', value: _fallback(item.year)),
-            AppMetadataItem(
-              label: 'Condition',
-              value: _fallback(item.condition),
-            ),
-            AppMetadataItem(
-              label: 'Variant',
-              value: _fallback(item.setName ?? item.edition ?? item.rarity),
-            ),
-            AppMetadataItem(label: 'Language', value: _fallback(item.language)),
-            AppMetadataItem(label: 'Country', value: _fallback(item.country)),
-            AppMetadataItem(label: 'Series', value: _fallback(item.series)),
-            AppMetadataItem(label: 'Material', value: _fallback(item.material)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
 class _AiSummarySection extends StatelessWidget {
   const _AiSummarySection({required this.item});
 
@@ -663,44 +1008,6 @@ class _KeyAttributeChipsSection extends StatelessWidget {
           children: [
             for (final chip in chips)
               _DetailChip(icon: Icons.sell_outlined, label: chip),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PortfolioInformationSection extends StatelessWidget {
-  const _PortfolioInformationSection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppProfileSection(
-      title: 'Portfolio Information',
-      children: [
-        AppCompactMetadata(
-          items: [
-            AppMetadataItem(
-              label: 'Date Added',
-              value: _formatDate(item.createdAt),
-            ),
-            AppMetadataItem(
-              label: 'Last Updated',
-              value: _formatDate(item.lastSyncedAt ?? item.createdAt),
-            ),
-            AppMetadataItem(label: 'Scan Source', value: _scanSource(item)),
-            AppMetadataItem(label: 'Image Source', value: _imageSource(item)),
-            AppMetadataItem(
-              label: 'Confidence',
-              value: _confidencePercent(item.confidence),
-            ),
-            AppMetadataItem(
-              label: 'Estimated Value',
-              value: _formatAud(item.estimatedValue),
-            ),
-            AppMetadataItem(label: 'Notes', value: _fallback(item.notes)),
           ],
         ),
       ],
@@ -1287,8 +1594,9 @@ class _DetailSections extends StatelessWidget {
     return Column(
       children: [
         if (item.pricing != null) ...[
-          AppProfileSection(
-            title: 'Market Pricing',
+          _DetailExpansionSection(
+            title: 'Market Evidence',
+            icon: Icons.paid_outlined,
             children: [
               AppCompactMetadata(
                 items: [
@@ -1324,18 +1632,26 @@ class _DetailSections extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
         ],
         if (item.marketSummary != null) ...[
-          _MarketIntelligenceSection(summary: item.marketSummary!),
+          _DetailExpansionSection(
+            title: 'Market Summary',
+            icon: Icons.query_stats_outlined,
+            children: [
+              _MarketIntelligenceSection(summary: item.marketSummary!),
+            ],
+          ),
           const SizedBox(height: AppSpacing.xl),
         ],
         if (collectibleDetails.isNotEmpty) ...[
-          AppProfileSection(
-            title: 'Key Attributes',
+          _DetailExpansionSection(
+            title: 'Primary Metadata',
+            icon: Icons.tune_outlined,
             children: [AppCompactMetadata(items: collectibleDetails)],
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
-        AppProfileSection(
-          title: 'Sync Status',
+        _DetailExpansionSection(
+          title: 'Raw Diagnostics',
+          icon: Icons.data_object_outlined,
           children: [
             AppCompactMetadata(
               items: [
@@ -1364,8 +1680,9 @@ class _DetailSections extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xl),
         if (_hasAiReview(item)) ...[
-          AppProfileSection(
-            title: 'AI Review',
+          _DetailExpansionSection(
+            title: 'AI Analysis',
+            icon: Icons.psychology_alt_outlined,
             children: [
               if ((item.primaryMatch ?? '').trim().isNotEmpty)
                 AppLabelValueRow(
@@ -1396,8 +1713,10 @@ class _DetailSections extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
-        AppProfileSection(
+        _DetailExpansionSection(
           title: 'Recommendation',
+          icon: Icons.lightbulb_outline,
+          initiallyExpanded: true,
           children: [
             Text(
               item.recommendation,
@@ -1450,6 +1769,56 @@ class _DetailSections extends StatelessWidget {
   }
 }
 
+class _DetailExpansionSection extends StatelessWidget {
+  const _DetailExpansionSection({
+    required this.title,
+    required this.icon,
+    required this.children,
+    this.initiallyExpanded = false,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: Material(
+          color: Colors.transparent,
+          child: ExpansionTile(
+            initiallyExpanded: initiallyExpanded,
+            leading: Icon(icon, color: colorScheme.primary),
+            title: Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MarketIntelligenceSection extends StatelessWidget {
   const _MarketIntelligenceSection({required this.summary});
 
@@ -1459,8 +1828,8 @@ class _MarketIntelligenceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final currency = _marketCurrency(summary);
 
-    return AppProfileSection(
-      title: 'Market Summary',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppCompactMetadata(
           items: [
@@ -2384,31 +2753,6 @@ String? _clean(String? value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-String _scanSource(CollectibleItem item) {
-  final imagePath = item.imagePath.trim();
-  if (imagePath.startsWith('sample://')) {
-    return 'Sample scan';
-  }
-  if (imagePath.isNotEmpty) {
-    return 'Device image';
-  }
-  return 'Unknown';
-}
-
-String _imageSource(CollectibleItem item) {
-  if ((item.cloudImageUrl ?? '').trim().isNotEmpty) {
-    return 'Cloud image';
-  }
-  final imagePath = item.imagePath.trim();
-  if (imagePath.startsWith('sample://')) {
-    return 'Sample image';
-  }
-  if (imagePath.isNotEmpty) {
-    return 'Local image';
-  }
-  return 'Unknown';
-}
-
 String _galleryRoleLabel(CollectibleImage image) {
   final role = (image.role ?? '').trim();
   if (role.isEmpty) {
@@ -2425,6 +2769,31 @@ String _galleryRoleLabel(CollectibleImage image) {
       .where((part) => part.isNotEmpty)
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
+}
+
+String _shortGalleryRoleLabel(CollectibleImage image) {
+  final label = _galleryRoleLabel(image).toLowerCase();
+  if (label.contains('front') || label.contains('obverse')) {
+    return 'Front';
+  }
+  if (label.contains('back') || label.contains('reverse')) {
+    return 'Back';
+  }
+  if (label.contains('base') ||
+      label.contains('underside') ||
+      label.contains('bottom')) {
+    return 'Base';
+  }
+  if (label.contains('detail') ||
+      label.contains('logo') ||
+      label.contains('barcode') ||
+      label.contains('close')) {
+    return 'Detail';
+  }
+  if (label.contains('primary')) {
+    return 'Primary';
+  }
+  return _galleryRoleLabel(image);
 }
 
 String _formatAud(double value) {

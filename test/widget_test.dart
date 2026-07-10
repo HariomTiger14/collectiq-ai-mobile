@@ -3159,8 +3159,207 @@ void main() {
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Estimated value'), findsOneWidget);
     expect(find.text('Wishlist Status'), findsOneWidget);
-    expect(find.text('Why this match?'), findsOneWidget);
+    expect(find.text('AI Analysis'), findsOneWidget);
     expect(find.text('Recommendation'), findsOneWidget);
+  });
+
+  testWidgets('portfolio detail gallery thumbnails switch hero image', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([_portfolioGalleryItemJson()]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await _openGalleryDetail(tester);
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-hero-sample://front')),
+      findsOneWidget,
+    );
+
+    final detailThumb = find.byKey(
+      const ValueKey('collectible-detail-gallery-sample://detail'),
+    );
+    await tester.reveal(detailThumb);
+    await tester.tap(detailThumb);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-hero-sample://detail')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('portfolio detail hero opens swipe gallery carousel', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([_portfolioGalleryItemJson()]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await _openGalleryDetail(tester);
+
+    final hero = find.byKey(const ValueKey('collectible-detail-image-preview'));
+    await tester.reveal(hero);
+    await tester.tap(hero);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('portfolio-gallery-page-view')),
+      findsOneWidget,
+    );
+    expect(find.text('Photo 1 of 3'), findsOneWidget);
+    expect(find.text('Primary image'), findsOneWidget);
+
+    await tester.fling(
+      find.byKey(const ValueKey('portfolio-gallery-page-view')),
+      const Offset(-500, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Photo 2 of 3'), findsOneWidget);
+    expect(find.text('Back'), findsWidgets);
+  });
+
+  testWidgets('portfolio detail primary image update persists', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([_portfolioGalleryItemJson()]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await _openGalleryDetail(tester);
+
+    final detailThumb = find.byKey(
+      const ValueKey('collectible-detail-gallery-sample://detail'),
+    );
+    await tester.reveal(detailThumb);
+    await tester.tap(detailThumb);
+    await tester.pumpAndSettle();
+    final hero = find.byKey(const ValueKey('collectible-detail-image-preview'));
+    await tester.reveal(hero);
+    await tester.tap(hero);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('portfolio-gallery-primary')));
+    await tester.pumpAndSettle();
+
+    final preferences = await SharedPreferences.getInstance();
+    final items =
+        jsonDecode(preferences.getString('portfolio_items')!) as List<dynamic>;
+    final item = items.single as Map<String, dynamic>;
+    expect(item['imagePath'], 'sample://detail');
+    final gallery = item['galleryImages'] as List<dynamic>;
+    final primary = gallery.whereType<Map<String, dynamic>>().singleWhere(
+      (image) => image['isPrimary'] == true,
+    );
+    expect(primary['path'], 'sample://detail');
+  });
+
+  testWidgets(
+    'portfolio detail gallery deletion persists only selected image',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([_portfolioGalleryItemJson()]),
+      });
+
+      await tester.pumpCollectIqApp();
+      await _openGalleryDetail(tester);
+
+      final backThumb = find.byKey(
+        const ValueKey('collectible-detail-gallery-sample://back'),
+      );
+      await tester.reveal(backThumb);
+      await tester.tap(backThumb);
+      await tester.pumpAndSettle();
+      final hero = find.byKey(
+        const ValueKey('collectible-detail-image-preview'),
+      );
+      await tester.reveal(hero);
+      await tester.tap(hero);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('portfolio-gallery-delete')));
+      await tester.pumpAndSettle();
+
+      final preferences = await SharedPreferences.getInstance();
+      final items =
+          jsonDecode(preferences.getString('portfolio_items')!)
+              as List<dynamic>;
+      final item = items.single as Map<String, dynamic>;
+      final gallery = item['galleryImages'] as List<dynamic>;
+      expect(gallery, hasLength(2));
+      expect(
+        gallery.whereType<Map<String, dynamic>>().map((image) => image['path']),
+        isNot(contains('sample://back')),
+      );
+      expect(item['imagePath'], 'sample://front');
+    },
+  );
+
+  testWidgets('portfolio detail cannot delete final gallery image', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        _portfolioGalleryItemJson(
+          id: 'single-gallery',
+          title: 'Single Gallery Item',
+          galleryImages: const [
+            {
+              'path': 'sample://only',
+              'role': 'front',
+              'source': 'sample',
+              'isPrimary': true,
+            },
+          ],
+          imagePath: 'sample://only',
+        ),
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await _openGalleryDetail(tester, itemId: 'single-gallery');
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-image-preview')),
+    );
+    await tester.pumpAndSettle();
+
+    final deleteButton = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('portfolio-gallery-delete')),
+    );
+    expect(deleteButton.onPressed, isNull);
+    expect(find.text('Keep final photo'), findsOneWidget);
+  });
+
+  testWidgets('legacy one-image portfolio detail renders without overflow', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        _portfolioGalleryItemJson(
+          id: 'legacy-one',
+          title: 'Legacy One Image',
+          imagePath: 'sample://legacy-card',
+          galleryImages: const [],
+        ),
+      ]),
+    });
+
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpCollectIqApp();
+    await _openGalleryDetail(tester, itemId: 'legacy-one');
+
+    expect(find.text('Legacy One Image'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-gallery-filmstrip')),
+      findsOneWidget,
+    );
+    expectNoFlutterError(tester);
   });
 
   testWidgets('collectible detail handles missing optional fields safely', (
@@ -3190,7 +3389,7 @@ void main() {
     expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
     expect(find.text('Needs Review'), findsOneWidget);
-    expect(find.text('62%'), findsWidgets);
+    expect(find.textContaining('62%'), findsWidgets);
     expect(find.text('Unknown'), findsWidgets);
     expect(find.text('AI Summary'), findsOneWidget);
     expect(
@@ -3286,8 +3485,6 @@ void main() {
     expect(find.text('Edited Silver Eagle'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
     expect(find.text(r'$300'), findsWidgets);
-    expect(find.text('US Mint'), findsOneWidget);
-    expect(find.text('American Eagle'), findsWidgets);
     expect(find.text('Edited local notes.'), findsWidgets);
 
     final preferences = await SharedPreferences.getInstance();
@@ -3299,6 +3496,11 @@ void main() {
     expect(savedItem['category'], 'Coin');
     expect(savedItem['estimatedValue'], 300);
     expect(savedItem['imagePath'], 'test/fixtures/persistent-camera-card.jpg');
+    expect(savedItem['brand'], 'US Mint');
+    expect(savedItem['series'], 'American Eagle');
+    expect(savedItem['year'], '2001');
+    expect(savedItem['country'], 'United States');
+    expect(savedItem['notes'], 'Edited local notes.');
 
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -3396,7 +3598,7 @@ void main() {
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Home Detail Charizard'), findsWidgets);
-    expect(find.text('Portfolio Information'), findsOneWidget);
+    expect(find.text('Raw Diagnostics'), findsOneWidget);
   });
 
   testWidgets('scan recent scans tap opens detail page', (
@@ -3420,7 +3622,7 @@ void main() {
 
     expect(find.text('Collectible Details'), findsOneWidget);
     expect(find.text('Scan Detail Charizard'), findsWidgets);
-    expect(find.text('Portfolio Information'), findsOneWidget);
+    expect(find.text('Raw Diagnostics'), findsOneWidget);
   });
 
   testWidgets('opens portfolio item detail page actions', (
@@ -3451,15 +3653,25 @@ void main() {
     expect(find.text('High confidence (94%)'), findsOneWidget);
     expect(find.text('Primary Metadata'), findsOneWidget);
     expect(find.text('AI Summary'), findsOneWidget);
-    expect(find.text('Portfolio Information'), findsOneWidget);
-    expect(find.text('Date Added'), findsOneWidget);
-    expect(find.text('27/06/2026'), findsWidgets);
+    expect(find.text('Raw Diagnostics'), findsOneWidget);
+    expect(find.text('Date Added'), findsNothing);
+    expect(find.text('27/06/2026'), findsNothing);
     expect(find.text('Key Attributes'), findsWidgets);
     expect(find.text('Base Set'), findsWidgets);
+    expect(find.text('4/102'), findsNothing);
+    await tester.reveal(find.text('Primary Metadata'));
+    await tester.tap(find.text('Primary Metadata'));
+    await tester.pumpAndSettle();
     expect(find.text('4/102'), findsWidgets);
     expect(find.text('Charizard'), findsWidgets);
-    expect(find.text('Market Pricing'), findsOneWidget);
+    expect(find.text('Market Evidence'), findsOneWidget);
+    await tester.reveal(find.text('Market Evidence'));
+    await tester.tap(find.text('Market Evidence'));
+    await tester.pumpAndSettle();
     expect(find.text('Market Summary'), findsOneWidget);
+    await tester.reveal(find.text('Market Summary'));
+    await tester.tap(find.text('Market Summary'));
+    await tester.pumpAndSettle();
     expect(find.text('Trend'), findsOneWidget);
     expect(find.text('Stable'), findsWidgets);
     expect(find.text('Recent comparable sales'), findsOneWidget);
@@ -4236,6 +4448,63 @@ class _MemoryUsageRepository implements UsageRepository {
   Future<void> resetUsage() async {
     count = 0;
   }
+}
+
+Future<void> _openGalleryDetail(
+  WidgetTester tester, {
+  String itemId = 'gallery-detail',
+}) async {
+  await tester.tap(find.text('Portfolio').last);
+  await tester.pump();
+  await tester.pump();
+  await tester.reveal(find.byKey(ValueKey('portfolio-grid-item-$itemId')));
+  await tester.pump();
+  await tester.tap(find.byKey(ValueKey('portfolio-grid-item-$itemId')));
+  await tester.pumpAndSettle();
+}
+
+Map<String, Object?> _portfolioGalleryItemJson({
+  String id = 'gallery-detail',
+  String title = 'Gallery Hot Wheels',
+  String imagePath = 'sample://front',
+  List<Map<String, Object?>> galleryImages = const [
+    {
+      'path': 'sample://front',
+      'role': 'front',
+      'source': 'sample',
+      'isPrimary': true,
+    },
+    {
+      'path': 'sample://back',
+      'role': 'back',
+      'source': 'sample',
+      'isPrimary': false,
+    },
+    {
+      'path': 'sample://detail',
+      'role': 'barcode',
+      'source': 'sample',
+      'isPrimary': false,
+    },
+  ],
+}) {
+  return {
+    'id': id,
+    'title': title,
+    'category': 'Toy Car',
+    'estimatedValue': 25,
+    'confidence': 0.91,
+    'condition': 'Packaged',
+    'recommendation': 'Keep complete photo set.',
+    'imagePath': imagePath,
+    'galleryImages': galleryImages,
+    'createdAt': '2026-07-07T00:00:00.000',
+    'brand': 'Hot Wheels',
+    'series': 'HW Euro',
+    'year': '2026',
+    'primaryMatch': 'Hot Wheels Audi RS 6 Avant',
+    'confidenceExplanation': 'Photos show the package and model clearly.',
+  };
 }
 
 class _SelectedCameraService extends CameraService {
