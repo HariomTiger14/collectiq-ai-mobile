@@ -60,7 +60,26 @@ class CameraService {
 
   /// Initializes camera metadata needed by the scanner feature.
   Future<void> initializeCamera() async {
+    final activeController = _controller;
+    if (activeController != null && activeController.value.isInitialized) {
+      return;
+    }
+
     _availableCameras = await availableCameras();
+    if (_availableCameras.isEmpty) {
+      throw const ScannerException(
+        message: 'No camera is available.',
+        code: 'scanner.camera.unavailable',
+      );
+    }
+
+    await disposeCamera();
+    _controller = CameraController(
+      _availableCameras[_selectedCameraIndex],
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+    await _controller?.initialize();
   }
 
   /// Reads the current camera permission state.
@@ -209,20 +228,12 @@ class CameraService {
 
   /// Opens the selected camera and prepares it for capture.
   Future<void> openCamera() async {
-    if (_availableCameras.isEmpty) {
-      throw const ScannerException(
-        message: 'No camera is available.',
-        code: 'scanner.camera.unavailable',
-      );
+    final activeController = _controller;
+    if (activeController != null && activeController.value.isInitialized) {
+      return;
     }
 
-    await disposeCamera();
-    _controller = CameraController(
-      _availableCameras[_selectedCameraIndex],
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    await _controller?.initialize();
+    await initializeCamera();
   }
 
   /// Captures an image from the active camera.
