@@ -270,10 +270,10 @@ void main() {
     );
     expect(find.text('Scan'), findsWidgets);
     expect(find.text('Import Photo'), findsOneWidget);
-    expect(find.text('Choose from gallery'), findsOneWidget);
+    expect(find.text('From gallery'), findsOneWidget);
     expect(find.text('Portfolio'), findsWidgets);
     expect(find.text('Trends'), findsOneWidget);
-    expect(find.text('Coming soon'), findsOneWidget);
+    expect(find.text('Planned'), findsOneWidget);
     expect(find.text('Soon'), findsOneWidget);
     expect(find.text('Quick Actions'), findsOneWidget);
     await tester.reveal(find.text('Portfolio Overview'));
@@ -1983,6 +1983,29 @@ void main() {
     expect(find.text('Value unavailable'), findsWidgets);
   });
 
+  testWidgets('scan result renders valuation unavailable statuses', (
+    WidgetTester tester,
+  ) async {
+    const cases = <ValuationStatus, String>{
+      ValuationStatus.providerNotConfigured:
+          'Market value unavailable — pricing source not connected yet',
+      ValuationStatus.noMarketMatch: 'No reliable market match found yet',
+      ValuationStatus.lookupFailed: 'Value lookup failed — try again',
+    };
+
+    for (final entry in cases.entries) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpCollectIqApp(
+        aiAnalysisProvider: _ValuationStatusAiAnalysisProvider(entry.key),
+      );
+      await tester.completeSampleScan();
+
+      expect(find.text(entry.value), findsWidgets);
+      expect(find.text('Valuation status'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('scan result low confidence shows needs review', (
     WidgetTester tester,
   ) async {
@@ -2211,6 +2234,31 @@ void main() {
     expect(container.read(portfolioControllerProvider).items.length, 1);
     expect(find.text('Saved to Portfolio'), findsOneWidget);
   });
+
+  test(
+    'portfolio item serialization preserves valuation status and source',
+    () {
+      final item = CollectibleItem(
+        id: 'valuation-item',
+        title: 'Hot Wheels 17 Audi RS 6 Avant',
+        category: 'Die-cast Car',
+        estimatedValue: 0,
+        confidence: 0.92,
+        condition: 'Packaged',
+        recommendation: 'Review valuation status before saving.',
+        imagePath: 'sample://hot-wheels',
+        createdAt: DateTime.utc(2026, 7, 7),
+        valuationStatus: ValuationStatus.providerNotConfigured,
+        valuationSource: 'not_configured',
+      );
+
+      final restored = CollectibleItem.fromJson(item.toJson());
+
+      expect(restored.valuationStatus, ValuationStatus.providerNotConfigured);
+      expect(restored.valuationSource, 'not_configured');
+      expect(restored.aiEstimatedValue, isNull);
+    },
+  );
 
   testWidgets('local portfolio save works when auth and cloud fail', (
     WidgetTester tester,
@@ -3840,6 +3888,60 @@ class _LowConfidenceAiAnalysisProvider implements AiAnalysisProvider {
           pricingConfidence: 0.2,
           lastUpdated: DateTime.parse('2026-06-29T00:00:00Z'),
         ),
+      ),
+    );
+  }
+}
+
+class _ValuationStatusAiAnalysisProvider implements AiAnalysisProvider {
+  const _ValuationStatusAiAnalysisProvider(this.status);
+
+  final ValuationStatus status;
+
+  @override
+  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) async {
+    final now = DateTime.now();
+    final marketValue = status == ValuationStatus.marketEstimated ? 42.0 : 0.0;
+    final aiValue = status == ValuationStatus.aiEstimated ? 37.0 : null;
+
+    return AiAnalysisResult(
+      recommendation: 'Review valuation status before saving.',
+      scanResult: ScanResult(
+        id: 'valuation-${status.wireValue}-${now.microsecondsSinceEpoch}',
+        title: 'Hot Wheels 17 Audi RS 6 Avant',
+        category: 'Die-cast Car',
+        estimatedValue: marketValue > 0 ? marketValue : aiValue ?? 0,
+        confidence: 0.92,
+        condition: 'Packaged',
+        thumbnail: request.imagePath,
+        scanDate: now,
+        primaryMatch: 'Hot Wheels 17 Audi RS 6 Avant',
+        alternativeMatches: const [],
+        confidenceExplanation: 'Visible packaging supports the match.',
+        detectionQuality: 'Good',
+        aiReasoning: 'The card art and vehicle silhouette match the Audi RS 6.',
+        pricing: PricingInfo(
+          estimatedMarketValue: marketValue,
+          lowEstimate: marketValue,
+          highEstimate: marketValue,
+          currency: 'AUD',
+          pricingSource: status == ValuationStatus.providerNotConfigured
+              ? 'not_configured'
+              : 'test_pricing',
+          pricingConfidence: marketValue > 0 ? 0.82 : 0,
+          lastUpdated: now,
+          valuationStatus: status,
+          valuationSource: status == ValuationStatus.providerNotConfigured
+              ? 'not_configured'
+              : 'test_pricing',
+          aiEstimatedValue: aiValue,
+        ),
+        estimatedMarketValue: marketValue > 0 ? marketValue : null,
+        valuationStatus: status,
+        valuationSource: status == ValuationStatus.providerNotConfigured
+            ? 'not_configured'
+            : 'test_pricing',
+        aiEstimatedValue: aiValue,
       ),
     );
   }

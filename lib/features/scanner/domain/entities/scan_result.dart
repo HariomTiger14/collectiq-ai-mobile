@@ -61,6 +61,9 @@ class ScanResult {
     this.estimatedMarketValue,
     this.askingPriceWarning,
     this.valuationConfidence,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
+    this.aiEstimatedValue,
     this.photosUsed,
     this.photoRoles = const [],
   });
@@ -127,6 +130,9 @@ class ScanResult {
   final double? estimatedMarketValue;
   final String? askingPriceWarning;
   final double? valuationConfidence;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
+  final double? aiEstimatedValue;
   final int? photosUsed;
   final List<String> photoRoles;
 
@@ -174,6 +180,9 @@ class ScanResult {
       estimatedMarketValue: estimatedMarketValue,
       askingPriceWarning: askingPriceWarning,
       valuationConfidence: valuationConfidence,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
       photosUsed: photosUsed ?? this.photosUsed,
       photoRoles: photoRoles ?? this.photoRoles,
     );

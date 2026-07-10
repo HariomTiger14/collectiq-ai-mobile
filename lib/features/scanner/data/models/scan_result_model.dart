@@ -35,6 +35,9 @@ class ScanResultModel extends ScanResult {
     super.mint,
     super.material,
     super.notes,
+    super.valuationStatus,
+    super.valuationSource,
+    super.aiEstimatedValue,
   });
 
   /// Creates a model from a JSON map.
@@ -94,6 +97,9 @@ class ScanResultModel extends ScanResult {
       mint: _optionalString(json['mint']),
       material: _optionalString(json['material']),
       notes: _optionalString(json['notes']),
+      valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
+      valuationSource: json['valuationSource'] as String? ?? 'unknown',
+      aiEstimatedValue: (json['aiEstimatedValue'] as num?)?.toDouble(),
     );
   }
 
@@ -137,6 +143,9 @@ class ScanResultModel extends ScanResult {
       'mint': mint,
       'material': material,
       'notes': notes,
+      'valuationStatus': valuationStatus.wireValue,
+      'valuationSource': valuationSource,
+      'aiEstimatedValue': aiEstimatedValue,
     };
   }
 }

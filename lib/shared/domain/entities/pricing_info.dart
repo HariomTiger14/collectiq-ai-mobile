@@ -1,5 +1,30 @@
 import 'package:collectiq_ai/core/utils/json_parse.dart';
 
+enum ValuationStatus {
+  marketEstimated('market_estimated'),
+  aiEstimated('ai_estimated'),
+  providerNotConfigured('provider_not_configured'),
+  noMarketMatch('no_market_match'),
+  lookupFailed('lookup_failed'),
+  unavailable('unavailable');
+
+  const ValuationStatus(this.wireValue);
+
+  final String wireValue;
+
+  static ValuationStatus fromJson(Object? value) {
+    final normalized = parseString(value).trim().toLowerCase();
+    return switch (normalized) {
+      'market_estimated' => ValuationStatus.marketEstimated,
+      'ai_estimated' => ValuationStatus.aiEstimated,
+      'provider_not_configured' => ValuationStatus.providerNotConfigured,
+      'no_market_match' => ValuationStatus.noMarketMatch,
+      'lookup_failed' => ValuationStatus.lookupFailed,
+      _ => ValuationStatus.unavailable,
+    };
+  }
+}
+
 /// Market pricing information supplied by a pricing provider.
 class PricingInfo {
   /// Creates immutable pricing information.
@@ -11,6 +36,9 @@ class PricingInfo {
     required this.pricingSource,
     required this.pricingConfidence,
     required this.lastUpdated,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
+    this.aiEstimatedValue,
   });
 
   final double estimatedMarketValue;
@@ -20,6 +48,9 @@ class PricingInfo {
   final String pricingSource;
   final double pricingConfidence;
   final DateTime? lastUpdated;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
+  final double? aiEstimatedValue;
 
   /// Creates pricing information from backend or local JSON.
   factory PricingInfo.fromJson(Map<String, dynamic> json) {
@@ -37,6 +68,12 @@ class PricingInfo {
           ? pricingConfidence / 100
           : pricingConfidence,
       lastUpdated: _dateTimeOrNull(json['lastUpdated']),
+      valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
+      valuationSource: parseString(
+        json['valuationSource'],
+        fallback: parseString(json['pricingSource'], fallback: 'unknown'),
+      ),
+      aiEstimatedValue: parseNullableDouble(json['aiEstimatedValue']),
     );
   }
 
@@ -50,6 +87,11 @@ class PricingInfo {
       pricingSource: 'Legacy AI estimate',
       pricingConfidence: 0,
       lastUpdated: null,
+      valuationStatus: estimatedValue > 0
+          ? ValuationStatus.aiEstimated
+          : ValuationStatus.unavailable,
+      valuationSource: 'legacy_ai_estimate',
+      aiEstimatedValue: estimatedValue > 0 ? estimatedValue : null,
     );
   }
 
@@ -63,6 +105,9 @@ class PricingInfo {
       'pricingSource': pricingSource,
       'pricingConfidence': pricingConfidence,
       'lastUpdated': lastUpdated?.toIso8601String(),
+      'valuationStatus': valuationStatus.wireValue,
+      'valuationSource': valuationSource,
+      'aiEstimatedValue': aiEstimatedValue,
     };
   }
 }

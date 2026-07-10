@@ -92,6 +92,9 @@ class CollectibleItem {
     this.mint,
     this.material,
     this.notes,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
+    this.aiEstimatedValue,
   });
 
   /// Unique item identifier.
@@ -157,6 +160,9 @@ class CollectibleItem {
   final String? mint;
   final String? material;
   final String? notes;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
+  final double? aiEstimatedValue;
 
   /// Creates a collectible item from a JSON map.
   factory CollectibleItem.fromJson(Map<String, dynamic> json) {
@@ -206,6 +212,9 @@ class CollectibleItem {
       mint: _optionalString(json['mint']),
       material: _optionalString(json['material']),
       notes: _optionalString(json['notes']),
+      valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
+      valuationSource: _optionalString(json['valuationSource']) ?? 'unknown',
+      aiEstimatedValue: _optionalDouble(json['aiEstimatedValue']),
     );
   }
 
@@ -250,6 +259,9 @@ class CollectibleItem {
       'mint': mint,
       'material': material,
       'notes': notes,
+      'valuationStatus': valuationStatus.wireValue,
+      'valuationSource': valuationSource,
+      'aiEstimatedValue': aiEstimatedValue,
     };
   }
 
@@ -452,6 +464,16 @@ DateTime _savedAtFromJson(Map<String, dynamic> json) {
       _optionalDateTime(json['createdAt']) ??
       _optionalDateTime(json['updatedAt']) ??
       DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+double? _optionalDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value);
+  }
+  return null;
 }
 
 DateTime? _optionalDateTime(Object? value) {

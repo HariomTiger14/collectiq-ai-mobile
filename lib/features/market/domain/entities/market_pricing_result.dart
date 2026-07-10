@@ -84,6 +84,10 @@ class MarketPricingResult {
       pricingSource: sourceLabel,
       pricingConfidence: confidence,
       lastUpdated: lastUpdated,
+      valuationStatus: estimatedValue > 0
+          ? ValuationStatus.marketEstimated
+          : ValuationStatus.noMarketMatch,
+      valuationSource: sourceLabel,
     );
   }
 

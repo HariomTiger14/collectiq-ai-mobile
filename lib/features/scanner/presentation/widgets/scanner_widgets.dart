@@ -1009,6 +1009,9 @@ class AiResultCard extends ConsumerWidget {
     this.estimatedMarketValue,
     this.askingPriceWarning,
     this.valuationConfidence,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
+    this.aiEstimatedValue,
     super.key,
   });
 
@@ -1084,6 +1087,9 @@ class AiResultCard extends ConsumerWidget {
   final double? estimatedMarketValue;
   final String? askingPriceWarning;
   final double? valuationConfidence;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
+  final double? aiEstimatedValue;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1154,6 +1160,9 @@ class AiResultCard extends ConsumerWidget {
               estimatedMarketValue: estimatedMarketValue,
               askingPriceWarning: askingPriceWarning,
               valuationConfidence: valuationConfidence,
+              valuationStatus: valuationStatus,
+              valuationSource: valuationSource,
+              aiEstimatedValue: aiEstimatedValue,
             ),
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
@@ -1862,6 +1871,29 @@ String _formatPricingDate(DateTime? date) {
   return '$day/$month/${date.year}';
 }
 
+String _valuationStatusLabel(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => 'Market-estimated',
+    ValuationStatus.aiEstimated => 'AI-estimated',
+    ValuationStatus.providerNotConfigured => 'Pricing source not connected',
+    ValuationStatus.noMarketMatch => 'No market match',
+    ValuationStatus.lookupFailed => 'Lookup failed',
+    ValuationStatus.unavailable => 'Unavailable',
+  };
+}
+
+String _valuationStatusMessage(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.providerNotConfigured =>
+      'Market value unavailable — pricing source not connected yet',
+    ValuationStatus.noMarketMatch => 'No reliable market match found yet',
+    ValuationStatus.lookupFailed => 'Value lookup failed — try again',
+    ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
+    ValuationStatus.marketEstimated => 'Value unavailable',
+    ValuationStatus.unavailable => 'Value unavailable',
+  };
+}
+
 class _MetadataDetail {
   const _MetadataDetail(this.label, String? value) : value = value ?? '';
 
@@ -1892,6 +1924,9 @@ class _TrustSummaryCard extends StatelessWidget {
     this.estimatedMarketValue,
     this.askingPriceWarning,
     this.valuationConfidence,
+    this.valuationStatus = ValuationStatus.unavailable,
+    this.valuationSource = 'unknown',
+    this.aiEstimatedValue,
   });
 
   final String pricingSource;
@@ -1903,6 +1938,9 @@ class _TrustSummaryCard extends StatelessWidget {
   final double? estimatedMarketValue;
   final String? askingPriceWarning;
   final double? valuationConfidence;
+  final ValuationStatus valuationStatus;
+  final String valuationSource;
+  final double? aiEstimatedValue;
 
   @override
   Widget build(BuildContext context) {
@@ -1947,6 +1985,11 @@ class _TrustSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           AppLabelValueRow(label: 'Pricing source', value: pricingSource),
+          AppLabelValueRow(
+            label: 'Valuation status',
+            value: _valuationStatusLabel(valuationStatus),
+          ),
+          AppLabelValueRow(label: 'Valuation source', value: valuationSource),
           AppLabelValueRow(label: 'Freshness', value: freshnessLabel),
           AppLabelValueRow(label: 'Photos used', value: usedLabel),
           if (faceValue != null && faceValue! > 0)
@@ -1954,12 +1997,23 @@ class _TrustSummaryCard extends StatelessWidget {
               label: 'Face value',
               value: _formatMoney(faceValue!, 'AUD'),
             ),
-          if (estimatedMarketValue != null)
+          if (estimatedMarketValue != null &&
+              valuationStatus == ValuationStatus.marketEstimated)
             AppLabelValueRow(
               label: 'Market value',
-              value: estimatedMarketValue! <= 0
-                  ? 'Insufficient evidence'
-                  : _formatMoney(estimatedMarketValue!, 'AUD'),
+              value: _formatMoney(estimatedMarketValue!, 'AUD'),
+            ),
+          if (aiEstimatedValue != null &&
+              valuationStatus == ValuationStatus.aiEstimated)
+            AppLabelValueRow(
+              label: 'AI-estimated value',
+              value: _formatMoney(aiEstimatedValue!, 'AUD'),
+            ),
+          if (valuationStatus != ValuationStatus.marketEstimated &&
+              valuationStatus != ValuationStatus.aiEstimated)
+            AppLabelValueRow(
+              label: 'Value note',
+              value: _valuationStatusMessage(valuationStatus),
             ),
           AppLabelValueRow(
             label: 'Pricing confidence',
