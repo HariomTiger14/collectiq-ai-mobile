@@ -1355,21 +1355,32 @@ void main() {
           role: ScanCaptureRole.back,
           source: 'camera',
         ),
+        CapturedScanImage(
+          path: 'close.jpg',
+          role: ScanCaptureRole.closeUp,
+          source: 'camera',
+        ),
+        CapturedScanImage(
+          path: 'damage.jpg',
+          role: ScanCaptureRole.damageDetail,
+          source: 'camera',
+        ),
       ]);
 
       expect(identifyReady.isMinimumReadyForAnalyze, isTrue);
       expect(identifyReady.nextRecommendedRole, ScanCaptureRole.back);
       expect(detailedReady.isMinimumReadyForAnalyze, isTrue);
-      expect(detailedReady.nextRecommendedRole, ScanCaptureRole.edge);
+      expect(detailedReady.nextRecommendedRole, ScanCaptureRole.damageDetail);
       expect(saleReady.isMinimumReadyForAnalyze, isTrue);
       expect(saleReady.requiredRoles, [
         ScanCaptureRole.front,
         ScanCaptureRole.back,
-      ]);
-      expect(saleReady.optionalRoles, [
         ScanCaptureRole.closeUp,
         ScanCaptureRole.damageDetail,
+      ]);
+      expect(saleReady.optionalRoles, [
         ScanCaptureRole.serialOrMark,
+        ScanCaptureRole.angledReflective,
       ]);
     });
 
@@ -1388,12 +1399,32 @@ void main() {
               role: ScanCaptureRole.back,
               source: 'camera',
             ),
+            CapturedScanImage(
+              path: 'close.jpg',
+              role: ScanCaptureRole.closeUp,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'damage.jpg',
+              role: ScanCaptureRole.damageDetail,
+              source: 'camera',
+            ),
           ]);
       final afterBackDelete = service
           .buildPlan(ScanGoal.prepareForSale, null, const [
             CapturedScanImage(
               path: 'front.jpg',
               role: ScanCaptureRole.front,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'close.jpg',
+              role: ScanCaptureRole.closeUp,
+              source: 'camera',
+            ),
+            CapturedScanImage(
+              path: 'damage.jpg',
+              role: ScanCaptureRole.damageDetail,
               source: 'camera',
             ),
           ]);
@@ -1812,6 +1843,55 @@ void main() {
                 (error) => error.message,
                 'message',
                 'Backend provider unavailable.',
+              ),
+        ),
+      );
+    });
+
+    test('FastAPI detail error preserves analyzer error code', () async {
+      final service = DioAiBackendApiService(
+        endpointUrl: 'https://api.collectiq.test/analyze',
+        dio: Dio()
+          ..httpClientAdapter = _FakeDioAdapter(
+            statusCode: 422,
+            responseData: {
+              'detail': {
+                'code': 'INVALID_IMAGE_PAYLOAD',
+                'message': 'Real AI analysis requires uploaded image bytes.',
+                'retryable': false,
+                'details': {
+                  'missingImageBytes': [
+                    {'fileName': 'hot-wheels.jpg'},
+                  ],
+                },
+              },
+            },
+          ),
+      );
+      final client = HttpAiBackendClient(
+        endpointUrl: 'https://api.collectiq.test/analyze',
+        apiService: service,
+      );
+
+      await expectLater(
+        client.analyze(_backendFileRequest()),
+        throwsA(
+          isA<AiBackendClientException>()
+              .having(
+                (error) => error.type,
+                'type',
+                AiBackendClientErrorType.backendError,
+              )
+              .having((error) => error.statusCode, 'statusCode', 422)
+              .having(
+                (error) => error.message,
+                'message',
+                'Real AI analysis requires uploaded image bytes.',
+              )
+              .having(
+                (error) => error.details['details']?['missingImageBytes'],
+                'missing image bytes',
+                isA<List>(),
               ),
         ),
       );
@@ -2280,6 +2360,12 @@ void main() {
           );
           expect(script, contains('--dart-define=API_BASE_URL=%API_BASE_URL%'));
           expect(script, contains('--dart-define=APP_ENV=sit'));
+          expect(
+            script,
+            contains(
+              '--dart-define=AI_ANALYSIS_PROVIDER=%AI_ANALYSIS_PROVIDER%',
+            ),
+          );
           expect(script, contains('--dart-define=USE_CLOUD_AUTH=true'));
           expect(
             script,
@@ -2290,6 +2376,10 @@ void main() {
             contains('--dart-define=USE_CLOUD_IMAGE_STORAGE=true'),
           );
           expect(script, contains('scripts\\load_env.bat'));
+          expect(
+            script,
+            isNot(contains('--dart-define=AI_ANALYSIS_PROVIDER=mock')),
+          );
           expect(script, isNot(contains('ljrkhamgbgtsicqdisos')));
         }
       },

@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Alternative match displayed in the scan result review.
@@ -66,6 +67,7 @@ class ScanResult {
     this.aiEstimatedValue,
     this.photosUsed,
     this.photoRoles = const [],
+    this.galleryImages = const [],
   });
 
   /// Unique scan identifier.
@@ -135,6 +137,7 @@ class ScanResult {
   final double? aiEstimatedValue;
   final int? photosUsed;
   final List<String> photoRoles;
+  final List<CollectibleImage> galleryImages;
 
   /// Creates a copy with local review edits applied before saving.
   ScanResult copyWith({
@@ -145,6 +148,7 @@ class ScanResult {
     String? notes,
     int? photosUsed,
     List<String>? photoRoles,
+    List<CollectibleImage>? galleryImages,
   }) {
     return ScanResult(
       id: id,
@@ -185,6 +189,7 @@ class ScanResult {
       aiEstimatedValue: aiEstimatedValue,
       photosUsed: photosUsed ?? this.photosUsed,
       photoRoles: photoRoles ?? this.photoRoles,
+      galleryImages: galleryImages ?? this.galleryImages,
     );
   }
 }

@@ -16,6 +16,7 @@ class CaptureWorkspace extends StatelessWidget {
     required this.slots,
     required this.isBusy,
     required this.hasResult,
+    this.selectedPath,
     required this.onPrimaryCapture,
     required this.onAnalyze,
     required this.onCamera,
@@ -34,6 +35,7 @@ class CaptureWorkspace extends StatelessWidget {
   final Map<String, ScannerPhotoSlot> slots;
   final bool isBusy;
   final bool hasResult;
+  final String? selectedPath;
   final VoidCallback? onPrimaryCapture;
   final VoidCallback? onAnalyze;
   final Future<void> Function(String role) onCamera;
@@ -56,6 +58,7 @@ class CaptureWorkspace extends StatelessWidget {
     final nextRole = plan.nextRecommendedRole;
     final analyzeReady = plan.isMinimumReadyForAnalyze;
     final roles = [...plan.requiredRoles, ...plan.optionalRoles];
+    final activeSlot = _activeSlot(slots, selectedPath);
     final primaryLabel = analyzeReady
         ? 'Analyze ${slots.length} photo${slots.length == 1 ? '' : 's'}'
         : 'Capture ${nextRole?.title ?? ScanCaptureRole.front.title}';
@@ -92,7 +95,7 @@ class CaptureWorkspace extends StatelessWidget {
                 ),
               ),
               Text(
-                '${slots.length} ready',
+                _photoCountLabel(slots.length, analyzeReady),
                 style: textTheme.labelMedium?.copyWith(
                   color: colorScheme.primary,
                   fontWeight: FontWeight.w900,
@@ -102,6 +105,10 @@ class CaptureWorkspace extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           _NextRecommendedBlock(role: nextRole, guidance: plan.userGuidance),
+          if (activeSlot != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _ActiveCapturePreview(slot: activeSlot),
+          ],
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
             width: double.infinity,
@@ -129,7 +136,7 @@ class CaptureWorkspace extends StatelessWidget {
             roles: roles,
             requiredRoles: plan.requiredRoles,
             slots: slots,
-            selectedPath: slots.values.lastOrNull?.path,
+            selectedPath: selectedPath ?? activeSlot?.path,
             canAddPhoto: nextRole != null,
             isBusy: isBusy,
             onTapImage: onPreview,
@@ -287,6 +294,71 @@ class ScanImageFilmstrip extends StatelessWidget {
             onDelete: slot == null ? null : () => onDelete(slot),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ActiveCapturePreview extends StatelessWidget {
+  const _ActiveCapturePreview({required this.slot});
+
+  final ScannerPhotoSlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      key: const ValueKey('scan-active-capture-preview'),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 10,
+            child: ScanThumbnail(imagePath: slot.path),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    slot.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  slot.source,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -939,11 +1011,18 @@ String _shortRoleLabel(ScanCaptureRole role) {
   return switch (role) {
     ScanCaptureRole.front => 'Front',
     ScanCaptureRole.back => 'Back',
+    ScanCaptureRole.leftSide => 'Left',
+    ScanCaptureRole.rightSide => 'Right',
     ScanCaptureRole.closeUp => 'Close-up',
     ScanCaptureRole.edge => 'Edge',
     ScanCaptureRole.side => 'Side',
     ScanCaptureRole.top => 'Top',
     ScanCaptureRole.bottom => 'Bottom',
+    ScanCaptureRole.baseUnderside => 'Base',
+    ScanCaptureRole.barcode => 'Barcode',
+    ScanCaptureRole.cornerCondition => 'Corner',
+    ScanCaptureRole.surfaceGlare => 'Glare',
+    ScanCaptureRole.dateMint => 'Date',
     ScanCaptureRole.serialOrMark => 'Serial',
     ScanCaptureRole.damageDetail => 'Damage',
     ScanCaptureRole.angledReflective => 'Angle',
@@ -952,6 +1031,31 @@ String _shortRoleLabel(ScanCaptureRole role) {
 
 bool _hasWarning(Map<String, Object?> qualityMetadata) {
   return qualityMetadata['severity'] == 'WARNING';
+}
+
+ScannerPhotoSlot? _activeSlot(
+  Map<String, ScannerPhotoSlot> slots,
+  String? selectedPath,
+) {
+  if (slots.isEmpty) {
+    return null;
+  }
+  final normalizedPath = selectedPath?.trim();
+  if (normalizedPath != null && normalizedPath.isNotEmpty) {
+    for (final slot in slots.values) {
+      if (slot.path == normalizedPath) {
+        return slot;
+      }
+    }
+  }
+  return slots[ScanCaptureRole.front.id] ?? slots.values.last;
+}
+
+String _photoCountLabel(int count, bool analyzeReady) {
+  if (count == 1) {
+    return analyzeReady ? '1 photo ready' : '1 photo captured';
+  }
+  return analyzeReady ? '$count photos ready' : '$count photos captured';
 }
 
 String _selectedTitle(ScannerPhotoSlot slot) {

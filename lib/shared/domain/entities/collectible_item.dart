@@ -33,6 +33,38 @@ class CollectibleAlternativeMatch {
   }
 }
 
+class CollectibleImage {
+  const CollectibleImage({
+    required this.path,
+    this.role,
+    this.source,
+    this.isPrimary = false,
+  });
+
+  final String path;
+  final String? role;
+  final String? source;
+  final bool isPrimary;
+
+  factory CollectibleImage.fromJson(Map<String, dynamic> json) {
+    return CollectibleImage(
+      path: json['path'] as String? ?? json['imagePath'] as String? ?? '',
+      role: _optionalString(json['role']),
+      source: _optionalString(json['source']),
+      isPrimary: json['isPrimary'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'path': path,
+      'role': role,
+      'source': source,
+      'isPrimary': isPrimary,
+    };
+  }
+}
+
 enum CloudItemSyncStatus {
   localOnly,
   pendingUpload,
@@ -66,6 +98,7 @@ class CollectibleItem {
     required this.recommendation,
     required this.imagePath,
     required this.createdAt,
+    this.galleryImages = const [],
     this.imageStoragePath,
     this.cloudImageUrl,
     this.syncStatus = CloudItemSyncStatus.localOnly,
@@ -121,6 +154,8 @@ class CollectibleItem {
   /// Local image path or sample image identifier.
   final String imagePath;
 
+  final List<CollectibleImage> galleryImages;
+
   /// Supabase Storage object path after background upload completes.
   final String? imageStoragePath;
 
@@ -175,6 +210,7 @@ class CollectibleItem {
       condition: json['condition'] as String,
       recommendation: json['recommendation'] as String,
       imagePath: json['imagePath'] as String,
+      galleryImages: _galleryImagesFromJson(json),
       imageStoragePath: _optionalString(json['imageStoragePath']),
       cloudImageUrl: _optionalString(json['cloudImageUrl']),
       syncStatus: CloudItemSyncStatus.fromJson(json['syncStatus']),
@@ -229,6 +265,10 @@ class CollectibleItem {
       'condition': condition,
       'recommendation': recommendation,
       'imagePath': imagePath,
+      'primaryImage': imagePath,
+      'galleryImages': [
+        for (final image in effectiveGalleryImages) image.toJson(),
+      ],
       'imageStoragePath': imageStoragePath,
       'cloudImageUrl': cloudImageUrl,
       'syncStatus': syncStatus.name,
@@ -265,6 +305,19 @@ class CollectibleItem {
     };
   }
 
+  List<CollectibleImage> get effectiveGalleryImages {
+    final cleaned = galleryImages
+        .where((image) => image.path.trim().isNotEmpty)
+        .toList(growable: false);
+    if (cleaned.isNotEmpty) {
+      return cleaned;
+    }
+    if (imagePath.trim().isEmpty) {
+      return const [];
+    }
+    return [CollectibleImage(path: imagePath, role: 'front', isPrimary: true)];
+  }
+
   /// Creates a copy with updated background image sync metadata.
   CollectibleItem copyWithImageSync({
     required String imageStoragePath,
@@ -279,6 +332,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
+      galleryImages: galleryImages,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
       syncStatus: CloudItemSyncStatus.synced,
@@ -306,6 +360,9 @@ class CollectibleItem {
       mint: mint,
       material: material,
       notes: notes,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
     );
   }
 
@@ -320,6 +377,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
+      galleryImages: galleryImages,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
       syncStatus: syncStatus,
@@ -347,6 +405,9 @@ class CollectibleItem {
       mint: mint,
       material: material,
       notes: notes,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
     );
   }
 
@@ -367,6 +428,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
+      galleryImages: galleryImages,
       imageStoragePath: imageStoragePath ?? this.imageStoragePath,
       cloudImageUrl: cloudImageUrl ?? this.cloudImageUrl,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -394,6 +456,9 @@ class CollectibleItem {
       mint: mint,
       material: material,
       notes: notes,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
     );
   }
 
@@ -409,6 +474,7 @@ class CollectibleItem {
     String? series,
     String? country,
     String? notes,
+    List<CollectibleImage>? galleryImages,
   }) {
     return CollectibleItem(
       id: id,
@@ -419,6 +485,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
+      galleryImages: galleryImages ?? this.galleryImages,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
       syncStatus: syncStatus,
@@ -446,8 +513,35 @@ class CollectibleItem {
       mint: mint,
       material: material,
       notes: notes ?? this.notes,
+      valuationStatus: valuationStatus,
+      valuationSource: valuationSource,
+      aiEstimatedValue: aiEstimatedValue,
     );
   }
+}
+
+List<CollectibleImage> _galleryImagesFromJson(Map<String, dynamic> json) {
+  final rawImages = json['galleryImages'] ?? json['images'] ?? json['gallery'];
+  if (rawImages is List) {
+    final images = rawImages
+        .whereType<Map>()
+        .map(
+          (image) =>
+              CollectibleImage.fromJson(Map<String, dynamic>.from(image)),
+        )
+        .where((image) => image.path.trim().isNotEmpty)
+        .toList(growable: false);
+    if (images.isNotEmpty) {
+      return images;
+    }
+  }
+
+  final imagePath =
+      json['imagePath'] as String? ?? json['primaryImage'] as String? ?? '';
+  if (imagePath.trim().isEmpty) {
+    return const [];
+  }
+  return [CollectibleImage(path: imagePath, role: 'front', isPrimary: true)];
 }
 
 String? _optionalString(Object? value) {

@@ -1,5 +1,6 @@
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Data model for serializing and deserializing scanner results.
@@ -38,6 +39,7 @@ class ScanResultModel extends ScanResult {
     super.valuationStatus,
     super.valuationSource,
     super.aiEstimatedValue,
+    super.galleryImages,
   });
 
   /// Creates a model from a JSON map.
@@ -100,6 +102,7 @@ class ScanResultModel extends ScanResult {
       valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
       valuationSource: json['valuationSource'] as String? ?? 'unknown',
       aiEstimatedValue: (json['aiEstimatedValue'] as num?)?.toDouble(),
+      galleryImages: _galleryImagesFromJson(json),
     );
   }
 
@@ -146,8 +149,23 @@ class ScanResultModel extends ScanResult {
       'valuationStatus': valuationStatus.wireValue,
       'valuationSource': valuationSource,
       'aiEstimatedValue': aiEstimatedValue,
+      'galleryImages': [for (final image in galleryImages) image.toJson()],
     };
   }
+}
+
+List<CollectibleImage> _galleryImagesFromJson(Map<String, dynamic> json) {
+  final rawImages = json['galleryImages'] ?? json['images'];
+  if (rawImages is! List) {
+    return const [];
+  }
+  return rawImages
+      .whereType<Map>()
+      .map(
+        (image) => CollectibleImage.fromJson(Map<String, dynamic>.from(image)),
+      )
+      .where((image) => image.path.trim().isNotEmpty)
+      .toList(growable: false);
 }
 
 String? _optionalString(Object? value) {

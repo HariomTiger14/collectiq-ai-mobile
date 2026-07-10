@@ -2,11 +2,14 @@ import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_imag
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_role_guide.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_goal_card.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -107,8 +110,75 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(find.byKey(const ValueKey('filmstrip-back')));
     await tester.tap(find.byKey(const ValueKey('filmstrip-back')));
     expect(capturedRole, ScanCaptureRole.back.id);
+  });
+
+  testWidgets('filmstrip thumbnail tap selects active large preview', (
+    WidgetTester tester,
+  ) async {
+    final slots = _slots([
+      _slot(role: ScanCaptureRole.front, path: 'sample://front'),
+      _slot(role: ScanCaptureRole.back, path: 'sample://back'),
+    ]);
+    ScannerPhotoSlot? selectedSlot;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ScanImageFilmstrip(
+            roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            requiredRoles: const [ScanCaptureRole.front],
+            slots: slots,
+            selectedPath: 'sample://front',
+            onCaptureRole: (_) async {},
+            onTapImage: (slot) => selectedSlot = slot,
+            onRetake: (_) {},
+            onDelete: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('filmstrip-back')));
+    expect(selectedSlot?.role, ScanCaptureRole.back.id);
+  });
+
+  testWidgets('deleting one filmstrip image does not delete all images', (
+    WidgetTester tester,
+  ) async {
+    final slots = _slots([
+      _slot(role: ScanCaptureRole.front, path: 'sample://front'),
+      _slot(role: ScanCaptureRole.back, path: 'sample://back'),
+    ]);
+    var deletedRole = '';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ScanImageFilmstrip(
+            roles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            requiredRoles: const [ScanCaptureRole.front, ScanCaptureRole.back],
+            slots: slots,
+            selectedPath: 'sample://front',
+            onCaptureRole: (_) async {},
+            onTapImage: (_) {},
+            onRetake: (_) {},
+            onDelete: (slot) => deletedRole = slot.role,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('filmstrip-back')),
+        matching: find.byIcon(Icons.close),
+      ),
+    );
+    expect(deletedRole, ScanCaptureRole.back.id);
+    expect(slots.length, 2);
   });
 
   testWidgets('CaptureRoleCard renders missing captured and warning states', (
@@ -172,8 +242,8 @@ void main() {
     (WidgetTester tester) async {
       const service = ScanCapturePlanService();
       final emptyPlan = service.buildPlan(
-        ScanGoal.prepareForSale,
-        null,
+        ScanGoal.identifyValue,
+        CollectibleCategory.toyCar,
         const [],
       );
       var primaryCaptures = 0;
@@ -184,7 +254,7 @@ void main() {
           home: Scaffold(
             body: SingleChildScrollView(
               child: CaptureWorkspace(
-                goal: ScanGoal.prepareForSale,
+                goal: ScanGoal.identifyValue,
                 plan: emptyPlan,
                 slots: const {},
                 isBusy: false,
@@ -203,8 +273,8 @@ void main() {
         ),
       );
 
-      expect(find.text('0 of 2 required photos captured'), findsOneWidget);
-      expect(find.text('Add 2 more required photos'), findsWidgets);
+      expect(find.text('0 of 1 required photos captured'), findsOneWidget);
+      expect(find.text('Add 1 more required photo'), findsWidgets);
       expect(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
         findsNothing,
@@ -224,28 +294,21 @@ void main() {
       );
       expect(primaryCaptures, 1);
 
-      final readySlots = _slots([
-        _slot(role: ScanCaptureRole.front),
-        _slot(role: ScanCaptureRole.back),
-      ]);
-      final readyPlan = service.buildPlan(ScanGoal.prepareForSale, null, const [
-        CapturedScanImage(
-          path: 'sample://front',
-          role: ScanCaptureRole.front,
-          source: 'sample',
-        ),
-        CapturedScanImage(
-          path: 'sample://back',
-          role: ScanCaptureRole.back,
-          source: 'sample',
-        ),
-      ]);
+      final readySlots = _slots([_slot(role: ScanCaptureRole.front)]);
+      final readyPlan = service
+          .buildPlan(ScanGoal.identifyValue, CollectibleCategory.toyCar, const [
+            CapturedScanImage(
+              path: 'sample://front',
+              role: ScanCaptureRole.front,
+              source: 'sample',
+            ),
+          ]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: SingleChildScrollView(
               child: CaptureWorkspace(
-                goal: ScanGoal.prepareForSale,
+                goal: ScanGoal.identifyValue,
                 plan: readyPlan,
                 slots: readySlots,
                 isBusy: false,
@@ -268,7 +331,10 @@ void main() {
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
         findsOneWidget,
       );
-      expect(find.text('Analyze 2 photos'), findsOneWidget);
+      expect(find.text('Analyze 1 photo'), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      );
       await tester.tap(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
       );
@@ -321,6 +387,73 @@ void main() {
       );
     },
   );
+
+  test('quick and detailed modes recommend different toy car roles', () {
+    const service = ScanCapturePlanService();
+
+    final quickPlan = service.buildPlan(
+      ScanGoal.identifyValue,
+      CollectibleCategory.toyCar,
+      const [],
+    );
+    final detailedPlan = service.buildPlan(
+      ScanGoal.detailedAnalysis,
+      CollectibleCategory.toyCar,
+      const [
+        CapturedScanImage(
+          path: 'sample://front',
+          role: ScanCaptureRole.front,
+          source: 'sample',
+        ),
+      ],
+    );
+
+    expect(quickPlan.requiredRoles, [ScanCaptureRole.front]);
+    expect(
+      detailedPlan.requiredRoles,
+      containsAll([ScanCaptureRole.back, ScanCaptureRole.baseUnderside]),
+    );
+    expect(detailedPlan.nextRecommendedRole, ScanCaptureRole.back);
+  });
+
+  testWidgets('portfolio detail renders saved gallery images', (
+    WidgetTester tester,
+  ) async {
+    final item = _itemWithGallery();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(home: CollectibleDetailPage(item: item)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-gallery-filmstrip')),
+      findsOneWidget,
+    );
+    expect(find.text('Front'), findsOneWidget);
+    expect(find.text('Back'), findsOneWidget);
+  });
+
+  test('old one-image portfolio items expose a compatible gallery', () {
+    final item = CollectibleItem.fromJson({
+      'id': 'legacy-1',
+      'title': 'Legacy Card',
+      'category': 'Trading Card',
+      'estimatedValue': 25,
+      'confidence': 0.8,
+      'condition': 'Good',
+      'recommendation': 'Hold.',
+      'imagePath': 'sample://legacy-card',
+      'createdAt': '2026-07-07T00:00:00.000',
+    });
+
+    expect(item.effectiveGalleryImages, hasLength(1));
+    expect(item.effectiveGalleryImages.single.path, 'sample://legacy-card');
+    expect(item.effectiveGalleryImages.single.isPrimary, isTrue);
+  });
 }
 
 ScannerPhotoSlot _slot({
@@ -342,4 +475,27 @@ ScannerPhotoSlot _slot({
 
 Map<String, ScannerPhotoSlot> _slots(List<ScannerPhotoSlot> slots) {
   return {for (final slot in slots) slot.role: slot};
+}
+
+CollectibleItem _itemWithGallery() {
+  return CollectibleItem(
+    id: 'gallery-item',
+    title: 'Gallery Hot Wheels',
+    category: 'Toy Car',
+    estimatedValue: 0,
+    confidence: 0.92,
+    condition: 'Packaged',
+    recommendation: 'Keep complete photo set.',
+    imagePath: 'sample://front',
+    createdAt: DateTime(2026, 7, 7),
+    galleryImages: const [
+      CollectibleImage(
+        path: 'sample://front',
+        role: 'front',
+        source: 'sample',
+        isPrimary: true,
+      ),
+      CollectibleImage(path: 'sample://back', role: 'back', source: 'sample'),
+    ],
+  );
 }

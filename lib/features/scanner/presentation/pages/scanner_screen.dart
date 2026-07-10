@@ -272,6 +272,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 selectedGoal: activeGoal,
                                 onGoalSelected: scannerController.selectGoal,
                               ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _CaptureCategorySelector(
+                                selectedCategory: scannerState.captureCategory,
+                                onCategorySelected:
+                                    scannerController.selectCaptureCategory,
+                              ),
                               const SizedBox(height: AppSpacing.md),
                               CaptureWorkspace(
                                 key: _previewKey,
@@ -286,6 +292,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     scannerState.isLoading ||
                                     scannerState.isPreparingImage,
                                 hasResult: scanResult != null,
+                                selectedPath: selectedImagePath,
                                 onPrimaryCapture: () {
                                   final role =
                                       activePlan.nextRecommendedRole ??
@@ -300,17 +307,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                     .startCameraScan(context, imageRole: role),
                                 onGallery: (role) => scannerController
                                     .pickImageFromGallery(imageRole: role),
-                                onPreview: (slot) => _showCapturedImagePreview(
-                                  context,
-                                  slot: slot,
-                                  onRetake: () =>
-                                      scannerController.startCameraScan(
-                                        context,
-                                        imageRole: slot.role,
-                                      ),
-                                  onDelete: () => scannerController
-                                      .deleteRoleImage(slot.role),
-                                ),
+                                onPreview: (slot) => scannerController
+                                    .selectCapturedImage(slot.role),
                                 onSample: scannerController.useSampleScan,
                                 onDelete: scannerController.deleteRoleImage,
                                 onReset: scannerController.resetScan,
@@ -489,6 +487,39 @@ class _ScanGoalSelector extends StatelessWidget {
             goal: goal,
             selected: goal == selectedGoal,
             onTap: () => onGoalSelected(goal),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CaptureCategorySelector extends StatelessWidget {
+  const _CaptureCategorySelector({
+    required this.selectedCategory,
+    required this.onCategorySelected,
+  });
+
+  final CollectibleCategory selectedCategory;
+  final ValueChanged<CollectibleCategory> onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: CollectibleCategory.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final category = CollectibleCategory.values[index];
+          final selected = category == selectedCategory;
+          return ChoiceChip(
+            key: ValueKey('scan-category-${category.id}'),
+            selected: selected,
+            label: Text(category.title),
+            onSelected: (_) => onCategorySelected(category),
+            visualDensity: VisualDensity.compact,
           );
         },
       ),
@@ -771,108 +802,6 @@ String _modelStatusFor(ScannerState state) {
   }
 
   return 'Start with the front photo';
-}
-
-void _showCapturedImagePreview(
-  BuildContext context, {
-  required ScannerPhotoSlot slot,
-  required VoidCallback onRetake,
-  required VoidCallback onDelete,
-}) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) {
-      final colorScheme = Theme.of(context).colorScheme;
-      final textTheme = Theme.of(context).textTheme;
-      final message =
-          slot.qualityMetadata['userMessage'] as String? ?? 'Image accepted.';
-      final warning = slot.qualityMetadata['severity'] == 'WARNING';
-
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                slot.label,
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  child: ScanThumbnail(imagePath: slot.path),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Icon(
-                    warning
-                        ? Icons.warning_amber_outlined
-                        : Icons.check_circle_outline,
-                    color: warning ? colorScheme.tertiary : colorScheme.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        onRetake();
-                      },
-                      icon: const Icon(Icons.refresh_outlined),
-                      label: const Text('Retake'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        onDelete();
-                      },
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Delete'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  IconButton.filledTonal(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
 }
 
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
