@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_plan.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
@@ -28,12 +29,16 @@ class CaptureWorkspace extends StatelessWidget {
     required this.onSelectRole,
     required this.onPreview,
     required this.onUseAsPrimary,
+    required this.onEnhance,
     required this.onDelete,
     required this.onSample,
     required this.onReset,
     super.key,
     this.selectedItemTitle,
     this.selectedItemStatus,
+    this.categoryLabel,
+    this.hasManualCategory = false,
+    this.detectedCategory,
   });
 
   final ScanGoal goal;
@@ -52,11 +57,19 @@ class CaptureWorkspace extends StatelessWidget {
   final void Function(String role) onSelectRole;
   final void Function(ScannerPhotoSlot slot) onPreview;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
+  final Future<void> Function(
+    ScannerPhotoSlot slot,
+    ImageEnhancementPreset preset,
+  )
+  onEnhance;
   final void Function(String imagePath) onDelete;
   final VoidCallback? onSample;
   final VoidCallback? onReset;
   final String? selectedItemTitle;
   final String? selectedItemStatus;
+  final String? categoryLabel;
+  final bool hasManualCategory;
+  final String? detectedCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -126,26 +139,32 @@ class CaptureWorkspace extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _CaptureSetStatusCard(
             goal: goal,
-            category: category,
+            categoryLabel: categoryLabel ?? 'Not selected yet',
             imageCount: captureImages.length,
-            identificationConfidence: _heuristicConfidence(
-              requiredCompleted: requiredCompleted,
-              requiredTotal: plan.requiredRoles.length,
-              imageCount: captureImages.length,
-              weight: 0.92,
-            ),
-            valuationConfidence: _heuristicConfidence(
-              requiredCompleted: requiredCompleted,
-              requiredTotal: plan.requiredRoles.length + 1,
-              imageCount: captureImages.length,
-              weight: 0.76,
-            ),
-            conditionConfidence: _heuristicConfidence(
-              requiredCompleted: requiredCompleted,
-              requiredTotal: plan.requiredRoles.length + 2,
-              imageCount: captureImages.length,
-              weight: 0.82,
-            ),
+            identificationConfidence: captureImages.isEmpty
+                ? null
+                : _heuristicConfidence(
+                    requiredCompleted: requiredCompleted,
+                    requiredTotal: plan.requiredRoles.length,
+                    imageCount: captureImages.length,
+                    weight: 0.92,
+                  ),
+            valuationConfidence: captureImages.isEmpty
+                ? null
+                : _heuristicConfidence(
+                    requiredCompleted: requiredCompleted,
+                    requiredTotal: plan.requiredRoles.length + 1,
+                    imageCount: captureImages.length,
+                    weight: 0.76,
+                  ),
+            conditionConfidence: captureImages.isEmpty
+                ? null
+                : _heuristicConfidence(
+                    requiredCompleted: requiredCompleted,
+                    requiredTotal: plan.requiredRoles.length + 2,
+                    imageCount: captureImages.length,
+                    weight: 0.82,
+                  ),
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -192,6 +211,12 @@ class CaptureWorkspace extends StatelessWidget {
                 onRetake: (slot) => onCamera(slot.role),
                 onDelete: (slot) => onDelete(slot.path),
                 onUseAsPrimary: onUseAsPrimary,
+                onEnhance: onEnhance,
+              ),
+              onEnhance: () => _showEnhancementSheet(
+                context,
+                slot: activeSlot,
+                onEnhance: onEnhance,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -214,6 +239,7 @@ class CaptureWorkspace extends StatelessWidget {
               onRetake: (slot) => onCamera(slot.role),
               onDelete: (slot) => onDelete(slot.path),
               onUseAsPrimary: onUseAsPrimary,
+              onEnhance: onEnhance,
             ),
             onSelectRole: onSelectRole,
             onCaptureRole: onCamera,
@@ -464,12 +490,14 @@ class _ActiveCapturePreview extends StatelessWidget {
     required this.activeRole,
     required this.roleCount,
     this.onOpenReview,
+    this.onEnhance,
   });
 
   final ScannerPhotoSlot? slot;
   final ScanCaptureRole activeRole;
   final int roleCount;
   final VoidCallback? onOpenReview;
+  final VoidCallback? onEnhance;
 
   @override
   Widget build(BuildContext context) {
@@ -493,9 +521,20 @@ class _ActiveCapturePreview extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: capturedSlot == null
-                  ? _EmptyActivePreview(role: activeRole)
-                  : ScanThumbnail(imagePath: capturedSlot.path),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  capturedSlot == null
+                      ? _EmptyActivePreview(role: activeRole)
+                      : ScanThumbnail(imagePath: capturedSlot.path),
+                  if (capturedSlot?.isEnhanced ?? false)
+                    const Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _EnhancedBadge(),
+                    ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -525,13 +564,26 @@ class _ActiveCapturePreview extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    capturedSlot == null ? 'camera' : 'Review',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
+                  if (capturedSlot == null)
+                    Text(
+                      'camera',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  else
+                    TextButton.icon(
+                      key: const ValueKey('scan-enhance-active-photo'),
+                      onPressed: onEnhance,
+                      icon: const Icon(Icons.auto_fix_high_outlined, size: 16),
+                      label: const Text('Enhance'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -629,6 +681,11 @@ Future<void> _openPhotoReview(
   required void Function(ScannerPhotoSlot slot) onRetake,
   required void Function(ScannerPhotoSlot slot) onDelete,
   required void Function(ScannerPhotoSlot slot) onUseAsPrimary,
+  required Future<void> Function(
+    ScannerPhotoSlot slot,
+    ImageEnhancementPreset preset,
+  )
+  onEnhance,
 }) {
   if (photos.isEmpty) {
     return Future<void>.value();
@@ -647,6 +704,7 @@ Future<void> _openPhotoReview(
       onRetake: onRetake,
       onDelete: onDelete,
       onUseAsPrimary: onUseAsPrimary,
+      onEnhance: onEnhance,
     ),
   );
 }
@@ -659,6 +717,7 @@ class _PhotoReviewCarousel extends StatefulWidget {
     required this.onRetake,
     required this.onDelete,
     required this.onUseAsPrimary,
+    required this.onEnhance,
   });
 
   final int initialIndex;
@@ -667,6 +726,11 @@ class _PhotoReviewCarousel extends StatefulWidget {
   final void Function(ScannerPhotoSlot slot) onRetake;
   final void Function(ScannerPhotoSlot slot) onDelete;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
+  final Future<void> Function(
+    ScannerPhotoSlot slot,
+    ImageEnhancementPreset preset,
+  )
+  onEnhance;
 
   @override
   State<_PhotoReviewCarousel> createState() => _PhotoReviewCarouselState();
@@ -793,6 +857,16 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
+                  OutlinedButton.icon(
+                    key: const ValueKey('photo-review-enhance'),
+                    onPressed: () => _showEnhancementSheet(
+                      context,
+                      slot: active,
+                      onEnhance: widget.onEnhance,
+                    ),
+                    icon: const Icon(Icons.auto_fix_high_outlined),
+                    label: const Text('Enhance'),
+                  ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-retake'),
                     onPressed: () => widget.onRetake(active),
@@ -1048,7 +1122,7 @@ class _EmptyActivePreview extends StatelessWidget {
 class _CaptureSetStatusCard extends StatelessWidget {
   const _CaptureSetStatusCard({
     required this.goal,
-    required this.category,
+    required this.categoryLabel,
     required this.imageCount,
     required this.identificationConfidence,
     required this.valuationConfidence,
@@ -1056,11 +1130,11 @@ class _CaptureSetStatusCard extends StatelessWidget {
   });
 
   final ScanGoal goal;
-  final CollectibleCategory category;
+  final String categoryLabel;
   final int imageCount;
-  final double identificationConfidence;
-  final double valuationConfidence;
-  final double conditionConfidence;
+  final double? identificationConfidence;
+  final double? valuationConfidence;
+  final double? conditionConfidence;
 
   @override
   Widget build(BuildContext context) {
@@ -1080,7 +1154,7 @@ class _CaptureSetStatusCard extends StatelessWidget {
             children: [
               _StatusChip(icon: goal.icon, label: goal.title),
               const SizedBox(width: AppSpacing.xs),
-              _StatusChip(icon: Icons.category_outlined, label: category.title),
+              _StatusChip(icon: Icons.category_outlined, label: categoryLabel),
               const Spacer(),
               Text(
                 '$imageCount photo${imageCount == 1 ? '' : 's'}',
@@ -1146,12 +1220,12 @@ class _ConfidenceMeter extends StatelessWidget {
   const _ConfidenceMeter({required this.label, required this.value});
 
   final String label;
-  final double value;
+  final double? value;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final bounded = value.clamp(0.0, 1.0).toDouble();
+    final bounded = value?.clamp(0.0, 1.0).toDouble();
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
@@ -1169,12 +1243,12 @@ class _ConfidenceMeter extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: bounded, minHeight: 6),
+              child: LinearProgressIndicator(value: bounded ?? 0, minHeight: 6),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Text(
-            '${(bounded * 100).round()}%',
+            bounded == null ? '--' : '${(bounded * 100).round()}%',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w900,
@@ -1288,6 +1362,126 @@ class ScanThumbnail extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EnhancedBadge extends StatelessWidget {
+  const _EnhancedBadge({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : AppSpacing.sm,
+          vertical: compact ? 3 : 5,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_fix_high_outlined,
+              size: compact ? 12 : 14,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Enhanced',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showEnhancementSheet(
+  BuildContext context, {
+  required ScannerPhotoSlot slot,
+  required Future<void> Function(
+    ScannerPhotoSlot slot,
+    ImageEnhancementPreset preset,
+  )
+  onEnhance,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.auto_fix_high_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Enhance',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  if (slot.isEnhanced) const _EnhancedBadge(compact: true),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Improve clarity for AI analysis. Original photos stay preserved.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final preset in ImageEnhancementPreset.values)
+                    ChoiceChip(
+                      key: ValueKey('enhancement-preset-${preset.id}'),
+                      selected: slot.enhancementPreset == preset,
+                      label: Text(preset.label),
+                      onSelected: (_) async {
+                        await onEnhance(slot, preset);
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _NextRecommendedBlock extends StatelessWidget {
@@ -1522,6 +1716,12 @@ class _FilmstripPhotoTile extends StatelessWidget {
                         right: 6,
                         child: _TinyCountPill(label: '$countForRole'),
                       ),
+                      if (slot.isEnhanced)
+                        const Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: _EnhancedBadge(compact: true),
+                        ),
                     ],
                   ),
                 ),
@@ -1539,7 +1739,11 @@ class _FilmstripPhotoTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        warning ? 'Review' : 'Captured',
+                        slot.isEnhanced
+                            ? slot.enhancementPreset.label
+                            : warning
+                            ? 'Review'
+                            : 'Captured',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.labelSmall?.copyWith(
