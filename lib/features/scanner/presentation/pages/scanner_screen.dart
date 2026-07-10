@@ -332,8 +332,12 @@ String _workspaceDetectedCategory(ScannerState state) {
   if (state.hasManualCaptureCategory) {
     return state.captureCategory.title;
   }
-  final roles = state.captureImages.map((slot) => slot.role.toLowerCase());
-  final sources = state.captureImages.map((slot) => slot.path.toLowerCase());
+  return _workspaceCategoryForPhotos(state.captureImages);
+}
+
+String _workspaceCategoryForPhotos(List<ScannerPhotoSlot> photos) {
+  final roles = photos.map((slot) => slot.role.toLowerCase());
+  final sources = photos.map((slot) => slot.path.toLowerCase());
   if (sources.any((path) => path.contains('card')) ||
       roles.any((role) => role.contains('corner') || role.contains('glare'))) {
     return 'Trading card';
@@ -492,7 +496,7 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
       return 'Match found';
     }
     if (widget.captureImages.isNotEmpty) {
-      return 'Hot Wheels detected';
+      return '${_workspaceCategoryForPhotos(widget.captureImages)} detected';
     }
     return 'Detecting...';
   }
