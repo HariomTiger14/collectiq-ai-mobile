@@ -4,6 +4,8 @@ import 'package:collectiq_ai/features/market/data/providers/market_pricing_provi
 import 'package:collectiq_ai/features/market/domain/repositories/market_provider.dart';
 import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_provider.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
+import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +20,14 @@ final cameraServiceProvider = Provider<CameraService>((ref) {
 /// Provides the scanner gallery service.
 final galleryServiceProvider = Provider<GalleryService>((ref) {
   return GalleryService();
+});
+
+final scanCapturePlanServiceProvider = Provider<ScanCapturePlanService>((ref) {
+  return const ScanCapturePlanService();
+});
+
+final scanQualityGateServiceProvider = Provider<ScanQualityGateService>((ref) {
+  return const ScanQualityGateService();
 });
 
 final marketProviderProvider = Provider<MarketProvider>((ref) {

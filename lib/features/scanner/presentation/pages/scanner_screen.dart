@@ -6,8 +6,13 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/scan/scan_ui.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_role_guide.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_goal_card.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
@@ -275,6 +280,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
                               const SizedBox(height: AppSpacing.lg),
+                              _ScanGoalSelector(
+                                selectedGoal:
+                                    scannerState.scanSession?.scanGoal ??
+                                    ScanGoal.identifyValue,
+                                onGoalSelected: scannerController.selectGoal,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
                               _MultiPhotoAnalysisPanel(
                                 state: scannerState,
                                 onCamera: (role) => scannerController
@@ -381,6 +393,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                       .read(scannerControllerProvider.notifier)
                                       .resetScan,
                                 ),
+                                const SizedBox(height: AppSpacing.md),
+                                _ScanResultGoalSummary(
+                                  goal:
+                                      scannerState.scanSession?.scanGoal ??
+                                      ScanGoal.identifyValue,
+                                  imageCount: scannerState.photoSlots.length,
+                                  confidenceModel: ConfidenceModel(
+                                    confidenceTarget:
+                                        scannerState
+                                            .scanSession
+                                            ?.confidenceTarget ??
+                                        ScanGoal.identifyValue.confidenceTarget,
+                                    confidenceAchieved: scanResult.confidence,
+                                  ),
+                                ),
                               ],
                               const SizedBox(height: AppSpacing.xxl),
                               const ScanSectionHeader('Recent Scans'),
@@ -422,6 +449,49 @@ String _formatScanValue(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+class _ScanGoalSelector extends StatelessWidget {
+  const _ScanGoalSelector({
+    required this.selectedGoal,
+    required this.onGoalSelected,
+  });
+
+  final ScanGoal selectedGoal;
+  final ValueChanged<ScanGoal> onGoalSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width >= 720;
+    final cards = [
+      for (final goal in ScanGoal.values)
+        ScanGoalCard(
+          goal: goal,
+          selected: goal == selectedGoal,
+          onTap: () => onGoalSelected(goal),
+        ),
+    ];
+
+    if (isWide) {
+      final children = <Widget>[];
+      for (var index = 0; index < cards.length; index += 1) {
+        if (index > 0) {
+          children.add(const SizedBox(width: AppSpacing.sm));
+        }
+        children.add(Expanded(child: cards[index]));
+      }
+      return Row(children: children);
+    }
+
+    return Column(
+      children: [
+        for (final card in cards) ...[
+          card,
+          if (card != cards.last) const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
 }
 
 class _ScanPreviewSurface extends StatelessWidget {
@@ -594,13 +664,18 @@ class _MultiPhotoAnalysisPanel extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final isBusy = state.isLoading || state.isPreparingImage;
     final slots = state.photoSlots;
-    final suppliedRequired = [
-      if (slots.containsKey('front')) 'Front',
-      if (slots.containsKey('back')) 'Back',
-    ];
-    final suppliedLabel = suppliedRequired.length == 2
-        ? 'Front + Back supplied'
-        : 'Photos used: ${slots.isEmpty ? 0 : slots.length}/2';
+    final session = state.scanSession;
+    final plan = session?.capturePlan;
+    final suppliedLabel = plan == null
+        ? 'Photos used: ${slots.length}'
+        : '${(plan.completionPercentage * 100).round()}% ready';
+    final roles = plan == null
+        ? const [
+            ScanCaptureRole.front,
+            ScanCaptureRole.back,
+            ScanCaptureRole.closeUp,
+          ]
+        : [...plan.requiredRoles, ...plan.optionalRoles];
 
     return Container(
       width: double.infinity,
@@ -636,27 +711,23 @@ class _MultiPhotoAnalysisPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'For coins and cards, front and back photos improve accuracy.',
+            plan?.userGuidance ??
+                'Start with the front. Add back and detail photos when useful.',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          for (final slot in const [
-            ('front', 'Front / Obverse', true),
-            ('back', 'Back / Reverse', true),
-            ('closeup', 'Close-up / serial / damage', false),
-          ]) ...[
+          for (final role in roles) ...[
             _PhotoSlotRow(
-              role: slot.$1,
-              label: slot.$2,
-              requiredSlot: slot.$3,
-              value: slots[slot.$1],
+              role: role,
+              requiredSlot: plan?.requiredRoles.contains(role) ?? false,
+              value: slots[role.id],
               isBusy: isBusy,
               onCamera: onCamera,
               onGallery: onGallery,
             ),
-            if (slot.$1 != 'closeup') const SizedBox(height: AppSpacing.sm),
+            if (role != roles.last) const SizedBox(height: AppSpacing.sm),
           ],
         ],
       ),
@@ -667,7 +738,6 @@ class _MultiPhotoAnalysisPanel extends StatelessWidget {
 class _PhotoSlotRow extends StatelessWidget {
   const _PhotoSlotRow({
     required this.role,
-    required this.label,
     required this.requiredSlot,
     required this.value,
     required this.isBusy,
@@ -675,8 +745,7 @@ class _PhotoSlotRow extends StatelessWidget {
     required this.onGallery,
   });
 
-  final String role;
-  final String label;
+  final ScanCaptureRole role;
   final bool requiredSlot;
   final ScannerPhotoSlot? value;
   final bool isBusy;
@@ -704,7 +773,7 @@ class _PhotoSlotRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                role.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelLarge?.copyWith(
@@ -723,20 +792,81 @@ class _PhotoSlotRow extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (!hasPhoto) ...[
+                const SizedBox(height: 2),
+                CaptureRoleGuide(role: role, compact: true),
+              ],
             ],
           ),
         ),
         IconButton(
-          tooltip: 'Use camera for $label',
-          onPressed: isBusy ? null : () => onCamera(role),
+          tooltip: 'Use camera for ${role.title}',
+          onPressed: isBusy ? null : () => onCamera(role.id),
           icon: const Icon(Icons.photo_camera_outlined),
         ),
         IconButton(
-          tooltip: 'Import photo for $label',
-          onPressed: isBusy ? null : () => onGallery(role),
+          tooltip: 'Import photo for ${role.title}',
+          onPressed: isBusy ? null : () => onGallery(role.id),
           icon: const Icon(Icons.photo_library_outlined),
         ),
       ],
+    );
+  }
+}
+
+class _ScanResultGoalSummary extends StatelessWidget {
+  const _ScanResultGoalSummary({
+    required this.goal,
+    required this.imageCount,
+    required this.confidenceModel,
+  });
+
+  final ScanGoal goal;
+  final int imageCount;
+  final ConfidenceModel confidenceModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final belowTarget =
+        confidenceModel.confidenceAchieved != null &&
+        !confidenceModel.isTargetMet;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${goal.title} - $imageCount image${imageCount == 1 ? '' : 's'}',
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          if (belowTarget) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Improve accuracy with additional guided photos.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (goal == ScanGoal.prepareForSale) ...[
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.storefront_outlined),
+              label: const Text('Generate Listing Assets'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
