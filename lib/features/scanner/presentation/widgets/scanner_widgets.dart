@@ -1548,7 +1548,7 @@ class _ScanResultHero extends StatelessWidget {
           ),
           if (analyzedEnhancementLabel != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            _AnalyzedWithBadge(label: analyzedEnhancementLabel!),
+            const _AnalyzedWithBadge(),
           ],
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -1712,9 +1712,7 @@ class _ResultGalleryTile extends StatelessWidget {
 }
 
 class _AnalyzedWithBadge extends StatelessWidget {
-  const _AnalyzedWithBadge({required this.label});
-
-  final String label;
+  const _AnalyzedWithBadge();
 
   @override
   Widget build(BuildContext context) {
@@ -1740,7 +1738,7 @@ class _AnalyzedWithBadge extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.xs),
           Text(
-            'Analyzed with $label',
+            'AI Enhanced',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: colorScheme.primary,
               fontWeight: FontWeight.w900,
