@@ -167,7 +167,7 @@ class _GradientHeaderState extends State<GradientHeader>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final colors = _colorsFor(context, widget.gradientStyle);
+    final colors = PackLoxGradients.build(widget.gradientStyle, context);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -263,23 +263,5 @@ class _GradientHeaderState extends State<GradientHeader>
         );
       },
     );
-  }
-
-  List<Color> _colorsFor(BuildContext context, GradientStyle style) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return switch (style) {
-      GradientStyle.blueIndigo =>
-        isDark
-            ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
-            : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
-      GradientStyle.purpleDeepBlue =>
-        isDark
-            ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
-            : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
-      GradientStyle.tealEmerald =>
-        isDark
-            ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
-            : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
-    };
   }
 }

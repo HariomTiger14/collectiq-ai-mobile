@@ -258,8 +258,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     : 2;
                 final childAspectRatio = switch (crossAxisCount) {
                   1 => 0.58,
-                  2 => 0.52,
-                  _ => 0.62,
+                  2 => 0.47,
+                  _ => 0.58,
                 };
 
                 return SliverMainAxisGroup(

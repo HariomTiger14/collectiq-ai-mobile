@@ -1306,36 +1306,11 @@ class _EnhancedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 7 : AppSpacing.sm,
-          vertical: compact ? 3 : 5,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.auto_fix_high_outlined,
-              size: compact ? 12 : 14,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Enhanced',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return PremiumBadge(
+      label: 'Enhanced',
+      icon: Icons.auto_fix_high_outlined,
+      compact: compact,
+      maxWidth: 88,
     );
   }
 }
@@ -1703,24 +1678,11 @@ class _RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: emphasized
-            ? colorScheme.primary.withValues(alpha: 0.12)
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: emphasized
-              ? colorScheme.primary
-              : colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
+    return PremiumBadge.category(
+      label: label,
+      icon: emphasized ? Icons.check_circle_outline : null,
+      compact: true,
+      maxWidth: 92,
     );
   }
 }

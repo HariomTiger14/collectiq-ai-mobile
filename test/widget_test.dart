@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
@@ -104,6 +105,43 @@ void main() {
     expect(find.text('Your Collection Hub'), findsOneWidget);
     expectNoFlutterError(tester);
   });
+
+  testWidgets(
+    'premium badge uses global spacing radius and typography tokens',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          home: const Scaffold(
+            body: Center(
+              child: PremiumBadge.category(
+                label: 'Trading Card',
+                icon: Icons.style_outlined,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final badgeFinder = find.byKey(
+        const ValueKey('premium-badge-Trading Card'),
+      );
+      expect(badgeFinder, findsOneWidget);
+
+      final badge = tester.widget<Container>(badgeFinder);
+      expect(
+        badge.padding,
+        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      );
+      final decoration = badge.decoration! as BoxDecoration;
+      expect(decoration.borderRadius, BorderRadius.circular(AppRadius.sm));
+
+      final label = tester.widget<Text>(find.text('Trading Card'));
+      expect(label.maxLines, 1);
+      expect(label.overflow, TextOverflow.ellipsis);
+      expect(label.style?.fontWeight, FontWeight.w600);
+    },
+  );
 
   testWidgets('onboarding appears on first launch', (
     WidgetTester tester,
@@ -3883,7 +3921,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('portfolio-premium-badge-Trading Card')),
+      find.byKey(const ValueKey('premium-badge-Trading Card')),
       findsOneWidget,
     );
     expect(

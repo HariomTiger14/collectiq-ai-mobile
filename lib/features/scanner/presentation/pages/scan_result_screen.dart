@@ -408,18 +408,12 @@ class _AiEnhancedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      key: const ValueKey('scan-result-analyzed-with-enhancement'),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
-        child: Text(
-          'AI Enhanced',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-        ),
+    return const KeyedSubtree(
+      key: ValueKey('scan-result-analyzed-with-enhancement'),
+      child: PremiumBadge(
+        label: 'AI Enhanced',
+        icon: Icons.auto_awesome,
+        tone: PremiumBadgeTone.neutral,
       ),
     );
   }
@@ -433,27 +427,11 @@ class _ResultChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 8,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: colorScheme.primary),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-          ],
-        ),
-      ),
+    return PremiumBadge(
+      label: label,
+      icon: icon,
+      tone: PremiumBadgeTone.neutral,
+      maxWidth: 160,
     );
   }
 }

@@ -502,33 +502,21 @@ class PortfolioGridTile extends StatelessWidget {
                       spacing: AppSpacing.xs,
                       runSpacing: AppSpacing.xs,
                       children: [
-                        _PremiumBadge(
+                        PremiumBadge.category(
                           label: item.category,
                           icon: _categoryIcon(item.category),
-                          backgroundColor: colorScheme.secondaryContainer,
-                          foregroundColor: colorScheme.onSecondaryContainer,
                         ),
-                        _PremiumBadge(
+                        PremiumBadge.confidence(
                           label:
                               '${(item.confidence * 100).toStringAsFixed(0)}%',
-                          icon: Icons.verified_outlined,
-                          backgroundColor: colorScheme.primaryContainer,
-                          foregroundColor: colorScheme.onPrimaryContainer,
                         ),
-                        _PremiumBadge(
+                        PremiumBadge.trend(
                           label: _trendLabel(item),
                           icon: _trendIcon(item),
-                          backgroundColor: colorScheme.tertiaryContainer,
-                          foregroundColor: colorScheme.onTertiaryContainer,
                         ),
                         if (wishlistStatusLabel != null &&
                             wishlistStatusLabel!.trim().isNotEmpty)
-                          _PremiumBadge(
-                            label: wishlistStatusLabel!,
-                            icon: Icons.bookmark_border_outlined,
-                            backgroundColor: colorScheme.primaryContainer,
-                            foregroundColor: colorScheme.onPrimaryContainer,
-                          ),
+                          PremiumBadge.wishlist(label: wishlistStatusLabel!),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -666,54 +654,6 @@ class _PortfolioGridThumbnail extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PremiumBadge extends StatelessWidget {
-  const _PremiumBadge({
-    required this.label,
-    required this.icon,
-    required this.backgroundColor,
-    required this.foregroundColor,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color backgroundColor;
-  final Color foregroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      key: ValueKey('portfolio-premium-badge-$label'),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: foregroundColor),
-          const SizedBox(width: 3),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 104),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.labelSmall?.copyWith(
-                color: foregroundColor,
-                fontWeight: FontWeight.w600,
-                height: 1.15,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

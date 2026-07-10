@@ -180,6 +180,136 @@ class AppInfoSection extends StatelessWidget {
   }
 }
 
+enum PremiumBadgeTone { primary, secondary, tertiary, success, neutral }
+
+class PremiumBadge extends StatelessWidget {
+  const PremiumBadge({
+    required this.label,
+    this.icon,
+    this.tone = PremiumBadgeTone.primary,
+    this.compact = false,
+    this.maxWidth = 128,
+    super.key,
+  });
+
+  const PremiumBadge.confidence({
+    required this.label,
+    this.icon = Icons.verified_outlined,
+    this.compact = false,
+    this.maxWidth = 128,
+    super.key,
+  }) : tone = PremiumBadgeTone.primary;
+
+  const PremiumBadge.trend({
+    required this.label,
+    this.icon = Icons.trending_up,
+    this.compact = false,
+    this.maxWidth = 128,
+    super.key,
+  }) : tone = PremiumBadgeTone.tertiary;
+
+  const PremiumBadge.wishlist({
+    required this.label,
+    this.icon = Icons.bookmark_border_outlined,
+    this.compact = false,
+    this.maxWidth = 128,
+    super.key,
+  }) : tone = PremiumBadgeTone.success;
+
+  const PremiumBadge.category({
+    required this.label,
+    this.icon = Icons.category_outlined,
+    this.compact = false,
+    this.maxWidth = 128,
+    super.key,
+  }) : tone = PremiumBadgeTone.secondary;
+
+  final String label;
+  final IconData? icon;
+  final PremiumBadgeTone tone;
+  final bool compact;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final colors = _PremiumBadgeColors.from(colorScheme, tone);
+
+    return Container(
+      key: ValueKey('premium-badge-$label'),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? AppSpacing.xs : 6,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: compact ? 11 : 12, color: colors.foreground),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: colors.foreground,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumBadgeColors {
+  const _PremiumBadgeColors({
+    required this.background,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color foreground;
+
+  factory _PremiumBadgeColors.from(
+    ColorScheme colorScheme,
+    PremiumBadgeTone tone,
+  ) {
+    return switch (tone) {
+      PremiumBadgeTone.primary => _PremiumBadgeColors(
+        background: colorScheme.primaryContainer,
+        foreground: colorScheme.onPrimaryContainer,
+      ),
+      PremiumBadgeTone.secondary => _PremiumBadgeColors(
+        background: colorScheme.secondaryContainer,
+        foreground: colorScheme.onSecondaryContainer,
+      ),
+      PremiumBadgeTone.tertiary => _PremiumBadgeColors(
+        background: colorScheme.tertiaryContainer,
+        foreground: colorScheme.onTertiaryContainer,
+      ),
+      PremiumBadgeTone.success => _PremiumBadgeColors(
+        background: AppColors.success.withValues(alpha: 0.14),
+        foreground: AppColors.success,
+      ),
+      PremiumBadgeTone.neutral => _PremiumBadgeColors(
+        background: colorScheme.surfaceContainerHighest,
+        foreground: colorScheme.onSurfaceVariant,
+      ),
+    };
+  }
+}
+
 class AppMetricData {
   const AppMetricData({required this.label, required this.value, this.icon});
 
