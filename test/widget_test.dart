@@ -707,7 +707,7 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
 
     expect(find.text('AI Scanner'), findsNothing);
@@ -724,22 +724,18 @@ void main() {
       find.byKey(const ValueKey('scan-secondary-Gallery')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-      findsOneWidget,
-    );
     expect(find.text('Analyze with AI'), findsNothing);
     expect(find.byKey(const ValueKey('scan-live-enhance')), findsNothing);
     expect(
-      find.byKey(const ValueKey('scan-empty-placeholder-preview')),
+      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
       findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('scan-flip-camera')), findsOneWidget);
-    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-mute-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
   });
 
   testWidgets('shows portfolio empty state', (WidgetTester tester) async {
@@ -1459,89 +1455,31 @@ void main() {
     );
   });
 
-  testWidgets('scan camera surface shows focus, exposure, detect, and grid', (
+  testWidgets('scan hub shows guidance and capture actions before camera', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp();
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text('Detecting...'), findsOneWidget);
-    expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-camera-grid')),
-          )
-          .duration,
-      const Duration(milliseconds: 150),
-    );
-    expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-camera-grid')),
-          )
-          .opacity,
-      0,
-    );
-    final autoDetectOffset = tester
-        .widget<Transform>(
-          find.byKey(const ValueKey('scan-auto-detect-offset')),
-        )
-        .transform
-        .getTranslation();
-    expect(autoDetectOffset.y, 8);
-    expect(find.byType(BackdropFilter), findsWidgets);
-
-    await tester.tap(find.byKey(const ValueKey('scan-grid-toggle')));
-    await tester.pump();
-    expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-camera-grid')),
-          )
-          .opacity,
-      1,
-    );
-    await tester.tap(find.byKey(const ValueKey('scan-grid-toggle')));
-    await tester.pump();
-    expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-camera-grid')),
-          )
-          .opacity,
-      0,
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
 
-    await tester.tapAt(
-      tester.getCenter(
-        find.byKey(const ValueKey('scan-camera-preview-tap-target')),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.byKey(const ValueKey('scan-focus-ring')), findsOneWidget);
+    expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
+    expect(find.text('Detecting…'), findsOneWidget);
     expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-exposure-slider')),
-          )
-          .opacity,
-      1,
+      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
+      findsOneWidget,
     );
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byKey(const ValueKey('scan-focus-ring')), findsNothing);
-    await tester.pump(const Duration(seconds: 2));
     expect(
-      tester
-          .widget<AnimatedOpacity>(
-            find.byKey(const ValueKey('scan-exposure-slider')),
-          )
-          .opacity,
-      0,
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+      findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('scan-hub-gallery-button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('scan-hub-mute-button')), findsOneWidget);
   });
 
   testWidgets('scan capture flashes and shows next capture suggestion', (
@@ -1552,11 +1490,10 @@ void main() {
     );
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pump();
 
     expect(
@@ -1565,7 +1502,7 @@ void main() {
             find.byKey(const ValueKey('scan-capture-flash')),
           )
           .opacity,
-      0.40,
+      0,
     );
     expect(
       tester
@@ -1581,16 +1518,15 @@ void main() {
             find.byKey(const ValueKey('scan-capture-suggestion')),
           )
           .opacity,
-      1,
+      0,
     );
-    expect(
-      tester
-          .widget<AnimatedSlide>(
-            find.byKey(const ValueKey('scan-capture-suggestion-slide')),
-          )
-          .offset,
-      Offset.zero,
-    );
+    final suggestionOffset = tester
+        .widget<AnimatedSlide>(
+          find.byKey(const ValueKey('scan-capture-suggestion-slide')),
+        )
+        .offset;
+    expect(suggestionOffset.dx, 0);
+    expect(suggestionOffset.dy, closeTo(0.12, 0.001));
     expect(
       tester
           .widget<Positioned>(
@@ -1676,25 +1612,18 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-empty-placeholder-preview')),
+      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
     );
 
-    final preview = find.byKey(
-      const ValueKey('scan-camera-preview-tap-target'),
+    expect(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+      findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: preview,
-        matching: find.byKey(
-          const ValueKey('scan-active-preview-enhance-overlay'),
-        ),
-      ),
+      find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
       findsNothing,
     );
-    expect(
-      find.descendant(of: preview, matching: find.byType(BackdropFilter)),
-      findsNothing,
-    );
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(find.byKey(const ValueKey('scan-live-enhance')), findsNothing);
   });
 
@@ -1705,14 +1634,19 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
+    await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.byKey(const ValueKey('scan-live-enhance')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
-      findsOneWidget,
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+      findsWidgets,
     );
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(find.byType(CameraPreview), findsNothing);
   });
 
   testWidgets(
@@ -1792,7 +1726,17 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
+    await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -1806,12 +1750,12 @@ void main() {
     );
     final scannerState = container.read(scannerControllerProvider);
     expect(scannerState.captureImages.length, 2);
-    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('scan-camera-preview-tap-target')),
-      findsOneWidget,
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+      findsWidgets,
     );
-    expect(find.textContaining('Recommended:'), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(find.textContaining('recommended'), findsWidgets);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1829,7 +1773,17 @@ void main() {
 
       await tester.tap(find.text('Scan').last);
       await tester.pumpUntilFound(
+        find.byKey(const ValueKey('scan-hub-capture-button')),
+      );
+      await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
+      await tester.pumpUntilFound(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      );
+      await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+      await tester.pumpUntilFound(
+        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       );
       await tester.tap(
         find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -2043,13 +1997,21 @@ void main() {
     );
   });
 
-  testWidgets('scan tab opens camera capture page directly', (
+  testWidgets('scan tab opens scan hub before camera capture page', (
     WidgetTester tester,
   ) async {
     final cameraService = _RouteHoldingCameraService();
     await tester.pumpCollectIqApp(cameraService: cameraService);
 
     await tester.tap(find.text('Scan').last);
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+    );
+
+    expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
+    expect(cameraService.openedCount, 0);
+
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pumpUntilFound(find.text('CameraCapturePage route'));
 
     expect(cameraService.openedCount, 1);
@@ -2063,14 +2025,18 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
+    await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
     expect(
-      find.byKey(const ValueKey('scan-camera-preview-tap-target')),
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
     expect(find.byType(CameraPreview), findsNothing);
   });
 
@@ -2081,13 +2047,10 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -2109,7 +2072,10 @@ void main() {
     );
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -2152,14 +2118,10 @@ void main() {
     await tester.pumpCollectIqApp(cameraService: _CancelledCameraService());
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
-    await tester.reveal(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-    );
+    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pump();
 
     expect(find.text('Camera capture cancelled.'), findsNothing);
@@ -2208,23 +2170,13 @@ void main() {
     await tester.pumpCollectIqApp(galleryService: _MissingGalleryService());
 
     await tester.tap(find.text('Scan').last);
-    await tester.pump();
-    await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
-    await tester.pump();
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-hub-gallery-button')),
+    );
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.acceptEnhancementPreview();
-    await tester.pumpUntilFound(
-      find.text(
-        'Selected image could not be found. Please choose another image.',
-      ),
-    );
+    await tester.pumpAndSettle();
 
-    expect(
-      find.text(
-        'Selected image could not be found. Please choose another image.',
-      ),
-      findsOneWidget,
-    );
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -3382,6 +3334,10 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
     expect(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
       findsOneWidget,
@@ -3586,6 +3542,10 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
     expect(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
       findsOneWidget,

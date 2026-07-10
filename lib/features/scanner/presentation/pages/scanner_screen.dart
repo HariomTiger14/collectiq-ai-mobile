@@ -181,14 +181,32 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               _showCaptureLoopScan = false;
               _captureLoopRoleId = null;
             }),
-            onCapture: () => scannerController.startCameraScan(
-              context,
-              imageRole: captureRole,
-            ),
-            onGallery: () => scannerController.pickImageFromGallery(
-              context: context,
-              imageRole: captureRole,
-            ),
+            onCapture: () async {
+              await scannerController.startCameraScan(
+                context,
+                imageRole: captureRole,
+              );
+              if (!mounted) {
+                return;
+              }
+              setState(() {
+                _showCaptureLoopScan = false;
+                _captureLoopRoleId = null;
+              });
+            },
+            onGallery: () async {
+              await scannerController.pickImageFromGallery(
+                context: context,
+                imageRole: captureRole,
+              );
+              if (!mounted) {
+                return;
+              }
+              setState(() {
+                _showCaptureLoopScan = false;
+                _captureLoopRoleId = null;
+              });
+            },
             onAnalyze: scannerController.analyzeWithAi,
             onSelectPhoto: scannerController.selectCapturedPhoto,
             onSample: scannerController.useSampleScan,
