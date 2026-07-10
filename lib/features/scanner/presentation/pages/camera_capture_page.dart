@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -351,7 +352,7 @@ class _CameraLiveView extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: 12,
+          top: 4,
           left: 12,
           child: IconButton.filled(
             onPressed: onBack,
@@ -361,7 +362,7 @@ class _CameraLiveView extends StatelessWidget {
         ),
         if (isReady && (cameraService?.canToggleFlash ?? false))
           Positioned(
-            top: 12,
+            top: 4,
             right: 12,
             child: IconButton.filled(
               onPressed: onFlash,
@@ -375,18 +376,10 @@ class _CameraLiveView extends StatelessWidget {
             top: 0,
             bottom: 0,
             child: Center(
-              child: IconButton.filled(
+              child: EnhanceButton(
                 key: const ValueKey('camera-live-enhance'),
+                active: liveEnhanceEnabled,
                 onPressed: onEnhanceToggle,
-                icon: const Icon(Icons.auto_fix_high),
-                tooltip: 'AI Enhance',
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(58),
-                  backgroundColor: liveEnhanceEnabled
-                      ? Colors.white.withValues(alpha: 0.24)
-                      : Colors.black.withValues(alpha: 0.46),
-                  foregroundColor: Colors.white,
-                ),
               ),
             ),
           ),
@@ -394,7 +387,7 @@ class _CameraLiveView extends StatelessWidget {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 24,
+            bottom: 16,
             child: Row(
               children: [
                 IconButton.filledTonal(

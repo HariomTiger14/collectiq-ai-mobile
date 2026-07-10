@@ -520,7 +520,7 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
           ),
           Positioned.fill(child: CameraGridOverlay(visible: _showGrid)),
           Positioned(
-            top: AppSpacing.sm,
+            top: 4,
             left: AppSpacing.sm,
             right: AppSpacing.sm,
             child: Row(
@@ -583,9 +583,10 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
             ),
           ),
           Positioned(
+            key: const ValueKey('scan-capture-suggestion-position'),
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            bottom: 116,
+            bottom: 140,
             child: Center(
               child: CaptureSuggestionBubble(
                 label: _suggestionLabel,
@@ -614,7 +615,7 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
           Positioned(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            bottom: AppSpacing.xl,
+            bottom: AppSpacing.md,
             child: _SnapCaptureBar(
               canAnalyze: widget.canAnalyze,
               onGallery: widget.onGallery,
@@ -761,7 +762,9 @@ class _FilmstripThumb extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
+        key: ValueKey('scan-filmstrip-thumb-${slot.path}'),
         duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
         width: 62,
         height: 78,
         decoration: BoxDecoration(
@@ -773,10 +776,16 @@ class _FilmstripThumb extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 14,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.36),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
             ),
+            if (selected)
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.18),
+                blurRadius: 20,
+                spreadRadius: 1,
+              ),
           ],
         ),
         clipBehavior: Clip.antiAlias,
