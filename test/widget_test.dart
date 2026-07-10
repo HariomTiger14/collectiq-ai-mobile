@@ -3034,9 +3034,28 @@ void main() {
       find.text('Track, organize and grow your collection'),
       findsOneWidget,
     );
+    expect(find.text('Your collectible library'), findsOneWidget);
+    expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-action-filter')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-action-add-item')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-metrics-grid')),
+      findsOneWidget,
+    );
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
     );
+    expect(find.text('Collection Items'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
       findsOneWidget,
@@ -3051,7 +3070,6 @@ void main() {
     expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('Trading Card'), findsOneWidget);
     expect(find.text('94%'), findsWidgets);
-    expect(find.text('Stable'), findsWidgets);
     expect(find.text('Categories'), findsWidgets);
     expect(find.text('Top asset'), findsWidgets);
   });
@@ -3105,6 +3123,9 @@ void main() {
       ),
     );
     expect(titleText.maxLines, 2);
+    final tileSize = tester.getSize(gridItem);
+    expect(tileSize.height, lessThan(320));
+    expect(tileSize.width / tileSize.height, greaterThan(0.52));
     expect(
       find.byKey(const ValueKey('portfolio-grid-image-local-thumb')),
       findsOneWidget,
@@ -3121,6 +3142,47 @@ void main() {
     expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Share'), findsNothing);
     expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('portfolio grid falls back to gallery thumbnail image', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        {
+          'id': 'gallery-thumb',
+          'title': 'Gallery Primary Thumbnail',
+          'category': 'Toy Car',
+          'estimatedValue': 35,
+          'confidence': 0.88,
+          'condition': 'Packaged',
+          'recommendation': 'Keep.',
+          'imagePath': '',
+          'galleryImages': [
+            {
+              'path': _fixturePath('persistent-gallery-card.jpg'),
+              'role': 'front',
+              'isPrimary': true,
+            },
+          ],
+          'createdAt': '2026-06-27T00:00:00.000',
+        },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+
+    await tester.reveal(
+      find.byKey(const ValueKey('portfolio-grid-item-gallery-thumb')),
+    );
+
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-image-gallery-thumb')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('demo mode can seed portfolio from Settings', (
@@ -3679,7 +3741,6 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
     );
     await tester.pump();
-    expect(find.text('Wanted'), findsOneWidget);
     await tester.tap(find.byTooltip('Item actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('View details'));

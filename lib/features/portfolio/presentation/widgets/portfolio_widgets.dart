@@ -37,6 +37,8 @@ class PortfolioSummaryCard extends StatelessWidget {
     required this.totalValue,
     required this.itemCount,
     required this.averageConfidence,
+    required this.categoryCount,
+    required this.topAssetTitle,
     super.key,
   });
 
@@ -47,32 +49,196 @@ class PortfolioSummaryCard extends StatelessWidget {
   final int itemCount;
 
   final double averageConfidence;
+  final int categoryCount;
+  final String topAssetTitle;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      key: const ValueKey('portfolio-compact-snapshot'),
       children: [
-        AppPriceHero(
-          label: 'Total collection value',
-          value: _formatAud(totalValue),
-          subtitle: 'Estimated market value across your saved collectibles',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        AppResponsiveMetricGroup(
+        _CompactValueSummary(value: _formatAud(totalValue)),
+        const SizedBox(height: AppSpacing.sm),
+        _CompactMetricGrid(
           metrics: [
-            AppMetricData(
+            _CompactMetric(
               label: 'Items',
               value: itemCount.toString(),
               icon: Icons.inventory_2_outlined,
             ),
-            AppMetricData(
+            _CompactMetric(
+              label: 'Categories',
+              value: categoryCount.toString(),
+              icon: Icons.category_outlined,
+            ),
+            _CompactMetric(
               label: 'Avg confidence',
               value: '${(averageConfidence * 100).toStringAsFixed(0)}%',
               icon: Icons.verified_outlined,
             ),
+            _CompactMetric(
+              label: 'Top asset',
+              value: topAssetTitle,
+              icon: Icons.workspace_premium_outlined,
+              maxValueLines: 2,
+            ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _CompactValueSummary extends StatelessWidget {
+  const _CompactValueSummary({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: AppGradients.premium,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppElevation.level1,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total collection value',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            color: Colors.white.withValues(alpha: 0.78),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactMetric {
+  const _CompactMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.maxValueLines = 1,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final int maxValueLines;
+}
+
+class _CompactMetricGrid extends StatelessWidget {
+  const _CompactMetricGrid({required this.metrics});
+
+  final List<_CompactMetric> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 620 ? 4 : 2;
+        return GridView.builder(
+          key: const ValueKey('portfolio-compact-metrics-grid'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: metrics.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+            childAspectRatio: columns == 4 ? 2.25 : 2.1,
+          ),
+          itemBuilder: (context, index) =>
+              _CompactMetricTile(metric: metrics[index]),
+        );
+      },
+    );
+  }
+}
+
+class _CompactMetricTile extends StatelessWidget {
+  const _CompactMetricTile({required this.metric});
+
+  final _CompactMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(metric.icon, size: 18, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  metric.value,
+                  maxLines: metric.maxValueLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  metric.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -159,12 +325,12 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
           Icon(Icons.search_off, size: 44, color: colorScheme.primary),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No matching collectibles',
+            'No collectibles found',
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Try a different title or category.',
+            'Try adjusting your search or filters.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
@@ -177,7 +343,7 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onResetFilters,
                 icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('Reset Search'),
+                label: const Text('Clear filters'),
               ),
             ),
           ],
@@ -275,8 +441,8 @@ class PortfolioGridTile extends StatelessWidget {
   const PortfolioGridTile({
     required this.item,
     required this.onTap,
+    this.onViewDetails,
     this.onEdit,
-    this.onShare,
     this.onDelete,
     this.wishlistStatusLabel,
     super.key,
@@ -284,8 +450,8 @@ class PortfolioGridTile extends StatelessWidget {
 
   final CollectibleItem item;
   final VoidCallback onTap;
+  final VoidCallback? onViewDetails;
   final VoidCallback? onEdit;
-  final VoidCallback? onShare;
   final VoidCallback? onDelete;
   final String? wishlistStatusLabel;
 
@@ -294,112 +460,135 @@ class PortfolioGridTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 260;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: colorScheme.outlineVariant),
-            boxShadow: AppElevation.level1,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PortfolioGridThumbnail(item: item),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  item.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1.12,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  item.category,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatAud(item.estimatedValue),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: colorScheme.outlineVariant),
+                boxShadow: AppElevation.level1,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _PortfolioBadge(
-                      label: '${(item.confidence * 100).toStringAsFixed(0)}%',
-                      icon: Icons.verified_outlined,
-                      color: colorScheme.primary,
+                    _PortfolioGridThumbnail(
+                      item: item,
+                      aspectRatio: narrow ? 1.95 : 1.78,
                     ),
-                    _PortfolioBadge(
-                      label: item.marketSummary?.trendLabel ?? 'Stable',
-                      icon: Icons.trending_up_outlined,
-                      color: AppColors.secondaryAccent,
-                    ),
-                    if (wishlistStatusLabel != null &&
-                        wishlistStatusLabel!.trim().isNotEmpty)
-                      _PortfolioBadge(
-                        label: wishlistStatusLabel!,
-                        icon: Icons.bookmark_border_outlined,
-                        color: AppColors.success,
+                    const SizedBox(height: 6),
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1.12,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (narrow)
+                      Text(
+                        item.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _PortfolioBadge(
+                          label: item.category,
+                          icon: _categoryIcon(item.category),
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    if (!narrow)
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          _PortfolioBadge(
+                            label:
+                                '${(item.confidence * 100).toStringAsFixed(0)}%',
+                            icon: Icons.verified_outlined,
+                            color: colorScheme.primary,
+                          ),
+                          _PortfolioBadge(
+                            label: _trendLabel(item),
+                            icon: _trendIcon(item),
+                            color: AppColors.secondaryAccent,
+                          ),
+                          if (wishlistStatusLabel != null &&
+                              wishlistStatusLabel!.trim().isNotEmpty)
+                            _PortfolioBadge(
+                              label: wishlistStatusLabel!,
+                              icon: Icons.bookmark_border_outlined,
+                              color: AppColors.success,
+                            ),
+                        ],
+                      ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _formatAud(item.estimatedValue),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        _PortfolioOverflowMenu(
+                          onViewDetails: onViewDetails ?? onTap,
+                          onEdit: onEdit,
+                          onDelete: onDelete,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _PortfolioOverflowMenu(
-                    onEdit: onEdit,
-                    onShare: onShare,
-                    onDelete: onDelete,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
 class _PortfolioGridThumbnail extends StatelessWidget {
-  const _PortfolioGridThumbnail({required this.item});
+  const _PortfolioGridThumbnail({required this.item, this.aspectRatio = 1.78});
 
   final CollectibleItem item;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final normalizedPath = item.imagePath.trim();
+    final normalizedPath = _displayImagePath(item);
     final hasImage =
         normalizedPath.isNotEmpty &&
         !normalizedPath.startsWith('sample://') &&
         !normalizedPath.startsWith('selected-image');
 
     return AspectRatio(
-      aspectRatio: 1.42,
+      aspectRatio: aspectRatio,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: DecoratedBox(
@@ -426,10 +615,14 @@ class _PortfolioGridThumbnail extends StatelessWidget {
 }
 
 class _PortfolioOverflowMenu extends StatelessWidget {
-  const _PortfolioOverflowMenu({this.onEdit, this.onShare, this.onDelete});
+  const _PortfolioOverflowMenu({
+    this.onViewDetails,
+    this.onEdit,
+    this.onDelete,
+  });
 
+  final VoidCallback? onViewDetails;
   final VoidCallback? onEdit;
-  final VoidCallback? onShare;
   final VoidCallback? onDelete;
 
   @override
@@ -438,32 +631,34 @@ class _PortfolioOverflowMenu extends StatelessWidget {
 
     return PopupMenuButton<_PortfolioMenuAction>(
       tooltip: 'Item actions',
-      icon: const Icon(Icons.more_horiz),
+      icon: const Icon(Icons.more_vert),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
       onSelected: (value) {
         switch (value) {
+          case _PortfolioMenuAction.view:
+            onViewDetails?.call();
           case _PortfolioMenuAction.edit:
             onEdit?.call();
-          case _PortfolioMenuAction.share:
-            onShare?.call();
           case _PortfolioMenuAction.delete:
             onDelete?.call();
         }
       },
       itemBuilder: (context) => [
         PopupMenuItem(
+          value: _PortfolioMenuAction.view,
+          enabled: onViewDetails != null,
+          child: const _PortfolioMenuItem(
+            icon: Icons.open_in_new_outlined,
+            label: 'View details',
+          ),
+        ),
+        PopupMenuItem(
           value: _PortfolioMenuAction.edit,
           enabled: onEdit != null,
           child: const _PortfolioMenuItem(
             icon: Icons.edit_outlined,
             label: 'Edit',
-          ),
-        ),
-        PopupMenuItem(
-          value: _PortfolioMenuAction.share,
-          enabled: onShare != null,
-          child: const _PortfolioMenuItem(
-            icon: Icons.ios_share_outlined,
-            label: 'Share',
           ),
         ),
         PopupMenuItem(
@@ -480,7 +675,7 @@ class _PortfolioOverflowMenu extends StatelessWidget {
   }
 }
 
-enum _PortfolioMenuAction { edit, share, delete }
+enum _PortfolioMenuAction { view, edit, delete }
 
 class _PortfolioMenuItem extends StatelessWidget {
   const _PortfolioMenuItem({
@@ -678,7 +873,7 @@ class _PortfolioItemDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final trendLabel = item.marketSummary?.trendLabel ?? 'Stable';
+    final trendLabel = _trendLabel(item);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,7 +918,7 @@ class _PortfolioItemDetails extends StatelessWidget {
             ),
             _PortfolioBadge(
               label: trendLabel,
-              icon: Icons.trending_up_outlined,
+              icon: _trendIcon(item),
               color: AppColors.secondaryAccent,
             ),
             if (wishlistStatus != null)
@@ -790,13 +985,15 @@ class _PortfolioBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -857,5 +1054,42 @@ String _formatAud(double value) {
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  return 'AUD $withCommas';
+  return '\$$withCommas';
+}
+
+String _displayImagePath(CollectibleItem item) {
+  final primaryPath = item.imagePath.trim();
+  if (primaryPath.isNotEmpty) {
+    return primaryPath;
+  }
+  for (final image in item.galleryImages) {
+    if (image.isPrimary && image.path.trim().isNotEmpty) {
+      return image.path.trim();
+    }
+  }
+  for (final image in item.galleryImages) {
+    if (image.path.trim().isNotEmpty) {
+      return image.path.trim();
+    }
+  }
+  return '';
+}
+
+String _trendLabel(CollectibleItem item) {
+  final raw = item.marketSummary?.trendLabel.trim().toLowerCase() ?? '';
+  if (raw.contains('ris') || raw.contains('up') || raw.contains('gain')) {
+    return 'Rising';
+  }
+  if (raw.contains('cool') || raw.contains('fall') || raw.contains('down')) {
+    return 'Cooling';
+  }
+  return 'Stable';
+}
+
+IconData _trendIcon(CollectibleItem item) {
+  return switch (_trendLabel(item)) {
+    'Rising' => Icons.trending_up_outlined,
+    'Cooling' => Icons.trending_down_outlined,
+    _ => Icons.trending_flat_outlined,
+  };
 }
