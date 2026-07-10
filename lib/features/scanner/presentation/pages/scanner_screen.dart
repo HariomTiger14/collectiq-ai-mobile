@@ -274,6 +274,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 category: scanResult?.category,
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _MultiPhotoAnalysisPanel(
+                                state: scannerState,
+                                onCamera: (role) => scannerController
+                                    .startCameraScan(context, imageRole: role),
+                                onGallery: (role) => scannerController
+                                    .pickImageFromGallery(imageRole: role),
+                              ),
                               const SizedBox(height: AppSpacing.xl),
                               ScanActionRow(
                                 isBusy:
@@ -321,11 +329,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   key: ValueKey('scan-result-${scanResult.id}'),
                                   item: scanResult.title,
                                   category: scanResult.category,
-                                  estimatedValue:
-                                      'AUD ${scanResult.estimatedValue.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ',')}',
+                                  estimatedValue: _formatScanValue(
+                                    scanResult.estimatedValue,
+                                  ),
                                   confidence:
                                       '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
                                   condition: scanResult.condition,
+                                  imagePath: scanResult.thumbnail,
+                                  confidenceScore: scanResult.confidence,
+                                  rawEstimatedValue: scanResult.estimatedValue,
                                   primaryMatch: scanResult.primaryMatch,
                                   alternativeMatches:
                                       scanResult.alternativeMatches,
@@ -354,6 +366,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                       scannerState.aiRecommendation ??
                                       'Consider grading before selling.',
                                   isSaved: scannerState.isSavedToPortfolio,
+                                  isSaving: scannerState.isSavingToPortfolio,
+                                  photosUsed: scanResult.photosUsed,
+                                  photoRoles: scanResult.photoRoles,
+                                  faceValue: scanResult.faceValue,
+                                  estimatedMarketValue:
+                                      scanResult.estimatedMarketValue,
+                                  askingPriceWarning:
+                                      scanResult.askingPriceWarning,
+                                  valuationConfidence:
+                                      scanResult.valuationConfidence,
                                   onViewPortfolio: widget.onViewPortfolio,
                                   onScanAnother: ref
                                       .read(scannerControllerProvider.notifier)
@@ -387,6 +409,19 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       ),
     );
   }
+}
+
+String _formatScanValue(double value) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
+
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '\$$withCommas';
 }
 
 class _ScanPreviewSurface extends StatelessWidget {
@@ -538,6 +573,170 @@ class _ScanPreviewSurface extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MultiPhotoAnalysisPanel extends StatelessWidget {
+  const _MultiPhotoAnalysisPanel({
+    required this.state,
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  final ScannerState state;
+  final Future<void> Function(String role) onCamera;
+  final Future<void> Function(String role) onGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isBusy = state.isLoading || state.isPreparingImage;
+    final slots = state.photoSlots;
+    final suppliedRequired = [
+      if (slots.containsKey('front')) 'Front',
+      if (slots.containsKey('back')) 'Back',
+    ];
+    final suppliedLabel = suppliedRequired.length == 2
+        ? 'Front + Back supplied'
+        : 'Photos used: ${slots.isEmpty ? 0 : slots.length}/2';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.photo_library_outlined, color: colorScheme.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Photos for analysis',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                suppliedLabel,
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'For coins and cards, front and back photos improve accuracy.',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          for (final slot in const [
+            ('front', 'Front / Obverse', true),
+            ('back', 'Back / Reverse', true),
+            ('closeup', 'Close-up / serial / damage', false),
+          ]) ...[
+            _PhotoSlotRow(
+              role: slot.$1,
+              label: slot.$2,
+              requiredSlot: slot.$3,
+              value: slots[slot.$1],
+              isBusy: isBusy,
+              onCamera: onCamera,
+              onGallery: onGallery,
+            ),
+            if (slot.$1 != 'closeup') const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoSlotRow extends StatelessWidget {
+  const _PhotoSlotRow({
+    required this.role,
+    required this.label,
+    required this.requiredSlot,
+    required this.value,
+    required this.isBusy,
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  final String role;
+  final String label;
+  final bool requiredSlot;
+  final ScannerPhotoSlot? value;
+  final bool isBusy;
+  final Future<void> Function(String role) onCamera;
+  final Future<void> Function(String role) onGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final hasPhoto = value != null;
+
+    return Row(
+      children: [
+        Icon(
+          hasPhoto
+              ? Icons.check_circle_outline
+              : Icons.add_photo_alternate_outlined,
+          color: hasPhoto ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          size: 22,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                hasPhoto
+                    ? '${value!.source} photo added'
+                    : requiredSlot
+                    ? 'Recommended'
+                    : 'Optional',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Use camera for $label',
+          onPressed: isBusy ? null : () => onCamera(role),
+          icon: const Icon(Icons.photo_camera_outlined),
+        ),
+        IconButton(
+          tooltip: 'Import photo for $label',
+          onPressed: isBusy ? null : () => onGallery(role),
+          icon: const Icon(Icons.photo_library_outlined),
+        ),
+      ],
     );
   }
 }

@@ -57,6 +57,12 @@ class ScanResult {
     this.mint,
     this.material,
     this.notes,
+    this.faceValue,
+    this.estimatedMarketValue,
+    this.askingPriceWarning,
+    this.valuationConfidence,
+    this.photosUsed,
+    this.photoRoles = const [],
   });
 
   /// Unique scan identifier.
@@ -117,4 +123,59 @@ class ScanResult {
   final String? mint;
   final String? material;
   final String? notes;
+  final double? faceValue;
+  final double? estimatedMarketValue;
+  final String? askingPriceWarning;
+  final double? valuationConfidence;
+  final int? photosUsed;
+  final List<String> photoRoles;
+
+  /// Creates a copy with local review edits applied before saving.
+  ScanResult copyWith({
+    String? title,
+    String? category,
+    double? estimatedValue,
+    String? condition,
+    String? notes,
+    int? photosUsed,
+    List<String>? photoRoles,
+  }) {
+    return ScanResult(
+      id: id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      estimatedValue: estimatedValue ?? this.estimatedValue,
+      confidence: confidence,
+      condition: condition ?? this.condition,
+      thumbnail: thumbnail,
+      scanDate: scanDate,
+      primaryMatch: primaryMatch,
+      alternativeMatches: alternativeMatches,
+      confidenceExplanation: confidenceExplanation,
+      detectionQuality: detectionQuality,
+      aiReasoning: aiReasoning,
+      pricing: pricing,
+      marketSummary: marketSummary,
+      year: year,
+      brand: brand,
+      setName: setName,
+      series: series,
+      cardNumber: cardNumber,
+      playerOrCharacter: playerOrCharacter,
+      rarity: rarity,
+      estimatedGrade: estimatedGrade,
+      language: language,
+      edition: edition,
+      country: country,
+      mint: mint,
+      material: material,
+      notes: notes ?? this.notes,
+      faceValue: faceValue,
+      estimatedMarketValue: estimatedMarketValue,
+      askingPriceWarning: askingPriceWarning,
+      valuationConfidence: valuationConfidence,
+      photosUsed: photosUsed ?? this.photosUsed,
+      photoRoles: photoRoles ?? this.photoRoles,
+    );
+  }
 }

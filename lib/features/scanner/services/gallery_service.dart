@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
+import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +10,9 @@ import 'package:path_provider/path_provider.dart';
 /// Service responsible for selecting and validating gallery images.
 class GalleryService {
   /// Creates a gallery service with an optional [imagePicker].
-  GalleryService({ImagePicker? imagePicker})
-    : _imagePicker = imagePicker ?? ImagePicker();
+  GalleryService({ImagePicker? imagePicker, ScanImageProcessor? imageProcessor})
+    : _imagePicker = imagePicker ?? ImagePicker(),
+      _imageProcessor = imageProcessor ?? const ScanImageProcessor();
 
   static const _allowedExtensions = {'jpg', 'jpeg', 'png'};
   static const _maxImageBytes = 10 * 1024 * 1024;
@@ -18,6 +20,7 @@ class GalleryService {
   static const _pickerImageQuality = 82;
 
   final ImagePicker _imagePicker;
+  final ScanImageProcessor _imageProcessor;
 
   /// Opens the gallery and returns the selected image file.
   Future<XFile?> pickImage() async {
@@ -81,7 +84,7 @@ class GalleryService {
     return true;
   }
 
-  /// Copies a selected gallery image into app-owned documents storage.
+  /// Copies and optimizes a selected gallery image into app-owned storage.
   Future<XFile> persistSelectedImage(XFile image) async {
     final originalPath = image.path;
     debugPrint('[GalleryService] original gallery path: $originalPath');
@@ -112,17 +115,23 @@ class GalleryService {
     );
     await galleryDirectory.create(recursive: true);
 
-    final extension = _extensionForCopy(image);
-    final fileName =
-        'gallery_${DateTime.now().millisecondsSinceEpoch}$extension';
-    final copiedFile = await sourceFile.copy(
-      '${galleryDirectory.path}${Platform.pathSeparator}$fileName',
+    final fileName = 'gallery_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final outputPath =
+        '${galleryDirectory.path}${Platform.pathSeparator}$fileName';
+    final optimized = await _imageProcessor.optimize(
+      inputPath: sourceFile.path,
+      outputPath: outputPath,
     );
+    final copiedFile = File(optimized.outputPath);
     final copiedExists = await copiedFile.exists();
     final copiedSize = copiedExists ? await copiedFile.length() : 0;
     debugPrint('[GalleryService] copied persistent path: ${copiedFile.path}');
     debugPrint('[GalleryService] copied gallery file exists: $copiedExists');
     debugPrint('[GalleryService] copied gallery file size: $copiedSize');
+    debugPrint(
+      '[GalleryService] optimized gallery dimensions='
+      '${optimized.width}x${optimized.height}',
+    );
 
     return XFile(copiedFile.path, name: fileName);
   }
@@ -137,10 +146,5 @@ class GalleryService {
       return '';
     }
     return fileName.substring(dotIndex + 1);
-  }
-
-  String _extensionForCopy(XFile image) {
-    final extension = _extensionFor(image);
-    return extension.isEmpty ? '.jpg' : '.$extension';
   }
 }

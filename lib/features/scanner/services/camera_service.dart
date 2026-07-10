@@ -2,8 +2,9 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/errors/scanner_exception.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
+import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,10 +13,12 @@ import 'package:permission_handler/permission_handler.dart';
 /// Service responsible for camera lifecycle and capture operations.
 class CameraService {
   /// Creates a camera service.
-  CameraService({ImagePicker? imagePicker})
-    : _imagePicker = imagePicker ?? ImagePicker();
+  CameraService({ImagePicker? imagePicker, ScanImageProcessor? imageProcessor})
+    : _imagePicker = imagePicker ?? ImagePicker(),
+      _imageProcessor = imageProcessor ?? const ScanImageProcessor();
 
   final ImagePicker _imagePicker;
+  final ScanImageProcessor _imageProcessor;
   static const _maxPickerDimension = 1280.0;
   static const _pickerImageQuality = 82;
 
@@ -31,17 +34,57 @@ class CameraService {
   /// Current camera controller, if one has been opened.
   CameraController? get controller => _controller;
 
+  /// Whether the active camera can toggle flash.
+  bool get canToggleFlash {
+    final activeController = _controller;
+    if (activeController == null || !activeController.value.isInitialized) {
+      return false;
+    }
+
+    return _availableCameras[_selectedCameraIndex].lensDirection !=
+        CameraLensDirection.front;
+  }
+
+  /// Launches the in-app scanner camera flow.
+  Future<CameraCaptureFlowResult?> captureWithInAppCamera(
+    BuildContext context, {
+    String imageRole = 'front',
+  }) {
+    return Navigator.of(context).push<CameraCaptureFlowResult?>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => CameraCapturePage(imageRole: imageRole),
+      ),
+    );
+  }
+
   /// Initializes camera metadata needed by the scanner feature.
   Future<void> initializeCamera() async {
     _availableCameras = await availableCameras();
   }
 
+  /// Reads the current camera permission state.
+  Future<PermissionStatus> cameraPermissionStatus() {
+    return Permission.camera.status;
+  }
+
   /// Requests camera permissions from the operating system.
-  Future<bool> requestPermissions() async {
+  Future<PermissionStatus> requestPermissionStatus() async {
     debugPrint('[CameraService] camera permission request start');
     final status = await Permission.camera.request();
     debugPrint('[CameraService] camera permission status: $status');
+    return status;
+  }
+
+  /// Requests camera permissions from the operating system.
+  Future<bool> requestPermissions() async {
+    final status = await requestPermissionStatus();
     return status.isGranted;
+  }
+
+  /// Opens the app settings screen for permanently denied permissions.
+  Future<bool> openSettings() {
+    return openAppSettings();
   }
 
   /// Opens the native camera capture flow and returns the captured image.
@@ -115,7 +158,7 @@ class CameraService {
     return image;
   }
 
-  /// Copies a camera capture from temporary storage into app documents storage.
+  /// Copies and optimizes a camera capture into app documents storage.
   Future<XFile> persistCapturedImage(XFile image) async {
     final originalPath = image.path;
     debugPrint('[CameraService] original camera path: $originalPath');
@@ -143,15 +186,23 @@ class CameraService {
     );
     await capturesDirectory.create(recursive: true);
 
-    final extension = _extensionFor(image);
-    final fileName =
-        'camera_${DateTime.now().millisecondsSinceEpoch}$extension';
-    final copiedFile = await sourceFile.copy(
-      '${capturesDirectory.path}${Platform.pathSeparator}$fileName',
+    final fileName = 'camera_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final outputPath =
+        '${capturesDirectory.path}${Platform.pathSeparator}$fileName';
+    final optimized = await _imageProcessor.optimize(
+      inputPath: sourceFile.path,
+      outputPath: outputPath,
     );
+    final copiedFile = File(optimized.outputPath);
     final copiedExists = await copiedFile.exists();
-    debugPrint('[CameraService] copied persistent path: ${copiedFile.path}');
+    debugPrint(
+      '[CameraService] copied persistent path: ${optimized.outputPath}',
+    );
     debugPrint('[CameraService] copied camera file exists: $copiedExists');
+    debugPrint(
+      '[CameraService] optimized camera size=${optimized.fileSizeBytes} '
+      'dimensions=${optimized.width}x${optimized.height}',
+    );
 
     return XFile(copiedFile.path, name: fileName);
   }
@@ -165,6 +216,7 @@ class CameraService {
       );
     }
 
+    await disposeCamera();
     _controller = CameraController(
       _availableCameras[_selectedCameraIndex],
       ResolutionPreset.high,
@@ -215,17 +267,5 @@ class CameraService {
   Future<void> disposeCamera() async {
     await _controller?.dispose();
     _controller = null;
-  }
-
-  String _extensionFor(XFile image) {
-    final candidate = image.name.isNotEmpty
-        ? image.name
-        : image.path.split(RegExp(r'[\\/]')).last;
-    final dotIndex = candidate.lastIndexOf('.');
-    if (dotIndex == -1 || dotIndex == candidate.length - 1) {
-      return '.jpg';
-    }
-
-    return candidate.substring(dotIndex);
   }
 }

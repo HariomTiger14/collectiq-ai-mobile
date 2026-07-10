@@ -1,44 +1,89 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+class CameraCaptureFlowResult {
+  const CameraCaptureFlowResult._({this.image, this.openGallery = false});
+
+  const CameraCaptureFlowResult.image(XFile image) : this._(image: image);
+
+  const CameraCaptureFlowResult.galleryFallback() : this._(openGallery: true);
+
+  final XFile? image;
+  final bool openGallery;
+}
 
 /// Full-screen camera capture experience for scanner image acquisition.
 class CameraCapturePage extends ConsumerStatefulWidget {
   /// Creates the camera capture page.
-  const CameraCapturePage({super.key});
+  const CameraCapturePage({required this.imageRole, super.key});
+
+  final String imageRole;
 
   @override
   ConsumerState<CameraCapturePage> createState() => _CameraCapturePageState();
 }
 
-class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
+class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
+    with WidgetsBindingObserver {
+  late final ScanImageProcessor _imageProcessor;
   CameraService? _cameraService;
+  XFile? _capturedImage;
+  ScanImageQualityReport? _qualityReport;
   bool _isInitializing = true;
   bool _isCapturing = false;
+  bool _isInspecting = false;
   bool _isFlashEnabled = false;
+  bool _isPermissionPermanentlyDenied = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _imageProcessor = const ScanImageProcessor();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        _initializeCamera();
       }
-      _initializeCamera();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final cameraService = _cameraService;
+    if (cameraService == null) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      cameraService.disposeCamera();
+      return;
+    }
+    if (state == AppLifecycleState.resumed && _capturedImage == null) {
+      _initializeCamera();
+    }
   }
 
   Future<void> _initializeCamera() async {
     final cameraService = ref.read(cameraServiceProvider);
     _cameraService = cameraService;
+    setState(() {
+      _isInitializing = true;
+      _errorMessage = null;
+      _isPermissionPermanentlyDenied = false;
+    });
 
     try {
-      final hasPermission = await cameraService.requestPermissions();
-      if (!hasPermission) {
-        _setError('Camera permission is required to scan collectibles.');
+      final permission = await cameraService.requestPermissionStatus();
+      if (!permission.isGranted) {
+        _setPermissionError(permission);
         return;
       }
 
@@ -53,8 +98,21 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
         _errorMessage = null;
       });
     } catch (_) {
-      _setError('Unable to open the camera.');
+      _setError('Unable to open the camera on this device.');
     }
+  }
+
+  void _setPermissionError(PermissionStatus status) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isPermissionPermanentlyDenied = status.isPermanentlyDenied;
+      _errorMessage = status.isPermanentlyDenied
+          ? 'Camera permission is turned off. Enable it in Settings to capture scans.'
+          : 'Camera permission is required to capture scans.';
+      _isInitializing = false;
+    });
   }
 
   void _setError(String message) {
@@ -65,6 +123,8 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
     setState(() {
       _errorMessage = message;
       _isInitializing = false;
+      _isCapturing = false;
+      _isInspecting = false;
     });
   }
 
@@ -76,6 +136,7 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
 
     setState(() {
       _isCapturing = true;
+      _errorMessage = null;
     });
 
     try {
@@ -83,21 +144,27 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop(image.path);
-    } catch (_) {
+      setState(() {
+        _capturedImage = image;
+        _isCapturing = false;
+        _isInspecting = true;
+      });
+      final report = await _imageProcessor.inspect(image.path);
       if (!mounted) {
         return;
       }
       setState(() {
-        _isCapturing = false;
-        _errorMessage = 'Unable to capture image.';
+        _qualityReport = report;
+        _isInspecting = false;
       });
+    } catch (_) {
+      _setError('Unable to capture image. Please try again.');
     }
   }
 
   Future<void> _toggleFlash() async {
     final cameraService = _cameraService;
-    if (cameraService == null) {
+    if (cameraService == null || !cameraService.canToggleFlash) {
       return;
     }
 
@@ -120,65 +187,171 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage> {
     }
   }
 
+  void _retake() {
+    setState(() {
+      _capturedImage = null;
+      _qualityReport = null;
+      _errorMessage = null;
+      _isInspecting = false;
+      _isCapturing = false;
+    });
+  }
+
+  void _usePhoto() {
+    final image = _capturedImage;
+    if (image == null) {
+      return;
+    }
+    Navigator.of(context).pop(CameraCaptureFlowResult.image(image));
+  }
+
+  void _openGalleryFallback() {
+    Navigator.of(context).pop(const CameraCaptureFlowResult.galleryFallback());
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cameraService?.disposeCamera();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = _cameraService?.controller;
-    final isReady = controller != null && controller.value.isInitialized;
-
+    final capturedImage = _capturedImage;
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: _CameraPreviewBody(
-                controller: isReady ? controller : null,
+        child: capturedImage == null
+            ? _CameraLiveView(
+                cameraService: _cameraService,
                 isInitializing: _isInitializing,
+                isCapturing: _isCapturing,
+                isFlashEnabled: _isFlashEnabled,
                 errorMessage: _errorMessage,
+                isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
+                roleTitle: _roleTitle(widget.imageRole),
+                guidanceText: _guidanceText(widget.imageRole),
+                onBack: () => Navigator.of(context).maybePop(),
+                onCapture: _captureImage,
+                onFlash: _toggleFlash,
+                onGallery: _openGalleryFallback,
+                onRetryPermission: _initializeCamera,
+                onOpenSettings: _cameraService?.openSettings,
+              )
+            : _CameraReviewView(
+                image: capturedImage,
+                qualityReport: _qualityReport,
+                isInspecting: _isInspecting,
+                onRetake: _retake,
+                onUsePhoto: _usePhoto,
               ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: IconButton.filled(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.close),
-                tooltip: 'Close camera',
-              ),
-            ),
-            if (isReady)
-              Positioned(
-                top: 12,
-                right: 12,
-                child: IconButton.filled(
-                  onPressed: _toggleFlash,
-                  icon: Icon(
-                    _isFlashEnabled ? Icons.flash_on : Icons.flash_off,
-                  ),
-                  tooltip: 'Toggle flash',
-                ),
-              ),
-            if (isReady)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 32,
-                child: Center(
-                  child: _CaptureButton(
-                    isCapturing: _isCapturing,
-                    onPressed: _captureImage,
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
+    );
+  }
+}
+
+class _CameraLiveView extends StatelessWidget {
+  const _CameraLiveView({
+    required this.cameraService,
+    required this.isInitializing,
+    required this.isCapturing,
+    required this.isFlashEnabled,
+    required this.errorMessage,
+    required this.isPermissionPermanentlyDenied,
+    required this.roleTitle,
+    required this.guidanceText,
+    required this.onBack,
+    required this.onCapture,
+    required this.onFlash,
+    required this.onGallery,
+    required this.onRetryPermission,
+    required this.onOpenSettings,
+  });
+
+  final CameraService? cameraService;
+  final bool isInitializing;
+  final bool isCapturing;
+  final bool isFlashEnabled;
+  final String? errorMessage;
+  final bool isPermissionPermanentlyDenied;
+  final String roleTitle;
+  final String guidanceText;
+  final VoidCallback onBack;
+  final VoidCallback onCapture;
+  final VoidCallback onFlash;
+  final VoidCallback onGallery;
+  final VoidCallback onRetryPermission;
+  final Future<bool> Function()? onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = cameraService?.controller;
+    final isReady = controller != null && controller.value.isInitialized;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _CameraPreviewBody(
+            controller: isReady ? controller : null,
+            isInitializing: isInitializing,
+            errorMessage: errorMessage,
+            isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
+            onRetryPermission: onRetryPermission,
+            onOpenSettings: onOpenSettings,
+          ),
+        ),
+        if (isReady) const Positioned.fill(child: _GuideOverlayFrame()),
+        Positioned(
+          top: 12,
+          left: 12,
+          child: IconButton.filled(
+            onPressed: onBack,
+            icon: const Icon(Icons.close),
+            tooltip: 'Close camera',
+          ),
+        ),
+        if (isReady && (cameraService?.canToggleFlash ?? false))
+          Positioned(
+            top: 12,
+            right: 12,
+            child: IconButton.filled(
+              onPressed: onFlash,
+              icon: Icon(isFlashEnabled ? Icons.flash_on : Icons.flash_off),
+              tooltip: 'Toggle flash',
+            ),
+          ),
+        Positioned(
+          left: 24,
+          right: 24,
+          top: 72,
+          child: _CameraGuidanceCard(title: roleTitle, body: guidanceText),
+        ),
+        if (isReady)
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 24,
+            child: Row(
+              children: [
+                IconButton.filledTonal(
+                  onPressed: onGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  tooltip: 'Choose from gallery',
+                ),
+                Expanded(
+                  child: Center(
+                    child: _CaptureButton(
+                      isCapturing: isCapturing,
+                      onPressed: onCapture,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -188,17 +361,25 @@ class _CameraPreviewBody extends StatelessWidget {
     required this.controller,
     required this.isInitializing,
     required this.errorMessage,
+    required this.isPermissionPermanentlyDenied,
+    required this.onRetryPermission,
+    required this.onOpenSettings,
   });
 
   final CameraController? controller;
   final bool isInitializing;
   final String? errorMessage;
+  final bool isPermissionPermanentlyDenied;
+  final VoidCallback onRetryPermission;
+  final Future<bool> Function()? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
     final activeController = controller;
     if (activeController != null) {
-      return Center(child: CameraPreview(activeController));
+      return Center(
+        child: CameraPreview(activeController, child: const SizedBox.expand()),
+      );
     }
 
     if (isInitializing) {
@@ -210,14 +391,191 @@ class _CameraPreviewBody extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          errorMessage ?? 'Camera is unavailable.',
-          textAlign: TextAlign.center,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.photo_camera_outlined,
+              color: Colors.white,
+              size: 42,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage ?? 'Camera is unavailable.',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: isPermissionPermanentlyDenied
+                  ? () => onOpenSettings?.call()
+                  : onRetryPermission,
+              child: Text(
+                isPermissionPermanentlyDenied ? 'Open Settings' : 'Try Again',
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _GuideOverlayFrame extends StatelessWidget {
+  const _GuideOverlayFrame();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Center(
+        child: FractionallySizedBox(
+          widthFactor: 0.82,
+          heightFactor: 0.48,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraGuidanceCard extends StatelessWidget {
+  const _CameraGuidanceCard({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              body,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraReviewView extends StatelessWidget {
+  const _CameraReviewView({
+    required this.image,
+    required this.qualityReport,
+    required this.isInspecting,
+    required this.onRetake,
+    required this.onUsePhoto,
+  });
+
+  final XFile image;
+  final ScanImageQualityReport? qualityReport;
+  final bool isInspecting;
+  final VoidCallback onRetake;
+  final VoidCallback onUsePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final report = qualityReport;
+    final warnings = report?.warnings ?? const <ScanImageQualityWarning>[];
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.file(File(image.path), fit: BoxFit.contain),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 24,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    warnings.isEmpty ? 'Review photo' : 'Quality warning',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (isInspecting)
+                    const LinearProgressIndicator()
+                  else if (warnings.isEmpty)
+                    const Text(
+                      'Looks ready for analysis.',
+                      style: TextStyle(color: Colors.white70),
+                    )
+                  else
+                    for (final warning in warnings)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          warning.message,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: onRetake,
+                          child: const Text('Retake'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: isInspecting ? null : onUsePhoto,
+                          child: Text(
+                            warnings.isEmpty ? 'Use Photo' : 'Use Anyway',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -258,4 +616,29 @@ class _CaptureButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String _roleTitle(String role) {
+  return switch (_normalizeRole(role)) {
+    'back' => 'Capture back / reverse',
+    'closeup' => 'Capture close-up',
+    _ => 'Capture front / obverse',
+  };
+}
+
+String _guidanceText(String role) {
+  return switch (_normalizeRole(role)) {
+    'back' => 'Flip the item and capture the reverse side.',
+    'closeup' => 'Move closer to the year, mark, damage, label, or serial.',
+    _ => 'Place the item clearly inside the guide.',
+  };
+}
+
+String _normalizeRole(String role) {
+  final normalized = role.trim().toLowerCase();
+  return switch (normalized) {
+    'reverse' || 'back' => 'back',
+    'close-up' || 'closeup' || 'detail' || 'serial' || 'damage' => 'closeup',
+    _ => 'front',
+  };
 }
