@@ -130,7 +130,6 @@ class _ImageEnhancementPreviewSurfaceState
   ImageQualityAssessment? _assessment;
   ImageEnhancementResult? _cachedAiEnhance;
   Future<ImageEnhancementResult>? _aiEnhanceFuture;
-  bool _isEnhancing = false;
 
   @override
   void initState() {
@@ -178,7 +177,6 @@ class _ImageEnhancementPreviewSurfaceState
       setState(() {
         _activePath = result.activePath;
         _metadata = _metadataForResult(result);
-        _isEnhancing = false;
       });
     }
   }
@@ -190,7 +188,6 @@ class _ImageEnhancementPreviewSurfaceState
         _selectedPreset = simplifiedPreset;
         _activePath = widget.image.path;
         _metadata = _metadataForPreset(simplifiedPreset);
-        _isEnhancing = false;
       });
       return;
     }
@@ -198,7 +195,6 @@ class _ImageEnhancementPreviewSurfaceState
     final cached = _cachedAiEnhance;
     setState(() {
       _selectedPreset = simplifiedPreset;
-      _isEnhancing = cached == null;
       if (cached != null) {
         _activePath = cached.activePath;
         _metadata = _metadataForResult(cached);
@@ -248,7 +244,6 @@ class _ImageEnhancementPreviewSurfaceState
   Future<void> _usePhoto() async {
     if (_selectedPreset == ImageEnhancementPreset.autoEnhance &&
         _cachedAiEnhance == null) {
-      setState(() => _isEnhancing = true);
       await _warmAiEnhance();
       if (!mounted) {
         return;
@@ -269,8 +264,6 @@ class _ImageEnhancementPreviewSurfaceState
   Widget build(BuildContext context) {
     final previewFile = File(_activePath);
     final canShowImage = previewFile.existsSync();
-    final recommended = _assessment?.recommendedPreset.isEnhanced ?? false;
-
     return Stack(
       key: const ValueKey('enhancement-preview-surface'),
       fit: StackFit.expand,
@@ -331,8 +324,6 @@ class _ImageEnhancementPreviewSurfaceState
                       label: 'AI Enhance',
                       selected:
                           _selectedPreset == ImageEnhancementPreset.autoEnhance,
-                      recommended: recommended,
-                      busy: _isEnhancing,
                       onTap: () =>
                           _selectPreset(ImageEnhancementPreset.autoEnhance),
                     ),
@@ -446,16 +437,12 @@ class _EnhancementTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.recommended = false,
-    this.busy = false,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
-  final bool recommended;
-  final bool busy;
   final VoidCallback onTap;
 
   @override
@@ -489,24 +476,7 @@ class _EnhancementTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(icon, color: color, size: 22),
-                  if (busy)
-                    const Positioned(
-                      right: -10,
-                      top: -8,
-                      child: SizedBox.square(
-                        dimension: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.6,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              Icon(icon, color: color, size: 22),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -517,18 +487,6 @@ class _EnhancementTile extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              if (recommended) ...[
-                const SizedBox(height: 3),
-                Text(
-                  'Recommended',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ],
           ),
         ),

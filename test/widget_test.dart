@@ -77,7 +77,10 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -130,7 +133,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isTrue);
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -507,7 +510,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -526,9 +529,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.acceptEnhancementPreview();
 
-    expect(find.text('AI Scanner'), findsOneWidget);
-    await tester.pumpUntilFound(find.text('Gallery image'));
-    expect(find.text('Gallery image'), findsOneWidget);
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
+    expect(find.text('AI Scanner'), findsNothing);
   });
 
   testWidgets('shell recreation returns to Home and Scan still works', (
@@ -538,20 +542,20 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     await tester.pumpCollectIqApp();
     await tester.pumpAndSettle();
 
-    expect(find.text('AI Scanner'), findsNothing);
+    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
     expect(find.text('Quick Actions'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -564,11 +568,12 @@ void main() {
     await tester.tap(find.text('Scan').last);
     await tester.pump();
 
-    expect(find.text('AI Scanner'), findsOneWidget);
-    expect(
-      find.text('Instantly identify and value collectibles.'),
-      findsOneWidget,
-    );
+    expect(find.text('AI Scanner'), findsNothing);
+    expect(find.text('Ready to Scan'), findsNothing);
+    expect(find.text('Category'), findsNothing);
+    expect(find.text('Confidence'), findsNothing);
+    expect(find.text('Advanced scan options'), findsNothing);
+    expect(find.text('Scan Workspace'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
@@ -582,9 +587,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Analyze with AI'), findsNothing);
-    expect(find.text('Supported Categories'), findsOneWidget);
-    expect(find.text('How It Works'), findsOneWidget);
-    expect(find.text('Unlimited AI Scans'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-live-enhance')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-flip-camera')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
   });
 
   testWidgets('shows portfolio empty state', (WidgetTester tester) async {
@@ -1286,10 +1291,12 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
-    await tester.pumpUntilFound(find.text('Captured image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Captured image'), findsOneWidget);
-    expect(find.text('Ready for AI analysis'), findsOneWidget);
+    expect(find.text('Captured image'), findsNothing);
+    expect(find.text('Ready for AI analysis'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1310,22 +1317,22 @@ void main() {
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Smart Scan'), findsOneWidget);
-    expect(find.textContaining('Auto Detect'), findsWidgets);
-    expect(find.text('Advanced scan options'), findsOneWidget);
-    expect(find.textContaining('Choose category'), findsOneWidget);
+    expect(find.text('Smart Scan'), findsNothing);
+    expect(find.textContaining('Auto Detect'), findsNothing);
+    expect(find.text('Advanced scan options'), findsNothing);
+    expect(find.textContaining('Choose category'), findsNothing);
     expect(find.text('Identify & Value'), findsNothing);
     expect(find.text('Detailed Analysis'), findsNothing);
     expect(find.text('Prepare for Sale'), findsNothing);
     expect(find.byKey(const ValueKey('scan-category-toy_car')), findsNothing);
     expect(find.textContaining('AI Readiness'), findsNothing);
     expect(
-      find.byKey(const ValueKey('scan-workspace-compact-guidance')),
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
       findsOneWidget,
     );
-    expect(find.text('Not selected yet'), findsWidgets);
-    expect(find.text('0 photos'), findsWidgets);
-    expect(find.text('--'), findsWidgets);
+    expect(find.text('Not selected yet'), findsNothing);
+    expect(find.text('0 photos'), findsNothing);
+    expect(find.text('--'), findsNothing);
     expect(find.text('Selected: Toy car'), findsNothing);
     expect(find.text('Detected: Toy car'), findsNothing);
     expect(
@@ -1334,7 +1341,7 @@ void main() {
     );
   });
 
-  testWidgets('advanced scan options reveal existing scan modes', (
+  testWidgets('advanced scan options are removed from simplified scan', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp();
@@ -1342,13 +1349,13 @@ void main() {
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const ValueKey('advanced-scan-options-tile')),
+      findsNothing,
+    );
     expect(find.text('Identify & Value'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('advanced-scan-options-tile')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Identify & Value'), findsOneWidget);
-    expect(find.text('Detailed Analysis'), findsOneWidget);
-    expect(find.text('Prepare for Sale'), findsOneWidget);
+    expect(find.text('Detailed Analysis'), findsNothing);
+    expect(find.text('Prepare for Sale'), findsNothing);
   });
 
   testWidgets('manual and detected scanner categories are labeled clearly', (
@@ -1366,7 +1373,7 @@ void main() {
         .selectCaptureCategory(CollectibleCategory.toyCar);
     await tester.pumpAndSettle();
 
-    expect(find.text('Selected: Toy car'), findsWidgets);
+    expect(find.text('Selected: Toy car'), findsNothing);
 
     await tester.reveal(
       find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
@@ -1389,6 +1396,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Detected: Pokemon Card'), findsWidgets);
+    expect(find.text('Pokemon Card'), findsWidgets);
   });
 
   testWidgets('scanner slot updates after captured front image', (
@@ -1405,9 +1413,11 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
-    await tester.pumpUntilFound(find.text('Captured image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Captured image'), findsNothing);
   });
 
   testWidgets('camera denied UI shows friendly message', (
@@ -1446,15 +1456,18 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
-    await tester.pumpUntilFound(find.text('Preparing image...'));
+    await tester.pump();
 
-    expect(find.text('Preparing your PackLox scan.'), findsOneWidget);
+    expect(find.text('Preparing image...'), findsNothing);
+    expect(find.text('Preparing your PackLox scan.'), findsNothing);
     expect(find.text('Welcome back to PackLox'), findsNothing);
 
     cameraService.complete();
-    await tester.pumpUntilFound(find.text('Captured image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Captured image'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1475,9 +1488,11 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
     );
-    await tester.pumpUntilFound(find.text('Captured image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Captured image'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1495,10 +1510,12 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pump();
-    await tester.pumpUntilFound(find.text('Recovered image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('AI Scanner'), findsOneWidget);
-    expect(find.text('Recovered image'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
+    expect(find.text('Recovered image'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1517,9 +1534,11 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.acceptEnhancementPreview();
-    await tester.pumpUntilFound(find.text('Gallery image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Gallery image'), findsOneWidget);
+    expect(find.text('Gallery image'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1628,8 +1647,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Sample Sports Card'), findsOneWidget);
-    expect(find.text('Ready for AI analysis'), findsOneWidget);
+    expect(find.text('Sample Sports Card'), findsNothing);
+    expect(find.text('Ready for AI analysis'), findsNothing);
 
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
@@ -1742,11 +1761,11 @@ void main() {
         .onPressed
         ?.call();
     await tester.pumpUntilFound(
-      find.text('AI Enhance applied'),
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
       timeout: const Duration(seconds: 10),
     );
 
-    expect(find.text('AI Enhance applied'), findsOneWidget);
+    expect(find.text('AI Enhance applied'), findsNothing);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MaterialApp)),
     );
@@ -1768,56 +1787,6 @@ void main() {
       controller.captureImages.single.qualityMetadata['originalImagePath'],
       isNotEmpty,
     );
-
-    tester
-        .widget<InkWell>(
-          find.byKey(const ValueKey('scan-active-capture-preview')),
-        )
-        .onTap
-        ?.call();
-    await tester.pump();
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('photo-review-enhance')),
-    );
-    tester
-        .widget<OutlinedButton>(
-          find.byKey(const ValueKey('photo-review-enhance')),
-        )
-        .onPressed
-        ?.call();
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('enhancement-preview-presets')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('enhancement-preview-original')).last,
-    );
-    await tester.pump(const Duration(milliseconds: 300));
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
-        )
-        .onPressed
-        ?.call();
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('photo-review-enhance')),
-    );
-
-    final reverted = container.read(scannerControllerProvider);
-    expect(reverted.captureImages.single.enhancementPreset.id, 'original');
-    expect(reverted.captureImages.single.qualityMetadata['enhanced'], isFalse);
-
-    await container
-        .read(scannerControllerProvider.notifier)
-        .applyEnhancementToPhoto(
-          reverted.captureImages.single,
-          ImageEnhancementPreset.autoEnhance,
-        );
-    await tester.pumpUntilFound(
-      find.text('AI Enhance applied'),
-      timeout: const Duration(seconds: 10),
-    );
-    await tester.tap(find.byKey(const ValueKey('photo-review-close')));
-    await tester.pump(const Duration(seconds: 2));
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
@@ -2350,9 +2319,11 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.acceptEnhancementPreview();
-    await tester.pumpUntilFound(find.text('Gallery image'));
+    await tester.pumpUntilFound(
+      find.byKey(const ValueKey('scan-primary-Analyze Image')),
+    );
 
-    expect(find.text('Gallery image'), findsOneWidget);
+    expect(find.text('Gallery image'), findsNothing);
 
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
@@ -2366,8 +2337,8 @@ void main() {
         ?.call();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Gallery image'), findsOneWidget);
-    expect(find.text('Analyzing scan'), findsOneWidget);
+    expect(find.text('Gallery image'), findsNothing);
+    expect(find.byKey(const ValueKey('scan-busy-overlay')), findsOneWidget);
 
     await tester.pumpAndSettle();
 
@@ -2569,14 +2540,11 @@ void main() {
         ?.call();
     await tester.pumpAndSettle();
 
-    expect(find.text('We need a clearer photo'), findsOneWidget);
-    expect(
-      find.text('Try better lighting or include the full item.'),
-      findsOneWidget,
-    );
-    expect(find.text('Try Again'), findsOneWidget);
-    expect(find.text('Choose Another Photo'), findsOneWidget);
-    expect(find.text('Back to Home'), findsOneWidget);
+    expect(find.text('Provider failed safely.'), findsOneWidget);
+    expect(find.text('We need a clearer photo'), findsNothing);
+    expect(find.text('Try Again'), findsNothing);
+    expect(find.text('Choose Another Photo'), findsNothing);
+    expect(find.text('Back to Home'), findsNothing);
   });
 
   testWidgets('scan result long title is safe on small Android width', (
@@ -2906,7 +2874,11 @@ void main() {
 
     expect(find.text('Sample Sports Card'), findsNothing);
     expect(find.text('1999 PokÃ©mon Charizard'), findsNothing);
-    expect(find.text('AI Scanner'), findsOneWidget);
+    expect(find.text('AI Scanner'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
 
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -2917,7 +2889,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Captured image'), findsOneWidget);
+    expect(find.text('Captured image'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -3617,18 +3589,9 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Recent Scans'));
-    await tester.pump();
-    expect(
-      tester
-          .getTopLeft(find.byKey(const ValueKey('scan-recent-gallery-new')))
-          .dy,
-      lessThan(
-        tester
-            .getTopLeft(find.byKey(const ValueKey('scan-recent-camera-old')))
-            .dy,
-      ),
-    );
+    expect(find.text('Recent Scans'), findsNothing);
+    expect(find.byKey(const ValueKey('scan-recent-gallery-new')), findsNothing);
+    expect(find.byKey(const ValueKey('scan-recent-camera-old')), findsNothing);
 
     await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
@@ -3654,7 +3617,7 @@ void main() {
     );
   });
 
-  testWidgets('scan recent scans use images and gallery fallback thumbnails', (
+  testWidgets('scan screen hides recent scans in simplified camera mode', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -3707,24 +3670,21 @@ void main() {
     await tester.pumpCollectIqApp();
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Recent Scans'));
-    await tester.pump();
+    expect(find.text('Recent Scans'), findsNothing);
 
     expect(
       find.byKey(const ValueKey('scan-recent-thumbnail-recent-primary')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('scan-recent-thumbnail-recent-gallery')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('scan-recent-placeholder-recent-empty')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.textContaining('Scanned'), findsWidgets);
-    expect(find.textContaining('Analyzed with AI Enhance'), findsOneWidget);
-    expect(find.textContaining('82% confidence'), findsOneWidget);
+    expect(find.textContaining('Analyzed with AI Enhance'), findsNothing);
   });
 
   testWidgets('portfolio item tap opens detail page', (
@@ -4212,7 +4172,7 @@ void main() {
     expect(find.text('Raw Diagnostics'), findsOneWidget);
   });
 
-  testWidgets('scan recent scans tap opens detail page', (
+  testWidgets('scan recent scans are not shown in simplified camera mode', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -4224,16 +4184,8 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Recent Scans'));
-    await tester.pump();
-    await tester.reveal(find.byKey(const ValueKey('scan-recent-scan-detail')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-recent-scan-detail')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Collectible Details'), findsOneWidget);
-    expect(find.text('Scan Detail Charizard'), findsWidgets);
-    expect(find.text('Raw Diagnostics'), findsOneWidget);
+    expect(find.text('Recent Scans'), findsNothing);
+    expect(find.byKey(const ValueKey('scan-recent-scan-detail')), findsNothing);
   });
 
   testWidgets('opens portfolio item detail page actions', (
@@ -4398,7 +4350,7 @@ void main() {
 
       await tester.tap(find.text('Scan').last);
       await tester.pumpAndSettle();
-      expect(find.text('AI Scanner'), findsOneWidget);
+      expect(find.text('AI Scanner'), findsNothing);
       expect(
         find.byKey(const ValueKey('scan-primary-Scan with Camera')),
         findsOneWidget,

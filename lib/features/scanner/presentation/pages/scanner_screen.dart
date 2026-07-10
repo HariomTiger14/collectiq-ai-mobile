@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -6,6 +8,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
@@ -222,6 +225,43 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       },
     );
 
+    if (scanResult == null) {
+      final nextRole =
+          scannerState.activeCaptureRole ??
+          activePlan.nextRecommendedRole?.id ??
+          ScanCaptureRole.front.id;
+      final activeSlot = _activeScanSlot(
+        scannerState.captureImages,
+        selectedImagePath,
+      );
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: _SnapchatScanSurface(
+          captureImages: scannerState.captureImages,
+          activeSlot: activeSlot,
+          isBusy: scannerState.isLoading || scannerState.isPreparingImage,
+          canAnalyze: scannerState.captureImages.isNotEmpty,
+          errorMessage: scannerState.errorMessage,
+          onClose: scannerController.resetScan,
+          onCapture: () =>
+              scannerController.startCameraScan(context, imageRole: nextRole),
+          onGallery: () => scannerController.pickImageFromGallery(
+            context: context,
+            imageRole: nextRole,
+          ),
+          onAnalyze: scannerController.analyzeWithAi,
+          onSelectPhoto: scannerController.selectCapturedPhoto,
+          onSample: scannerController.useSampleScan,
+          onEnhance: activeSlot == null
+              ? null
+              : () => scannerController.applyEnhancementToPhoto(
+                  activeSlot,
+                  ImageEnhancementPreset.autoEnhance,
+                ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
@@ -272,7 +312,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                             children: [
                               ScanStatusBar(
                                 status: _scanStatusFor(scannerState),
-                                confidence: scanResult?.confidence,
+                                confidence: scanResult.confidence,
                                 category: _scanCategoryStatus(scannerState),
                                 modelStatus: _modelStatusFor(scannerState),
                               ),
@@ -315,7 +355,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 ),
                                 hasManualCategory:
                                     scannerState.hasManualCaptureCategory,
-                                detectedCategory: scanResult?.category,
+                                detectedCategory: scanResult.category,
                                 plan: activePlan,
                                 slots: scannerState.photoSlots,
                                 captureImages: scannerState.captureImages,
@@ -326,7 +366,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                 isBusy:
                                     scannerState.isLoading ||
                                     scannerState.isPreparingImage,
-                                hasResult: scanResult != null,
+                                hasResult: true,
                                 selectedPath: selectedImagePath,
                                 activeRoleId: scannerState.activeCaptureRole,
                                 onPrimaryCapture: () {
@@ -374,92 +414,89 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                                   message: scannerState.errorMessage!,
                                 ),
                               ],
-                              if (scanResult != null) ...[
-                                const SizedBox(height: AppSpacing.xxl),
-                                KeyedSubtree(
-                                  key: _resultKey,
-                                  child: const ScanSectionHeader(
-                                    'Analysis Complete',
-                                  ),
+                              const SizedBox(height: AppSpacing.xxl),
+                              KeyedSubtree(
+                                key: _resultKey,
+                                child: const ScanSectionHeader(
+                                  'Analysis Complete',
                                 ),
-                                const SizedBox(height: AppSpacing.md),
-                                AiResultCard(
-                                  key: ValueKey('scan-result-${scanResult.id}'),
-                                  item: scanResult.title,
-                                  category: scanResult.category,
-                                  estimatedValue: _formatScanValue(
-                                    scanResult.estimatedValue,
-                                    scanResult.valuationStatus,
-                                  ),
-                                  confidence:
-                                      '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
-                                  condition: scanResult.condition,
-                                  imagePath: scanResult.thumbnail,
-                                  confidenceScore: scanResult.confidence,
-                                  rawEstimatedValue: scanResult.estimatedValue,
-                                  primaryMatch: scanResult.primaryMatch,
-                                  alternativeMatches:
-                                      scanResult.alternativeMatches,
-                                  confidenceExplanation:
-                                      scanResult.confidenceExplanation,
-                                  detectionQuality: scanResult.detectionQuality,
-                                  aiReasoning: scanResult.aiReasoning,
-                                  pricing: scanResult.pricing,
-                                  marketSummary: scanResult.marketSummary,
-                                  year: scanResult.year,
-                                  brand: scanResult.brand,
-                                  setName: scanResult.setName,
-                                  series: scanResult.series,
-                                  cardNumber: scanResult.cardNumber,
-                                  playerOrCharacter:
-                                      scanResult.playerOrCharacter,
-                                  rarity: scanResult.rarity,
-                                  estimatedGrade: scanResult.estimatedGrade,
-                                  language: scanResult.language,
-                                  edition: scanResult.edition,
-                                  country: scanResult.country,
-                                  mint: scanResult.mint,
-                                  material: scanResult.material,
-                                  notes: scanResult.notes,
-                                  recommendation:
-                                      scannerState.aiRecommendation ??
-                                      'Consider grading before selling.',
-                                  isSaved: scannerState.isSavedToPortfolio,
-                                  isSaving: scannerState.isSavingToPortfolio,
-                                  photosUsed: scanResult.photosUsed,
-                                  photoRoles: scanResult.photoRoles,
-                                  galleryImages: scanResult.galleryImages,
-                                  faceValue: scanResult.faceValue,
-                                  estimatedMarketValue:
-                                      scanResult.estimatedMarketValue,
-                                  askingPriceWarning:
-                                      scanResult.askingPriceWarning,
-                                  valuationConfidence:
-                                      scanResult.valuationConfidence,
-                                  valuationStatus: scanResult.valuationStatus,
-                                  valuationSource: scanResult.valuationSource,
-                                  aiEstimatedValue: scanResult.aiEstimatedValue,
-                                  onViewPortfolio: widget.onViewPortfolio,
-                                  onScanAnother: ref
-                                      .read(scannerControllerProvider.notifier)
-                                      .resetScan,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              AiResultCard(
+                                key: ValueKey('scan-result-${scanResult.id}'),
+                                item: scanResult.title,
+                                category: scanResult.category,
+                                estimatedValue: _formatScanValue(
+                                  scanResult.estimatedValue,
+                                  scanResult.valuationStatus,
                                 ),
-                                const SizedBox(height: AppSpacing.md),
-                                _ScanResultGoalSummary(
-                                  goal:
-                                      scannerState.scanSession?.scanGoal ??
-                                      ScanGoal.identifyValue,
-                                  imageCount: scannerState.captureImages.length,
-                                  confidenceModel: ConfidenceModel(
-                                    confidenceTarget:
-                                        scannerState
-                                            .scanSession
-                                            ?.confidenceTarget ??
-                                        ScanGoal.identifyValue.confidenceTarget,
-                                    confidenceAchieved: scanResult.confidence,
-                                  ),
+                                confidence:
+                                    '${(scanResult.confidence * 100).toStringAsFixed(0)}%',
+                                condition: scanResult.condition,
+                                imagePath: scanResult.thumbnail,
+                                confidenceScore: scanResult.confidence,
+                                rawEstimatedValue: scanResult.estimatedValue,
+                                primaryMatch: scanResult.primaryMatch,
+                                alternativeMatches:
+                                    scanResult.alternativeMatches,
+                                confidenceExplanation:
+                                    scanResult.confidenceExplanation,
+                                detectionQuality: scanResult.detectionQuality,
+                                aiReasoning: scanResult.aiReasoning,
+                                pricing: scanResult.pricing,
+                                marketSummary: scanResult.marketSummary,
+                                year: scanResult.year,
+                                brand: scanResult.brand,
+                                setName: scanResult.setName,
+                                series: scanResult.series,
+                                cardNumber: scanResult.cardNumber,
+                                playerOrCharacter: scanResult.playerOrCharacter,
+                                rarity: scanResult.rarity,
+                                estimatedGrade: scanResult.estimatedGrade,
+                                language: scanResult.language,
+                                edition: scanResult.edition,
+                                country: scanResult.country,
+                                mint: scanResult.mint,
+                                material: scanResult.material,
+                                notes: scanResult.notes,
+                                recommendation:
+                                    scannerState.aiRecommendation ??
+                                    'Consider grading before selling.',
+                                isSaved: scannerState.isSavedToPortfolio,
+                                isSaving: scannerState.isSavingToPortfolio,
+                                photosUsed: scanResult.photosUsed,
+                                photoRoles: scanResult.photoRoles,
+                                galleryImages: scanResult.galleryImages,
+                                faceValue: scanResult.faceValue,
+                                estimatedMarketValue:
+                                    scanResult.estimatedMarketValue,
+                                askingPriceWarning:
+                                    scanResult.askingPriceWarning,
+                                valuationConfidence:
+                                    scanResult.valuationConfidence,
+                                valuationStatus: scanResult.valuationStatus,
+                                valuationSource: scanResult.valuationSource,
+                                aiEstimatedValue: scanResult.aiEstimatedValue,
+                                onViewPortfolio: widget.onViewPortfolio,
+                                onScanAnother: ref
+                                    .read(scannerControllerProvider.notifier)
+                                    .resetScan,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _ScanResultGoalSummary(
+                                goal:
+                                    scannerState.scanSession?.scanGoal ??
+                                    ScanGoal.identifyValue,
+                                imageCount: scannerState.captureImages.length,
+                                confidenceModel: ConfidenceModel(
+                                  confidenceTarget:
+                                      scannerState
+                                          .scanSession
+                                          ?.confidenceTarget ??
+                                      ScanGoal.identifyValue.confidenceTarget,
+                                  confidenceAchieved: scanResult.confidence,
                                 ),
-                              ],
+                              ),
                               const SizedBox(height: AppSpacing.xl),
                               const ScanSectionHeader('Recent Scans'),
                               const SizedBox(height: AppSpacing.sm),
@@ -500,6 +537,407 @@ String _formatScanValue(double value, ValuationStatus status) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+ScannerPhotoSlot? _activeScanSlot(
+  List<ScannerPhotoSlot> captureImages,
+  String? selectedPath,
+) {
+  if (captureImages.isEmpty) {
+    return null;
+  }
+  if (selectedPath == null || selectedPath.trim().isEmpty) {
+    return captureImages.last;
+  }
+  for (final slot in captureImages.reversed) {
+    if (slot.path == selectedPath) {
+      return slot;
+    }
+  }
+  return captureImages.last;
+}
+
+class _SnapchatScanSurface extends StatelessWidget {
+  const _SnapchatScanSurface({
+    required this.captureImages,
+    required this.activeSlot,
+    required this.isBusy,
+    required this.canAnalyze,
+    required this.errorMessage,
+    required this.onClose,
+    required this.onCapture,
+    required this.onGallery,
+    required this.onAnalyze,
+    required this.onSelectPhoto,
+    required this.onSample,
+    required this.onEnhance,
+  });
+
+  final List<ScannerPhotoSlot> captureImages;
+  final ScannerPhotoSlot? activeSlot;
+  final bool isBusy;
+  final bool canAnalyze;
+  final String? errorMessage;
+  final VoidCallback onClose;
+  final VoidCallback onCapture;
+  final VoidCallback onGallery;
+  final VoidCallback onAnalyze;
+  final ValueChanged<ScannerPhotoSlot> onSelectPhoto;
+  final VoidCallback onSample;
+  final VoidCallback? onEnhance;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Stack(
+        children: [
+          Positioned.fill(child: _SnapCameraPreview(slot: activeSlot)),
+          Positioned(
+            top: AppSpacing.sm,
+            left: AppSpacing.sm,
+            right: AppSpacing.sm,
+            child: Row(
+              children: [
+                _GlassIconButton(
+                  key: const ValueKey('scan-close'),
+                  icon: Icons.close,
+                  tooltip: 'Close',
+                  onPressed: onClose,
+                ),
+                const Spacer(),
+                _GlassIconButton(
+                  key: const ValueKey('scan-flash-toggle'),
+                  icon: Icons.flash_off,
+                  tooltip: 'Flash',
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: AppSpacing.sm,
+            top: 96,
+            bottom: 132,
+            child: _VerticalFilmstrip(
+              captureImages: captureImages,
+              activePath: activeSlot?.path,
+              onSelectPhoto: onSelectPhoto,
+            ),
+          ),
+          Positioned(
+            right: AppSpacing.md,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _GlassIconButton(
+                key: const ValueKey('scan-live-enhance'),
+                icon: Icons.auto_fix_high,
+                tooltip: 'AI Enhance',
+                onPressed: onEnhance,
+                large: true,
+              ),
+            ),
+          ),
+          if (errorMessage != null)
+            Positioned(
+              left: AppSpacing.md,
+              right: AppSpacing.md,
+              bottom: 124,
+              child: _ScanErrorToast(message: errorMessage!),
+            ),
+          if (isBusy)
+            const Positioned.fill(
+              key: ValueKey('scan-busy-overlay'),
+              child: ColoredBox(
+                color: Color(0x66000000),
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            ),
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: AppSpacing.xl,
+            child: _SnapCaptureBar(
+              canAnalyze: canAnalyze,
+              onGallery: onGallery,
+              onCapture: onCapture,
+              onAnalyze: onAnalyze,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            child: SizedBox.square(
+              dimension: 1,
+              child: IconButton(
+                key: const ValueKey('scan-secondary-Use Sample Scan'),
+                padding: EdgeInsets.zero,
+                onPressed: onSample,
+                icon: const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SnapCameraPreview extends StatelessWidget {
+  const _SnapCameraPreview({required this.slot});
+
+  final ScannerPhotoSlot? slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = slot?.path.trim();
+    final file = path == null || path.isEmpty ? null : File(path);
+    if (file != null && file.existsSync()) {
+      return Image.file(file, fit: BoxFit.cover);
+    }
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF111111), Color(0xFF050505)],
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: 118,
+          height: 118,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.06),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: const Icon(
+            Icons.photo_camera_outlined,
+            color: Colors.white54,
+            size: 42,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VerticalFilmstrip extends StatelessWidget {
+  const _VerticalFilmstrip({
+    required this.captureImages,
+    required this.activePath,
+    required this.onSelectPhoto,
+  });
+
+  final List<ScannerPhotoSlot> captureImages;
+  final String? activePath;
+  final ValueChanged<ScannerPhotoSlot> onSelectPhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('scan-left-filmstrip'),
+      width: 66,
+      child: ListView.separated(
+        itemCount: captureImages.length,
+        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final slot = captureImages[index];
+          return _FilmstripThumb(
+            slot: slot,
+            selected: slot.path == activePath,
+            onTap: () => onSelectPhoto(slot),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FilmstripThumb extends StatelessWidget {
+  const _FilmstripThumb({
+    required this.slot,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ScannerPhotoSlot slot;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(slot.path);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 62,
+        height: 78,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? Colors.white : Colors.white24,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: file.existsSync()
+            ? Image.file(file, fit: BoxFit.cover)
+            : const Icon(Icons.image_outlined, color: Colors.white54),
+      ),
+    );
+  }
+}
+
+class _SnapCaptureBar extends StatelessWidget {
+  const _SnapCaptureBar({
+    required this.canAnalyze,
+    required this.onGallery,
+    required this.onCapture,
+    required this.onAnalyze,
+  });
+
+  final bool canAnalyze;
+  final VoidCallback onGallery;
+  final VoidCallback onCapture;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _GlassIconButton(
+          key: const ValueKey('scan-secondary-Gallery'),
+          icon: Icons.photo_library_outlined,
+          tooltip: 'Gallery',
+          onPressed: onGallery,
+        ),
+        Expanded(
+          child: Center(
+            child: GestureDetector(
+              key: const ValueKey('scan-primary-Scan with Camera'),
+              onTap: onCapture,
+              child: Container(
+                width: 78,
+                height: 78,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 4),
+                ),
+                child: Center(
+                  child: Container(
+                    width: 58,
+                    height: 58,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (canAnalyze)
+          Tooltip(
+            message: 'Analyze Image',
+            child: FilledButton(
+              key: const ValueKey('scan-primary-Analyze Image'),
+              onPressed: onAnalyze,
+              style: FilledButton.styleFrom(
+                fixedSize: const Size.square(48),
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+                backgroundColor: Colors.black.withValues(alpha: 0.42),
+                foregroundColor: Colors.white,
+              ),
+              child: const Icon(Icons.auto_awesome),
+            ),
+          )
+        else
+          _GlassIconButton(
+            key: const ValueKey('scan-flip-camera'),
+            icon: Icons.cameraswitch_outlined,
+            tooltip: 'Flip Camera',
+            onPressed: () {},
+          ),
+      ],
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  const _GlassIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.large = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = large ? 58.0 : 48.0;
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, color: Colors.white),
+        style: IconButton.styleFrom(
+          fixedSize: Size.square(size),
+          backgroundColor: Colors.black.withValues(alpha: 0.42),
+          disabledBackgroundColor: Colors.black.withValues(alpha: 0.22),
+          shape: const CircleBorder(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanErrorToast extends StatelessWidget {
+  const _ScanErrorToast({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 String _scanCategoryStatus(ScannerState state) {
