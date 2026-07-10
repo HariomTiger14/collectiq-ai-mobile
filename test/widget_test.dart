@@ -313,7 +313,7 @@ void main() {
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 198);
+    expect(heroMotion.baseHeight, 260);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -326,12 +326,12 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Scan'), findsWidgets);
-    expect(find.text('Import Photo'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
     expect(find.text('From gallery'), findsOneWidget);
     expect(find.text('Portfolio'), findsWidgets);
     expect(find.text('Trends'), findsOneWidget);
     expect(find.text('Planned'), findsOneWidget);
-    expect(find.text('Soon'), findsOneWidget);
+    expect(find.textContaining('Soon'), findsOneWidget);
     expect(find.text('Quick Actions'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-section-divider-actions')),
@@ -495,7 +495,7 @@ void main() {
         matching: find.byType(PortfolioThumbnail),
       ),
     );
-    expect(recentThumbnail.size, 60);
+    expect(recentThumbnail.size, 52);
     await tester.reveal(find.text('AI Insights'));
     expect(find.text('AI Insights'), findsWidgets);
     expect(find.text('Portfolio Confidence • Excellent (84%)'), findsOneWidget);
@@ -648,6 +648,10 @@ void main() {
   testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
@@ -663,6 +667,10 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Import Photo')),
+    );
+    await tester.pump();
     await tester.tap(
       find.byKey(const ValueKey('home-quick-action-Import Photo')),
     );
@@ -681,6 +689,10 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsNothing);
@@ -693,6 +705,10 @@ void main() {
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
     expect(find.text('Quick Actions'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 
@@ -2046,6 +2062,10 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     await tester.pumpUntilFound(
@@ -2095,6 +2115,10 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
@@ -3623,6 +3647,10 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
     await tester.pumpAndSettle();
 

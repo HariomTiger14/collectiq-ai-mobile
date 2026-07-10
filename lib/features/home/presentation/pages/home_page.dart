@@ -88,7 +88,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 SliverToBoxAdapter(
                   child: _HomeFrame(
                     horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.lg,
+                    topPadding: AppSpacing.xl,
                     child: _PortfolioOverviewSection(insights: insights),
                   ),
                 ),
@@ -183,7 +183,7 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 198,
+          baseHeight: 260,
           scrollOffset: scrollOffset,
           child: MotionParallax(
             scrollOffset: scrollOffset,
@@ -244,12 +244,7 @@ class _PremiumHomeHero extends StatelessWidget {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.xl,
-                        AppSpacing.lg,
-                        AppSpacing.xl,
-                        AppSpacing.lg,
-                      ),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
                       child: Align(
                         alignment: Alignment.bottomLeft,
                         child: MotionReveal(
@@ -266,23 +261,19 @@ class _PremiumHomeHero extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.xs),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Your Collection Hub',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: textTheme.displayLarge?.copyWith(
-                                    color: colorScheme.onPrimary,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.02,
-                                    letterSpacing: 0,
-                                  ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                'Your Collection Hub',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.displayLarge?.copyWith(
+                                  color: colorScheme.onPrimary,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.02,
+                                  letterSpacing: 0,
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.sm),
+                              const SizedBox(height: AppSpacing.md),
                               Text(
                                 'Scan, value, and track your collectibles.',
                                 maxLines: 2,
@@ -336,7 +327,7 @@ class _StatsSurface extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.lg),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: MotionTapScale(
                     child: _StatColumn(
@@ -347,7 +338,7 @@ class _StatsSurface extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.lg),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: MotionTapScale(
                     child: _StatColumn(
@@ -450,7 +441,7 @@ class _QuickActionsSection extends StatelessWidget {
       _ActionSpec(
         key: const ValueKey('home-quick-action-Import Photo'),
         icon: Icons.photo_library_outlined,
-        label: 'Import Photo',
+        label: 'Import',
         subtitle: 'From gallery',
         onTap: onImportPhotoPressed,
         color: AppColors.secondaryAccent,
@@ -466,7 +457,7 @@ class _QuickActionsSection extends StatelessWidget {
       const _ActionSpec(
         key: ValueKey('home-quick-action-PI'),
         icon: Icons.auto_awesome_outlined,
-        label: 'PI',
+        label: 'PI (Soon)',
         subtitle: 'Trends',
         color: Color(0xFFF59E0B),
       ),
@@ -572,8 +563,6 @@ class _QuickActionTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!enabled)
-                  _TinyStatusPill(label: 'Soon', color: action.color),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -650,6 +639,13 @@ class _PortfolioOverviewSection extends StatelessWidget {
                 value: _formatMonthlyChange(insights),
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Divider(
+            height: 1,
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: 0.48),
           ),
           const SizedBox(height: AppSpacing.md),
           _TopAssetPreview(item: topAsset),
@@ -831,7 +827,7 @@ class _RecentActivityTile extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.md),
-              child: PortfolioThumbnail(imagePath: item.imagePath, size: 60),
+              child: PortfolioThumbnail(imagePath: item.imagePath, size: 52),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -847,7 +843,7 @@ class _RecentActivityTile extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     item.category,
                     maxLines: 1,
@@ -857,7 +853,7 @@ class _RecentActivityTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.xs,
@@ -882,13 +878,19 @@ class _RecentActivityTile extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              _formatCurrency(item.estimatedValue),
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
+            const SizedBox(width: AppSpacing.md),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  _formatCurrency(item.estimatedValue),
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ],
@@ -1054,34 +1056,6 @@ class _PremiumSurface extends StatelessWidget {
         boxShadow: high ? AppElevation.level2 : AppElevation.level1,
       ),
       child: child,
-    );
-  }
-}
-
-class _TinyStatusPill extends StatelessWidget {
-  const _TinyStatusPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
     );
   }
 }

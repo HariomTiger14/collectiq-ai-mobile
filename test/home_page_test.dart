@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +57,12 @@ void main() {
     );
     expect(find.byType(MotionParallax), findsOneWidget);
     expect(find.byType(MotionAmbientGradient), findsOneWidget);
+
+    final heroMotion = tester.widget<MotionElasticHero>(
+      find.byKey(const ValueKey('home-hero-motion')),
+    );
+    expect(heroMotion.baseHeight, 260);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('stats row shows portfolio values', (tester) async {
@@ -62,6 +70,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('home-stats-surface')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SizedBox && widget.width == AppSpacing.md,
+      ),
+      findsWidgets,
+    );
     expect(find.text('Items'), findsWidgets);
     expect(find.text('2 items'), findsWidgets);
     expect(find.text('Total value'), findsOneWidget);
@@ -87,20 +101,30 @@ void main() {
       find.byKey(const ValueKey('home-quick-action-Scan')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('home-quick-action-Import Photo')),
-      findsOneWidget,
-    );
+    expect(find.text('Import'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-quick-action-Portfolio')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('home-quick-action-PI')), findsOneWidget);
+    expect(find.text('PI (Soon)'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Scan')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Scan')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Import Photo')),
+    );
+    await tester.pump();
     await tester.tap(
       find.byKey(const ValueKey('home-quick-action-Import Photo')),
     );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('home-quick-action-Portfolio')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-quick-action-Portfolio')));
 
     expect(scanTaps, 1);
@@ -119,6 +143,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Portfolio Overview'), findsOneWidget);
+    expect(find.byType(Divider), findsWidgets);
     expect(find.text('Categories'), findsOneWidget);
     expect(find.text('2 types'), findsOneWidget);
     expect(find.text('Top asset'), findsOneWidget);
@@ -128,6 +153,13 @@ void main() {
       find.byKey(const ValueKey('home-recent-home-test-card')),
       findsOneWidget,
     );
+    final recentThumbnail = tester.widget<PortfolioThumbnail>(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-recent-home-test-card')),
+        matching: find.byType(PortfolioThumbnail),
+      ),
+    );
+    expect(recentThumbnail.size, 52);
   });
 
   testWidgets('home page is responsive at 320px', (tester) async {
