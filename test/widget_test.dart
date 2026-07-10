@@ -455,6 +455,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
+    await tester.reveal(find.text('Portfolio Overview'));
     expect(find.text('Portfolio Overview'), findsWidgets);
     await tester.reveal(find.byKey(const ValueKey('home-recent-alert-card')));
     expect(find.text('Alert Charizard'), findsWidgets);
