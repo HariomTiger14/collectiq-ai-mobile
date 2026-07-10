@@ -49,6 +49,7 @@ class ScannerPhotoSlot {
     required this.source,
     this.image,
     this.qualityMetadata = const {},
+    this.capturedAt,
   });
 
   final String role;
@@ -57,6 +58,7 @@ class ScannerPhotoSlot {
   final String source;
   final XFile? image;
   final Map<String, Object?> qualityMetadata;
+  final DateTime? capturedAt;
 }
 
 /// Immutable presentation state for the scanner workflow.
@@ -71,7 +73,9 @@ class ScannerState {
     this.selectedItemTitle,
     this.selectedItemStatus,
     this.photoSlots = const {},
+    this.captureImages = const [],
     this.captureCategory = CollectibleCategory.toyCar,
+    this.activeCaptureRole,
     this.scanSession,
     this.scanResult,
     this.aiRecommendation,
@@ -103,7 +107,11 @@ class ScannerState {
 
   final Map<String, ScannerPhotoSlot> photoSlots;
 
+  final List<ScannerPhotoSlot> captureImages;
+
   final CollectibleCategory captureCategory;
+
+  final String? activeCaptureRole;
 
   final ScanSession? scanSession;
 
@@ -132,7 +140,9 @@ class ScannerState {
     String? selectedItemTitle,
     String? selectedItemStatus,
     Map<String, ScannerPhotoSlot>? photoSlots,
+    List<ScannerPhotoSlot>? captureImages,
     CollectibleCategory? captureCategory,
+    String? activeCaptureRole,
     ScanSession? scanSession,
     ScanResult? scanResult,
     String? aiRecommendation,
@@ -144,6 +154,8 @@ class ScannerState {
     bool clearSelectedItemTitle = false,
     bool clearSelectedItemStatus = false,
     bool clearPhotoSlots = false,
+    bool clearCaptureImages = false,
+    bool clearActiveCaptureRole = false,
     bool clearScanSession = false,
     bool clearScanResult = false,
     bool clearAiRecommendation = false,
@@ -166,7 +178,13 @@ class ScannerState {
           ? null
           : selectedItemStatus ?? this.selectedItemStatus,
       photoSlots: clearPhotoSlots ? const {} : photoSlots ?? this.photoSlots,
+      captureImages: clearCaptureImages
+          ? const []
+          : captureImages ?? this.captureImages,
       captureCategory: captureCategory ?? this.captureCategory,
+      activeCaptureRole: clearActiveCaptureRole
+          ? null
+          : activeCaptureRole ?? this.activeCaptureRole,
       scanSession: clearScanSession ? null : scanSession ?? this.scanSession,
       scanResult: clearScanResult ? null : scanResult ?? this.scanResult,
       aiRecommendation: clearAiRecommendation
@@ -312,7 +330,7 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   void selectCaptureCategory(CollectibleCategory category) {
-    final capturedImages = _capturedImagesFromSlots(state.photoSlots);
+    final capturedImages = _capturedImagesFromCaptureImages();
     final goal = state.scanSession?.scanGoal ?? ScanGoal.identifyValue;
     final plan = _capturePlanService.buildPlan(goal, category, capturedImages);
     final session = _ensureSession().copyWith(
@@ -334,6 +352,27 @@ class ScannerController extends Notifier<ScannerState> {
     );
   }
 
+  void selectCaptureRole(String imageRole) {
+    final normalizedRole = _normalizeImageRole(imageRole);
+    final slot = _latestSlotForRole(normalizedRole);
+    _setState(
+      state.copyWith(
+        activeCaptureRole: normalizedRole,
+        selectedImage: slot?.image,
+        selectedImagePath: slot?.path,
+        selectedItemTitle: slot == null
+            ? _slotLabel(normalizedRole)
+            : slot.label,
+        selectedItemStatus: slot == null
+            ? 'Ready to capture'
+            : 'Ready for AI analysis',
+        clearSelectedImage: slot == null,
+        clearSelectedImagePath: slot == null,
+      ),
+      event: 'capture role selected',
+    );
+  }
+
   void selectCapturedImage(String imageRole) {
     final slot = state.photoSlots[_normalizeImageRole(imageRole)];
     if (slot == null) {
@@ -347,6 +386,19 @@ class ScannerController extends Notifier<ScannerState> {
         selectedItemStatus: 'Ready for AI analysis',
       ),
       event: 'active capture selected',
+    );
+  }
+
+  void selectCapturedPhoto(ScannerPhotoSlot slot) {
+    _setState(
+      state.copyWith(
+        activeCaptureRole: slot.role,
+        selectedImage: slot.image,
+        selectedImagePath: slot.path,
+        selectedItemTitle: slot.label,
+        selectedItemStatus: 'Ready for AI analysis',
+      ),
+      event: 'active captured photo selected',
     );
   }
 
@@ -509,6 +561,14 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint(
         '[Scanner] Supabase sync triggered after camera selection: false',
       );
+      final capturedSlot = _photoSlotFor(
+        imageRole: imageRole,
+        path: selectedImagePath,
+        source: 'camera',
+        image: image,
+        qualityMetadata: quality.toMetadataJson(),
+      );
+      final captureImages = _appendCaptureImage(capturedSlot);
       _setState(
         state.copyWith(
           selectedImage: image,
@@ -518,13 +578,9 @@ class ScannerController extends Notifier<ScannerState> {
             source: 'camera',
           ),
           selectedItemStatus: 'Ready for AI analysis',
-          photoSlots: _updatedPhotoSlots(
-            imageRole: imageRole,
-            path: selectedImagePath,
-            source: 'camera',
-            image: image,
-            qualityMetadata: quality.toMetadataJson(),
-          ),
+          photoSlots: _latestSlotsFromImages(captureImages),
+          captureImages: captureImages,
+          activeCaptureRole: capturedSlot.role,
           scanSession: _updatedSessionWithImage(
             imageRole: imageRole,
             path: selectedImagePath,
@@ -600,21 +656,22 @@ class ScannerController extends Notifier<ScannerState> {
       userMessage: 'Image accepted.',
       technicalMetrics: {'source': 'sample'},
     );
+    final sampleSlot = const ScannerPhotoSlot(
+      role: 'front',
+      label: 'Front / Obverse',
+      path: 'sample://sports-card',
+      source: 'sample',
+      qualityMetadata: {'source': 'sample'},
+    );
     state = state.copyWith(
       isLoading: false,
       isPreparingImage: false,
       selectedImagePath: 'sample://sports-card',
       selectedItemTitle: 'Sample Sports Card',
       selectedItemStatus: 'Ready for AI analysis',
-      photoSlots: {
-        'front': const ScannerPhotoSlot(
-          role: 'front',
-          label: 'Front / Obverse',
-          path: 'sample://sports-card',
-          source: 'sample',
-          qualityMetadata: {'source': 'sample'},
-        ),
-      },
+      photoSlots: {'front': sampleSlot},
+      captureImages: [sampleSlot],
+      activeCaptureRole: ScanCaptureRole.front.id,
       scanSession: _updatedSessionWithImage(
         imageRole: 'front',
         path: 'sample://sports-card',
@@ -726,6 +783,14 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint(
         '[Scanner] Supabase sync triggered after gallery selection: false',
       );
+      final capturedSlot = _photoSlotFor(
+        imageRole: imageRole,
+        path: selectedImagePath,
+        source: 'gallery',
+        image: persistedImage,
+        qualityMetadata: quality.toMetadataJson(),
+      );
+      final captureImages = _appendCaptureImage(capturedSlot);
       _setState(
         state.copyWith(
           selectedImage: persistedImage,
@@ -735,13 +800,9 @@ class ScannerController extends Notifier<ScannerState> {
             source: 'gallery',
           ),
           selectedItemStatus: 'Ready for AI analysis',
-          photoSlots: _updatedPhotoSlots(
-            imageRole: imageRole,
-            path: selectedImagePath,
-            source: 'gallery',
-            image: persistedImage,
-            qualityMetadata: quality.toMetadataJson(),
-          ),
+          photoSlots: _latestSlotsFromImages(captureImages),
+          captureImages: captureImages,
+          activeCaptureRole: capturedSlot.role,
           scanSession: _updatedSessionWithImage(
             imageRole: imageRole,
             path: selectedImagePath,
@@ -848,6 +909,14 @@ class ScannerController extends Notifier<ScannerState> {
       await _ensureLocalImageExists(selectedImagePath, source: 'recovered');
       final quality = await _evaluateImageQuality(selectedImagePath);
       debugPrint('[Scanner] lost picker persistent path: $selectedImagePath');
+      final capturedSlot = _photoSlotFor(
+        imageRole: 'front',
+        path: selectedImagePath,
+        source: 'recovered',
+        image: persistedImage,
+        qualityMetadata: quality.toMetadataJson(),
+      );
+      final captureImages = _appendCaptureImage(capturedSlot);
       _setState(
         state.copyWith(
           isLoading: false,
@@ -856,13 +925,9 @@ class ScannerController extends Notifier<ScannerState> {
           selectedImagePath: selectedImagePath,
           selectedItemTitle: 'Recovered image',
           selectedItemStatus: 'Ready for AI analysis',
-          photoSlots: _updatedPhotoSlots(
-            imageRole: 'front',
-            path: selectedImagePath,
-            source: 'recovered',
-            image: persistedImage,
-            qualityMetadata: quality.toMetadataJson(),
-          ),
+          photoSlots: _latestSlotsFromImages(captureImages),
+          captureImages: captureImages,
+          activeCaptureRole: capturedSlot.role,
           scanSession: _updatedSessionWithImage(
             imageRole: 'front',
             path: selectedImagePath,
@@ -1012,7 +1077,7 @@ class ScannerController extends Notifier<ScannerState> {
           imagePath: selectedImagePath,
           image: state.selectedImage,
           images: [
-            for (final slot in state.photoSlots.values)
+            for (final slot in state.captureImages)
               if (!slot.path.startsWith('sample://'))
                 AnalyzerImageInput(
                   path: slot.path,
@@ -1024,8 +1089,10 @@ class ScannerController extends Notifier<ScannerState> {
           metadata: {
             'selectedItemTitle': state.selectedItemTitle,
             'selectedItemStatus': state.selectedItemStatus,
-            'imageCount': state.photoSlots.length,
-            'imageRoles': state.photoSlots.keys.join(','),
+            'imageCount': state.captureImages.length,
+            'imageRoles': state.captureImages
+                .map((slot) => slot.role)
+                .join(','),
             'captureCategory': state.captureCategory.id,
             'scannerTraceId': scannerTraceId,
             ..._analyzeMetadata(),
@@ -1034,7 +1101,7 @@ class ScannerController extends Notifier<ScannerState> {
       );
       final analysis = analyzerResponse.toAiAnalysisResult();
       final localPhotoRoles = [
-        for (final slot in state.photoSlots.values)
+        for (final slot in state.captureImages)
           if (!slot.path.startsWith('sample://')) slot.role,
       ];
       aiStopwatch.stop();
@@ -1407,6 +1474,8 @@ class ScannerController extends Notifier<ScannerState> {
       clearSelectedItemTitle: true,
       clearSelectedItemStatus: true,
       clearPhotoSlots: true,
+      clearCaptureImages: true,
+      clearActiveCaptureRole: true,
       clearScanSession: true,
       clearScanResult: true,
       clearAiRecommendation: true,
@@ -1419,11 +1488,33 @@ class ScannerController extends Notifier<ScannerState> {
   /// Removes the captured image for a role and refreshes session readiness.
   void deleteRoleImage(String imageRole) {
     final normalizedRole = _normalizeImageRole(imageRole);
-    final nextSlots = {
-      for (final entry in state.photoSlots.entries)
-        if (entry.key != normalizedRole) entry.key: entry.value,
-    };
-    final capturedImages = _capturedImagesFromSlots(nextSlots);
+    final slot = _latestSlotForRole(normalizedRole);
+    if (slot == null) {
+      selectCaptureRole(normalizedRole);
+      return;
+    }
+    deleteCapturedImage(slot.path);
+  }
+
+  void deleteCapturedImage(String imagePath) {
+    final normalizedPath = imagePath.trim();
+    if (normalizedPath.isEmpty) {
+      return;
+    }
+    final nextImages = [
+      for (final slot in state.captureImages)
+        if (slot.path != normalizedPath) slot,
+    ];
+    final nextSlots = _latestSlotsFromImages(nextImages);
+    final capturedImages = [
+      for (final slot in nextImages)
+        CapturedScanImage(
+          path: slot.path,
+          role: ScanCaptureRole.fromId(slot.role),
+          source: slot.source,
+          qualityMetadata: slot.qualityMetadata,
+        ),
+    ];
     final session = _ensureSession()
         .copyWith(
           capturedImages: capturedImages,
@@ -1439,18 +1530,21 @@ class ScannerController extends Notifier<ScannerState> {
           CaptureEvent(
             type: CaptureEventType.roleRequested,
             timestamp: DateTime.now(),
-            role: normalizedRole,
+            role: state.activeCaptureRole,
             metadata: const {'action': 'delete'},
           ),
         );
-    final nextSelectedSlot = nextSlots.values.firstOrNull;
+    final nextSelectedSlot =
+        nextImages.lastOrNull ?? nextSlots[ScanCaptureRole.front.id];
 
     _setState(
       state.copyWith(
         photoSlots: nextSlots,
+        captureImages: nextImages,
         scanSession: session,
         selectedImage: nextSelectedSlot?.image,
         selectedImagePath: nextSelectedSlot?.path,
+        activeCaptureRole: nextSelectedSlot?.role ?? state.activeCaptureRole,
         selectedItemTitle: nextSelectedSlot == null
             ? null
             : '${nextSelectedSlot.label} photo',
@@ -1507,7 +1601,7 @@ class ScannerController extends Notifier<ScannerState> {
     return image.name.isEmpty ? 'selected-image' : image.name;
   }
 
-  Map<String, ScannerPhotoSlot> _updatedPhotoSlots({
+  ScannerPhotoSlot _photoSlotFor({
     required String imageRole,
     required String path,
     required String source,
@@ -1515,23 +1609,41 @@ class ScannerController extends Notifier<ScannerState> {
     Map<String, Object?> qualityMetadata = const {},
   }) {
     final normalizedRole = _normalizeImageRole(imageRole);
-    return {
-      ...state.photoSlots,
-      normalizedRole: ScannerPhotoSlot(
-        role: normalizedRole,
-        label: _slotLabel(normalizedRole),
-        path: path,
-        source: source,
-        image: image,
-        qualityMetadata: qualityMetadata,
-      ),
-    };
+    return ScannerPhotoSlot(
+      role: normalizedRole,
+      label: _slotLabel(normalizedRole),
+      path: path,
+      source: source,
+      image: image,
+      qualityMetadata: qualityMetadata,
+      capturedAt: DateTime.now(),
+    );
+  }
+
+  List<ScannerPhotoSlot> _appendCaptureImage(ScannerPhotoSlot slot) {
+    return [...state.captureImages, slot];
+  }
+
+  Map<String, ScannerPhotoSlot> _latestSlotsFromImages(
+    List<ScannerPhotoSlot> images,
+  ) {
+    return {for (final image in images) image.role: image};
+  }
+
+  ScannerPhotoSlot? _latestSlotForRole(String imageRole) {
+    final normalizedRole = _normalizeImageRole(imageRole);
+    for (final slot in state.captureImages.reversed) {
+      if (slot.role == normalizedRole) {
+        return slot;
+      }
+    }
+    return state.photoSlots[normalizedRole];
   }
 
   ScanSession _ensureSession({ScanGoal? scanGoal}) {
     final goal =
         scanGoal ?? state.scanSession?.scanGoal ?? ScanGoal.identifyValue;
-    final capturedImages = _capturedImagesFromSlots(state.photoSlots);
+    final capturedImages = _capturedImagesFromCaptureImages();
     final plan = _capturePlanService.buildPlan(
       goal,
       state.captureCategory,
@@ -1561,8 +1673,7 @@ class ScannerController extends Notifier<ScannerState> {
   }) {
     final session = _ensureSession();
     final capturedImages = [
-      for (final image in session.capturedImages)
-        if (image.role != ScanCaptureRole.fromId(imageRole)) image,
+      for (final image in session.capturedImages) image,
       CapturedScanImage(
         path: path,
         role: ScanCaptureRole.fromId(imageRole),
@@ -1657,6 +1768,21 @@ class ScannerController extends Notifier<ScannerState> {
     ];
   }
 
+  List<CapturedScanImage> _capturedImagesFromCaptureImages() {
+    if (state.captureImages.isEmpty) {
+      return _capturedImagesFromSlots(state.photoSlots);
+    }
+    return [
+      for (final slot in state.captureImages)
+        CapturedScanImage(
+          path: slot.path,
+          role: ScanCaptureRole.fromId(slot.role),
+          source: slot.source,
+          qualityMetadata: slot.qualityMetadata,
+        ),
+    ];
+  }
+
   List<CollectibleImage> _galleryImagesFromSlots() {
     final slots = _orderedSlotsForPrimary();
     final primaryPath = slots.firstOrNull?.path ?? state.selectedImagePath;
@@ -1674,7 +1800,9 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   List<ScannerPhotoSlot> _orderedSlotsForPrimary() {
-    final slots = state.photoSlots.values.toList(growable: false);
+    final slots = state.captureImages.isNotEmpty
+        ? state.captureImages
+        : state.photoSlots.values.toList(growable: false);
     int priority(ScannerPhotoSlot slot) {
       if (slot.role == ScanCaptureRole.front.id) {
         return 0;

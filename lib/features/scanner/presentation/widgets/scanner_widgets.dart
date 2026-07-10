@@ -8,6 +8,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1005,6 +1006,7 @@ class AiResultCard extends ConsumerWidget {
     this.notes,
     this.photosUsed,
     this.photoRoles = const [],
+    this.galleryImages = const [],
     this.faceValue,
     this.estimatedMarketValue,
     this.askingPriceWarning,
@@ -1083,6 +1085,7 @@ class AiResultCard extends ConsumerWidget {
   final String? notes;
   final int? photosUsed;
   final List<String> photoRoles;
+  final List<CollectibleImage> galleryImages;
   final double? faceValue;
   final double? estimatedMarketValue;
   final String? askingPriceWarning;
@@ -1136,8 +1139,9 @@ class AiResultCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ScanResultHero(
+            _ScanResultHeroGallery(
               imagePath: imagePath,
+              galleryImages: galleryImages,
               item: itemTitle,
               primaryMatch: primaryMatch,
               estimatedValue: estimatedValue,
@@ -1373,6 +1377,98 @@ class AiResultCard extends ConsumerWidget {
   }
 }
 
+class _ScanResultHeroGallery extends StatefulWidget {
+  const _ScanResultHeroGallery({
+    required this.imagePath,
+    required this.galleryImages,
+    required this.item,
+    required this.primaryMatch,
+    required this.estimatedValue,
+    required this.confidence,
+    required this.confidenceBand,
+    required this.category,
+    required this.condition,
+    required this.year,
+    required this.brand,
+  });
+
+  final String imagePath;
+  final List<CollectibleImage> galleryImages;
+  final String item;
+  final String primaryMatch;
+  final String estimatedValue;
+  final String confidence;
+  final _ConfidenceBand confidenceBand;
+  final String category;
+  final String condition;
+  final String year;
+  final String brand;
+
+  @override
+  State<_ScanResultHeroGallery> createState() => _ScanResultHeroGalleryState();
+}
+
+class _ScanResultHeroGalleryState extends State<_ScanResultHeroGallery> {
+  late String _activeImagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeImagePath = widget.imagePath;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ScanResultHeroGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imagePath != widget.imagePath) {
+      _activeImagePath = widget.imagePath;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = _resultGalleryImages(widget.imagePath, widget.galleryImages);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ScanResultHero(
+          imagePath: _activeImagePath,
+          item: widget.item,
+          primaryMatch: widget.primaryMatch,
+          estimatedValue: widget.estimatedValue,
+          confidence: widget.confidence,
+          confidenceBand: widget.confidenceBand,
+          category: widget.category,
+          condition: widget.condition,
+          year: widget.year,
+          brand: widget.brand,
+        ),
+        if (images.length > 1) ...[
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            key: const ValueKey('scan-result-gallery-filmstrip'),
+            height: 86,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, index) {
+                final image = images[index];
+                final selected = image.path == _activeImagePath;
+                return _ResultGalleryTile(
+                  image: image,
+                  selected: selected,
+                  onTap: () => setState(() => _activeImagePath = image.path),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _ScanResultHero extends StatelessWidget {
   const _ScanResultHero({
     required this.imagePath,
@@ -1404,6 +1500,7 @@ class _ScanResultHero extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      key: ValueKey('scan-result-hero-$imagePath'),
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1520,6 +1617,99 @@ class _ScanResultHero extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ResultGalleryTile extends StatelessWidget {
+  const _ResultGalleryTile({
+    required this.image,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CollectibleImage image;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 82,
+      child: InkWell(
+        key: ValueKey('scan-result-gallery-${image.path}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(5),
+            child: Column(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: _ScanPreviewThumbnail(
+                      imagePath: image.path,
+                      colorScheme: colorScheme,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _roleLabel(image.role),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+List<CollectibleImage> _resultGalleryImages(
+  String imagePath,
+  List<CollectibleImage> galleryImages,
+) {
+  final seen = <String>{};
+  return [
+    if (imagePath.trim().isNotEmpty)
+      CollectibleImage(path: imagePath, role: 'primary', isPrimary: true),
+    for (final image in galleryImages)
+      if (image.path.trim().isNotEmpty) image,
+  ].where((image) => seen.add(image.path)).toList(growable: false);
+}
+
+String _roleLabel(String? role) {
+  final normalized = (role ?? '').trim();
+  if (normalized.isEmpty) {
+    return 'Photo';
+  }
+  return normalized
+      .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (match) {
+        return '${match.group(1)} ${match.group(2)}';
+      })
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
 }
 
 class _ReviewValuePanel extends StatelessWidget {
