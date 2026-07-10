@@ -122,8 +122,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Price alert notifications'), findsOneWidget);
-    expect(find.text('Notification permission'), findsOneWidget);
+    expect(find.text('Price alerts'), findsOneWidget);
+    expect(find.text('Permissions'), findsOneWidget);
     expect(find.text('Denied'), findsWidgets);
     expect(notificationSwitch, findsOneWidget);
   });
