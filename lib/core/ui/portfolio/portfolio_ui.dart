@@ -18,12 +18,51 @@ class PortfolioHeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _HeroSurface(gradientStyle: gradientStyle);
+    final topInset = MediaQuery.paddingOf(context).top;
+    final scrollOffset = scrollController?.hasClients ?? false
+        ? scrollController!.offset
+        : 0.0;
+    final hero = MotionElasticHero(
+      key: const ValueKey('portfolio-hero-motion'),
+      baseHeight: 198 + topInset,
+      scrollOffset: scrollOffset,
+      child: MotionParallax(
+        scrollOffset: scrollOffset,
+        child: MotionAmbientGradient(
+          gradientBuilder: _ambientGradientFor(gradientStyle),
+          child: _PortfolioHeroSurface(gradientStyle: gradientStyle),
+        ),
+      ),
+    );
+
+    final controller = scrollController;
+    if (controller == null) {
+      return hero;
+    }
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final offset = controller.hasClients ? controller.offset : 0.0;
+        return MotionElasticHero(
+          key: const ValueKey('portfolio-hero-motion'),
+          baseHeight: 198 + topInset,
+          scrollOffset: offset,
+          child: MotionParallax(
+            scrollOffset: offset,
+            child: MotionAmbientGradient(
+              gradientBuilder: _ambientGradientFor(gradientStyle),
+              child: _PortfolioHeroSurface(gradientStyle: gradientStyle),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
-class _HeroSurface extends StatelessWidget {
-  const _HeroSurface({required this.gradientStyle});
+class _PortfolioHeroSurface extends StatelessWidget {
+  const _PortfolioHeroSurface({required this.gradientStyle});
 
   final GradientStyle gradientStyle;
 
@@ -32,93 +71,64 @@ class _HeroSurface extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = _colorsFor(context, gradientStyle);
     final topInset = MediaQuery.paddingOf(context).top;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        bottom: Radius.circular(AppRadius.xxl),
+    return HeroSurfaceContainerHighest(
+      key: const ValueKey('portfolio-hero-surface'),
+      height: 198 + topInset,
+      gradientStyle: gradientStyle,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        topInset + AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.lg,
       ),
-      child: Container(
-        height: 168 + topInset,
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          topInset + AppSpacing.lg,
-          AppSpacing.xl,
-          AppSpacing.lg,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(AppRadius.xxl),
+      decorativeChildren: [
+        Positioned(
+          right: -24,
+          top: -32,
+          child: HeroDecorativeCircle(
+            key: const ValueKey('portfolio-hero-decorative-circle'),
+            diameter: 138,
+            strokeWidth: 22,
+            opacity: isDark ? 0.14 : 0.18,
           ),
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colors.last.withValues(alpha: isDark ? 0.20 : 0.26),
-              blurRadius: 36,
-              offset: const Offset(0, 20),
-            ),
-          ],
         ),
-        child: Stack(
+      ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Positioned(
-              right: -22,
-              top: -34,
-              child: Container(
-                width: 138,
-                height: 138,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.14),
-                    width: 22,
-                  ),
-                ),
+            Text(
+              'Your Collections',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.headlineMedium?.copyWith(
+                color: colorScheme.onPrimary,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
               ),
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Collections',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.w900,
-                      height: 1.05,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Track, organize and grow your collection',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.82),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Your collectible library',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.68),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 8),
+            Text(
+              'Track, organize and grow your collection',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onPrimary.withValues(alpha: 0.82),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your collectible library',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onPrimary.withValues(alpha: 0.68),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -268,7 +278,7 @@ class _CategoryHeaderState extends State<CategoryHeader>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final colors = _colorsFor(context, widget.gradientStyle);
+    final colors = PackLoxGradients.build(widget.gradientStyle, context);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -776,21 +786,11 @@ class _AnimatedItemIconTileState extends State<_AnimatedItemIconTile> {
   }
 }
 
-List<Color> _colorsFor(BuildContext context, GradientStyle style) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
+Gradient Function(double) _ambientGradientFor(GradientStyle style) {
   return switch (style) {
-    GradientStyle.blueIndigo =>
-      isDark
-          ? const [Color(0xFF07111F), Color(0xFF1E40AF), Color(0xFF5E5CE6)]
-          : const [Color(0xFF0A84FF), Color(0xFF1456D9), Color(0xFF5E5CE6)],
-    GradientStyle.purpleDeepBlue =>
-      isDark
-          ? const [Color(0xFF1A103D), Color(0xFF5B21B6), Color(0xFF1E40AF)]
-          : const [Color(0xFF8B5CF6), Color(0xFF5E5CE6), Color(0xFF0A84FF)],
-    GradientStyle.tealEmerald =>
-      isDark
-          ? const [Color(0xFF062D35), Color(0xFF0F766E), Color(0xFF047857)]
-          : const [Color(0xFF0A84FF), Color(0xFF14B8A6), Color(0xFF10B981)],
+    GradientStyle.purpleDeepBlue => PackLoxMotionTheme.ambientPurpleDeepBlue,
+    GradientStyle.blueIndigo ||
+    GradientStyle.tealEmerald => PackLoxMotionTheme.ambientBlueIndigo,
   };
 }
 

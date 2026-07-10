@@ -25,6 +25,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/core/ui/portfolio/portfolio_ui.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
@@ -45,6 +46,7 @@ import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -353,6 +355,52 @@ void main() {
     expect(find.text('Start First Scan'), findsNothing);
     expect(find.text('Dashboard Insights'), findsNothing);
     expect(find.text('Category Breakdown'), findsNothing);
+  });
+
+  testWidgets('portfolio hero uses premium motion hero system', (
+    WidgetTester tester,
+  ) async {
+    const topInset = 24.0;
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(padding: EdgeInsets.only(top: topInset)),
+          child: PortfolioHeroHeader(),
+        ),
+      ),
+    );
+
+    final heroMotion = tester.widget<MotionElasticHero>(
+      find.byKey(const ValueKey('portfolio-hero-motion')),
+    );
+    expect(heroMotion.baseHeight, 198 + topInset);
+    expect(find.byType(MotionParallax), findsOneWidget);
+    expect(find.byType(MotionAmbientGradient), findsOneWidget);
+
+    final surface = tester.widget<HeroSurfaceContainerHighest>(
+      find.byKey(const ValueKey('portfolio-hero-surface')),
+    );
+    expect(surface.height, 198 + topInset);
+    expect(surface.gradientStyle, GradientStyle.blueIndigo);
+
+    final decorativeCircle = tester.widget<HeroDecorativeCircle>(
+      find.byKey(const ValueKey('portfolio-hero-decorative-circle')),
+    );
+    expect(decorativeCircle.diameter, 138);
+    expect(decorativeCircle.strokeWidth, 22);
+    expect(decorativeCircle.opacity, 0.18);
+
+    final title = tester.widget<Text>(find.text('Your Collections'));
+    expect(title.style?.fontWeight, FontWeight.w900);
+    expect(title.style?.height, 1.05);
+
+    final subtitle = tester.widget<Text>(
+      find.text('Track, organize and grow your collection'),
+    );
+    expect(subtitle.style?.fontWeight, FontWeight.w600);
+
+    final caption = tester.widget<Text>(find.text('Your collectible library'));
+    expect(caption.style?.fontWeight, FontWeight.w600);
   });
 
   testWidgets('home shows local price alert summary', (
