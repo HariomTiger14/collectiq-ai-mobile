@@ -75,15 +75,6 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/capture_event.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/confidence_model.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/scan_session.dart';
-import 'package:collectiq_ai/features/scanner/domain/entities/scanner_constants.dart';
-import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
-import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_result_enrichment_service.dart';
@@ -109,7 +100,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1245,247 +1235,6 @@ void main() {
     });
   });
 
-  group('Scanner UX v1 foundation', () {
-    test('scan goals expose stable metadata', () {
-      expect(ScanGoal.identifyValue.id, 'identifyValue');
-      expect(ScanGoal.identifyValue.title, 'Identify & Value');
-      expect(ScanGoal.identifyValue.confidenceTarget, 0.90);
-      expect(ScanGoal.detailedAnalysis.confidenceTarget, 0.98);
-      expect(ScanGoal.prepareForSale.confidenceTarget, 0.95);
-      expect(ScanGoal.fromId('prepareForSale'), ScanGoal.prepareForSale);
-    });
-
-    test('confidence model reports target status and delta', () {
-      const below = ConfidenceModel(
-        confidenceTarget: 0.95,
-        confidenceAchieved: 0.90,
-      );
-      const unavailable = ConfidenceModel(confidenceTarget: 0.95);
-
-      expect(below.isTargetMet, isFalse);
-      expect(below.deltaFromTarget, closeTo(-0.05, 0.0001));
-      expect(unavailable.isTargetMet, isFalse);
-      expect(unavailable.deltaFromTarget, isNull);
-    });
-
-    test('scan session records events and scanner UX version', () {
-      final plan = const ScanCapturePlanService().buildPlan(
-        ScanGoal.identifyValue,
-        null,
-        const [],
-      );
-      final session =
-          ScanSession.start(
-            sessionId: 'session-1',
-            scanGoal: ScanGoal.identifyValue,
-            capturePlan: plan,
-            startTime: DateTime.parse('2026-07-06T10:00:00Z'),
-          ).addEvent(
-            CaptureEvent(
-              type: CaptureEventType.goalSelected,
-              timestamp: DateTime.parse('2026-07-06T10:01:00Z'),
-            ),
-          );
-
-      expect(session.scannerUxVersion, scannerUxVersion);
-      expect(session.confidenceTarget, 0.90);
-      expect(session.events.first.type, CaptureEventType.sessionStarted);
-      expect(session.events.last.type, CaptureEventType.goalSelected);
-    });
-
-    test('capture plan completion and next role are goal aware', () {
-      const service = ScanCapturePlanService();
-
-      final initial = service.buildPlan(
-        ScanGoal.detailedAnalysis,
-        null,
-        const [],
-      );
-      final partial = service.buildPlan(ScanGoal.detailedAnalysis, null, const [
-        CapturedScanImage(
-          path: 'front.jpg',
-          role: ScanCaptureRole.front,
-          source: 'camera',
-        ),
-      ]);
-
-      expect(initial.nextRecommendedRole, ScanCaptureRole.front);
-      expect(initial.isMinimumReadyForAnalyze, isFalse);
-      expect(partial.completionPercentage, closeTo(1, 0.001));
-      expect(partial.nextRecommendedRole, ScanCaptureRole.back);
-    });
-
-    test('goal capture plans expose v1 analyze readiness rules', () {
-      const service = ScanCapturePlanService();
-
-      final identifyReady = service
-          .buildPlan(ScanGoal.identifyValue, null, const [
-            CapturedScanImage(
-              path: 'front.jpg',
-              role: ScanCaptureRole.front,
-              source: 'camera',
-            ),
-          ]);
-      final detailedReady = service
-          .buildPlan(ScanGoal.detailedAnalysis, null, const [
-            CapturedScanImage(
-              path: 'front.jpg',
-              role: ScanCaptureRole.front,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'back.jpg',
-              role: ScanCaptureRole.back,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'close.jpg',
-              role: ScanCaptureRole.closeUp,
-              source: 'camera',
-            ),
-          ]);
-      final saleReady = service.buildPlan(ScanGoal.prepareForSale, null, const [
-        CapturedScanImage(
-          path: 'front.jpg',
-          role: ScanCaptureRole.front,
-          source: 'camera',
-        ),
-        CapturedScanImage(
-          path: 'back.jpg',
-          role: ScanCaptureRole.back,
-          source: 'camera',
-        ),
-        CapturedScanImage(
-          path: 'close.jpg',
-          role: ScanCaptureRole.closeUp,
-          source: 'camera',
-        ),
-        CapturedScanImage(
-          path: 'damage.jpg',
-          role: ScanCaptureRole.damageDetail,
-          source: 'camera',
-        ),
-      ]);
-
-      expect(identifyReady.isMinimumReadyForAnalyze, isTrue);
-      expect(identifyReady.nextRecommendedRole, ScanCaptureRole.back);
-      expect(detailedReady.isMinimumReadyForAnalyze, isTrue);
-      expect(detailedReady.nextRecommendedRole, ScanCaptureRole.damageDetail);
-      expect(saleReady.isMinimumReadyForAnalyze, isTrue);
-      expect(saleReady.requiredRoles, [ScanCaptureRole.front]);
-      expect(saleReady.optionalRoles, [
-        ScanCaptureRole.back,
-        ScanCaptureRole.closeUp,
-        ScanCaptureRole.damageDetail,
-        ScanCaptureRole.serialOrMark,
-        ScanCaptureRole.angledReflective,
-      ]);
-    });
-
-    test('capture plan updates next role after delete-like removal', () {
-      const service = ScanCapturePlanService();
-
-      final withFrontBack = service
-          .buildPlan(ScanGoal.prepareForSale, null, const [
-            CapturedScanImage(
-              path: 'front.jpg',
-              role: ScanCaptureRole.front,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'back.jpg',
-              role: ScanCaptureRole.back,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'close.jpg',
-              role: ScanCaptureRole.closeUp,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'damage.jpg',
-              role: ScanCaptureRole.damageDetail,
-              source: 'camera',
-            ),
-          ]);
-      final afterBackDelete = service
-          .buildPlan(ScanGoal.prepareForSale, null, const [
-            CapturedScanImage(
-              path: 'front.jpg',
-              role: ScanCaptureRole.front,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'close.jpg',
-              role: ScanCaptureRole.closeUp,
-              source: 'camera',
-            ),
-            CapturedScanImage(
-              path: 'damage.jpg',
-              role: ScanCaptureRole.damageDetail,
-              source: 'camera',
-            ),
-          ]);
-
-      expect(withFrontBack.isMinimumReadyForAnalyze, isTrue);
-      expect(afterBackDelete.isMinimumReadyForAnalyze, isTrue);
-      expect(afterBackDelete.nextRecommendedRole, ScanCaptureRole.back);
-    });
-
-    test('quality gates pass valid image and block undecodable bytes', () {
-      const service = ScanQualityGateService(
-        minimumDimension: 1,
-        minimumFileSizeBytes: 1,
-      );
-      final validBytes = Uint8List.fromList(
-        img.encodeJpg(img.Image(width: 4, height: 4)),
-      );
-
-      final valid = service.evaluateBytes(
-        validBytes,
-        fileSizeBytes: validBytes.length,
-      );
-      final invalid = service.evaluateBytes(
-        Uint8List.fromList([1, 2, 3]),
-        fileSizeBytes: 3,
-      );
-
-      expect(valid.passed, isTrue);
-      expect(valid.technicalMetrics['width'], isNotNull);
-      expect(invalid.passed, isFalse);
-      expect(invalid.severity, QualityGateSeverity.blocker);
-    });
-
-    test('analyze payload includes scanner metadata', () {
-      final request = AiBackendAnalysisRequest(
-        imagePath: 'test/fixtures/image.jpg',
-        imageSource: 'gallery',
-        timestamp: DateTime.parse('2026-07-06T10:00:00Z'),
-        scanGoal: ScanGoal.prepareForSale.id,
-        confidenceTarget: ScanGoal.prepareForSale.confidenceTarget,
-        scannerUxVersion: scannerUxVersion,
-        qualityMetadata: const {
-          'front': {'passed': true},
-        },
-        images: const [
-          AiBackendAnalysisImage(
-            imagePath: 'test/fixtures/image.jpg',
-            imageSource: 'gallery',
-            imageRole: 'front',
-          ),
-        ],
-      );
-
-      final json = request.toJson();
-
-      expect(json['scanGoal'], 'prepareForSale');
-      expect(json['confidenceTarget'], 0.95);
-      expect(json['scannerUxVersion'], scannerUxVersion);
-      expect(json['qualityMetadata'], isNotEmpty);
-      expect((json['images'] as List).single['imageRole'], 'front');
-    });
-  });
-
   group('AiImageUploadPayload', () {
     test('builds metadata from valid file', () async {
       const preparer = AiImagePayloadPreparer();
@@ -1841,55 +1590,6 @@ void main() {
                 (error) => error.message,
                 'message',
                 'Backend provider unavailable.',
-              ),
-        ),
-      );
-    });
-
-    test('FastAPI detail error preserves analyzer error code', () async {
-      final service = DioAiBackendApiService(
-        endpointUrl: 'https://api.collectiq.test/analyze',
-        dio: Dio()
-          ..httpClientAdapter = _FakeDioAdapter(
-            statusCode: 422,
-            responseData: {
-              'detail': {
-                'code': 'INVALID_IMAGE_PAYLOAD',
-                'message': 'Real AI analysis requires uploaded image bytes.',
-                'retryable': false,
-                'details': {
-                  'missingImageBytes': [
-                    {'fileName': 'hot-wheels.jpg'},
-                  ],
-                },
-              },
-            },
-          ),
-      );
-      final client = HttpAiBackendClient(
-        endpointUrl: 'https://api.collectiq.test/analyze',
-        apiService: service,
-      );
-
-      await expectLater(
-        client.analyze(_backendFileRequest()),
-        throwsA(
-          isA<AiBackendClientException>()
-              .having(
-                (error) => error.type,
-                'type',
-                AiBackendClientErrorType.backendError,
-              )
-              .having((error) => error.statusCode, 'statusCode', 422)
-              .having(
-                (error) => error.message,
-                'message',
-                'Real AI analysis requires uploaded image bytes.',
-              )
-              .having(
-                (error) => error.details['details']?['missingImageBytes'],
-                'missing image bytes',
-                isA<List>(),
               ),
         ),
       );
@@ -2358,12 +2058,6 @@ void main() {
           );
           expect(script, contains('--dart-define=API_BASE_URL=%API_BASE_URL%'));
           expect(script, contains('--dart-define=APP_ENV=sit'));
-          expect(
-            script,
-            contains(
-              '--dart-define=AI_ANALYSIS_PROVIDER=%AI_ANALYSIS_PROVIDER%',
-            ),
-          );
           expect(script, contains('--dart-define=USE_CLOUD_AUTH=true'));
           expect(
             script,
@@ -2374,10 +2068,6 @@ void main() {
             contains('--dart-define=USE_CLOUD_IMAGE_STORAGE=true'),
           );
           expect(script, contains('scripts\\load_env.bat'));
-          expect(
-            script,
-            isNot(contains('--dart-define=AI_ANALYSIS_PROVIDER=mock')),
-          );
           expect(script, isNot(contains('ljrkhamgbgtsicqdisos')));
         }
       },

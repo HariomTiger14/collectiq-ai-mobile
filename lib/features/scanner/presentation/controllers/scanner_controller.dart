@@ -1282,16 +1282,6 @@ class ScannerController extends Notifier<ScannerState> {
         AnalyzerRequest(
           imagePath: selectedImagePath,
           image: state.selectedImage,
-          images: [
-            for (final slot in state.captureImages)
-              if (!slot.path.startsWith('sample://'))
-                AnalyzerImageInput(
-                  path: slot.analyzerPath,
-                  role: slot.role,
-                  image: slot.image,
-                  source: slot.source,
-                ),
-          ],
           metadata: {
             'selectedItemTitle': state.selectedItemTitle,
             'selectedItemStatus': state.selectedItemStatus,

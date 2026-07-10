@@ -172,8 +172,8 @@ class ScanQualityGateService {
   double _averageLuma(img.Image image) {
     var total = 0.0;
     var count = 0;
-    final stepX = max(1, image.width ~/ 80);
-    final stepY = max(1, image.height ~/ 80);
+    final stepX = max<int>(1, image.width ~/ 80);
+    final stepY = max<int>(1, image.height ~/ 80);
     for (var y = 0; y < image.height; y += stepY) {
       for (var x = 0; x < image.width; x += stepX) {
         final pixel = image.getPixel(x, y);
@@ -195,8 +195,8 @@ class ScanQualityGateService {
   double _edgeScore(img.Image image) {
     var total = 0.0;
     var count = 0;
-    final stepX = max(1, image.width ~/ 80);
-    final stepY = max(1, image.height ~/ 80);
+    final stepX = max<int>(1, image.width ~/ 80);
+    final stepY = max<int>(1, image.height ~/ 80);
     for (var y = stepY; y < image.height; y += stepY) {
       for (var x = stepX; x < image.width; x += stepX) {
         final current = image.getPixel(x, y);
