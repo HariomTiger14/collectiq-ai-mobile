@@ -31,6 +31,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -1634,6 +1635,7 @@ void main() {
       aiAnalysisProvider: provider,
       galleryService: _SelectedGalleryService(),
       imageEnhancementService: const _FakeImageEnhancementService(),
+      imageQualityAssessmentService: const _FakeImageQualityAssessmentService(),
     );
 
     await tester.tap(find.text('Scan').last);
@@ -1678,6 +1680,10 @@ void main() {
     final controller = container.read(scannerControllerProvider);
     expect(controller.captureImages.single.enhancementPreset.id, 'brighten');
     expect(controller.captureImages.single.qualityMetadata['enhanced'], isTrue);
+    expect(
+      controller.captureImages.single.qualityMetadata['readinessScore'],
+      57,
+    );
     expect(
       controller.captureImages.single.qualityMetadata['originalImagePath'],
       isNotEmpty,
@@ -1751,8 +1757,88 @@ void main() {
       provider.lastRequest?.metadata['activeEnhancementPreset'],
       'brighten',
     );
+    expect(provider.lastRequest?.metadata['activeReadinessScore'], 57);
+    expect(
+      provider.lastRequest?.metadata['activeQualityWarnings'],
+      contains('Slight blur detected'),
+    );
     expect(provider.lastRequest?.metadata['enhancedImageCount'], 1);
   });
+
+  testWidgets(
+    'enhancement preview shows AI recommendation and compare toggle',
+    (WidgetTester tester) async {
+      ImageEnhancementPreviewResult? accepted;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ImageEnhancementPreviewSurface(
+              image: XFile(_fixturePath('persistent-gallery-card.jpg')),
+              initialPreset: ImageEnhancementPreset.original,
+              title: 'Review photo',
+              subtitle: 'Choose the clearest version for analysis.',
+              enhancementService: const _FakeImageEnhancementService(),
+              assessmentService: const _FakeImageQualityAssessmentService(),
+              onCancel: () {},
+              onRetake: () {},
+              onUsePhoto: (result) => accepted = result,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpUntilFound(
+        find.text('AI recommends: Text / Package Clarity'),
+      );
+      expect(
+        find.byKey(const ValueKey('enhancement-ai-recommendation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('enhancement-readiness-summary')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('57/100'), findsWidgets);
+      expect(find.text('Package AI'), findsOneWidget);
+      expect(find.text('Slight blur detected'), findsOneWidget);
+
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('enhancement-preview-contrast')),
+          )
+          .onSelected
+          ?.call(true);
+      await tester.pump();
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(
+          of: find.byKey(const ValueKey('enhancement-preview-presets')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      final offsetAfterSelection = scrollable.position.pixels;
+      expect(offsetAfterSelection, greaterThanOrEqualTo(0));
+
+      await tester.tap(
+        find.byKey(const ValueKey('enhancement-preview-compare')),
+      );
+      await tester.pump();
+      expect(find.text('Original preview'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('enhancement-preview-compare')),
+      );
+      await tester.pump();
+      expect(find.text('Original preview'), findsNothing);
+
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
+          )
+          .onPressed
+          ?.call();
+      expect(accepted?.preset, ImageEnhancementPreset.contrast);
+      expect(accepted?.metadata['readinessScore'], 57);
+    },
+  );
 
   testWidgets('enhancement preview retake and cancel do not add photos', (
     WidgetTester tester,
@@ -1796,6 +1882,7 @@ void main() {
     await tester.pumpCollectIqApp(
       galleryService: _SelectedGalleryService(),
       imageEnhancementService: const _FakeImageEnhancementService(),
+      imageQualityAssessmentService: const _FakeImageQualityAssessmentService(),
     );
 
     await tester.tap(find.text('Scan').last);
@@ -1828,6 +1915,10 @@ void main() {
         .onPressed
         ?.call();
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('scan-result-analyzed-with-enhancement')),
+      findsOneWidget,
+    );
     await tester.reveal(find.text('Save to Portfolio'));
     await tester.pump();
     await tester.tap(find.text('Save to Portfolio'));
@@ -1841,6 +1932,10 @@ void main() {
     final firstImage = gallery.first as Map<String, dynamic>;
     expect(firstImage['enhancementPreset'], 'contrast');
     expect(firstImage['originalPath'], isNotEmpty);
+    expect(
+      (firstImage['qualityMetadata'] as Map<String, dynamic>)['readinessScore'],
+      57,
+    );
   });
 
   testWidgets('scanner backend failure shows friendly message', (
@@ -4131,6 +4226,7 @@ extension on WidgetTester {
     CameraService? cameraService,
     GalleryService? galleryService,
     ImageEnhancementService? imageEnhancementService,
+    ImageQualityAssessmentService? imageQualityAssessmentService,
     EnvironmentConfig? environmentConfig,
     bool onboardingCompleted = true,
     OnboardingRepository? onboardingRepository,
@@ -4175,6 +4271,10 @@ extension on WidgetTester {
           if (imageEnhancementService != null)
             imageEnhancementServiceProvider.overrideWithValue(
               imageEnhancementService,
+            ),
+          if (imageQualityAssessmentService != null)
+            imageQualityAssessmentServiceProvider.overrideWithValue(
+              imageQualityAssessmentService,
             ),
           if (environmentConfig != null)
             environmentConfigProvider.overrideWithValue(environmentConfig),
@@ -5059,6 +5159,26 @@ class _FakeImageEnhancementService extends ImageEnhancementService {
       activePath: originalPath,
       preset: preset,
       createdEnhancedFile: false,
+    );
+  }
+}
+
+class _FakeImageQualityAssessmentService extends ImageQualityAssessmentService {
+  const _FakeImageQualityAssessmentService();
+
+  @override
+  Future<ImageQualityAssessment> assess(String imagePath) async {
+    return const ImageQualityAssessment(
+      recommendedPreset: ImageEnhancementPreset.textPackageClarity,
+      readinessScore: 57,
+      lighting: 0.44,
+      sharpness: 0.35,
+      glareRisk: 0.41,
+      textClarity: 0.38,
+      framingConfidence: 0.72,
+      recommendationConfidence: 0.85,
+      reason: 'Best for barcode and package text.',
+      warnings: ['Slight blur detected', 'Glare may affect packaging text'],
     );
   }
 }

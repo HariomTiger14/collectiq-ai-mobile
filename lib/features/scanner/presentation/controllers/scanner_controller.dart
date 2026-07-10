@@ -36,6 +36,7 @@ import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart'
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -262,6 +263,7 @@ class ScannerController extends Notifier<ScannerState> {
   late final ScanResultEnrichmentService _enrichmentService;
 
   late final ImageEnhancementService _imageEnhancementService;
+  late final ImageQualityAssessmentService _qualityAssessmentService;
   late final ScanCapturePlanService _capturePlanService;
   late final ScanQualityGateService _qualityGateService;
   late final AppTelemetryService _telemetry;
@@ -281,6 +283,9 @@ class ScannerController extends Notifier<ScannerState> {
     _analyzerService = ref.watch(analyzerServiceProvider);
     _enrichmentService = ref.watch(scanResultEnrichmentServiceProvider);
     _imageEnhancementService = ref.watch(imageEnhancementServiceProvider);
+    _qualityAssessmentService = ref.watch(
+      imageQualityAssessmentServiceProvider,
+    );
     _capturePlanService = ref.watch(scanCapturePlanServiceProvider);
     _qualityGateService = ref.watch(scanQualityGateServiceProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
@@ -480,6 +485,7 @@ class ScannerController extends Notifier<ScannerState> {
       originalPath: originalPath,
       preset: preset,
     );
+    final assessment = await _qualityAssessmentService.assess(originalPath);
     final enhancedSlot = ScannerPhotoSlot(
       role: slot.role,
       label: slot.label,
@@ -489,7 +495,11 @@ class ScannerController extends Notifier<ScannerState> {
       originalPath: result.originalPath,
       enhancedImagePath: result.preset.isEnhanced ? result.activePath : null,
       enhancementPreset: result.preset,
-      qualityMetadata: {...slot.qualityMetadata, ...result.toMetadataJson()},
+      qualityMetadata: {
+        ...slot.qualityMetadata,
+        ...result.toMetadataJson(),
+        ...assessment.toMetadataJson(),
+      },
       capturedAt: slot.capturedAt,
     );
     final nextImages = [
@@ -851,6 +861,8 @@ class ScannerController extends Notifier<ScannerState> {
               image: image,
               title: 'Review import',
               subtitle: 'Choose the clearest version for analysis.',
+              enhancementService: _imageEnhancementService,
+              assessmentService: _qualityAssessmentService,
             );
       if (_isDisposed) {
         return;
@@ -1264,6 +1276,7 @@ class ScannerController extends Notifier<ScannerState> {
       final scannerTraceId = 'scan-${DateTime.now().microsecondsSinceEpoch}';
       debugPrint('[AnalyzerTrace] scanner-trace-id=$scannerTraceId');
       final aiStopwatch = Stopwatch()..start();
+      final activeSlot = _activeSlotForPath(selectedImagePath);
       final analyzerResponse = await _analyzerService.analyze(
         AnalyzerRequest(
           imagePath: selectedImagePath,
@@ -1288,9 +1301,13 @@ class ScannerController extends Notifier<ScannerState> {
             'captureCategory': state.captureCategory.id,
             'captureCategorySelected': state.hasManualCaptureCategory,
             'activeImagePath': selectedImagePath,
-            'activeEnhancementPreset': _activeSlotForPath(
-              selectedImagePath,
-            )?.enhancementPreset.id,
+            'originalImagePath': activeSlot?.originalPath,
+            'activeEnhancedImagePath': activeSlot?.enhancedImagePath,
+            'activeEnhancementPreset': activeSlot?.enhancementPreset.id,
+            'activeReadinessScore':
+                activeSlot?.qualityMetadata['readinessScore'],
+            'activeQualityWarnings':
+                activeSlot?.qualityMetadata['qualityWarnings'],
             'enhancedImageCount': state.captureImages
                 .where((slot) => slot.isEnhanced)
                 .length,
@@ -2066,6 +2083,7 @@ class ScannerController extends Notifier<ScannerState> {
             source: slot.source,
             originalPath: slot.originalPath,
             enhancementPreset: slot.enhancementPreset.id,
+            qualityMetadata: slot.qualityMetadata,
             isPrimary: slot.path == primaryPath,
           ),
     ];

@@ -2,6 +2,8 @@ import 'package:camera/camera.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
+import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_image_processing_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +54,8 @@ class CameraCapturePage extends ConsumerStatefulWidget {
 class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     with WidgetsBindingObserver {
   late final ScanImageProcessor _imageProcessor;
+  late final ImageEnhancementService _enhancementService;
+  late final ImageQualityAssessmentService _assessmentService;
   CameraService? _cameraService;
   XFile? _capturedImage;
   ScanImageQualityReport? _qualityReport;
@@ -66,6 +70,8 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
   void initState() {
     super.initState();
     _imageProcessor = const ScanImageProcessor();
+    _enhancementService = ref.read(imageEnhancementServiceProvider);
+    _assessmentService = ref.read(imageQualityAssessmentServiceProvider);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -270,6 +276,8 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
                 initialPreset: ImageEnhancementPreset.original,
                 title: _qualityTitle(_qualityReport),
                 subtitle: _qualitySubtitle(_qualityReport, _isInspecting),
+                enhancementService: _enhancementService,
+                assessmentService: _assessmentService,
                 onRetake: _retake,
                 onCancel: () => Navigator.of(context).pop(),
                 onUsePhoto: _usePhoto,

@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
@@ -1113,6 +1114,10 @@ class AiResultCard extends ConsumerWidget {
     final conditionLabel = _reviewValue(condition, 'Not detected');
     final yearLabel = _reviewValue(year, 'Unknown');
     final brandLabel = _reviewValue(brand, 'Not detected');
+    final analyzedEnhancementLabel = _analyzedEnhancementLabel(
+      imagePath,
+      galleryImages,
+    );
     final aiExplanation = _buildAiExplanation(
       confidenceScore: confidenceScore,
       brand: brand,
@@ -1155,6 +1160,7 @@ class AiResultCard extends ConsumerWidget {
               condition: conditionLabel,
               year: yearLabel,
               brand: brandLabel,
+              analyzedEnhancementLabel: analyzedEnhancementLabel,
             ),
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
@@ -1399,6 +1405,7 @@ class _ScanResultHeroGallery extends StatefulWidget {
     required this.condition,
     required this.year,
     required this.brand,
+    this.analyzedEnhancementLabel,
   });
 
   final String imagePath;
@@ -1412,6 +1419,7 @@ class _ScanResultHeroGallery extends StatefulWidget {
   final String condition;
   final String year;
   final String brand;
+  final String? analyzedEnhancementLabel;
 
   @override
   State<_ScanResultHeroGallery> createState() => _ScanResultHeroGalleryState();
@@ -1451,6 +1459,7 @@ class _ScanResultHeroGalleryState extends State<_ScanResultHeroGallery> {
           condition: widget.condition,
           year: widget.year,
           brand: widget.brand,
+          analyzedEnhancementLabel: widget.analyzedEnhancementLabel,
         ),
         if (images.length > 1) ...[
           const SizedBox(height: AppSpacing.sm),
@@ -1490,6 +1499,7 @@ class _ScanResultHero extends StatelessWidget {
     required this.condition,
     required this.year,
     required this.brand,
+    this.analyzedEnhancementLabel,
   });
 
   final String imagePath;
@@ -1502,6 +1512,7 @@ class _ScanResultHero extends StatelessWidget {
   final String condition;
   final String year;
   final String brand;
+  final String? analyzedEnhancementLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1535,6 +1546,10 @@ class _ScanResultHero extends StatelessWidget {
               ),
             ),
           ),
+          if (analyzedEnhancementLabel != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _AnalyzedWithBadge(label: analyzedEnhancementLabel!),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -1696,6 +1711,47 @@ class _ResultGalleryTile extends StatelessWidget {
   }
 }
 
+class _AnalyzedWithBadge extends StatelessWidget {
+  const _AnalyzedWithBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('scan-result-analyzed-with-enhancement'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.auto_fix_high_outlined,
+            size: 15,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            'Analyzed with $label',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 List<CollectibleImage> _resultGalleryImages(
   String imagePath,
   List<CollectibleImage> galleryImages,
@@ -1707,6 +1763,31 @@ List<CollectibleImage> _resultGalleryImages(
     for (final image in galleryImages)
       if (image.path.trim().isNotEmpty) image,
   ].where((image) => seen.add(image.path)).toList(growable: false);
+}
+
+String? _analyzedEnhancementLabel(
+  String imagePath,
+  List<CollectibleImage> galleryImages,
+) {
+  for (final image in galleryImages) {
+    if (image.path == imagePath && image.enhancementPreset != null) {
+      return _enhancementLabelFromId(image.enhancementPreset);
+    }
+  }
+  for (final image in galleryImages) {
+    if (image.isPrimary && image.enhancementPreset != null) {
+      return _enhancementLabelFromId(image.enhancementPreset);
+    }
+  }
+  return null;
+}
+
+String? _enhancementLabelFromId(String? value) {
+  final preset = ImageEnhancementPreset.fromId(value);
+  if (!preset.isEnhanced) {
+    return null;
+  }
+  return preset.label;
 }
 
 String _roleLabel(String? role) {

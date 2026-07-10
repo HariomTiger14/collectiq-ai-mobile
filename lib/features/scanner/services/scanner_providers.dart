@@ -9,6 +9,7 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_quality_gate_
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
+import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the scanner camera service.
@@ -36,6 +37,11 @@ final imageEnhancementServiceProvider = Provider<ImageEnhancementService>((
 ) {
   return const ImageEnhancementService();
 });
+
+final imageQualityAssessmentServiceProvider =
+    Provider<ImageQualityAssessmentService>((ref) {
+      return const ImageQualityAssessmentService();
+    });
 
 final marketProviderProvider = Provider<MarketProvider>((ref) {
   return const MarketProviderFactory().create();
