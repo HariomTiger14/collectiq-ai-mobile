@@ -4271,7 +4271,7 @@ void main() {
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     expect(find.text('Filter portfolio'), findsOneWidget);
-    expect(find.text('Confidence range'), findsOneWidget);
+    expect(find.text('Confidence'), findsOneWidget);
     expect(find.text('Trend'), findsOneWidget);
 
     await tester.tap(find.text('80%+'));
@@ -4316,6 +4316,87 @@ void main() {
     );
   });
 
+  testWidgets(
+    'portfolio filter and sort sheets use premium components at 320px',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items':
+            '[{"id":"premium-sheet-card","title":"Premium Sheet Card","category":"Trading Card","estimatedValue":900,"confidence":0.91,"condition":"Near Mint","recommendation":"Hold.","imagePath":"sample://card","createdAt":"2026-06-27T00:00:00.000","marketSummary":{"averagePrice":900,"medianPrice":880,"lowPrice":750,"highPrice":950,"salesCount":4,"trendLabel":"Rising","confidence":0.82,"lastUpdated":"2026-06-29T00:00:00Z","sources":[],"comps":[]}}]',
+      });
+
+      await tester.pumpCollectIqApp();
+      await tester.tap(find.text('Portfolio').last);
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Filter'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-filter-sheet-surface')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-elastic-sheet')),
+        findsOneWidget,
+      );
+      expect(find.byType(MotionAmbientGradient), findsWidgets);
+      expect(find.byType(MotionParallax), findsWidgets);
+      expect(find.byType(MotionReveal), findsWidgets);
+      expect(find.byType(MotionTapScale), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-filter-chip-cards')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-range-slider')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-trend-badges')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-primary-cta')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-secondary-cta')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-cta-stack')),
+        findsOneWidget,
+      );
+      expectNoFlutterError(tester);
+
+      await tester.tap(find.text('Apply filters'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sort'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-premium-sort-sheet-surface')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('portfolio-premium-sort-tile-value-high-low'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('portfolio-premium-sort-tile-recently-added'),
+        ),
+        findsOneWidget,
+      );
+      expectNoFlutterError(tester);
+    },
+  );
+
   testWidgets('sorts portfolio items by value and confidence', (
     WidgetTester tester,
   ) async {
@@ -4353,7 +4434,7 @@ void main() {
     await tester.tap(find.text('Sort'));
     await tester.pumpAndSettle();
     expect(find.text('Sort portfolio'), findsOneWidget);
-    await tester.tap(find.text('Highest value'));
+    await tester.tap(find.text('Value (High -> Low)'));
     await tester.pumpAndSettle();
 
     await tester.reveal(
@@ -4380,7 +4461,7 @@ void main() {
     await tester.scrollToTop();
     await tester.tap(find.text('Sort'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Highest confidence'));
+    await tester.tap(find.text('Confidence'));
     await tester.pumpAndSettle();
 
     await tester.reveal(
