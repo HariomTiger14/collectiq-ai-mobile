@@ -1,6 +1,8 @@
 import 'package:camera/camera.dart';
 // ignore: depend_on_referenced_packages
 import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
@@ -21,8 +23,8 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.text('Good morning.'), findsOneWidget);
-    expect(find.text('Harry 👋'), findsOneWidget);
+    expect(find.text('Good morning'), findsOneWidget);
+    expect(find.text('Collector 👋'), findsOneWidget);
     expect(find.text('Scan a\ncollectible.'), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
     expect(
@@ -33,13 +35,46 @@ void main() {
       find.byKey(const ValueKey('scan-hub-gallery-button')),
       findsOneWidget,
     );
-    expect(find.text('Take a Photo'), findsOneWidget);
-    expect(find.text('Choose from Gallery'), findsOneWidget);
-    expect(find.text('Try Sample Scan'), findsOneWidget);
+    expect(find.text('Take a photo'), findsOneWidget);
+    expect(find.text('Choose from gallery'), findsOneWidget);
+    expect(find.text('Try a sample scan'), findsOneWidget);
     expect(find.textContaining('Auto Detect'), findsNothing);
     expect(find.textContaining('Confidence'), findsNothing);
     expect(find.textContaining('Photo readiness'), findsNothing);
     expect(find.textContaining('Analyze'), findsNothing);
+  });
+
+  testWidgets('greeting uses authenticated first name and local time period', (
+    WidgetTester tester,
+  ) async {
+    const authState = AuthState(
+      status: AuthFlowStatus.signedIn,
+      user: AppUser(
+        id: 'profile-1',
+        displayName: 'Avery Collector',
+        email: 'avery@example.com',
+        provider: AuthProviderType.emailPassword,
+      ),
+    );
+
+    await _pumpHub(
+      tester,
+      authState: authState,
+      now: () => DateTime(2026, 7, 12, 15),
+    );
+
+    expect(find.text('Good afternoon'), findsOneWidget);
+    expect(find.text('Avery 👋'), findsOneWidget);
+    expect(find.textContaining('Harry'), findsNothing);
+  });
+
+  testWidgets('greeting uses evening period and fallback without a name', (
+    WidgetTester tester,
+  ) async {
+    await _pumpHub(tester, now: () => DateTime(2026, 7, 12, 20));
+
+    expect(find.text('Good evening'), findsOneWidget);
+    expect(find.text('Collector 👋'), findsOneWidget);
   });
 
   testWidgets(
@@ -94,9 +129,9 @@ void main() {
       find.byKey(const ValueKey('scanner-dark-background')),
       findsOneWidget,
     );
-    expect(find.text('Take a Photo'), findsOneWidget);
-    expect(find.text('Choose from Gallery'), findsOneWidget);
-    expect(find.text('Try Sample Scan'), findsOneWidget);
+    expect(find.text('Take a photo'), findsOneWidget);
+    expect(find.text('Choose from gallery'), findsOneWidget);
+    expect(find.text('Try a sample scan'), findsOneWidget);
   });
 
   testWidgets('gallery and sample actions remain connected', (
@@ -121,13 +156,16 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.bySemanticsLabel('Notifications'), findsOneWidget);
-    expect(find.bySemanticsLabel('Take a Photo. Use Camera.'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('Choose from Gallery. Pick from photos.'),
+      find.bySemanticsLabel('Take a photo. Use your camera to scan an item.'),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('Try Sample Scan. See how it works.'),
+      find.bySemanticsLabel('Choose from gallery. Select an existing photo.'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Try a sample scan. See how PackLox works.'),
       findsOneWidget,
     );
     semantics.dispose();
@@ -138,6 +176,8 @@ Future<void> _pumpHub(
   WidgetTester tester, {
   CameraService? cameraService,
   GalleryService? galleryService,
+  AuthState? authState,
+  DateTime Function()? now,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -148,15 +188,28 @@ Future<void> _pumpHub(
         galleryServiceProvider.overrideWithValue(
           galleryService ?? _TrackingGalleryService(),
         ),
+        if (authState != null)
+          authControllerProvider.overrideWith(
+            () => _TestAuthController(authState),
+          ),
       ],
       child: MaterialApp(
         theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
-        home: const ScanHubPage(),
+        home: ScanHubPage(now: now ?? DateTime.now),
       ),
     ),
   );
   await tester.pump();
   await tester.pump();
+}
+
+class _TestAuthController extends AuthController {
+  _TestAuthController(this.initialState);
+
+  final AuthState initialState;
+
+  @override
+  AuthState build() => initialState;
 }
 
 class _TrackingGalleryService extends GalleryService {

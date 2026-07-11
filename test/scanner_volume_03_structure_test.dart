@@ -32,12 +32,15 @@ void main() {
         );
 
         _expectInOrder(source, const [
-          "title: 'Take a Photo'",
-          "title: 'Choose from Gallery'",
-          "title: 'Try Sample Scan'",
+          "title: 'Take a photo'",
+          "title: 'Choose from gallery'",
+          "title: 'Try a sample scan'",
         ]);
         expect(source, contains('Scan a collectible'));
-        expect(source, contains('Good morning.'));
+        expect(source, contains("< 12 => 'Good morning'"));
+        expect(source, contains("< 18 => 'Good afternoon'"));
+        expect(source, contains("_ => 'Good evening'"));
+        expect(source, contains("? 'Collector'"));
         expect(source, contains('Choose an option'));
         expect(source, contains('scan-hub-hero-card'));
         expect(source, contains('scan-hub-notifications-button'));

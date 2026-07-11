@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
@@ -9,10 +10,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Design Bible Volume 03, S01 scanner entry hub.
 class ScanHubPage extends ConsumerStatefulWidget {
-  const ScanHubPage({this.onViewPortfolio, this.onNotifications, super.key});
+  const ScanHubPage({
+    this.onViewPortfolio,
+    this.onNotifications,
+    this.now = DateTime.now,
+    super.key,
+  });
 
   final VoidCallback? onViewPortfolio;
   final VoidCallback? onNotifications;
+  final DateTime Function() now;
 
   @override
   ConsumerState<ScanHubPage> createState() => _ScanHubPageState();
@@ -71,7 +78,10 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _ScanHubHeader(onNotifications: widget.onNotifications),
+                      _ScanHubHeader(
+                        onNotifications: widget.onNotifications,
+                        now: widget.now,
+                      ),
                       SizedBox(height: compact ? AppSpacing.xl : 28),
                       const _ScanHubHeroCard(),
                       const SizedBox.shrink(
@@ -100,10 +110,11 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         compatibilityKey: const ValueKey(
                           'scan-primary-Scan with Camera',
                         ),
-                        semanticLabel: 'Take a Photo. Use Camera.',
+                        semanticLabel:
+                            'Take a photo. Use your camera to scan an item.',
                         icon: Icons.photo_camera_outlined,
-                        title: 'Take a Photo',
-                        subtitle: 'Use Camera',
+                        title: 'Take a photo',
+                        subtitle: 'Use your camera to scan an item',
                         onTap: () => unawaited(_startCameraScan(context)),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -112,10 +123,11 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         compatibilityKey: const ValueKey(
                           'scan-secondary-Gallery',
                         ),
-                        semanticLabel: 'Choose from Gallery. Pick from photos.',
+                        semanticLabel:
+                            'Choose from gallery. Select an existing photo.',
                         icon: Icons.photo_library_outlined,
-                        title: 'Choose from Gallery',
-                        subtitle: 'Pick from photos',
+                        title: 'Choose from gallery',
+                        subtitle: 'Select an existing photo',
                         onTap: () => unawaited(_pickFromGallery(context)),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -124,10 +136,11 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         compatibilityKey: const ValueKey(
                           'scan-secondary-Use Sample Scan',
                         ),
-                        semanticLabel: 'Try Sample Scan. See how it works.',
+                        semanticLabel:
+                            'Try a sample scan. See how PackLox works.',
                         icon: Icons.science_outlined,
-                        title: 'Try Sample Scan',
-                        subtitle: 'See how it works',
+                        title: 'Try a sample scan',
+                        subtitle: 'See how PackLox works',
                         onTap: ref
                             .read(scannerControllerProvider.notifier)
                             .useSampleScan,
@@ -152,13 +165,16 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
       .pickImageFromGallery(context: context, imageRole: 'front');
 }
 
-class _ScanHubHeader extends StatelessWidget {
-  const _ScanHubHeader({this.onNotifications});
+class _ScanHubHeader extends ConsumerWidget {
+  const _ScanHubHeader({required this.now, this.onNotifications});
 
   final VoidCallback? onNotifications;
+  final DateTime Function() now;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final greeting = _scanHubGreeting(authState, now());
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -168,7 +184,7 @@ class _ScanHubHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good morning.',
+                greeting.period,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: ScannerVisualTheme.textSecondary,
                   fontWeight: FontWeight.w600,
@@ -176,7 +192,7 @@ class _ScanHubHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Harry 👋',
+                '${greeting.firstName} 👋',
                 key: const ValueKey('scan-hub-title'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: ScannerVisualTheme.textPrimary,
@@ -208,6 +224,24 @@ class _ScanHubHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+({String period, String firstName}) _scanHubGreeting(
+  AuthState authState,
+  DateTime now,
+) {
+  final displayName = authState.isSignedIn
+      ? authState.user?.displayName.trim() ?? ''
+      : '';
+  final firstName = displayName.isEmpty
+      ? 'Collector'
+      : displayName.split(RegExp(r'\s+')).first;
+  final period = switch (now.hour) {
+    < 12 => 'Good morning',
+    < 18 => 'Good afternoon',
+    _ => 'Good evening',
+  };
+  return (period: period, firstName: firstName);
 }
 
 class _ScanHubHeroCard extends StatelessWidget {
