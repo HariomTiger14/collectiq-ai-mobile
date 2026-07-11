@@ -82,7 +82,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         onNotifications: widget.onNotifications,
                         now: widget.now,
                       ),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.md),
                       const ScannerHeroCard(),
                       const SizedBox.shrink(
                         key: ValueKey('scan-hub-collectible-visual'),
@@ -184,7 +184,9 @@ class _ScanHubHeader extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
+              SizedBox(
+                height: MediaQuery.textScalerOf(context).scale(AppSpacing.xs),
+              ),
               Text(
                 '${greeting.firstName} 👋',
                 key: const ValueKey('scan-hub-title'),
@@ -209,8 +211,8 @@ class _ScanHubHeader extends ConsumerWidget {
               child: IconButton(
                 key: const ValueKey('scan-hub-notifications-button'),
                 onPressed: onNotifications,
-                icon: const Icon(Icons.notifications_none_outlined),
-                color: ScannerVisualTheme.textPrimary,
+                icon: const Icon(Icons.notifications_outlined, size: 22),
+                color: ScannerVisualTheme.textSecondary,
               ),
             ),
           ),
@@ -245,7 +247,7 @@ class ScannerHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const ValueKey('scan-hub-hero-card'),
-      constraints: const BoxConstraints(minHeight: 136),
+      constraints: const BoxConstraints(minHeight: 132),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -271,14 +273,14 @@ class ScannerHeroCard extends StatelessWidget {
                     height: 1.08,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Identify, value, and\nprotect your items.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: ScannerVisualTheme.textPrimary.withValues(
                       alpha: 0.82,
                     ),
-                    height: 1.35,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -287,7 +289,7 @@ class ScannerHeroCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           const Icon(
             Icons.center_focus_strong_outlined,
-            size: 44,
+            size: 40,
             color: ScannerVisualTheme.cyan,
             semanticLabel: 'Collectible scanner',
           ),
@@ -344,6 +346,7 @@ class ScannerEntryTile extends StatelessWidget {
           minimumSize: const Size(0, 64),
           backgroundColor: ScannerVisualTheme.surfaceElevated,
           foregroundColor: ScannerVisualTheme.textPrimary,
+          overlayColor: ScannerVisualTheme.textPrimary.withValues(alpha: 0.08),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
             side: const BorderSide(color: ScannerVisualTheme.border),
@@ -370,7 +373,7 @@ class ScannerEntryTile extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -395,13 +398,13 @@ class ScannerEntryIconContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     decoration: BoxDecoration(
       color: ScannerVisualTheme.surface,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       border: Border.all(color: ScannerVisualTheme.border),
     ),
-    child: Icon(icon, size: 22, color: ScannerVisualTheme.textPrimary),
+    child: Icon(icon, size: 21, color: ScannerVisualTheme.textPrimary),
   );
 }
