@@ -167,7 +167,6 @@ class _PremiumHomeHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return AnimatedBuilder(
@@ -176,7 +175,6 @@ class _PremiumHomeHero extends StatelessWidget {
         final scrollOffset = scrollController.hasClients
             ? scrollController.offset
             : 0.0;
-        final heroGradient = AppGradients.ambientHeroGradientFor(colorScheme);
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
           baseHeight: 360,
@@ -185,11 +183,10 @@ class _PremiumHomeHero extends StatelessWidget {
             scrollOffset: scrollOffset,
             child: Container(
               key: const ValueKey('home-hero-container'),
+              width: double.infinity,
               constraints: const BoxConstraints(minHeight: 360),
-              decoration: BoxDecoration(
-                gradient: heroGradient,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: AppElevation.level2,
+              decoration: const BoxDecoration(
+                gradient: AppGradients.premiumHeroGradient,
               ),
               child: SafeArea(
                 top: true,
@@ -207,7 +204,7 @@ class _PremiumHomeHero extends StatelessWidget {
                         Text(
                           'Good evening',
                           style: textTheme.titleSmall?.copyWith(
-                            color: colorScheme.onSurface,
+                            color: Colors.white.withValues(alpha: 0.86),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -218,7 +215,7 @@ class _PremiumHomeHero extends StatelessWidget {
                           child: Text(
                             'Your Collection Hub',
                             style: textTheme.displayLarge?.copyWith(
-                              color: colorScheme.onSurface,
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                               height: 1.06,
                               letterSpacing: 0,
@@ -229,7 +226,7 @@ class _PremiumHomeHero extends StatelessWidget {
                         Text(
                           'Scan, value, and track your collectibles.',
                           style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            color: Colors.white.withValues(alpha: 0.78),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
