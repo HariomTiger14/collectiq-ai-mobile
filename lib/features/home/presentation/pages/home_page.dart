@@ -177,14 +177,14 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 360,
+          baseHeight: 280,
           scrollOffset: scrollOffset,
           child: MotionParallax(
             scrollOffset: scrollOffset,
             child: Container(
               key: const ValueKey('home-hero-container'),
               width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 360),
+              constraints: const BoxConstraints(minHeight: 280),
               decoration: const BoxDecoration(
                 gradient: AppGradients.premiumHeroGradient,
               ),
@@ -193,7 +193,7 @@ class _PremiumHomeHero extends StatelessWidget {
                 bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.xl,
+                    vertical: AppSpacing.lg,
                     horizontal: AppSpacing.lg,
                   ),
                   child: MotionReveal(

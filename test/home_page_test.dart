@@ -71,15 +71,39 @@ void main() {
       const Color(0xFF3A7BD5),
       const Color(0xFF00D2FF),
     ]);
+    expect(heroContainer.constraints?.minHeight, 280);
     expect(heroContainer.child, isA<SafeArea>());
+    final heroPadding = tester.widget<Padding>(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('home-hero-container')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Padding &&
+                  widget.padding ==
+                      const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.lg,
+                      ),
+            ),
+          )
+          .first,
+    );
+    expect(
+      heroPadding.padding,
+      const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.lg,
+      ),
+    );
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, greaterThanOrEqualTo(360));
+    expect(heroMotion.baseHeight, 280);
     expect(
       tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(360),
+      greaterThanOrEqualTo(280),
     );
     expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
     expect(
