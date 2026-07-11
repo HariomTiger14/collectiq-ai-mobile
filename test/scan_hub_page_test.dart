@@ -1,13 +1,13 @@
 import 'package:camera/camera.dart';
 // ignore: depend_on_referenced_packages
 import 'package:camera_platform_interface/camera_platform_interface.dart';
-import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
+import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
-import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,18 +15,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  testWidgets('scan hub renders premium guidance sections', (
+  testWidgets('S01 renders the approved hub and excludes workspace controls', (
     WidgetTester tester,
   ) async {
     await _pumpHub(tester);
 
     expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
-    expect(find.text('Detecting…'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
-      findsOneWidget,
-    );
+    expect(find.text('Good morning.'), findsOneWidget);
+    expect(find.text('Harry 👋'), findsOneWidget);
+    expect(find.text('Scan a\ncollectible.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,
@@ -35,7 +33,13 @@ void main() {
       find.byKey(const ValueKey('scan-hub-gallery-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('scan-hub-mute-button')), findsOneWidget);
+    expect(find.text('Take a Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+    expect(find.text('Try Sample Scan'), findsOneWidget);
+    expect(find.textContaining('Auto Detect'), findsNothing);
+    expect(find.textContaining('Confidence'), findsNothing);
+    expect(find.textContaining('Photo readiness'), findsNothing);
+    expect(find.textContaining('Analyze'), findsNothing);
   });
 
   testWidgets(
@@ -58,12 +62,14 @@ void main() {
       expect(cameraService.isAlive, isFalse);
       expect(find.byType(CameraCapturePage), findsNothing);
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
+      expect(find.text('Scan a\ncollectible.'), findsOneWidget);
     },
   );
 
-  testWidgets('scan hub fits at 320px width', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(320, 640);
+  testWidgets('scan hub fits at compact 360px width without overflow', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -71,18 +77,67 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.byKey(const ValueKey('scan-hub-action-row')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scan hub uses dark scanner visual mode', (
+    WidgetTester tester,
+  ) async {
+    await _pumpHub(tester);
+
+    final scaffold = tester.widget<Scaffold>(
+      find.byKey(const ValueKey('scan-hub-page')),
+    );
+    expect(scaffold.backgroundColor, ScannerVisualTheme.background);
     expect(
-      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
+      find.byKey(const ValueKey('scanner-dark-background')),
       findsOneWidget,
     );
-    expect(tester.takeException(), isNull);
+    expect(find.text('Take a Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+    expect(find.text('Try Sample Scan'), findsOneWidget);
+  });
+
+  testWidgets('gallery and sample actions remain connected', (
+    WidgetTester tester,
+  ) async {
+    final gallery = _TrackingGalleryService();
+    await _pumpHub(tester, galleryService: gallery);
+
+    await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
+    await tester.pump();
+    expect(gallery.pickCount, 1);
+
+    await tester.tap(find.byKey(const ValueKey('scan-hub-sample-button')));
+    await tester.pump();
+    expect(find.byType(ScannerScreen), findsOneWidget);
+  });
+
+  testWidgets('S01 exposes meaningful accessibility labels', (
+    WidgetTester tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _pumpHub(tester);
+
+    expect(find.bySemanticsLabel('Notifications'), findsOneWidget);
+    expect(find.bySemanticsLabel('Take a Photo. Use Camera.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Choose from Gallery. Pick from photos.'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel('Try Sample Scan. See how it works.'),
+      findsOneWidget,
+    );
+    semantics.dispose();
   });
 }
 
 Future<void> _pumpHub(
   WidgetTester tester, {
   CameraService? cameraService,
+  GalleryService? galleryService,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -90,7 +145,9 @@ Future<void> _pumpHub(
         cameraServiceProvider.overrideWithValue(
           cameraService ?? _ReadyCameraService(),
         ),
-        portfolioRepositoryProvider.overrideWithValue(_EmptyPortfolioRepo()),
+        galleryServiceProvider.overrideWithValue(
+          galleryService ?? _TrackingGalleryService(),
+        ),
       ],
       child: MaterialApp(
         theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
@@ -102,31 +159,14 @@ Future<void> _pumpHub(
   await tester.pump();
 }
 
-class _EmptyPortfolioRepo implements PortfolioRepository {
-  @override
-  Future<CollectibleItem> addItem(CollectibleItem item) async => item;
+class _TrackingGalleryService extends GalleryService {
+  int pickCount = 0;
 
   @override
-  Future<void> clearPortfolio() async {}
-
-  @override
-  Future<void> removeItem(String id) async {}
-
-  @override
-  Future<List<CollectibleItem>> getItems() async => const [];
-
-  @override
-  Future<void> updateItem(CollectibleItem item) async {}
-
-  @override
-  Future<void> updateItemImageSync({
-    required String itemId,
-    required String imageStoragePath,
-    required String cloudImageUrl,
-  }) async {}
-
-  @override
-  Future<void> upsertSyncedItem(CollectibleItem item) async {}
+  Future<XFile?> pickImage() async {
+    pickCount += 1;
+    return null;
+  }
 }
 
 class _ReadyCameraService extends CameraService {
