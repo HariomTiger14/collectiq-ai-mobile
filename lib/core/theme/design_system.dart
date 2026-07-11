@@ -122,8 +122,8 @@ class AppGradients {
   );
 
   static const premiumHeroGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
     stops: [0.0, 0.18, 0.55, 1.0],
     colors: [
       Color(0xFF0D1117),

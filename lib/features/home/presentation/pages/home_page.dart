@@ -177,14 +177,14 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 280,
+          baseHeight: 240,
           scrollOffset: scrollOffset,
           child: MotionParallax(
             scrollOffset: scrollOffset,
             child: Container(
               key: const ValueKey('home-hero-container'),
               width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 280),
+              constraints: const BoxConstraints(minHeight: 240),
               decoration: const BoxDecoration(
                 gradient: AppGradients.premiumHeroGradient,
               ),
@@ -193,7 +193,7 @@ class _PremiumHomeHero extends StatelessWidget {
                 bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.lg,
+                    vertical: AppSpacing.md,
                     horizontal: AppSpacing.lg,
                   ),
                   child: MotionReveal(
@@ -208,7 +208,7 @@ class _PremiumHomeHero extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
+                        const SizedBox(height: AppSpacing.xs),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
@@ -222,7 +222,7 @@ class _PremiumHomeHero extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           'Scan, value, and track your collectibles.',
                           style: textTheme.bodyMedium?.copyWith(
@@ -230,7 +230,7 @@ class _PremiumHomeHero extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
+                        const SizedBox(height: AppSpacing.sm),
                       ],
                     ),
                   ),

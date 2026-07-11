@@ -317,7 +317,7 @@ void main() {
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 280);
+    expect(heroMotion.baseHeight, 240);
     expect(
       find.byWidgetPredicate(
         (widget) =>

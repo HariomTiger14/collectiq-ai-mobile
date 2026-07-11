@@ -62,8 +62,8 @@ void main() {
     final heroDecoration = heroContainer.decoration! as BoxDecoration;
     final heroGradient = heroDecoration.gradient! as LinearGradient;
     expect(heroDecoration.gradient, AppGradients.premiumHeroGradient);
-    expect(heroGradient.begin, Alignment.topLeft);
-    expect(heroGradient.end, Alignment.bottomRight);
+    expect(heroGradient.begin, Alignment.topCenter);
+    expect(heroGradient.end, Alignment.bottomCenter);
     expect(heroGradient.stops, [0.0, 0.18, 0.55, 1.0]);
     expect(heroGradient.colors, [
       const Color(0xFF0D1117),
@@ -71,7 +71,7 @@ void main() {
       const Color(0xFF3A7BD5),
       const Color(0xFF00D2FF),
     ]);
-    expect(heroContainer.constraints?.minHeight, 280);
+    expect(heroContainer.constraints?.minHeight, 240);
     expect(heroContainer.child, isA<SafeArea>());
     final heroPadding = tester.widget<Padding>(
       find
@@ -83,7 +83,7 @@ void main() {
                   widget.padding ==
                       const EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.lg,
+                        vertical: AppSpacing.md,
                       ),
             ),
           )
@@ -93,17 +93,35 @@ void main() {
       heroPadding.padding,
       const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
-        vertical: AppSpacing.lg,
+        vertical: AppSpacing.md,
       ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-hero-container')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SizedBox && widget.height == AppSpacing.xs,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-hero-container')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SizedBox && widget.height == AppSpacing.sm,
+        ),
+      ),
+      findsNWidgets(2),
     );
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 280);
+    expect(heroMotion.baseHeight, 240);
     expect(
       tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(280),
+      greaterThanOrEqualTo(240),
     );
     expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
     expect(
