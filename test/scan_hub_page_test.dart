@@ -101,18 +101,40 @@ void main() {
     },
   );
 
-  testWidgets('scan hub fits at compact 360px width without overflow', (
+  for (final width in <double>[360, 390, 412, 430]) {
+    testWidgets('scan hub fits at ${width.toInt()} logical pixels', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpHub(tester);
+
+      expect(find.byType(ScanHubPage), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+      expect(find.text('Choose from gallery'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'logical width $width');
+    });
+  }
+
+  testWidgets('scan hub remains usable with larger text', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(360, 720);
+    tester.view.physicalSize = const Size(360, 760);
     tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
     await _pumpHub(tester);
 
-    expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-scroll-view')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-hub-sample-button')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

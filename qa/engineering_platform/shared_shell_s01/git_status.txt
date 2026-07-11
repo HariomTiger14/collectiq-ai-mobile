@@ -1,0 +1,29 @@
+Repository safety snapshot (2026-07-12)
+
+Engineering Platform
+branch: master
+HEAD: 2f872983813bd7687befcdf72c712c6c7acc9309
+staged: none
+unstaged: none
+untracked: none
+state: clean
+
+Flutter baseline
+branch: main
+HEAD: 08cf0ef49fe3bd40bb27a3d8f2c7a9e2f42b0c0a
+staged: none
+unstaged: many pre-existing files, including backend, scanner, app shell,
+  navigation, generated registrants, pubspec, scripts, and tests
+untracked: many pre-existing assets, design files, QA captures, scanner theme,
+  backend provider/test files, and documentation
+state: dirty (expected)
+
+Sprint paths after implementation
+modified: lib/core/navigation/app_shell.dart
+modified: lib/core/ui/navigation/glass_bottom_nav_bar.dart
+modified: lib/features/scanner/presentation/pages/scan_hub_page.dart
+modified: test/scan_hub_page_test.dart
+untracked: test/shared_shell_s01_test.dart
+untracked: qa/engineering_platform/shared_shell_s01/
+
+No reset, clean, restore, checkout, or broad staging command was used.

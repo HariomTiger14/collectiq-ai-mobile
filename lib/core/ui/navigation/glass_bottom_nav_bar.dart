@@ -36,38 +36,47 @@ class GlassBottomNavBar extends StatelessWidget {
       ],
     );
 
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: isDark ? 0.18 : 0.12),
-              blurRadius: isDark ? 22 : 32,
-              offset: const Offset(0, -10),
-            ),
-          ],
+    final outerSurface = isDark
+        ? colorScheme.surface
+        : Theme.of(context).scaffoldBackgroundColor;
+    return ColoredBox(
+      key: const ValueKey('bottom-navigation-safe-area-surface'),
+      color: outerSurface,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.sm,
         ),
-        child: Container(
-          height: 78,
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: isDark
-                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.92)
-                : colorScheme.surface.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(AppRadius.xl),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.56),
-            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(
+                  alpha: isDark ? 0.18 : 0.12,
+                ),
+                blurRadius: isDark ? 22 : 32,
+                offset: const Offset(0, -10),
+              ),
+            ],
           ),
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: navChild,
+          child: Container(
+            height: 70,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.92)
+                  : colorScheme.surface.withValues(alpha: 0.96),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.56),
+              ),
+            ),
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: navChild,
+          ),
         ),
       ),
     );
@@ -107,65 +116,76 @@ class NavBarItem extends StatelessWidget {
             ? colors.last.withValues(alpha: isDark ? 0.18 : 0.10)
             : Colors.transparent,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 30,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              gradient: isActive
-                  ? LinearGradient(
-                      colors: colors,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isActive
-                  ? null
-                  : colorScheme.surfaceContainerHighest.withValues(
-                      alpha: isDark ? 0.34 : 0.0,
-                    ),
-            ),
-            child: Icon(icon, color: foreground, size: AppIconSizes.md),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style:
-                textTheme.labelSmall?.copyWith(
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  gradient: isActive
+                      ? LinearGradient(
+                          colors: colors,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
                   color: isActive
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                  letterSpacing: 0,
-                ) ??
-                TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
+                      ? null
+                      : colorScheme.surfaceContainerHighest.withValues(
+                          alpha: isDark ? 0.34 : 0.0,
+                        ),
                 ),
+                child: Icon(icon, color: foreground, size: AppIconSizes.md),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    textTheme.labelSmall?.copyWith(
+                      color: isActive
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                      letterSpacing: 0,
+                    ) ??
+                    TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                    ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
 
-    return MotionTapScale(
-      onTap: onTap,
-      scale: 0.97,
-      child: AnimatedContainer(
-        duration: PackLoxMotionTheme.fast,
-        curve: PackLoxMotionTheme.navStateCurve,
-        child: AnimatedSwitcher(
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: label,
+      excludeSemantics: true,
+      child: MotionTapScale(
+        onTap: onTap,
+        scale: 0.97,
+        child: AnimatedContainer(
           duration: PackLoxMotionTheme.fast,
-          switchInCurve: PackLoxMotionTheme.navStateCurve,
-          switchOutCurve: PackLoxMotionTheme.navStateCurve,
-          child: KeyedSubtree(key: ValueKey<bool>(isActive), child: content),
+          curve: PackLoxMotionTheme.navStateCurve,
+          child: AnimatedSwitcher(
+            duration: PackLoxMotionTheme.fast,
+            switchInCurve: PackLoxMotionTheme.navStateCurve,
+            switchOutCurve: PackLoxMotionTheme.navStateCurve,
+            child: KeyedSubtree(key: ValueKey<bool>(isActive), child: content),
+          ),
         ),
       ),
     );

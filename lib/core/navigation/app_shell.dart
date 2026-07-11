@@ -10,8 +10,10 @@ import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -158,18 +160,33 @@ class _AppShellState extends ConsumerState<AppShell>
   ];
 
   Widget _buildBottomNavigationBar(int selectedIndex) {
-    return GlassBottomNavBar(
+    final navigation = GlassBottomNavBar(
       key: const ValueKey('bottom-navigation'),
       currentIndex: selectedIndex,
       onTap: (index) => _selectTab(index, reason: 'bottom-navigation'),
       items: _navItems,
     );
+    return selectedIndex == _scanTabIndex
+        ? ScannerFocusTheme(child: navigation)
+        : navigation;
   }
 
   @override
   Widget build(BuildContext context) {
     final onboardingCompleted = ref.watch(onboardingControllerProvider);
     final selectedIndex = ref.watch(appShellTabControllerProvider);
+    final scannerState = ref.watch(scannerControllerProvider);
+    final hasActiveScannerSession =
+        scannerState.scanResult != null ||
+        scannerState.captureImages.isNotEmpty ||
+        scannerState.selectedImagePath != null ||
+        scannerState.isLoading ||
+        scannerState.isPreparingImage ||
+        scannerState.errorMessage != null;
+    final hideBottomNavigation =
+        selectedIndex == _scanTabIndex &&
+        hasActiveScannerSession &&
+        scannerState.scanResult == null;
 
     return onboardingCompleted.when(
       data: (completed) {
@@ -180,10 +197,33 @@ class _AppShellState extends ConsumerState<AppShell>
           );
         }
 
-        return Scaffold(
-          key: const ValueKey('app-shell'),
-          body: _buildActiveTab(selectedIndex),
-          bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
+        final scannerSelected = selectedIndex == _scanTabIndex;
+        final shellBackground = scannerSelected
+            ? ScannerVisualTheme.background
+            : Theme.of(context).scaffoldBackgroundColor;
+        final overlayStyle = scannerSelected
+            ? const SystemUiOverlayStyle(
+                statusBarColor: ScannerVisualTheme.background,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+                systemNavigationBarColor: ScannerVisualTheme.backgroundDeep,
+                systemNavigationBarDividerColor:
+                    ScannerVisualTheme.backgroundDeep,
+                systemNavigationBarIconBrightness: Brightness.light,
+                systemNavigationBarContrastEnforced: false,
+              )
+            : SystemUiOverlayStyle.dark;
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: Scaffold(
+            key: const ValueKey('app-shell'),
+            backgroundColor: shellBackground,
+            body: _buildActiveTab(selectedIndex),
+            bottomNavigationBar: hideBottomNavigation
+                ? null
+                : _buildBottomNavigationBar(selectedIndex),
+          ),
         );
       },
       loading: () =>

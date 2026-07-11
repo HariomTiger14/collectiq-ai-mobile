@@ -70,9 +70,9 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                 return SingleChildScrollView(
                   key: const ValueKey('scan-hub-scroll-view'),
                   padding: EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
+                    AppSpacing.md,
                     compact ? AppSpacing.md : AppSpacing.lg,
-                    AppSpacing.lg,
+                    AppSpacing.md,
                     AppSpacing.xl,
                   ),
                   child: Column(
@@ -82,8 +82,8 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         onNotifications: widget.onNotifications,
                         now: widget.now,
                       ),
-                      SizedBox(height: compact ? AppSpacing.xl : 28),
-                      const _ScanHubHeroCard(),
+                      const SizedBox(height: AppSpacing.lg),
+                      const ScannerHeroCard(),
                       const SizedBox.shrink(
                         key: ValueKey('scan-hub-collectible-visual'),
                         child: Column(
@@ -96,16 +96,10 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Text(
-                        'Choose an option',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: ScannerVisualTheme.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const ScannerSectionHeading('Choose an option'),
                       const SizedBox(height: AppSpacing.md),
-                      _ScanHubOptionTile(
+                      ScannerEntryTile(
                         key: const ValueKey('scan-hub-capture-button'),
                         compatibilityKey: const ValueKey(
                           'scan-primary-Scan with Camera',
@@ -118,7 +112,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         onTap: () => unawaited(_startCameraScan(context)),
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      _ScanHubOptionTile(
+                      ScannerEntryTile(
                         key: const ValueKey('scan-hub-gallery-button'),
                         compatibilityKey: const ValueKey(
                           'scan-secondary-Gallery',
@@ -131,7 +125,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                         onTap: () => unawaited(_pickFromGallery(context)),
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      _ScanHubOptionTile(
+                      ScannerEntryTile(
                         key: const ValueKey('scan-hub-sample-button'),
                         compatibilityKey: const ValueKey(
                           'scan-secondary-Use Sample Scan',
@@ -244,15 +238,15 @@ class _ScanHubHeader extends ConsumerWidget {
   return (period: period, firstName: firstName);
 }
 
-class _ScanHubHeroCard extends StatelessWidget {
-  const _ScanHubHeroCard();
+class ScannerHeroCard extends StatelessWidget {
+  const ScannerHeroCard({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       key: const ValueKey('scan-hub-hero-card'),
-      constraints: const BoxConstraints(minHeight: 176),
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      constraints: const BoxConstraints(minHeight: 136),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -293,7 +287,7 @@ class _ScanHubHeroCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.md),
           const Icon(
             Icons.center_focus_strong_outlined,
-            size: 58,
+            size: 44,
             color: ScannerVisualTheme.cyan,
             semanticLabel: 'Collectible scanner',
           ),
@@ -303,8 +297,23 @@ class _ScanHubHeroCard extends StatelessWidget {
   }
 }
 
-class _ScanHubOptionTile extends StatelessWidget {
-  const _ScanHubOptionTile({
+class ScannerSectionHeading extends StatelessWidget {
+  const ScannerSectionHeading(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+      color: ScannerVisualTheme.textPrimary,
+      fontWeight: FontWeight.w700,
+    ),
+  );
+}
+
+class ScannerEntryTile extends StatelessWidget {
+  const ScannerEntryTile({
     required this.semanticLabel,
     required this.icon,
     required this.title,
@@ -332,7 +341,7 @@ class _ScanHubOptionTile extends StatelessWidget {
         onPressed: onTap,
         style: FilledButton.styleFrom(
           padding: EdgeInsets.zero,
-          minimumSize: const Size(0, 68),
+          minimumSize: const Size(0, 64),
           backgroundColor: ScannerVisualTheme.surfaceElevated,
           foregroundColor: ScannerVisualTheme.textPrimary,
           shape: RoundedRectangleBorder(
@@ -347,20 +356,7 @@ class _ScanHubOptionTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: ScannerVisualTheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(color: ScannerVisualTheme.border),
-                ),
-                child: Icon(
-                  icon,
-                  size: 23,
-                  color: ScannerVisualTheme.textPrimary,
-                ),
-              ),
+              ScannerEntryIconContainer(icon: icon),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -390,4 +386,22 @@ class _ScanHubOptionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class ScannerEntryIconContainer extends StatelessWidget {
+  const ScannerEntryIconContainer({required this.icon, super.key});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: ScannerVisualTheme.surface,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      border: Border.all(color: ScannerVisualTheme.border),
+    ),
+    child: Icon(icon, size: 22, color: ScannerVisualTheme.textPrimary),
+  );
 }
