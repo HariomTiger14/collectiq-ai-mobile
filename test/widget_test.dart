@@ -317,7 +317,7 @@ void main() {
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 350);
+    expect(heroMotion.baseHeight, 360);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -530,6 +530,7 @@ void main() {
     await tester.pumpCollectIqApp();
     await tester.pumpAndSettle();
 
+    await tester.reveal(find.byKey(const ValueKey('home-small-portfolio-cta')));
     expect(
       find.byKey(const ValueKey('home-small-portfolio-cta')),
       findsOneWidget,

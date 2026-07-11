@@ -56,24 +56,30 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(MotionParallax), findsOneWidget);
-    expect(find.byType(MotionAmbientGradient), findsOneWidget);
     final heroContainer = tester.widget<Container>(
       find.byKey(const ValueKey('home-hero-container')),
     );
     final heroDecoration = heroContainer.decoration! as BoxDecoration;
-    expect(heroDecoration.gradient, AppGradients.ambientHeroGradient);
     final heroGradient = heroDecoration.gradient! as LinearGradient;
     expect(heroGradient.begin, Alignment.topCenter);
     expect(heroGradient.end, Alignment.bottomCenter);
     expect(heroGradient.stops, [0.0, 0.35, 1.0]);
+    final theme = Theme.of(
+      tester.element(find.byKey(const ValueKey('home-hero-container'))),
+    );
+    final expectedGradient = AppGradients.ambientHeroGradientFor(
+      theme.colorScheme,
+    );
+    expect(heroGradient.colors, expectedGradient.colors);
+    expect(heroContainer.child, isA<SafeArea>());
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, greaterThanOrEqualTo(340));
+    expect(heroMotion.baseHeight, greaterThanOrEqualTo(360));
     expect(
       tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(340),
+      greaterThanOrEqualTo(360),
     );
     expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
     expect(

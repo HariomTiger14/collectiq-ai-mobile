@@ -176,67 +176,65 @@ class _PremiumHomeHero extends StatelessWidget {
         final scrollOffset = scrollController.hasClients
             ? scrollController.offset
             : 0.0;
+        final heroGradient = AppGradients.ambientHeroGradientFor(colorScheme);
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 350,
+          baseHeight: 360,
           scrollOffset: scrollOffset,
-          child: MotionAmbientGradient(
-            gradientBuilder: (t) => AppGradients.ambientHeroGradient,
-            child: MotionParallax(
-              scrollOffset: scrollOffset,
-              child: Container(
-                key: const ValueKey('home-hero-container'),
-                constraints: const BoxConstraints(minHeight: 350),
-                decoration: BoxDecoration(
-                  gradient: AppGradients.ambientHeroGradient,
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  boxShadow: AppElevation.level2,
-                ),
-                child: SafeArea(
-                  top: true,
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.xl,
-                      horizontal: AppSpacing.lg,
-                    ),
-                    child: MotionReveal(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Good evening',
-                            style: textTheme.titleSmall?.copyWith(
+          child: MotionParallax(
+            scrollOffset: scrollOffset,
+            child: Container(
+              key: const ValueKey('home-hero-container'),
+              constraints: const BoxConstraints(minHeight: 360),
+              decoration: BoxDecoration(
+                gradient: heroGradient,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                boxShadow: AppElevation.level2,
+              ),
+              child: SafeArea(
+                top: true,
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.xl,
+                    horizontal: AppSpacing.lg,
+                  ),
+                  child: MotionReveal(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Good evening',
+                          style: textTheme.titleSmall?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Your Collection Hub',
+                            style: textTheme.displayLarge?.copyWith(
                               color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.bold,
+                              height: 1.06,
+                              letterSpacing: 0,
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.sm),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Your Collection Hub',
-                              style: textTheme.displayLarge?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                height: 1.06,
-                                letterSpacing: 0,
-                              ),
-                            ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Scan, value, and track your collectibles.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            'Scan, value, and track your collectibles.',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
                     ),
                   ),
                 ),

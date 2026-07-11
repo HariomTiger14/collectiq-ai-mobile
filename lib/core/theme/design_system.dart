@@ -121,8 +121,21 @@ class AppGradients {
     end: Alignment.bottomRight,
   );
 
+  static LinearGradient ambientHeroGradientFor(ColorScheme colorScheme) {
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: const [0.0, 0.35, 1.0],
+      colors: [
+        colorScheme.primary.withValues(alpha: 0.40),
+        colorScheme.primary.withValues(alpha: 0.22),
+        colorScheme.surfaceContainerHighest,
+      ],
+    );
+  }
+
   static const ambientHeroGradient = LinearGradient(
-    colors: [Color(0xFFEAF4FF), Color(0xFFF4F0FF), Color(0xFFE8FFF9)],
+    colors: [Color(0x660A84FF), Color(0x380A84FF), Color(0xFFF4F0FF)],
     stops: [0.0, 0.35, 1.0],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
