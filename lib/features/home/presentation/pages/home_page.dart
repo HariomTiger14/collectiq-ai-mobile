@@ -1,6 +1,5 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -170,10 +169,6 @@ class _PremiumHomeHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final gradientColors = PackLoxGradients.build(
-      GradientStyle.blueIndigo,
-      context,
-    );
 
     return AnimatedBuilder(
       animation: scrollController,
@@ -183,35 +178,17 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 320,
+          baseHeight: 350,
           scrollOffset: scrollOffset,
-          child: MotionParallax(
-            scrollOffset: scrollOffset,
-            child: MotionAmbientGradient(
-              gradientBuilder: (t) => LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.lerp(gradientColors[0], gradientColors[1], t)!,
-                  Color.lerp(gradientColors[1], gradientColors[2], 1 - t)!,
-                  gradientColors[2],
-                ],
-              ),
+          child: MotionAmbientGradient(
+            gradientBuilder: (t) => AppGradients.ambientHeroGradient,
+            child: MotionParallax(
+              scrollOffset: scrollOffset,
               child: Container(
-                constraints: const BoxConstraints(minHeight: 320),
+                key: const ValueKey('home-hero-container'),
+                constraints: const BoxConstraints(minHeight: 350),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.94,
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colorScheme.surfaceContainerHighest,
-                      colorScheme.surfaceContainerHighest,
-                      colorScheme.primaryContainer.withValues(alpha: 0.18),
-                    ],
-                  ),
+                  gradient: AppGradients.ambientHeroGradient,
                   borderRadius: BorderRadius.circular(AppRadius.xl),
                   boxShadow: AppElevation.level2,
                 ),

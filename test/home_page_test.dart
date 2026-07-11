@@ -57,14 +57,19 @@ void main() {
     );
     expect(find.byType(MotionParallax), findsOneWidget);
     expect(find.byType(MotionAmbientGradient), findsOneWidget);
+    final heroContainer = tester.widget<Container>(
+      find.byKey(const ValueKey('home-hero-container')),
+    );
+    final heroDecoration = heroContainer.decoration! as BoxDecoration;
+    expect(heroDecoration.gradient, AppGradients.ambientHeroGradient);
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, greaterThanOrEqualTo(280));
+    expect(heroMotion.baseHeight, greaterThanOrEqualTo(340));
     expect(
       tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(280),
+      greaterThanOrEqualTo(340),
     );
     expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
     expect(
@@ -163,6 +168,13 @@ void main() {
     expect(find.text('2 types'), findsOneWidget);
     expect(find.text('Top asset'), findsOneWidget);
     expect(find.text('Premium Charizard'), findsWidgets);
+
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Recent Activity'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-recent-home-test-card')),
