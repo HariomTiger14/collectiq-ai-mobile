@@ -167,9 +167,7 @@ class _PremiumHomeHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final colorScheme = theme.colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return AnimatedBuilder(
       animation: scrollController,
@@ -179,23 +177,23 @@ class _PremiumHomeHero extends StatelessWidget {
             : 0.0;
         return MotionElasticHero(
           key: const ValueKey('home-hero-motion'),
-          baseHeight: 240,
+          baseHeight: 280,
           scrollOffset: scrollOffset,
           child: MotionParallax(
             scrollOffset: scrollOffset,
             child: Container(
               key: const ValueKey('home-hero-container'),
               width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 240),
+              constraints: const BoxConstraints(minHeight: 280),
               decoration: const BoxDecoration(
-                gradient: AppGradients.modernHeroGradient,
+                gradient: AppGradients.premiumHeroGradient,
               ),
               child: SafeArea(
                 top: true,
                 bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.md,
+                    vertical: AppSpacing.lg,
                     horizontal: AppSpacing.lg,
                   ),
                   child: MotionReveal(
@@ -206,35 +204,33 @@ class _PremiumHomeHero extends StatelessWidget {
                         Text(
                           'Good evening',
                           style: textTheme.titleSmall?.copyWith(
-                            color: colorScheme.onSurface.withValues(
-                              alpha: 0.78,
-                            ),
+                            color: Colors.white.withValues(alpha: 0.86),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+                        const SizedBox(height: AppSpacing.sm),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
                           child: Text(
                             'Your Collection Hub',
                             style: textTheme.displayLarge?.copyWith(
-                              color: colorScheme.onSurface,
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                               height: 1.06,
                               letterSpacing: 0,
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
+                        const SizedBox(height: AppSpacing.md),
                         Text(
                           'Scan, value, and track your collectibles.',
                           style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            color: Colors.white.withValues(alpha: 0.78),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
+                        const SizedBox(height: AppSpacing.md),
                       ],
                     ),
                   ),

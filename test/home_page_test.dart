@@ -61,16 +61,17 @@ void main() {
     );
     final heroDecoration = heroContainer.decoration! as BoxDecoration;
     final heroGradient = heroDecoration.gradient! as LinearGradient;
-    expect(heroDecoration.gradient, AppGradients.modernHeroGradient);
-    expect(heroGradient.begin, Alignment.topCenter);
-    expect(heroGradient.end, Alignment.bottomCenter);
-    expect(heroGradient.stops, [0.0, 0.45, 1.0]);
+    expect(heroDecoration.gradient, AppGradients.premiumHeroGradient);
+    expect(heroGradient.begin, Alignment.topLeft);
+    expect(heroGradient.end, Alignment.bottomRight);
+    expect(heroGradient.stops, [0.0, 0.18, 0.55, 1.0]);
     expect(heroGradient.colors, [
-      const Color(0xFFE8F1FF),
-      const Color(0xFFDCEBFF),
-      const Color(0xFFCFE7FF),
+      const Color(0xFF0D1117),
+      const Color(0xFF1A2A6C),
+      const Color(0xFF3A7BD5),
+      const Color(0xFF00D2FF),
     ]);
-    expect(heroContainer.constraints?.minHeight, 240);
+    expect(heroContainer.constraints?.minHeight, 280);
     expect(heroContainer.child, isA<SafeArea>());
     final heroPadding = tester.widget<Padding>(
       find
@@ -82,7 +83,7 @@ void main() {
                   widget.padding ==
                       const EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.md,
+                        vertical: AppSpacing.lg,
                       ),
             ),
           )
@@ -92,17 +93,8 @@ void main() {
       heroPadding.padding,
       const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+        vertical: AppSpacing.lg,
       ),
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('home-hero-container')),
-        matching: find.byWidgetPredicate(
-          (widget) => widget is SizedBox && widget.height == AppSpacing.xs,
-        ),
-      ),
-      findsOneWidget,
     );
     expect(
       find.descendant(
@@ -111,16 +103,25 @@ void main() {
           (widget) => widget is SizedBox && widget.height == AppSpacing.sm,
         ),
       ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-hero-container')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SizedBox && widget.height == AppSpacing.md,
+        ),
+      ),
       findsNWidgets(2),
     );
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
     );
-    expect(heroMotion.baseHeight, 240);
+    expect(heroMotion.baseHeight, 280);
     expect(
       tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(240),
+      greaterThanOrEqualTo(280),
     );
     expect(tester.getRect(find.text('Good evening')).height, greaterThan(0));
     expect(
@@ -133,18 +134,14 @@ void main() {
           .height,
       greaterThan(0),
     );
-    final theme = Theme.of(tester.element(find.byType(HomePage)));
     final title = tester.widget<Text>(find.text('Your Collection Hub'));
-    expect(title.style?.color, theme.colorScheme.onSurface);
+    expect(title.style?.color, Colors.white);
     final greeting = tester.widget<Text>(find.text('Good evening'));
-    expect(
-      greeting.style?.color,
-      theme.colorScheme.onSurface.withValues(alpha: 0.78),
-    );
+    expect(greeting.style?.color, Colors.white.withValues(alpha: 0.86));
     final tagline = tester.widget<Text>(
       find.text('Scan, value, and track your collectibles.'),
     );
-    expect(tagline.style?.color, theme.colorScheme.onSurfaceVariant);
+    expect(tagline.style?.color, Colors.white.withValues(alpha: 0.78));
     expect(tester.takeException(), isNull);
   });
 

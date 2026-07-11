@@ -122,8 +122,8 @@ class AppGradients {
   );
 
   static const premiumHeroGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
     stops: [0.0, 0.18, 0.55, 1.0],
     colors: [
       Color(0xFF0D1117),
@@ -131,13 +131,6 @@ class AppGradients {
       Color(0xFF3A7BD5),
       Color(0xFF00D2FF),
     ],
-  );
-
-  static const modernHeroGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    stops: [0.0, 0.45, 1.0],
-    colors: [Color(0xFFE8F1FF), Color(0xFFDCEBFF), Color(0xFFCFE7FF)],
   );
 
   static LinearGradient ambientHeroGradientFor(ColorScheme colorScheme) {
