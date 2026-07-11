@@ -260,6 +260,7 @@ class _StatsSurface extends StatelessWidget {
       child: _PremiumSurface(
         key: const ValueKey('home-stats-surface'),
         low: true,
+        padding: AppSpacing.xl,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 360;
@@ -275,7 +276,7 @@ class _StatsSurface extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.lg),
                 Expanded(
                   child: MotionTapScale(
                     child: _StatColumn(
@@ -286,7 +287,7 @@ class _StatsSurface extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.lg),
                 Expanded(
                   child: MotionTapScale(
                     child: _StatColumn(
@@ -342,7 +343,7 @@ class _StatColumn extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: textTheme.titleMedium?.copyWith(
+          style: textTheme.titleLarge?.copyWith(
             color: colorScheme.onSurface,
             fontWeight: FontWeight.w900,
           ),
@@ -417,9 +418,8 @@ class _QuickActionsSection extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           const spacing = AppSpacing.lg;
-          final columns = constraints.maxWidth >= 680 ? 4 : 2;
-          final width =
-              (constraints.maxWidth - spacing * (columns - 1)) / columns;
+          const columns = 2;
+          final width = (constraints.maxWidth - spacing) / columns;
           return Wrap(
             spacing: spacing,
             runSpacing: spacing,
@@ -474,7 +474,7 @@ class _QuickActionTile extends StatelessWidget {
       enabled: enabled,
       onTap: action.onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 96),
+        constraints: const BoxConstraints(minHeight: 104),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
@@ -486,7 +486,7 @@ class _QuickActionTile extends StatelessWidget {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 44,
@@ -499,12 +499,14 @@ class _QuickActionTile extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
                   child: Text(
                     action.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: colorScheme.onSurface,
                       fontWeight: FontWeight.w800,
@@ -518,6 +520,7 @@ class _QuickActionTile extends StatelessWidget {
               action.subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -533,6 +536,7 @@ class _QuickActionTile extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.82),
                   fontWeight: FontWeight.w700,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ],
@@ -784,7 +788,7 @@ class _RecentActivityTile extends StatelessWidget {
                 children: [
                   Text(
                     item.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: colorScheme.onSurface,
@@ -802,42 +806,38 @@ class _RecentActivityTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.xs,
-                    children: [
-                      Text(
-                        item.condition,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        _formatSavedRelative(item.createdAt),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    item.condition,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    _formatSavedRelative(item.createdAt),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.md),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Text(
-                  _formatCurrency(item.estimatedValue),
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w900,
-                  ),
+            SizedBox(
+              width: 48,
+              child: Text(
+                _formatCurrency(item.estimatedValue),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
@@ -859,34 +859,17 @@ class _AiInsightsSection extends StatelessWidget {
         ? null
         : _formatPercent(insights.averageConfidence);
     final status = insights.isEmpty ? 'Learning' : _aiInsightStatus(insights);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return _SectionSurface(
       title: 'AI Insights',
       dividerKey: const ValueKey('home-section-divider-insights'),
-      child: TweenAnimationBuilder<double>(
+      high: true,
+      child: Column(
         key: const ValueKey('home-ai-insights-glow'),
-        tween: Tween(begin: 0.75, end: 1),
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) {
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.violet.withValues(alpha: 0.10 * value),
-                  Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.04 * value),
-                ],
-              ),
-            ),
-            child: child,
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               AnimatedScale(
                 key: const ValueKey('home-ai-insights-icon-motion'),
@@ -899,33 +882,32 @@ class _AiInsightsSection extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Portfolio Confidence • $status${confidence == null ? '' : ' ($confidence)'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      _portfolioAwareInsight(insights),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Portfolio Confidence • $status${confidence == null ? '' : ' ($confidence)'}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          Divider(
+            height: 1,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.48),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            _portfolioAwareInsight(insights),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -980,19 +962,23 @@ class _PremiumSurface extends StatelessWidget {
     required this.child,
     this.low = false,
     this.high = false,
+    this.padding,
     super.key,
   });
 
   final Widget child;
   final bool low;
   final bool high;
+  final double? padding;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(high ? AppSpacing.xl : AppSpacing.lg),
+      padding: EdgeInsets.all(
+        padding ?? (high ? AppSpacing.xl : AppSpacing.lg),
+      ),
       decoration: BoxDecoration(
         color: low
             ? colorScheme.surfaceContainerLow

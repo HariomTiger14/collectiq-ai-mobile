@@ -123,8 +123,9 @@ class AppGradients {
 
   static const ambientHeroGradient = LinearGradient(
     colors: [Color(0xFFEAF4FF), Color(0xFFF4F0FF), Color(0xFFE8FFF9)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    stops: [0.0, 0.35, 1.0],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   );
 }
 

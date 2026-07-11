@@ -203,6 +203,11 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(find.text('Your Collection Hub'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Quick Actions'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
@@ -324,6 +329,11 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Scan'), findsWidgets);
     expect(find.text('Import'), findsOneWidget);
     expect(find.text('From gallery'), findsOneWidget);
@@ -342,7 +352,7 @@ void main() {
             of: find.byKey(const ValueKey('home-quick-action-Scan')),
             matching: find.byWidgetPredicate(
               (widget) =>
-                  widget is Container && widget.constraints?.minHeight == 96,
+                  widget is Container && widget.constraints?.minHeight == 104,
             ),
           )
           .first,
@@ -647,6 +657,11 @@ void main() {
   testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Scan')),
     );
@@ -666,6 +681,11 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Import Photo')),
     );
@@ -688,6 +708,11 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Scan')),
     );
@@ -702,6 +727,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Quick Actions'), findsOneWidget);
 
     await tester.ensureVisible(
@@ -2061,6 +2091,11 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Scan')),
     );
@@ -2114,6 +2149,11 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Scan')),
     );
@@ -3645,6 +3685,11 @@ void main() {
     await tester.pump();
 
     await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -520),
+    );
     await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('home-quick-action-Scan')),

@@ -62,6 +62,10 @@ void main() {
     );
     final heroDecoration = heroContainer.decoration! as BoxDecoration;
     expect(heroDecoration.gradient, AppGradients.ambientHeroGradient);
+    final heroGradient = heroDecoration.gradient! as LinearGradient;
+    expect(heroGradient.begin, Alignment.topCenter);
+    expect(heroGradient.end, Alignment.bottomCenter);
+    expect(heroGradient.stops, [0.0, 0.35, 1.0]);
 
     final heroMotion = tester.widget<MotionElasticHero>(
       find.byKey(const ValueKey('home-hero-motion')),
@@ -92,7 +96,7 @@ void main() {
     expect(find.byKey(const ValueKey('home-stats-surface')), findsOneWidget);
     expect(
       find.byWidgetPredicate(
-        (widget) => widget is SizedBox && widget.width == AppSpacing.md,
+        (widget) => widget is SizedBox && widget.width == AppSpacing.lg,
       ),
       findsWidgets,
     );
@@ -187,6 +191,42 @@ void main() {
       ),
     );
     expect(recentThumbnail.size, 52);
+    final recentTitle = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-recent-home-test-card')),
+        matching: find.text('Premium Charizard'),
+      ),
+    );
+    expect(recentTitle.maxLines, 2);
+    expect(recentTitle.overflow, TextOverflow.ellipsis);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-recent-home-test-card')),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SizedBox && widget.width == 48,
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('AI insights use premium card hierarchy', (tester) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -1400),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Insights'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-ai-insights-glow')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-ai-insights-icon-motion')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Portfolio Confidence'), findsOneWidget);
   });
 
   testWidgets('home page is responsive at 320px', (tester) async {
