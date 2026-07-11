@@ -167,7 +167,9 @@ class _PremiumHomeHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
 
     return AnimatedBuilder(
       animation: scrollController,
@@ -186,7 +188,7 @@ class _PremiumHomeHero extends StatelessWidget {
               width: double.infinity,
               constraints: const BoxConstraints(minHeight: 240),
               decoration: const BoxDecoration(
-                gradient: AppGradients.premiumHeroGradient,
+                gradient: AppGradients.modernHeroGradient,
               ),
               child: SafeArea(
                 top: true,
@@ -204,7 +206,9 @@ class _PremiumHomeHero extends StatelessWidget {
                         Text(
                           'Good evening',
                           style: textTheme.titleSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.86),
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.78,
+                            ),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -215,7 +219,7 @@ class _PremiumHomeHero extends StatelessWidget {
                           child: Text(
                             'Your Collection Hub',
                             style: textTheme.displayLarge?.copyWith(
-                              color: Colors.white,
+                              color: colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               height: 1.06,
                               letterSpacing: 0,
@@ -226,7 +230,7 @@ class _PremiumHomeHero extends StatelessWidget {
                         Text(
                           'Scan, value, and track your collectibles.',
                           style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.78),
+                            color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

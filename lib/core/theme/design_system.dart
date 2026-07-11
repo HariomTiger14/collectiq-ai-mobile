@@ -133,6 +133,13 @@ class AppGradients {
     ],
   );
 
+  static const modernHeroGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.45, 1.0],
+    colors: [Color(0xFFE8F1FF), Color(0xFFDCEBFF), Color(0xFFCFE7FF)],
+  );
+
   static LinearGradient ambientHeroGradientFor(ColorScheme colorScheme) {
     return LinearGradient(
       begin: Alignment.topCenter,

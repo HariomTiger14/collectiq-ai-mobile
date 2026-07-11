@@ -61,15 +61,14 @@ void main() {
     );
     final heroDecoration = heroContainer.decoration! as BoxDecoration;
     final heroGradient = heroDecoration.gradient! as LinearGradient;
-    expect(heroDecoration.gradient, AppGradients.premiumHeroGradient);
+    expect(heroDecoration.gradient, AppGradients.modernHeroGradient);
     expect(heroGradient.begin, Alignment.topCenter);
     expect(heroGradient.end, Alignment.bottomCenter);
-    expect(heroGradient.stops, [0.0, 0.18, 0.55, 1.0]);
+    expect(heroGradient.stops, [0.0, 0.45, 1.0]);
     expect(heroGradient.colors, [
-      const Color(0xFF0D1117),
-      const Color(0xFF1A2A6C),
-      const Color(0xFF3A7BD5),
-      const Color(0xFF00D2FF),
+      const Color(0xFFE8F1FF),
+      const Color(0xFFDCEBFF),
+      const Color(0xFFCFE7FF),
     ]);
     expect(heroContainer.constraints?.minHeight, 240);
     expect(heroContainer.child, isA<SafeArea>());
@@ -134,14 +133,18 @@ void main() {
           .height,
       greaterThan(0),
     );
+    final theme = Theme.of(tester.element(find.byType(HomePage)));
     final title = tester.widget<Text>(find.text('Your Collection Hub'));
-    expect(title.style?.color, Colors.white);
+    expect(title.style?.color, theme.colorScheme.onSurface);
     final greeting = tester.widget<Text>(find.text('Good evening'));
-    expect(greeting.style?.color, Colors.white.withValues(alpha: 0.86));
+    expect(
+      greeting.style?.color,
+      theme.colorScheme.onSurface.withValues(alpha: 0.78),
+    );
     final tagline = tester.widget<Text>(
       find.text('Scan, value, and track your collectibles.'),
     );
-    expect(tagline.style?.color, Colors.white.withValues(alpha: 0.78));
+    expect(tagline.style?.color, theme.colorScheme.onSurfaceVariant);
     expect(tester.takeException(), isNull);
   });
 
