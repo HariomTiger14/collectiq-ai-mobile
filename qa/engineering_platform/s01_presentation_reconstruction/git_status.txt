@@ -1,0 +1,21 @@
+Repository safety snapshot
+Date: 2026-07-12
+
+Engineering Platform
+- branch: master
+- HEAD: 2f872983813bd7687befcdf72c712c6c7acc9309
+- state: clean
+
+Flutter before reconstruction
+- branch: main
+- HEAD: b6e56ab097a059f883a10ec661d48a1d8b62b2d4
+- staged: none
+- state: extensive unrelated unstaged backend, AI, portfolio, scanner-flow, build/platform-generated, and test changes; extensive untracked assets and QA evidence
+
+Intended reconstruction scope
+- lib/features/scanner/presentation/pages/scan_hub_page.dart
+- lib/features/scanner/presentation/widgets/scan_hub_presentation.dart
+- test/scanner_volume_03_structure_test.dart
+- qa/engineering_platform/s01_presentation_reconstruction/*
+
+No unrelated work was reset, cleaned, restored, overwritten, or broadly staged.

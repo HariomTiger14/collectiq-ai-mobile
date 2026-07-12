@@ -27,16 +27,21 @@ void main() {
     test(
       'hub uses approved S01 action order and excludes workspace content',
       () {
-        final source = _read(
-          'lib/features/scanner/presentation/pages/scan_hub_page.dart',
-        );
+        final source =
+            _read(
+              'lib/features/scanner/presentation/pages/scan_hub_page.dart',
+            ) +
+            _read(
+              'lib/features/scanner/presentation/widgets/'
+              'scan_hub_presentation.dart',
+            );
 
         _expectInOrder(source, const [
           "title: 'Take a photo'",
           "title: 'Choose from gallery'",
           "title: 'Try a sample scan'",
         ]);
-        expect(source, contains('Scan a collectible'));
+        expect(source, contains(r'Scan a\ncollectible.'));
         expect(source, contains("< 12 => 'Good morning'"));
         expect(source, contains("< 18 => 'Good afternoon'"));
         expect(source, contains("_ => 'Good evening'"));
