@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
@@ -27,6 +27,7 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   static const _scanTabIndex = AppShellTabController.scanTab;
+  final PageStorageBucket _shellPageStorageBucket = PageStorageBucket();
 
   @override
   void initState() {
@@ -107,65 +108,82 @@ class _AppShellState extends ConsumerState<AppShell>
         .selectTab(index, reason: reason);
   }
 
-  Widget _buildActiveTab(int index) {
-    return switch (index) {
-      AppShellTabController.homeTab => HomeScreen(
+  List<AppShellDestination> get _destinations => [
+    AppShellDestination(
+      index: AppShellTabController.homeTab,
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      builder: (_) => HomeScreen(
         onScanPressed: _startNewScan,
         onImportPhotoPressed: _startGalleryImport,
         onPortfolioPressed: _openPortfolio,
       ),
-      AppShellTabController.portfolioTab => PortfolioScreen(
-        onScanPressed: _startNewScan,
-      ),
-      AppShellTabController.scanTab => ScanHubPage(
+    ),
+    AppShellDestination(
+      index: AppShellTabController.portfolioTab,
+      label: 'Portfolio',
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2_rounded,
+      builder: (_) => PortfolioScreen(onScanPressed: _startNewScan),
+    ),
+    AppShellDestination(
+      index: AppShellTabController.scanTab,
+      label: 'Scan',
+      icon: Icons.camera_alt_outlined,
+      selectedIcon: Icons.camera_alt_rounded,
+      builder: (_) => ScanHubPage(
         onViewPortfolio: () => _selectTab(
           AppShellTabController.portfolioTab,
           reason: 'scan-view-portfolio',
         ),
       ),
-      AppShellTabController.settingsTab => const SettingsScreen(),
-      _ => HomeScreen(
-        onScanPressed: _startNewScan,
-        onImportPhotoPressed: _startGalleryImport,
-        onPortfolioPressed: _openPortfolio,
-      ),
-    };
-  }
-
-  List<NavBarItem> get _navItems => const [
-    NavBarItem(
-      key: ValueKey('nav-home'),
-      icon: Icons.home_rounded,
-      label: 'Home',
-      isActive: false,
     ),
-    NavBarItem(
-      key: ValueKey('nav-portfolio'),
-      icon: Icons.inventory_2_rounded,
-      label: 'Portfolio',
-      isActive: false,
-    ),
-    NavBarItem(
-      key: ValueKey('nav-scan'),
-      icon: Icons.camera_alt_rounded,
-      label: 'Scan',
-      isActive: false,
-      gradientStyle: GradientStyle.purpleDeepBlue,
-    ),
-    NavBarItem(
-      key: ValueKey('nav-settings'),
-      icon: Icons.settings_rounded,
+    const AppShellDestination(
+      index: AppShellTabController.settingsTab,
       label: 'Settings',
-      isActive: false,
+      icon: Icons.settings_outlined,
+      selectedIcon: Icons.settings_rounded,
+      builder: _buildSettingsDestination,
     ),
   ];
+
+  static Widget _buildSettingsDestination(BuildContext context) {
+    return const SettingsScreen();
+  }
+
+  AppShellDestination _destinationFor(int index) {
+    return _destinations.firstWhere(
+      (destination) => destination.index == index,
+      orElse: () => _destinations.first,
+    );
+  }
+
+  Widget _buildActiveDestination(AppShellDestination destination) {
+    return PageStorage(
+      bucket: _shellPageStorageBucket,
+      child: KeyedSubtree(
+        key: ValueKey('shell-destination-${destination.label.toLowerCase()}'),
+        child: destination.builder(context),
+      ),
+    );
+  }
 
   Widget _buildBottomNavigationBar(int selectedIndex) {
     final navigation = GlassBottomNavBar(
       key: const ValueKey('bottom-navigation'),
       currentIndex: selectedIndex,
       onTap: (index) => _selectTab(index, reason: 'bottom-navigation'),
-      items: _navItems,
+      items: [
+        for (final destination in _destinations)
+          NavBarItem(
+            key: ValueKey('nav-${destination.label.toLowerCase()}'),
+            icon: destination.icon,
+            selectedIcon: destination.selectedIcon,
+            label: destination.label,
+            isActive: false,
+          ),
+      ],
     );
     return selectedIndex == _scanTabIndex
         ? ScannerFocusTheme(child: navigation)
@@ -202,6 +220,7 @@ class _AppShellState extends ConsumerState<AppShell>
         }
 
         final scannerSelected = selectedIndex == _scanTabIndex;
+        final selectedDestination = _destinationFor(selectedIndex);
         final shellBackground = scannerSelected
             ? ScannerVisualTheme.background
             : Theme.of(context).scaffoldBackgroundColor;
@@ -225,7 +244,7 @@ class _AppShellState extends ConsumerState<AppShell>
             child: Scaffold(
               key: const ValueKey('app-shell'),
               backgroundColor: shellBackground,
-              body: _buildActiveTab(selectedIndex),
+              body: _buildActiveDestination(selectedDestination),
               bottomNavigationBar: hideBottomNavigation
                   ? null
                   : _buildBottomNavigationBar(selectedIndex),
