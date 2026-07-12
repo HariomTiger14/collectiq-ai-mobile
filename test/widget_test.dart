@@ -151,10 +151,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('How PackLox works'), findsOneWidget);
-    expect(find.text('Local-first by default'), findsOneWidget);
-    expect(find.text('Start Scanning'), findsOneWidget);
-    expect(find.text('Explore Dashboard'), findsOneWidget);
+    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.byKey(const ValueKey('onboarding-next')), findsOneWidget);
+    expect(find.text('Skip'), findsNothing);
     expect(find.textContaining('Mock AI'), findsNothing);
     expect(find.textContaining('mock analysis'), findsNothing);
     expect(find.textContaining('beta'), findsNothing);
@@ -171,10 +170,11 @@ void main() {
     await tester.pumpCollectIqApp(onboardingRepository: repository);
     await tester.pumpAndSettle();
 
-    await tester.reveal(
-      find.byKey(const ValueKey('onboarding-start-scanning')),
-    );
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const ValueKey('onboarding-start-scanning')));
     await tester.pumpAndSettle();
 
@@ -193,10 +193,11 @@ void main() {
     await tester.pumpCollectIqApp(onboardingRepository: repository);
     await tester.pumpAndSettle();
 
-    await tester.reveal(
-      find.byKey(const ValueKey('onboarding-explore-dashboard')),
-    );
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+
     await tester.tap(
       find.byKey(const ValueKey('onboarding-explore-dashboard')),
     );

@@ -39,18 +39,20 @@ void main() {
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
 
-  testWidgets('incomplete onboarding state shows existing OnboardingScreen', (
-    tester,
-  ) async {
-    await tester.pumpEntry(
-      repository: _ImmediateOnboardingRepository(completed: false),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'incomplete onboarding state shows reconstructed OnboardingScreen',
+    (tester) async {
+      await tester.pumpEntry(
+        repository: _ImmediateOnboardingRepository(completed: false),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('How PackLox works'), findsOneWidget);
-    expect(find.text('Home'), findsNothing);
-  });
+      expect(find.text('Welcome to PackLox'), findsOneWidget);
+      expect(find.text('Step 1 of 3'), findsOneWidget);
+      expect(find.byKey(const ValueKey('onboarding-next')), findsOneWidget);
+      expect(find.text('Home'), findsNothing);
+    },
+  );
 
   testWidgets('bootstrap does not insert authentication', (tester) async {
     final repository = _CompleterOnboardingRepository();
