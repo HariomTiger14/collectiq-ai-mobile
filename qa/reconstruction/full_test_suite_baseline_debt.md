@@ -4,10 +4,21 @@ Date: 2026-07-13
 
 Sprint 01 HEAD: `0f5c93c39abdc747770205ff0eb51715d602b34e`
 
-Baseline result:
+## History
+
+Sprint 01:
 
 - 509 passed
 - 19 failed
+
+Sprint 02:
+
+- 519 passed
+- 19 failed
+
+The Sprint 02 failure count did not increase from the recorded Sprint 01 baseline. The ten additional passing tests correspond to the new Sprint 02 onboarding coverage. The existing 19 failures remain outside Sprint 02 onboarding changes.
+
+## Sprint 01 baseline context
 
 This baseline was captured after Sprint 01 implementation and before freeze. The failures are outside Sprint 01 changed files and are not fixed in the freeze task.
 
