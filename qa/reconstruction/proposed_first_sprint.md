@@ -1,0 +1,11 @@
+# Proposed first implementation sprint
+
+Choose **A: App Bootstrap and Entry Routing Presentation**, specifically BOOT-02 at `MaterialApp.home -> AppShell` while `onboardingControllerProvider` resolves, plus the hand-off to ONB-01 or the existing shell. It comes first because every fresh and returning launch traverses it before onboarding/Home; authentication is not an entry route.
+
+Preserve `main()`, error/telemetry setup, environment selection, feature flags, `CloudServiceRegistry`, unawaited `CloudAppStartup`, Supabase initialization behaviour and safe fallback, `ProviderScope`, `AuthDeepLinkCoordinator`, onboarding controller ownership, the `SharedPreferences` key `onboarding_completed_v1`, shell tab default, guest and signed-out local access, password-recovery behaviour, and all auth behavior. Available components: Header/Hero/Entry Tile/Button; missing approval: launch/loading/offline/fatal bootstrap composition and system-bar/safe-area rules.
+
+Allowed scope: visible bootstrap/loading presentation, onboarding-entry transition presentation, recoverable startup error presentation, first-run handoff presentation, and returning-user handoff presentation. Router migration is out of scope unless implementation evidence proves the existing navigation structure prevents safe reconstruction.
+
+Likely presentation files: `lib/main.dart` only if a presentation wrapper is required, `lib/core/navigation/app_shell.dart`, new presentation-only bootstrap widgets under `lib/features/bootstrap/presentation/`, focused tests and QA evidence. Prohibited: cloud/auth/data/domain/config/native identifiers/backend, auth guards, password-recovery changes, and Product Language redesign.
+
+Tests: fresh-install loading -> onboarding; completed loading -> Home; preference error fallback; no blocking on cloud startup; deep-link startup retained; semantics/text scaling/system bars; full suite/analyze/SIT build. Samsung: uninstall/clean install, cold launch online/offline, warm launch with completed onboarding, screenshot + hierarchy + smoke. Approval gate: stop at `awaiting_visual_review`; design + product-owner approval required. Suggested commit: `feat: reconstruct PackLox bootstrap and entry presentation`.
