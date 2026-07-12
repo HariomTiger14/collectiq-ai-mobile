@@ -3,12 +3,13 @@ import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
-import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
-import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_hub_presentation.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -27,9 +28,10 @@ void main() {
     expect(find.byType(ScanHubPage), findsOneWidget);
     expect(find.text('Good morning'), findsOneWidget);
     expect(find.text('Collector'), findsOneWidget);
-    expect(find.text('\u{1F44B}'), findsOneWidget);
-    expect(find.text('Scan a\ncollectible.'), findsOneWidget);
-    expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+    expect(find.byType(PackLoxHeader), findsOneWidget);
+    expect(find.byType(PackLoxHero), findsOneWidget);
+    expect(find.byType(PackLoxEntryTile), findsNWidgets(3));
+    expect(find.text('Ready when your item is.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,
@@ -90,20 +92,22 @@ void main() {
       await _pumpHub(tester, cameraService: cameraService);
 
       await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(cameraService.openedCount, 1);
       expect(find.byType(CameraCapturePage), findsOneWidget);
       expect(find.byKey(const ValueKey('camera-close-button')), findsOneWidget);
 
       await tester.tap(find.byTooltip('Close camera'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(cameraService.disposeCount, 1);
       expect(cameraService.isAlive, isFalse);
       expect(find.byType(CameraCapturePage), findsNothing);
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.text('Scan a\ncollectible.'), findsOneWidget);
+      expect(find.text('Ready when your item is.'), findsOneWidget);
     },
   );
 
@@ -118,134 +122,37 @@ void main() {
       await _pumpHub(tester);
 
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+      expect(find.byType(PackLoxHero), findsOneWidget);
       expect(find.text('Choose from gallery'), findsOneWidget);
       expect(tester.takeException(), isNull, reason: 'logical width $width');
     });
   }
 
-  testWidgets('contract-critical spacing and geometry use preferred bounds', (
+  testWidgets('S01 composes approved shared component variants', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(390, 800);
-    tester.view.devicePixelRatio = 1;
-    tester.platformDispatcher.textScaleFactorTestValue = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await _pumpHub(tester, textScaler: TextScaler.noScaling);
-
-    final greetingGap = tester.widget<SizedBox>(
-      find.byKey(const ValueKey('scan-hub-greeting-name-gap')),
-    );
-    expect(greetingGap.height, ScannerS01VisualValues.greetingNameGap);
-
-    final name = tester.widget<Text>(find.text('Collector'));
-    expect(name.style?.height, 28 / 20);
-
-    final headerHeroGap = tester.widget<SizedBox>(
-      find.byKey(const ValueKey('scan-hub-header-hero-gap')),
-    );
-    expect(headerHeroGap.height, ScannerS01VisualValues.headerHeroGap);
-
-    final heroSize = tester.getSize(
-      find.byKey(const ValueKey('scan-hub-hero-card')),
-    );
-    expect(
-      heroSize.height,
-      inInclusiveRange(
-        ScannerS01VisualValues.heroMinHeight,
-        ScannerS01VisualValues.heroMaxHeight,
-      ),
-    );
-
-    final hero = tester.widget<Container>(
-      find.byKey(const ValueKey('scan-hub-hero-card')),
-    );
-    expect(tester.getSize(find.text('Scan a\ncollectible.')).height, 64);
-    expect(
-      tester
-          .getSize(find.text('Identify, value,\nand protect your items.'))
-          .height,
-      40,
-    );
-    expect(heroSize.width / heroSize.height, inInclusiveRange(2.25, 2.55));
-    expect(
-      hero.constraints?.minHeight,
-      greaterThanOrEqualTo(ScannerS01VisualValues.heroPreferredHeight),
-    );
-    expect(hero.constraints?.maxHeight, ScannerS01VisualValues.heroMaxHeight);
-
-    final titleRegionSize = tester.getSize(
-      find.byKey(const ValueKey('scan-hub-hero-title-region')),
-    );
-    expect(
-      titleRegionSize.width,
-      closeTo(
-        (heroSize.width - (AppSpacing.lg * 2) - 2) *
-            ScannerS01VisualValues.heroTitleWidthRatio,
-        0.01,
-      ),
-    );
+    await _pumpHub(tester);
 
     expect(
-      tester.getSize(find.byKey(const ValueKey('scan-hub-hero-icon'))),
-      const Size.square(ScannerS01VisualValues.heroIconSize),
+      tester.widget<PackLoxHero>(find.byType(PackLoxHero)).variant,
+      PackLoxHeroVariant.scanner,
     );
-
-    expect(
-      tester
-          .widget<SizedBox>(
-            find.byKey(const ValueKey('scan-hub-hero-section-gap')),
-          )
-          .height,
-      ScannerS01VisualValues.heroSectionGap,
-    );
-
+    for (final tile in tester.widgetList<PackLoxEntryTile>(
+      find.byType(PackLoxEntryTile),
+    )) {
+      expect(tile.variant, PackLoxEntryTileVariant.scanner);
+      expect(tile.onTap, isNotNull);
+    }
     for (final key in const [
-      ValueKey('scan-hub-capture-button'),
-      ValueKey('scan-hub-gallery-button'),
-      ValueKey('scan-hub-sample-button'),
-    ]) {
-      expect(
-        tester.getSize(find.byKey(key)).height,
-        greaterThanOrEqualTo(ScannerS01VisualValues.tilePreferredHeight),
-      );
-    }
-
-    for (final element
-        in find
-            .byKey(const ValueKey('scan-hub-entry-icon-container'))
-            .evaluate()) {
-      expect(
-        tester.getSize(
-          find.byElementPredicate((candidate) => candidate == element),
-        ),
-        const Size.square(ScannerS01VisualValues.entryIconContainerSize),
-      );
-    }
-
-    for (final gapKey in const [
       ValueKey('scan-hub-tile-gap-1'),
       ValueKey('scan-hub-tile-gap-2'),
     ]) {
-      expect(
-        tester.widget<SizedBox>(find.byKey(gapKey)).height,
-        ScannerS01VisualValues.tileGap,
-      );
+      expect(tester.widget<SizedBox>(find.byKey(key)).height, 6);
     }
-
-    for (final gap in tester.widgetList<SizedBox>(
-      find.byKey(const ValueKey('scan-hub-entry-icon-text-gap')),
-    )) {
-      expect(gap.width, ScannerS01VisualValues.entryIconTextGap);
-    }
-
-    for (final gap in tester.widgetList<SizedBox>(
-      find.byKey(const ValueKey('scan-hub-entry-title-subtitle-gap')),
-    )) {
-      expect(gap.height, ScannerS01VisualValues.entryTitleSubtitleGap);
-    }
+    expect(
+      find.byKey(const ValueKey('scan-hub-entry-icon-container')),
+      findsNothing,
+    );
   });
 
   testWidgets('long profile name and emoji reflow without clipping', (
@@ -268,7 +175,6 @@ void main() {
     await _pumpHub(tester, authState: authState);
 
     expect(find.text('Alexandria-Cassandra'), findsOneWidget);
-    expect(find.text('\u{1F44B}'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -300,7 +206,7 @@ void main() {
     final scaffold = tester.widget<Scaffold>(
       find.byKey(const ValueKey('scan-hub-page')),
     );
-    expect(scaffold.backgroundColor, ScannerVisualTheme.background);
+    expect(scaffold.backgroundColor, PackLoxTokens.background);
     expect(
       find.byKey(const ValueKey('scanner-dark-background')),
       findsOneWidget,
@@ -320,7 +226,10 @@ void main() {
     await tester.pump();
     expect(gallery.pickCount, 1);
 
-    await tester.tap(find.byKey(const ValueKey('scan-hub-sample-button')));
+    final sample = find.byKey(const ValueKey('scan-hub-sample-button'));
+    await tester.ensureVisible(sample);
+    await tester.pump();
+    await tester.tap(sample);
     await tester.pump();
     expect(find.byType(ScannerScreen), findsOneWidget);
   });

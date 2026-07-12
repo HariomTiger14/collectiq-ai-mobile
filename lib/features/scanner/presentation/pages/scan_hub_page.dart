@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_hub_presentation.dart';
@@ -62,31 +63,34 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
       period: greeting.period,
       firstName: greeting.firstName,
       onNotifications: widget.onNotifications,
-      cameraTile: ScannerEntryTile(
+      cameraTile: PackLoxEntryTile(
         key: const ValueKey('scan-hub-capture-button'),
         compatibilityKey: const ValueKey('scan-primary-Scan with Camera'),
         semanticLabel: 'Take a photo. Use your camera to scan an item.',
         icon: Icons.photo_camera_outlined,
         title: 'Take a photo',
-        subtitle: 'Use your camera to scan an item',
+        supportingText: 'Use your camera to scan an item',
+        variant: PackLoxEntryTileVariant.scanner,
         onTap: () => unawaited(_startCameraScan(context)),
       ),
-      galleryTile: ScannerEntryTile(
+      galleryTile: PackLoxEntryTile(
         key: const ValueKey('scan-hub-gallery-button'),
         compatibilityKey: const ValueKey('scan-secondary-Gallery'),
         semanticLabel: 'Choose from gallery. Select an existing photo.',
         icon: Icons.image_outlined,
         title: 'Choose from gallery',
-        subtitle: 'Select an existing photo',
+        supportingText: 'Select an existing photo',
+        variant: PackLoxEntryTileVariant.scanner,
         onTap: () => unawaited(_pickFromGallery(context)),
       ),
-      sampleTile: ScannerEntryTile(
+      sampleTile: PackLoxEntryTile(
         key: const ValueKey('scan-hub-sample-button'),
         compatibilityKey: const ValueKey('scan-secondary-Use Sample Scan'),
         semanticLabel: 'Try a sample scan. See how PackLox works.',
         icon: Icons.science_outlined,
         title: 'Try a sample scan',
-        subtitle: 'See how PackLox works',
+        supportingText: 'See how PackLox works',
+        variant: PackLoxEntryTileVariant.scanner,
         onTap: ref.read(scannerControllerProvider.notifier).useSampleScan,
       ),
     );

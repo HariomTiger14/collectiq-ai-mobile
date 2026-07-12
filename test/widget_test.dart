@@ -33,6 +33,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhanceme
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
@@ -573,12 +574,7 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
     await tester.pump();
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('scan-primary-Analyze Image')),
-        )
-        .onPressed
-        ?.call();
+    await tester.tap(find.byKey(const ValueKey('scan-primary-Analyze Image')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
@@ -719,15 +715,11 @@ void main() {
     );
     expect(find.text('Analyze with AI'), findsNothing);
     expect(find.byKey(const ValueKey('scan-live-enhance')), findsNothing);
-    expect(
-      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
-      findsOneWidget,
-    );
+    expect(find.text('Ready when your item is.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-active-preview-enhance-overlay')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('scan-hub-mute-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
   });
 
@@ -1408,7 +1400,7 @@ void main() {
     await tester.pump();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -1458,10 +1450,11 @@ void main() {
       find.byKey(const ValueKey('scan-hub-capture-button')),
     );
 
-    expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
-    expect(find.text('Detecting…'), findsOneWidget);
+    expect(find.text('Ready when your item is.'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
+      find.text(
+        'Position one item in clear light. PackLox will guide the rest.',
+      ),
       findsOneWidget,
     );
     expect(
@@ -1472,7 +1465,6 @@ void main() {
       find.byKey(const ValueKey('scan-hub-gallery-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('scan-hub-mute-button')), findsOneWidget);
   });
 
   testWidgets('scan capture flashes and shows next capture suggestion', (
@@ -1528,7 +1520,7 @@ void main() {
           .bottom,
       140,
     );
-    expect(find.text('Front recommended'), findsOneWidget);
+    expect(find.text('One more photo recommended'), findsWidgets);
     await tester.pump(const Duration(milliseconds: 150));
     expect(
       tester
@@ -1605,7 +1597,7 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-hub-silhouette-frame')),
+      find.byKey(const ValueKey('scan-hub-capture-button')),
     );
 
     expect(
@@ -1642,75 +1634,34 @@ void main() {
     expect(find.byType(CameraPreview), findsNothing);
   });
 
-  testWidgets(
-    'workspace capture next opens scan surface with existing photos',
-    (WidgetTester tester) async {
-      await tester.pumpCollectIqApp();
+  testWidgets('workspace capture next opens camera for the back photo', (
+    WidgetTester tester,
+  ) async {
+    final cameraService = _RouteHoldingCameraService();
+    await tester.pumpCollectIqApp(cameraService: cameraService);
 
-      await tester.tap(find.text('Scan').last);
-      await tester.pump();
-      await tester.reveal(
-        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-      );
-      await tester.pump();
-      await tester.tap(
-        find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
-      );
-      await tester.pumpUntilFound(find.text('Scan Workspace'));
+    await tester.tap(find.text('Scan').last);
+    await tester.pump();
+    await tester.reveal(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
+    );
+    await tester.pumpUntilFound(find.text('Review your photos'));
 
-      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
-      expect(find.text('1 photo'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('workspace-primary-photo-highlight')),
-        findsOneWidget,
-      );
-      expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is ListView && widget.physics is BouncingScrollPhysics,
-        ),
-        findsWidgets,
-      );
-      expect(find.text('Back recommended'), findsOneWidget);
-      expect(
-        find.byWidgetPredicate((widget) => widget is AnimatedSwitcher),
-        findsAtLeastNWidgets(4),
-      );
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(find.text('Nice first photo'), findsOneWidget);
+    expect(find.text('One more photo recommended'), findsOneWidget);
 
-      await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+    await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
+    await tester.pumpUntilFound(find.text('CameraCapturePage route'));
 
-      expect(find.text('Scan Workspace'), findsNothing);
-      expect(
-        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsOneWidget);
-      expect(find.text('Trading card detected'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('scan-recommended-role')),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Recommended:'), findsOneWidget);
-      final filmstripDecoration =
-          tester
-                  .widgetList<AnimatedContainer>(
-                    find.descendant(
-                      of: find.byKey(const ValueKey('scan-left-filmstrip')),
-                      matching: find.byType(AnimatedContainer),
-                    ),
-                  )
-                  .first
-                  .decoration
-              as BoxDecoration;
-      expect(filmstripDecoration.boxShadow, isNotNull);
-      expect(filmstripDecoration.boxShadow!.first.blurRadius, 18);
-      expect(filmstripDecoration.boxShadow!.first.offset.dy, 10);
-    },
-  );
+    expect(cameraService.openedCount, 1);
+  });
 
   testWidgets('capture review acceptance returns to updated workspace', (
     WidgetTester tester,
@@ -1728,15 +1679,7 @@ void main() {
     await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-    );
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
-    );
+    await tester.pumpUntilFound(find.text('Great — ready to analyze'));
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MaterialApp)),
@@ -1748,7 +1691,7 @@ void main() {
       findsWidgets,
     );
     expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
-    expect(find.textContaining('recommended'), findsWidgets);
+    expect(find.text('Analyze collectible'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1775,15 +1718,7 @@ void main() {
       await tester.reveal(find.byKey(const ValueKey('workspace-capture-next')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('workspace-capture-next')));
-      await tester.pumpUntilFound(
-        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('scan-primary-Scan with Camera')),
-      );
-      await tester.pumpUntilFound(
-        find.byKey(const ValueKey('scan-primary-Analyze Image')),
-      );
+      await tester.pumpUntilFound(find.text('Great — ready to analyze'));
       await tester.reveal(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
       );
@@ -1903,12 +1838,7 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
     await tester.pump();
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('scan-primary-Analyze Image')),
-        )
-        .onPressed
-        ?.call();
+    await tester.tap(find.byKey(const ValueKey('scan-primary-Analyze Image')));
     await tester.pumpAndSettle();
 
     expect(find.text('Detected: Pokemon Card'), findsNothing);
@@ -1954,7 +1884,7 @@ void main() {
       find.text('Camera permission is required to capture scans.'),
       findsOneWidget,
     );
-    expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
   });
 
   testWidgets('camera return shows preparing image bridge before preview', (
@@ -2001,9 +1931,8 @@ void main() {
       find.byKey(const ValueKey('scan-hub-capture-button')),
     );
 
-    expect(find.text('Recommended: Front / Obverse'), findsOneWidget);
     expect(cameraService.openedCount, 0);
-
+    expect(find.text('Ready when your item is.'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
     await tester.pumpUntilFound(find.text('CameraCapturePage route'));
 
@@ -2075,10 +2004,6 @@ void main() {
 
     await tester.tap(find.text('Scan').last);
     await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-hub-capture-button')),
-    );
-    await tester.tap(find.byKey(const ValueKey('scan-hub-capture-button')));
-    await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
@@ -2109,7 +2034,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
     await tester.acceptEnhancementPreview();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
@@ -2184,7 +2109,8 @@ void main() {
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-hub-gallery-button')),
     );
-    await tester.tap(find.byKey(const ValueKey('scan-secondary-Gallery')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
     await tester.acceptEnhancementPreview();
     await tester.pumpAndSettle();
 
@@ -2277,7 +2203,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: previewSurface, matching: find.text('AI Enhance')),
+      find.descendant(of: previewSurface, matching: find.text('Enhanced')),
       findsOneWidget,
     );
     expect(
@@ -2317,12 +2243,10 @@ void main() {
       find.byKey(const ValueKey('enhancement-preview-auto_enhance')).last,
     );
     await tester.pump(const Duration(milliseconds: 600));
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
-        )
-        .onPressed
-        ?.call();
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-use-photo')),
+    );
+    await tester.pump();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       timeout: const Duration(seconds: 10),
@@ -2403,12 +2327,9 @@ void main() {
       await tester.acceptEnhancementPreview(
         preset: ImageEnhancementPreset.autoEnhance,
       );
-      await tester.pumpUntilFound(find.text('Scan Workspace'));
-
-      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
-      expect(find.text('Trading card'), findsOneWidget);
-      expect(find.text('61%'), findsOneWidget);
-      expect(find.text('1 photo'), findsOneWidget);
+      await tester.pumpUntilFound(find.text('Review your photos'));
+      expect(find.text('Nice first photo'), findsOneWidget);
+      expect(find.text('Analyze now'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
         findsOneWidget,
@@ -2447,7 +2368,7 @@ void main() {
         find.byKey(const ValueKey('result-confidence-meter')),
         findsOneWidget,
       );
-      expect(find.text('AI Enhanced'), findsOneWidget);
+      expect(find.text('Enhanced'), findsWidgets);
       expect(find.text('Captured Provider Collectible'), findsOneWidget);
 
       await tester.reveal(
@@ -2477,7 +2398,7 @@ void main() {
     },
   );
 
-  testWidgets('enhancement preview shows only Original and AI Enhance', (
+  testWidgets('enhancement preview shows only Original and Enhanced', (
     WidgetTester tester,
   ) async {
     ImageEnhancementPreviewResult? accepted;
@@ -2499,11 +2420,11 @@ void main() {
       ),
     );
 
-    await tester.pumpUntilFound(find.text('AI Enhance'));
+    await tester.pumpUntilFound(find.text('Enhanced'));
     expect(find.text('Original'), findsOneWidget);
-    expect(find.text('AI Enhance'), findsOneWidget);
     expect(find.text('Brighten'), findsNothing);
-    expect(find.text('Contrast'), findsNothing);
+    expect(find.text('Enhanced'), findsWidgets);
+    expect(find.byType(ScannerSurface), findsOneWidget);
     expect(find.text('Sharpen'), findsNothing);
     expect(find.textContaining('AI recommends'), findsNothing);
     expect(find.textContaining('AI Readiness'), findsNothing);
@@ -2514,19 +2435,17 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 600));
 
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('enhancement-preview-use-photo')).last,
-        )
-        .onPressed
-        ?.call();
+    await tester.tap(
+      find.byKey(const ValueKey('enhancement-preview-use-photo')),
+    );
+    await tester.pump();
     expect(accepted?.preset, ImageEnhancementPreset.autoEnhance);
     expect(accepted?.metadata['enhanced'], isTrue);
     expect(accepted?.metadata['selectedEnhancement'], 'aiEnhance');
     expect(accepted?.metadata['readinessScore'], 57);
   });
 
-  testWidgets('enhancement preview can switch AI Enhance back to Original', (
+  testWidgets('enhancement preview can switch Enhanced back to Original', (
     WidgetTester tester,
   ) async {
     ImageEnhancementPreviewResult? accepted;
@@ -2548,7 +2467,7 @@ void main() {
       ),
     );
 
-    await tester.pumpUntilFound(find.text('AI Enhance'));
+    await tester.pumpUntilFound(find.text('Enhanced'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(
       find.byKey(const ValueKey('enhancement-preview-original')).last,
@@ -2645,7 +2564,7 @@ void main() {
       find.byKey(const ValueKey('scan-result-analyzed-with-enhancement')),
       findsOneWidget,
     );
-    expect(find.text('AI Enhanced'), findsOneWidget);
+    expect(find.text('Enhanced'), findsWidgets);
     await tester.reveal(
       find.byKey(const ValueKey('result-primary-add-to-portfolio')),
     );
@@ -3004,14 +2923,22 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Gallery image'), findsNothing);
-    expect(find.byKey(const ValueKey('analyze-blur-overlay')), findsOneWidget);
-    expect(find.byKey(const ValueKey('analyze-silhouette')), findsOneWidget);
-    expect(find.byKey(const ValueKey('analyze-progress-ring')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('analyze-branded-progress')),
+      findsOneWidget,
+    );
+    expect(find.text('Preparing photos'), findsOneWidget);
+    expect(find.text('Identifying item'), findsOneWidget);
+    expect(find.text('Estimating value'), findsOneWidget);
+    expect(find.text('Finalizing results'), findsOneWidget);
 
     await tester.pumpAndSettle();
 
     expect(find.text('Gallery image'), findsNothing);
-    expect(find.byKey(const ValueKey('analyze-blur-overlay')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('analyze-branded-progress')),
+      findsNothing,
+    );
     expect(find.text('Analysis Complete'), findsOneWidget);
   });
 
@@ -3087,7 +3014,7 @@ void main() {
     expect(find.text('Retry Analysis'), findsNothing);
   });
 
-  testWidgets('premium result shows AI Enhanced badge when photo is enhanced', (
+  testWidgets('premium result shows Enhanced badge when photo is enhanced', (
     WidgetTester tester,
   ) async {
     final now = DateTime.parse('2026-07-09T00:00:00Z');
@@ -3145,7 +3072,7 @@ void main() {
       find.byKey(const ValueKey('scan-result-analyzed-with-enhancement')),
       findsOneWidget,
     );
-    expect(find.text('AI Enhanced'), findsOneWidget);
+    expect(find.text('Enhanced'), findsWidgets);
     expect(find.byKey(const ValueKey('result-primary-image')), findsOneWidget);
     expect(find.byKey(const ValueKey('result-value-card')), findsOneWidget);
     expect(
@@ -3279,7 +3206,7 @@ void main() {
 
     expect(find.text('Provider failed safely.'), findsOneWidget);
     expect(find.text('We need a clearer photo'), findsNothing);
-    expect(find.text('Try Again'), findsNothing);
+    expect(find.text('Try again'), findsNothing);
     expect(find.text('Choose Another Photo'), findsNothing);
     expect(find.text('Back to Home'), findsNothing);
   });
@@ -3646,7 +3573,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsNothing);
-    expect(find.text('1999 PokÃ©mon Charizard'), findsNothing);
+    expect(find.text('1999 Pokemon Charizard'), findsNothing);
     expect(find.text('AI Scanner'), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-primary-Scan with Camera')),
@@ -4999,7 +4926,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('AI Enhanced'), findsOneWidget);
+    expect(find.text('Enhanced'), findsWidgets);
     expect(
       find.byKey(ValueKey('collectible-detail-hero-$enhancedPath')),
       findsOneWidget,
@@ -6438,10 +6365,10 @@ class _FakeAIRecognitionService implements AIRecognitionService {
       success: true,
       filename: 'scan.png',
       imageUrl: 'http://192.168.0.81:8000/uploads/scan.png',
-      title: '1999 PokÃ©mon Charizard',
+      title: '1999 Pokemon Charizard',
       category: 'Trading Card',
       confidence: 0.94,
-      description: 'Likely a PokÃ©mon Base Set Charizard.',
+      description: 'Likely a Pokemon Base Set Charizard.',
       estimatedValue: 1850,
       condition: 'Near Mint',
       recommendation: 'Consider grading before selling.',

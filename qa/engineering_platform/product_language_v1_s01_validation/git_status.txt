@@ -1,0 +1,28 @@
+Flutter branch: main
+Baseline HEAD: 70a8a2a2f41fdc4c410568b4482b08c8ad5ed078
+
+Exact intended commit manifest:
+ lib/core/ui/product_language/packlox_button.dart
+ lib/core/ui/product_language/packlox_entry_tile.dart
+ lib/core/ui/product_language/packlox_header.dart
+ lib/core/ui/product_language/packlox_hero.dart
+ lib/core/ui/product_language/product_language_tokens.dart
+ lib/features/scanner/presentation/pages/scan_hub_page.dart
+ lib/features/scanner/presentation/widgets/scan_hub_presentation.dart
+ test/product_language_components_test.dart
+ test/scan_hub_page_test.dart
+ test/scanner_volume_03_structure_test.dart
+ test/shared_shell_s01_test.dart
+ test/widget_test.dart
+ qa/engineering_platform/product_language_v1_s01_validation/ (required evidence only)
+
+Excluded unrelated pre-existing work:
+- all backend files
+- AI/analyzer changes
+- scanner controller, camera, enhancement, workspace and result feature work
+- generated plugin registrants
+- pubspec and build/run scripts
+- unrelated assets, design/docs and historical QA folders
+- camera_capture_page_test.dart and scanner_widgets_test.dart
+
+Engineering Platform: clean master at 2995e1aae77eaee241e09eeb41625516eb61ff4f.

@@ -41,14 +41,19 @@ void main() {
           "title: 'Choose from gallery'",
           "title: 'Try a sample scan'",
         ]);
-        expect(source, contains(r'Scan a\ncollectible.'));
+        expect(source, contains('PackLoxHeader('));
+        expect(source, contains('PackLoxHero('));
+        expect(source, contains('PackLoxEntryTile('));
+        expect(source, contains("variant: PackLoxHeroVariant.scanner"));
+        expect(source, contains("variant: PackLoxEntryTileVariant.scanner"));
+        expect(source, contains("title: 'Ready when your item is.'"));
         expect(source, contains("< 12 => 'Good morning'"));
         expect(source, contains("< 18 => 'Good afternoon'"));
         expect(source, contains("_ => 'Good evening'"));
         expect(source, contains("? 'Collector'"));
         expect(source, contains('Choose an option'));
-        expect(source, contains('scan-hub-hero-card'));
-        expect(source, contains('scan-hub-notifications-button'));
+        expect(source, isNot(contains('class ScanHubHero')));
+        expect(source, isNot(contains('class ScanHubEntryTile')));
         expect(source, isNot(contains('scan-hub-real-collectible-montage')));
         expect(source, isNot(contains('Cards • Coins')));
       },
