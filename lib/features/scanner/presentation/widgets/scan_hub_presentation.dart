@@ -2,6 +2,30 @@ import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:flutter/material.dart';
 
+abstract final class ScannerS01VisualValues {
+  static const pagePadding = 24.0;
+  static const compactPagePadding = 16.0;
+  static const topPadding = 24.0;
+  static const compactTopPadding = 16.0;
+  static const greetingNameGap = 8.0;
+  static const headerHeroGap = 24.0;
+  static const compactHeaderHeroGap = 16.0;
+  static const heroMinHeight = 132.0;
+  static const heroPreferredHeight = 144.0;
+  static const heroMaxHeight = 168.0;
+  static const heroAspectRatio = 2.38;
+  static const heroTitleWidthRatio = 0.56;
+  static const heroIconSize = 44.0;
+  static const heroSectionGap = 24.0;
+  static const sectionFirstTileGap = 12.0;
+  static const tilePreferredHeight = 72.0;
+  static const tileGap = 12.0;
+  static const entryIconContainerSize = 40.0;
+  static const entryIconSize = 22.0;
+  static const entryIconTextGap = 16.0;
+  static const entryTitleSubtitleGap = 4.0;
+}
+
 class ScannerPageScaffold extends StatelessWidget {
   const ScannerPageScaffold({
     required this.period,
@@ -30,12 +54,17 @@ class ScannerPageScaffold extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final short = constraints.maxHeight < 680;
+              final horizontalPadding = constraints.maxWidth <= 360
+                  ? ScannerS01VisualValues.compactPagePadding
+                  : ScannerS01VisualValues.pagePadding;
               return SingleChildScrollView(
                 key: const ValueKey('scan-hub-scroll-view'),
                 padding: EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  short ? AppSpacing.sm : AppSpacing.lg,
-                  AppSpacing.lg,
+                  horizontalPadding,
+                  short
+                      ? ScannerS01VisualValues.compactTopPadding
+                      : ScannerS01VisualValues.topPadding,
+                  horizontalPadding,
                   AppSpacing.xl,
                 ),
                 child: Column(
@@ -46,7 +75,12 @@ class ScannerPageScaffold extends StatelessWidget {
                       firstName: firstName,
                       onNotifications: onNotifications,
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      key: const ValueKey('scan-hub-header-hero-gap'),
+                      height: short
+                          ? ScannerS01VisualValues.compactHeaderHeroGap
+                          : ScannerS01VisualValues.headerHeroGap,
+                    ),
                     const ScannerHeroCard(),
                     const SizedBox.shrink(
                       key: ValueKey('scan-hub-collectible-visual'),
@@ -60,7 +94,10 @@ class ScannerPageScaffold extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(
+                      key: ValueKey('scan-hub-hero-section-gap'),
+                      height: ScannerS01VisualValues.heroSectionGap,
+                    ),
                     ScannerOptionSection(
                       cameraTile: cameraTile,
                       galleryTile: galleryTile,
@@ -128,27 +165,40 @@ class DynamicGreeting extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        SizedBox(height: MediaQuery.textScalerOf(context).scale(AppSpacing.xs)),
+        SizedBox(
+          key: const ValueKey('scan-hub-greeting-name-gap'),
+          height: MediaQuery.textScalerOf(
+            context,
+          ).scale(ScannerS01VisualValues.greetingNameGap),
+        ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
             Flexible(
               child: Text(
-                '$firstName \u{1F44B}',
+                firstName,
                 key: const ValueKey('scan-hub-title'),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: ScannerVisualTheme.textPrimary,
                   fontSize: 20,
-                  height: 26 / 20,
+                  height: 28 / 20,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            const SizedBox.shrink(),
-            const SizedBox.shrink(),
+            const SizedBox(width: 6),
+            const Text(
+              '\u{1F44B}',
+              style: TextStyle(
+                color: ScannerVisualTheme.textPrimary,
+                fontSize: 20,
+                height: 28 / 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ],
         ),
       ],
@@ -187,57 +237,92 @@ class ScannerHeroCard extends StatelessWidget {
   const ScannerHeroCard({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const ValueKey('scan-hub-hero-card'),
-    constraints: const BoxConstraints(minHeight: 136),
-    padding: const EdgeInsets.all(AppSpacing.lg),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF123C8F), Color(0xFF082C67)],
-      ),
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      border: Border.all(color: const Color(0xFF2563EB)),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final ratioHeight =
+          constraints.maxWidth / ScannerS01VisualValues.heroAspectRatio;
+      final preferredHeight = ratioHeight.clamp(
+        ScannerS01VisualValues.heroPreferredHeight,
+        ScannerS01VisualValues.heroMaxHeight,
+      );
+      final permitsContentGrowth =
+          MediaQuery.textScalerOf(context).scale(1.0) > 1.0;
+      return Container(
+        key: const ValueKey('scan-hub-hero-card'),
+        constraints: BoxConstraints(
+          minHeight: preferredHeight,
+          maxHeight: permitsContentGrowth
+              ? double.infinity
+              : ScannerS01VisualValues.heroMaxHeight,
+        ),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF123C8F), Color(0xFF082C67)],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: const Color(0xFF2563EB)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, innerConstraints) => Row(
             children: [
-              const Text(
-                'Scan a\ncollectible.',
-                style: TextStyle(
-                  color: ScannerVisualTheme.textPrimary,
-                  fontSize: 24,
-                  height: 32 / 24,
-                  fontWeight: FontWeight.w800,
+              SizedBox(
+                width: innerConstraints.maxWidth * 0.82,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      key: const ValueKey('scan-hub-hero-title-region'),
+                      width:
+                          innerConstraints.maxWidth *
+                          ScannerS01VisualValues.heroTitleWidthRatio,
+                      child: Text(
+                        'Scan a\ncollectible.',
+                        maxLines: 2,
+                        softWrap: permitsContentGrowth,
+                        overflow: TextOverflow.visible,
+                        style: const TextStyle(
+                          color: ScannerVisualTheme.textPrimary,
+                          fontSize: 24,
+                          height: 32 / 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Identify, value,\nand protect your items.',
+                      maxLines: permitsContentGrowth ? 3 : 2,
+                      softWrap: permitsContentGrowth,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        color: ScannerVisualTheme.textPrimary.withValues(
+                          alpha: 0.82,
+                        ),
+                        fontSize: 14,
+                        height: 20 / 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Identify, value, and\nprotect your items.',
-                style: TextStyle(
-                  color: ScannerVisualTheme.textPrimary.withValues(alpha: 0.82),
-                  fontSize: 14,
-                  height: 20 / 14,
+              const Spacer(),
+              const ExcludeSemantics(
+                child: Icon(
+                  key: ValueKey('scan-hub-hero-icon'),
+                  Icons.center_focus_strong_outlined,
+                  size: ScannerS01VisualValues.heroIconSize,
+                  color: ScannerVisualTheme.cyan,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: AppSpacing.lg),
-        const ExcludeSemantics(
-          child: Icon(
-            Icons.center_focus_strong_outlined,
-            size: 42,
-            color: ScannerVisualTheme.cyan,
-          ),
-        ),
-      ],
-    ),
+      );
+    },
   );
 }
 
@@ -257,11 +342,20 @@ class ScannerOptionSection extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       const ScannerSectionHeading('Choose an option'),
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(
+        key: ValueKey('scan-hub-section-first-tile-gap'),
+        height: ScannerS01VisualValues.sectionFirstTileGap,
+      ),
       cameraTile,
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(
+        key: ValueKey('scan-hub-tile-gap-1'),
+        height: ScannerS01VisualValues.tileGap,
+      ),
       galleryTile,
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(
+        key: ValueKey('scan-hub-tile-gap-2'),
+        height: ScannerS01VisualValues.tileGap,
+      ),
       sampleTile,
     ],
   );
@@ -309,7 +403,7 @@ class ScannerEntryTile extends StatelessWidget {
       onPressed: onTap,
       style: FilledButton.styleFrom(
         padding: EdgeInsets.zero,
-        minimumSize: const Size(0, 64),
+        minimumSize: const Size(0, ScannerS01VisualValues.tilePreferredHeight),
         backgroundColor: ScannerVisualTheme.surfaceElevated,
         foregroundColor: ScannerVisualTheme.textPrimary,
         shape: RoundedRectangleBorder(
@@ -318,45 +412,51 @@ class ScannerEntryTile extends StatelessWidget {
         ),
       ),
       child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            ScannerEntryIcon(icon: icon),
+            const SizedBox(
+              key: ValueKey('scan-hub-entry-icon-text-gap'),
+              width: ScannerS01VisualValues.entryIconTextGap,
             ),
-            child: Row(
-              children: [
-                ScannerEntryIcon(icon: icon),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: ScannerVisualTheme.textPrimary,
-                          fontSize: 14,
-                          height: 20 / 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: ScannerVisualTheme.textSecondary,
-                          fontSize: 12,
-                          height: 16 / 12,
-                        ),
-                      ),
-                    ],
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: ScannerVisualTheme.textPrimary,
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(
+                    key: ValueKey('scan-hub-entry-title-subtitle-gap'),
+                    height: ScannerS01VisualValues.entryTitleSubtitleGap,
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: ScannerVisualTheme.textSecondary,
+                      fontSize: 12,
+                      height: 16 / 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
+        ),
       ),
-    );
+    ),
+  );
 }
 
 class ScannerEntryIcon extends StatelessWidget {
@@ -364,13 +464,18 @@ class ScannerEntryIcon extends StatelessWidget {
   final IconData icon;
   @override
   Widget build(BuildContext context) => Container(
-    width: 40,
-    height: 40,
+    key: const ValueKey('scan-hub-entry-icon-container'),
+    width: ScannerS01VisualValues.entryIconContainerSize,
+    height: ScannerS01VisualValues.entryIconContainerSize,
     decoration: BoxDecoration(
       color: ScannerVisualTheme.surface,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       border: Border.all(color: ScannerVisualTheme.border),
     ),
-    child: Icon(icon, size: 22, color: ScannerVisualTheme.textPrimary),
+    child: Icon(
+      icon,
+      size: ScannerS01VisualValues.entryIconSize,
+      color: ScannerVisualTheme.textPrimary,
+    ),
   );
 }

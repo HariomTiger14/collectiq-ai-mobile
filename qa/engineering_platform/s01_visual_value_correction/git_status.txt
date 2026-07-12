@@ -1,0 +1,15 @@
+Repository: C:\Users\hario\Desktop\projects\collectiq_ai
+Branch: main
+HEAD before commit: 0478989a73618a7359d9d08615cf91e4c04f9621
+
+Intended tracked paths for this sprint:
+ M lib/features/scanner/presentation/pages/scan_hub_page.dart
+ M lib/features/scanner/presentation/widgets/scan_hub_presentation.dart
+ M test/scan_hub_page_test.dart
+
+Intended untracked evidence directory:
+?? qa/engineering_platform/s01_visual_value_correction/
+
+The worktree also contains extensive pre-existing unrelated modified and untracked paths. They were not reset, restored, cleaned, stashed, or broadly staged. Final staging uses explicit file paths only.
+
+Engineering Platform status after all six validators: clean (0 entries).

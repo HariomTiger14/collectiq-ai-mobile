@@ -75,7 +75,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
         key: const ValueKey('scan-hub-gallery-button'),
         compatibilityKey: const ValueKey('scan-secondary-Gallery'),
         semanticLabel: 'Choose from gallery. Select an existing photo.',
-        icon: Icons.photo_library_outlined,
+        icon: Icons.image_outlined,
         title: 'Choose from gallery',
         subtitle: 'Select an existing photo',
         onTap: () => unawaited(_pickFromGallery(context)),

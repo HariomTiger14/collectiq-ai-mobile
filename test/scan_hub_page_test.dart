@@ -3,10 +3,12 @@ import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_hub_presentation.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -24,7 +26,8 @@ void main() {
 
     expect(find.byType(ScanHubPage), findsOneWidget);
     expect(find.text('Good morning'), findsOneWidget);
-    expect(find.text('Collector 👋'), findsOneWidget);
+    expect(find.text('Collector'), findsOneWidget);
+    expect(find.text('\u{1F44B}'), findsOneWidget);
     expect(find.text('Scan a\ncollectible.'), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
     expect(
@@ -38,6 +41,9 @@ void main() {
     expect(find.text('Take a photo'), findsOneWidget);
     expect(find.text('Choose from gallery'), findsOneWidget);
     expect(find.text('Try a sample scan'), findsOneWidget);
+    expect(find.byIcon(Icons.photo_camera_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.image_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.science_outlined), findsOneWidget);
     expect(find.textContaining('Auto Detect'), findsNothing);
     expect(find.textContaining('Confidence'), findsNothing);
     expect(find.textContaining('Photo readiness'), findsNothing);
@@ -64,7 +70,7 @@ void main() {
     );
 
     expect(find.text('Good afternoon'), findsOneWidget);
-    expect(find.text('Avery 👋'), findsOneWidget);
+    expect(find.text('Avery'), findsOneWidget);
     expect(find.textContaining('Harry'), findsNothing);
   });
 
@@ -74,7 +80,7 @@ void main() {
     await _pumpHub(tester, now: () => DateTime(2026, 7, 12, 20));
 
     expect(find.text('Good evening'), findsOneWidget);
-    expect(find.text('Collector 👋'), findsOneWidget);
+    expect(find.text('Collector'), findsOneWidget);
   });
 
   testWidgets(
@@ -117,6 +123,154 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'logical width $width');
     });
   }
+
+  testWidgets('contract-critical spacing and geometry use preferred bounds', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _pumpHub(tester, textScaler: TextScaler.noScaling);
+
+    final greetingGap = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('scan-hub-greeting-name-gap')),
+    );
+    expect(greetingGap.height, ScannerS01VisualValues.greetingNameGap);
+
+    final name = tester.widget<Text>(find.text('Collector'));
+    expect(name.style?.height, 28 / 20);
+
+    final headerHeroGap = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('scan-hub-header-hero-gap')),
+    );
+    expect(headerHeroGap.height, ScannerS01VisualValues.headerHeroGap);
+
+    final heroSize = tester.getSize(
+      find.byKey(const ValueKey('scan-hub-hero-card')),
+    );
+    expect(
+      heroSize.height,
+      inInclusiveRange(
+        ScannerS01VisualValues.heroMinHeight,
+        ScannerS01VisualValues.heroMaxHeight,
+      ),
+    );
+
+    final hero = tester.widget<Container>(
+      find.byKey(const ValueKey('scan-hub-hero-card')),
+    );
+    expect(tester.getSize(find.text('Scan a\ncollectible.')).height, 64);
+    expect(
+      tester
+          .getSize(find.text('Identify, value,\nand protect your items.'))
+          .height,
+      40,
+    );
+    expect(heroSize.width / heroSize.height, inInclusiveRange(2.25, 2.55));
+    expect(
+      hero.constraints?.minHeight,
+      greaterThanOrEqualTo(ScannerS01VisualValues.heroPreferredHeight),
+    );
+    expect(hero.constraints?.maxHeight, ScannerS01VisualValues.heroMaxHeight);
+
+    final titleRegionSize = tester.getSize(
+      find.byKey(const ValueKey('scan-hub-hero-title-region')),
+    );
+    expect(
+      titleRegionSize.width,
+      closeTo(
+        (heroSize.width - (AppSpacing.lg * 2) - 2) *
+            ScannerS01VisualValues.heroTitleWidthRatio,
+        0.01,
+      ),
+    );
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('scan-hub-hero-icon'))),
+      const Size.square(ScannerS01VisualValues.heroIconSize),
+    );
+
+    expect(
+      tester
+          .widget<SizedBox>(
+            find.byKey(const ValueKey('scan-hub-hero-section-gap')),
+          )
+          .height,
+      ScannerS01VisualValues.heroSectionGap,
+    );
+
+    for (final key in const [
+      ValueKey('scan-hub-capture-button'),
+      ValueKey('scan-hub-gallery-button'),
+      ValueKey('scan-hub-sample-button'),
+    ]) {
+      expect(
+        tester.getSize(find.byKey(key)).height,
+        greaterThanOrEqualTo(ScannerS01VisualValues.tilePreferredHeight),
+      );
+    }
+
+    for (final element
+        in find
+            .byKey(const ValueKey('scan-hub-entry-icon-container'))
+            .evaluate()) {
+      expect(
+        tester.getSize(
+          find.byElementPredicate((candidate) => candidate == element),
+        ),
+        const Size.square(ScannerS01VisualValues.entryIconContainerSize),
+      );
+    }
+
+    for (final gapKey in const [
+      ValueKey('scan-hub-tile-gap-1'),
+      ValueKey('scan-hub-tile-gap-2'),
+    ]) {
+      expect(
+        tester.widget<SizedBox>(find.byKey(gapKey)).height,
+        ScannerS01VisualValues.tileGap,
+      );
+    }
+
+    for (final gap in tester.widgetList<SizedBox>(
+      find.byKey(const ValueKey('scan-hub-entry-icon-text-gap')),
+    )) {
+      expect(gap.width, ScannerS01VisualValues.entryIconTextGap);
+    }
+
+    for (final gap in tester.widgetList<SizedBox>(
+      find.byKey(const ValueKey('scan-hub-entry-title-subtitle-gap')),
+    )) {
+      expect(gap.height, ScannerS01VisualValues.entryTitleSubtitleGap);
+    }
+  });
+
+  testWidgets('long profile name and emoji reflow without clipping', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const authState = AuthState(
+      status: AuthFlowStatus.signedIn,
+      user: AppUser(
+        id: 'long-profile',
+        displayName: 'Alexandria-Cassandra Collector',
+        email: 'alexandria@example.com',
+        provider: AuthProviderType.emailPassword,
+      ),
+    );
+
+    await _pumpHub(tester, authState: authState);
+
+    expect(find.text('Alexandria-Cassandra'), findsOneWidget);
+    expect(find.text('\u{1F44B}'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('scan hub remains usable with larger text', (
     WidgetTester tester,
@@ -200,6 +354,7 @@ Future<void> _pumpHub(
   GalleryService? galleryService,
   AuthState? authState,
   DateTime Function()? now,
+  TextScaler? textScaler,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -215,9 +370,17 @@ Future<void> _pumpHub(
             () => _TestAuthController(authState),
           ),
       ],
-      child: MaterialApp(
-        theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
-        home: ScanHubPage(now: now ?? DateTime.now),
+      child: Builder(
+        builder: (context) => MaterialApp(
+          theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
+          builder: textScaler == null
+              ? null
+              : (context, child) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+                  child: child!,
+                ),
+          home: ScanHubPage(now: now ?? () => DateTime(2026, 7, 12, 9)),
+        ),
       ),
     ),
   );
