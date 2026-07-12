@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
@@ -191,9 +192,12 @@ class _AppShellState extends ConsumerState<AppShell>
     return onboardingCompleted.when(
       data: (completed) {
         if (!completed) {
-          return OnboardingScreen(
-            onStartScanning: _completeOnboardingAndStartScan,
-            onExploreDashboard: _completeOnboardingAndExploreDashboard,
+          return PackLoxEntryTransition(
+            stateKey: 'entry-onboarding',
+            child: OnboardingScreen(
+              onStartScanning: _completeOnboardingAndStartScan,
+              onExploreDashboard: _completeOnboardingAndExploreDashboard,
+            ),
           );
         }
 
@@ -214,24 +218,34 @@ class _AppShellState extends ConsumerState<AppShell>
               )
             : SystemUiOverlayStyle.dark;
 
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: overlayStyle,
-          child: Scaffold(
-            key: const ValueKey('app-shell'),
-            backgroundColor: shellBackground,
-            body: _buildActiveTab(selectedIndex),
-            bottomNavigationBar: hideBottomNavigation
-                ? null
-                : _buildBottomNavigationBar(selectedIndex),
+        return PackLoxEntryTransition(
+          stateKey: 'entry-shell',
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: overlayStyle,
+            child: Scaffold(
+              key: const ValueKey('app-shell'),
+              backgroundColor: shellBackground,
+              body: _buildActiveTab(selectedIndex),
+              bottomNavigationBar: hideBottomNavigation
+                  ? null
+                  : _buildBottomNavigationBar(selectedIndex),
+            ),
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (_, _) => Scaffold(
-        key: const ValueKey('app-shell'),
-        body: const HomeScreen(),
-        bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
+      loading: () => const PackLoxEntryTransition(
+        stateKey: 'entry-loading',
+        child: Scaffold(body: PackLoxBootstrapSurface.loading()),
+      ),
+      error: (_, _) => PackLoxEntryTransition(
+        stateKey: 'entry-error',
+        child: Scaffold(
+          key: const ValueKey('app-shell'),
+          body: PackLoxBootstrapSurface.recoverableError(
+            onRetry: () => ref.invalidate(onboardingControllerProvider),
+          ),
+          bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
+        ),
       ),
     );
   }
