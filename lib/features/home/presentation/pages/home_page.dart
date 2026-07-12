@@ -1,5 +1,9 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -44,7 +48,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final recentItems = homeData.recentItems.take(4).toList(growable: false);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: PackLoxTokens.background,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -63,9 +67,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                   child: _HomeFrame(
                     horizontalPadding: horizontalPadding,
                     topPadding: AppSpacing.md,
-                    child: _CompactHomeHero(
-                      scrollController: _scrollController,
-                      data: homeData,
+                    child: const PackLoxHeader(
+                      firstName: '',
+                      fallbackName: 'Collector',
+                      greetingText: 'Your collection',
+                      onNotifications: null,
                     ),
                   ),
                 ),
@@ -73,14 +79,35 @@ class _HomePageState extends ConsumerState<HomePage> {
                   child: _HomeFrame(
                     horizontalPadding: horizontalPadding,
                     topPadding: AppSpacing.md,
-                    child: _PrimaryScanCta(onPressed: widget.onScanPressed),
+                    child: PackLoxHero(
+                      key: const ValueKey('home-approved-hero'),
+                      variant: homeData.isEmpty
+                          ? PackLoxHeroVariant.emptyState
+                          : PackLoxHeroVariant.standard,
+                      eyebrow: homeData.isEmpty
+                          ? 'Start your collection'
+                          : 'Collection overview',
+                      title: homeData.isEmpty
+                          ? 'Your collection starts here'
+                          : 'Your collection, at a glance',
+                      subtitle: homeData.heroSupport,
+                      icon: Icons.auto_awesome_outlined,
+                      metric: homeData.hasValuedItems
+                          ? _formatCurrency(homeData.totalValuedAmount)
+                          : null,
+                      primaryActionLabel: 'Scan a collectible',
+                      onPrimaryAction: widget.onScanPressed,
+                      semanticLabel: homeData.isEmpty
+                          ? 'Empty collection. ${homeData.heroSupport}'
+                          : 'Collection overview. ${homeData.heroSupport}',
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
                   child: _HomeFrame(
                     horizontalPadding: horizontalPadding,
                     topPadding: AppSpacing.md,
-                    child: _SecondaryActions(
+                    child: _ApprovedQuickActions(
                       onImportPhotoPressed:
                           widget.onImportPhotoPressed ?? widget.onScanPressed,
                       onPortfolioPressed: widget.onPortfolioPressed,
@@ -126,6 +153,53 @@ class _HomePageState extends ConsumerState<HomePage> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ApprovedQuickActions extends StatelessWidget {
+  const _ApprovedQuickActions({
+    this.onImportPhotoPressed,
+    this.onPortfolioPressed,
+  });
+
+  final VoidCallback? onImportPhotoPressed;
+  final VoidCallback? onPortfolioPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Collection actions',
+      child: Column(
+        children: [
+          PackLoxEntryTile(
+            compatibilityKey: const ValueKey('home-secondary-import'),
+            icon: Icons.photo_library_outlined,
+            title: 'Import photo',
+            supportingText: 'Choose an existing collectible photo',
+            onTap: onImportPhotoPressed,
+            variant: PackLoxEntryTileVariant.primary,
+            state: onImportPhotoPressed == null
+                ? PackLoxEntryTileState.disabled
+                : PackLoxEntryTileState.normal,
+            semanticLabel: 'Import photo. Choose an existing collectible photo',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          PackLoxEntryTile(
+            compatibilityKey: const ValueKey('home-secondary-portfolio'),
+            icon: Icons.inventory_2_outlined,
+            title: 'Open portfolio',
+            supportingText: 'View every saved collectible',
+            onTap: onPortfolioPressed,
+            variant: PackLoxEntryTileVariant.portfolio,
+            state: onPortfolioPressed == null
+                ? PackLoxEntryTileState.disabled
+                : PackLoxEntryTileState.normal,
+            semanticLabel: 'Open portfolio. View every saved collectible',
+          ),
+        ],
       ),
     );
   }
@@ -242,280 +316,6 @@ class _HomeFrame extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: SizedBox(width: double.infinity, child: child),
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactHomeHero extends StatelessWidget {
-  const _CompactHomeHero({required this.scrollController, required this.data});
-
-  final ScrollController scrollController;
-  final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return AnimatedBuilder(
-      animation: scrollController,
-      builder: (context, child) {
-        final scrollOffset = scrollController.hasClients
-            ? scrollController.offset
-            : 0.0;
-        return MotionElasticHero(
-          key: const ValueKey('home-hero-motion'),
-          baseHeight: 156,
-          maxOverscroll: 40,
-          scrollOffset: scrollOffset,
-          child: MotionParallax(
-            scrollOffset: scrollOffset,
-            depth: 8,
-            child: Container(
-              key: const ValueKey('home-hero-container'),
-              width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 156),
-              decoration: BoxDecoration(
-                gradient: AppGradients.premiumHeroGradient,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: AppElevation.level2,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: MotionReveal(
-                  offset: 8,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _timeAwareGreeting(),
-                        style: textTheme.labelLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Ready to grow your collection?',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          height: 1.08,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        data.heroSupport,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.78),
-                          fontWeight: FontWeight.w600,
-                          height: 1.22,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PrimaryScanCta extends StatelessWidget {
-  const _PrimaryScanCta({this.onPressed});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Semantics(
-      button: true,
-      label: 'Scan a collectible',
-      hint: 'Starts a new collectible scan',
-      child: Tooltip(
-        message: 'Start a new scan',
-        child: MotionTapScale(
-          key: const ValueKey('home-primary-scan-cta'),
-          onTap: onPressed,
-          enabled: onPressed != null,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 96),
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              gradient: AppGradients.premium,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              boxShadow: AppElevation.level2,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                  ),
-                  child: const Icon(
-                    Icons.document_scanner_outlined,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Scan a collectible',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          height: 1.05,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Identify, value, and save an item',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white.withValues(alpha: 0.86),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecondaryActions extends StatelessWidget {
-  const _SecondaryActions({this.onImportPhotoPressed, this.onPortfolioPressed});
-
-  final VoidCallback? onImportPhotoPressed;
-  final VoidCallback? onPortfolioPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _SecondaryActionCard(
-            key: const ValueKey('home-secondary-import'),
-            icon: Icons.photo_library_outlined,
-            label: 'Import photo',
-            subtitle: 'Use gallery',
-            onTap: onImportPhotoPressed,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _SecondaryActionCard(
-            key: const ValueKey('home-secondary-portfolio'),
-            icon: Icons.inventory_2_outlined,
-            label: 'Open portfolio',
-            subtitle: 'View saved',
-            onTap: onPortfolioPressed,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SecondaryActionCard extends StatelessWidget {
-  const _SecondaryActionCard({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionTapScale(
-      onTap: onTap,
-      enabled: onTap != null,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 76),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.56),
-          ),
-          boxShadow: AppElevation.level1,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: colorScheme.primary, size: 22),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -998,17 +798,6 @@ int _categoryCount(CollectorDashboardAnalytics insights) {
   return insights.categoryDistribution.values
       .where((count) => count > 0)
       .length;
-}
-
-String _timeAwareGreeting({DateTime? now}) {
-  final hour = (now ?? DateTime.now()).hour;
-  if (hour < 12) {
-    return 'Good morning';
-  }
-  if (hour < 17) {
-    return 'Good afternoon';
-  }
-  return 'Good evening';
 }
 
 String _formatRelativeTime(DateTime date, {DateTime? now}) {
