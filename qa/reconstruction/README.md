@@ -1,6 +1,6 @@
 # PackLox frontend reconstruction baseline
 
-Status: Sprint 01 frozen; Sprint 02 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
+Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
 
 This directory is the execution control set for a presentation-only reconstruction. Preserve business logic and route contracts; require runtime visual approval before freeze.
 
@@ -10,9 +10,11 @@ Sprint 01 is **App Bootstrap and Entry Routing Presentation** and is **Frozen** 
 
 Sprint 02 is **Onboarding Presentation Reconstruction** and is **Frozen** at `725e895`. It preserves onboarding completion behaviour, the `onboarding_completed_v1` persistence key, guest/signed-out access, authentication separation, password-recovery behaviour, and the existing AppShell completion handoff. Router migration, authentication redesign, App Shell redesign, Home redesign, backend changes, permission prompts, speculative user-data collection, and artificial onboarding delay remained out of scope.
 
-Next sprint: **App Shell Presentation Reconstruction**. It may own only the post-onboarding application frame and shell-level navigation composition: bottom navigation presentation, selected/unselected tab states, safe-area and system-inset handling, shell-level background/surface composition, tab-switch presentation, accessibility semantics, responsive behaviour, and retained-state/performance behaviour.
+Sprint 03 is **App Shell Presentation Reconstruction** and is **Frozen** at `a39dddf`. It preserves frozen bootstrap entry behaviour, frozen onboarding completion behaviour, AppShell handoff, selected-tab ownership, active-destination-only shell lifecycle, guest access, existing Navigator usage, and business logic. It reconstructs only the post-onboarding frame and shell-level bottom navigation presentation. Home, Scanner, Portfolio, Settings, authentication redesign, backend changes, router migration, Search, Notifications, and all-tab retained shell lifecycle remained out of scope.
 
-Sprint 03 must preserve frozen bootstrap entry behaviour, frozen onboarding completion behaviour, AppShell handoff, existing selected-tab behaviour, controllers/navigation state, guest access, and business logic. It must not reconstruct Home, Scanner, Portfolio, or Settings screen contents except for minimal shell integration. It must not include authentication redesign, backend changes, or router migration unless separately approved through evidence.
+Next sprint: **Home Presentation Reconstruction**. It may own only Home screen presentation: Home visual hierarchy, approved Header and Hero composition, metric and summary presentation, quick actions, insight cards, empty/loading/error states, responsive behaviour, accessibility, motion/reduced-motion handling, and Home-specific runtime performance.
+
+Sprint 04 must preserve frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controllers, Home repositories, Home business logic, guest access, backend contracts, existing scanner entry action, and portfolio links. It must not reconstruct Scanner, Portfolio, Settings, Authentication, or App Shell. It must not include authentication redesign, router migration, backend changes, or shell lifecycle redesign unless a verified Home integration defect requires a minimal correction.
 
 Asset validation capability: **Declared but not implemented.** Do not count the asset validator as an operational platform gate until it inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
@@ -38,4 +40,7 @@ Asset validation capability: **Declared but not implemented.** Do not count the 
 - [Sprint 02 specification](sprint_02_onboarding_specification.md)
 - [Sprint 02 runtime comparison](sprint_02_runtime_comparison.md)
 - [Sprint 02 freeze record](sprint_02_freeze_record.md)
+- [Sprint 03 specification](sprint_03_app_shell_specification.md)
+- [Sprint 03 runtime comparison](sprint_03_runtime_comparison.md)
+- [Sprint 03 freeze record](sprint_03_freeze_record.md)
 - [Full test suite baseline debt](full_test_suite_baseline_debt.md)

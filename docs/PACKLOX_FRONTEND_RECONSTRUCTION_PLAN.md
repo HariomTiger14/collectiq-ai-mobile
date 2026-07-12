@@ -11,8 +11,8 @@ The revised implementation order is:
 1. App Bootstrap and Entry Routing
 2. Onboarding
 3. App Shell
-4. Authentication and Account Access
-5. Home
+4. Home
+5. Authentication and Account Access
 6. Scanner
 7. Portfolio
 8. Detail
@@ -28,10 +28,16 @@ Sprint 02 is **Onboarding Presentation Reconstruction** and is **Frozen** at `72
 
 Sprint 02 reconstructed only onboarding presentation into a three-stage explanatory journey. It did not add an auth guard, login/signup requirement, router migration, backend dependency, AppShell redesign, Home redesign, permission prompt, speculative user-data collection, or artificial onboarding delay.
 
+Sprint 03 is **App Shell Presentation Reconstruction** and is **Frozen** at `a39dddf`. It preserves frozen Sprint 01 bootstrap/entry behaviour, frozen Sprint 02 onboarding completion behaviour, `AppShell` handoff, selected-tab ownership, active-destination-only shell lifecycle, guest access, existing Navigator usage, and business logic.
+
+Sprint 03 reconstructed only the post-onboarding app frame and bottom navigation presentation. It records the shell navigation treatment as a composition of approved Product Language foundation primitives, not as an official standalone Product Language component. It did not add Search or Notifications, did not retain all tab trees, did not introduce an unconditional `IndexedStack`, did not redesign Home, Scanner, Portfolio, or Settings, did not add an auth guard, and did not migrate routing.
+
 Asset validation capability: **Declared but not implemented.** The asset validator must not be treated as an operational validation gate until it actually inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
 No production UI, backend, Supabase contract, deep-link identifier or storage/schema configuration is authorized by this plan. Each screen uses the screen contract, focused commit and explicit visual freeze gate.
 
-Next sprint: **App Shell Presentation Reconstruction**. Scope is limited to the post-onboarding application frame and shell-level navigation composition: bottom navigation presentation, selected and unselected tab states, safe-area and system-inset handling, shell-level background and surface composition, tab-switch presentation, accessibility semantics, responsive behaviour, and shell performance/retained-state behaviour.
+Next sprint: **Home Presentation Reconstruction**. Scope is limited to Home presentation reconstruction: Home screen visual hierarchy, approved Header and Hero composition, metric and summary presentation, quick actions, insight cards, empty/loading/error states, responsive behaviour, accessibility, motion and reduced-motion behaviour, and Home-specific runtime performance.
 
-Sprint 03 must preserve frozen bootstrap entry behaviour, frozen onboarding completion behaviour, AppShell handoff, existing selected-tab behaviour, controllers and navigation state, guest access, and business logic. It must not reconstruct the individual contents of Home, Scanner, Portfolio, or Settings. Those screens remain functionally present but visually outside Sprint 03 except for minimal integration required by the shell. Sprint 03 must not include authentication redesign, scanner reconstruction, portfolio reconstruction, backend changes, or router migration unless separately approved through evidence.
+Sprint 04 must preserve frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controller/provider ownership, existing business data, navigation actions, scanner entry action, portfolio links, guest behaviour, and backend contracts.
+
+Sprint 04 must not reconstruct Scanner, Portfolio, Settings, Authentication, or App Shell. It must not include authentication redesign, router migration, backend changes, or shell lifecycle redesign unless a verified Home integration defect requires a minimal correction.
