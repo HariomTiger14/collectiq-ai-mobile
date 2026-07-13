@@ -1,8 +1,8 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -32,11 +32,25 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final ScrollController _scrollController = ScrollController();
+  bool _scanRequestPending = false;
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleScanPressed() {
+    if (_scanRequestPending) {
+      return;
+    }
+    _scanRequestPending = true;
+    widget.onScanPressed?.call();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scanRequestPending = false;
+      }
+    });
   }
 
   @override
@@ -45,161 +59,258 @@ class _HomePageState extends ConsumerState<HomePage> {
     final items = portfolio.orderedItems;
     final insights = const CollectorDashboardAnalyticsService().build(items);
     final homeData = _HomeViewData.fromInsights(insights);
-    final recentItems = homeData.recentItems.take(4).toList(growable: false);
+    final recentItems = homeData.recentItems.take(3).toList(growable: false);
 
-    return Scaffold(
-      backgroundColor: PackLoxTokens.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth <= 360
-                ? AppSpacing.md
-                : AppSpacing.lg;
+    return Theme(
+      data: AppTheme.dark,
+      child: Scaffold(
+        backgroundColor: PackLoxTokens.background,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontalPadding = constraints.maxWidth <= 360
+                  ? AppSpacing.md
+                  : AppSpacing.lg;
 
-            return CustomScrollView(
-              key: const PageStorageKey<String>('home-scroll-position'),
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _HomeFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.md,
-                    child: const PackLoxHeader(
-                      firstName: '',
-                      fallbackName: 'Collector',
-                      greetingText: 'Your collection',
-                      onNotifications: null,
-                    ),
-                  ),
+              return CustomScrollView(
+                key: const PageStorageKey<String>('home-scroll-position'),
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
                 ),
-                SliverToBoxAdapter(
-                  child: _HomeFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.md,
-                    child: PackLoxHero(
-                      key: const ValueKey('home-approved-hero'),
-                      variant: homeData.isEmpty
-                          ? PackLoxHeroVariant.emptyState
-                          : PackLoxHeroVariant.standard,
-                      eyebrow: homeData.isEmpty
-                          ? 'Start your collection'
-                          : 'Collection overview',
-                      title: homeData.isEmpty
-                          ? 'Your collection starts here'
-                          : 'Your collection, at a glance',
-                      subtitle: homeData.heroSupport,
-                      icon: Icons.auto_awesome_outlined,
-                      metric: homeData.hasValuedItems
-                          ? _formatCurrency(homeData.totalValuedAmount)
-                          : null,
-                      primaryActionLabel: 'Scan a collectible',
-                      onPrimaryAction: widget.onScanPressed,
-                      semanticLabel: homeData.isEmpty
-                          ? 'Empty collection. ${homeData.heroSupport}'
-                          : 'Collection overview. ${homeData.heroSupport}',
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _HomeFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.md,
-                    child: _ApprovedQuickActions(
-                      onImportPhotoPressed:
-                          widget.onImportPhotoPressed ?? widget.onScanPressed,
-                      onPortfolioPressed: widget.onPortfolioPressed,
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _HomeFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.lg,
-                    child: _CollectionSnapshotSection(
-                      data: homeData,
-                      onScanPressed: widget.onScanPressed,
-                    ),
-                  ),
-                ),
-                if (recentItems.isNotEmpty)
+                slivers: [
                   SliverToBoxAdapter(
                     child: _HomeFrame(
                       horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.lg,
-                      child: _RecentCollectiblesSection(
-                        items: recentItems,
-                        hasMore: homeData.itemCount > recentItems.length,
-                        onViewAll: widget.onPortfolioPressed,
+                      topPadding: AppSpacing.sm,
+                      child: const PackLoxHeader(
+                        firstName: '',
+                        fallbackName: 'Collector',
+                        greetingText: 'Your collection',
+                        onNotifications: null,
                       ),
                     ),
                   ),
-                if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
+                  if (homeData.isEmpty)
+                    SliverToBoxAdapter(
+                      child: _HomeFrame(
+                        horizontalPadding: horizontalPadding,
+                        topPadding: AppSpacing.sm,
+                        child: _EmptyCollectionCard(
+                          onScanPressed: widget.onScanPressed == null
+                              ? null
+                              : _handleScanPressed,
+                        ),
+                      ),
+                    ),
                   SliverToBoxAdapter(
                     child: _HomeFrame(
                       horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.lg,
-                      bottomPadding: AppSpacing.xxl,
-                      child: _GroundedInsightCard(data: homeData),
+                      topPadding: AppSpacing.md,
+                      child: _CollectionSnapshotSection(
+                        data: homeData,
+                        onScanPressed: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                      ),
                     ),
-                  )
-                else
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: AppSpacing.xxl),
                   ),
-              ],
-            );
-          },
+                  SliverToBoxAdapter(
+                    child: _HomeFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.md,
+                      child: homeData.isEmpty
+                          ? const _PopularCategoriesSection()
+                          : _CompactQuickActions(
+                              onScanPressed: widget.onScanPressed == null
+                                  ? null
+                                  : _handleScanPressed,
+                              onImportPhotoPressed:
+                                  widget.onImportPhotoPressed ??
+                                  widget.onScanPressed,
+                              onPortfolioPressed: widget.onPortfolioPressed,
+                            ),
+                    ),
+                  ),
+                  if (homeData.isEmpty)
+                    SliverToBoxAdapter(
+                      child: _HomeFrame(
+                        horizontalPadding: horizontalPadding,
+                        topPadding: AppSpacing.md,
+                        child: _CompactQuickActions(
+                          onScanPressed: widget.onScanPressed == null
+                              ? null
+                              : _handleScanPressed,
+                          onImportPhotoPressed:
+                              widget.onImportPhotoPressed ??
+                              widget.onScanPressed,
+                          onPortfolioPressed: widget.onPortfolioPressed,
+                        ),
+                      ),
+                    ),
+                  if (recentItems.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _HomeFrame(
+                        horizontalPadding: horizontalPadding,
+                        topPadding: AppSpacing.lg,
+                        child: _RecentCollectiblesSection(
+                          items: recentItems,
+                          hasMore: homeData.itemCount > recentItems.length,
+                          onViewAll: widget.onPortfolioPressed,
+                        ),
+                      ),
+                    ),
+                  if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
+                    SliverToBoxAdapter(
+                      child: _HomeFrame(
+                        horizontalPadding: horizontalPadding,
+                        topPadding: AppSpacing.lg,
+                        bottomPadding: AppSpacing.xxl,
+                        child: _GroundedInsightCard(data: homeData),
+                      ),
+                    )
+                  else
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xxl),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _ApprovedQuickActions extends StatelessWidget {
-  const _ApprovedQuickActions({
+class _CompactQuickActions extends StatelessWidget {
+  const _CompactQuickActions({
+    this.onScanPressed,
     this.onImportPhotoPressed,
     this.onPortfolioPressed,
   });
 
+  final VoidCallback? onScanPressed;
   final VoidCallback? onImportPhotoPressed;
   final VoidCallback? onPortfolioPressed;
 
   @override
   Widget build(BuildContext context) {
+    final actions = [
+      _HomeActionData(
+        key: 'scan',
+        icon: Icons.photo_camera_outlined,
+        label: 'Scan',
+        semanticLabel: 'Scan a collectible',
+        onTap: onScanPressed,
+      ),
+      _HomeActionData(
+        key: 'import',
+        icon: Icons.image_outlined,
+        label: 'Import',
+        semanticLabel: 'Import photo',
+        onTap: onImportPhotoPressed,
+      ),
+      _HomeActionData(
+        key: 'portfolio',
+        icon: Icons.inventory_2_outlined,
+        label: 'Portfolio',
+        semanticLabel: 'Open portfolio',
+        onTap: onPortfolioPressed,
+      ),
+    ];
+
     return Semantics(
       container: true,
       label: 'Collection actions',
-      child: Column(
-        children: [
-          PackLoxEntryTile(
-            compatibilityKey: const ValueKey('home-secondary-import'),
-            icon: Icons.photo_library_outlined,
-            title: 'Import photo',
-            supportingText: 'Choose an existing collectible photo',
-            onTap: onImportPhotoPressed,
-            variant: PackLoxEntryTileVariant.primary,
-            state: onImportPhotoPressed == null
-                ? PackLoxEntryTileState.disabled
-                : PackLoxEntryTileState.normal,
-            semanticLabel: 'Import photo. Choose an existing collectible photo',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 420;
+          return Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final action in actions)
+                SizedBox(
+                  width: compact
+                      ? (constraints.maxWidth - AppSpacing.sm) / 2
+                      : (constraints.maxWidth - AppSpacing.sm * 2) / 3,
+                  child: _CompactHomeAction(action: action),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HomeActionData {
+  const _HomeActionData({
+    required this.key,
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    this.onTap,
+  });
+
+  final String key;
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback? onTap;
+}
+
+class _CompactHomeAction extends StatelessWidget {
+  const _CompactHomeAction({required this.action});
+
+  final _HomeActionData action;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final enabled = action.onTap != null;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: action.semanticLabel,
+      child: MotionTapScale(
+        onTap: action.onTap,
+        child: Container(
+          key: ValueKey('home-quick-action-${action.key}'),
+          constraints: const BoxConstraints(minHeight: 96),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: _packLoxRaisedSurfaceColor(colorScheme),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          PackLoxEntryTile(
-            compatibilityKey: const ValueKey('home-secondary-portfolio'),
-            icon: Icons.inventory_2_outlined,
-            title: 'Open portfolio',
-            supportingText: 'View every saved collectible',
-            onTap: onPortfolioPressed,
-            variant: PackLoxEntryTileVariant.portfolio,
-            state: onPortfolioPressed == null
-                ? PackLoxEntryTileState.disabled
-                : PackLoxEntryTileState.normal,
-            semanticLabel: 'Open portfolio. View every saved collectible',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                action.icon,
+                color: enabled
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                action.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: enabled
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -239,6 +350,20 @@ class _HomeViewData {
         ? ' worth an estimated ${_formatCurrency(totalValuedAmount)}'
         : '';
     return 'You have $_itemCountLabel$valueText.';
+  }
+
+  String get overviewTitle {
+    if (isEmpty) {
+      return 'Your collection is waiting';
+    }
+    return 'Your collection';
+  }
+
+  String get overviewSubtitle {
+    if (isEmpty) {
+      return 'No items yet';
+    }
+    return _itemCountLabel;
   }
 
   String get _itemCountLabel =>
@@ -331,10 +456,91 @@ class _CollectionSnapshotSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionSurface(
-      title: 'Collection snapshot',
+      title: data.isEmpty ? 'Collection status' : 'Collection snapshot',
       child: data.isEmpty
           ? _EmptySnapshot(onScanPressed: onScanPressed)
           : _SnapshotContent(data: data),
+    );
+  }
+}
+
+class _EmptyCollectionCard extends StatelessWidget {
+  const _EmptyCollectionCard({this.onScanPressed});
+
+  final VoidCallback? onScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      container: true,
+      label:
+          'Empty collection. Your collection is waiting. Scan your first item to get started.',
+      child: Container(
+        key: const ValueKey('home-empty-authority-card'),
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: _packLoxRaisedSurfaceColor(colorScheme),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
+          boxShadow: AppElevation.level1,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 86,
+              height: 86,
+              decoration: BoxDecoration(
+                color: PackLoxTokens.surface.withValues(alpha: 0.86),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: PackLoxTokens.blue.withValues(alpha: 0.34),
+                ),
+              ),
+              child: Icon(
+                Icons.inventory_2_outlined,
+                color: colorScheme.primary,
+                size: AppIconSizes.xl,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Your collection is waiting',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w900,
+                height: 1.04,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Scan your first item to get started.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            PackLoxButton(
+              key: const ValueKey('home-primary-scan'),
+              label: 'Scan a Collectible',
+              leadingIcon: Icons.photo_camera_outlined,
+              onPressed: onScanPressed,
+              size: PackLoxButtonSize.fullWidth,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -530,12 +736,103 @@ class _EmptySnapshot extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        TextButton.icon(
-          onPressed: onScanPressed,
-          icon: const Icon(Icons.document_scanner_outlined),
-          label: const Text('Scan first collectible'),
-        ),
+        if (onScanPressed != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          TextButton.icon(
+            onPressed: onScanPressed,
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: const Text('Scan first collectible'),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _PopularCategoriesSection extends StatelessWidget {
+  const _PopularCategoriesSection();
+
+  static const _categories = [
+    (label: 'Cards', icon: Icons.style_outlined),
+    (label: 'Coins', icon: Icons.monetization_on_outlined),
+    (label: 'Figures', icon: Icons.toys_outlined),
+    (label: 'More', icon: Icons.more_horiz),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _SectionSurface(
+      title: 'Popular Categories',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'See what collectors love',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final category in _categories)
+                _CategoryChip(label: category.label, icon: category.icon),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      label: 'Popular category $label',
+      child: Container(
+        key: ValueKey('home-popular-category-${label.toLowerCase()}'),
+        constraints: const BoxConstraints(minWidth: 82, minHeight: 72),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surface.withValues(
+            alpha: colorScheme.brightness == Brightness.dark ? 0.88 : 0.72,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: colorScheme.primary, size: AppIconSizes.md),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
