@@ -1,7 +1,8 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/portfolio/portfolio_ui.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -10,6 +11,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_w
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -114,237 +116,242 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
-        key: const PageStorageKey<String>('portfolio-scroll-position'),
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child: PortfolioHeroHeader(scrollController: _scrollController),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+      body: LayoutBuilder(
+        builder: (context, viewport) {
+          final horizontalPadding = viewport.maxWidth <= 360
+              ? AppSpacing.md
+              : AppSpacing.lg;
+
+          return CustomScrollView(
+            key: const PageStorageKey<String>('portfolio-scroll-position'),
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-            sliver: SliverToBoxAdapter(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          PortfolioActionTile(
-                            icon: Icons.sort,
-                            title: 'Sort',
-                            onTap: () => _showSortSheet(context),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          PortfolioActionTile(
-                            icon: Icons.filter_alt,
-                            title: 'Filter',
-                            onTap: () => _showFilterSheet(context),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          PortfolioActionTile(
-                            icon: Icons.add,
-                            title: 'Add Item',
-                            isPrimary: true,
-                            onTap: widget.onScanPressed,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      if (portfolioState.items.isNotEmpty) ...[
-                        PortfolioSectionCard(
-                          title: 'Find Items',
-                          child: _PortfolioControls(
-                            searchQuery: _searchQuery,
-                            categoryFilter: _categoryFilter,
-                            onSearchChanged: (value) {
-                              setState(() {
-                                _searchQuery = value;
-                              });
-                            },
-                            onCategoryFilterChanged: (value) {
-                              setState(() {
-                                _categoryFilter = value;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
-                      PortfolioSectionCard(
-                        title: 'Portfolio Snapshot',
-                        child: PortfolioSummaryCard(
-                          totalValue: portfolioState.totalValue,
-                          itemCount: portfolioState.itemCount,
-                          averageConfidence: _averageConfidence(orderedItems),
-                          categoryCount: _categoryCount(orderedItems),
-                          topAssetTitle: _topAssetTitle(orderedItems),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      if (portfolioState.isLoading &&
-                          portfolioState.items.isEmpty)
-                        const SizedBox.shrink()
-                      else if (portfolioState.errorMessage != null)
-                        const SizedBox.shrink()
-                      else if (portfolioState.items.isEmpty)
-                        const SizedBox.shrink(),
-                    ],
+            slivers: [
+              SliverToBoxAdapter(
+                child: _PortfolioFrame(
+                  horizontalPadding: horizontalPadding,
+                  topPadding: AppSpacing.md,
+                  child: const PackLoxHeader(
+                    firstName: '',
+                    fallbackName: 'Portfolio',
+                    greetingText: 'Your collection',
+                    onNotifications: null,
                   ),
                 ),
               ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.xl,
-            ),
-            sliver: SliverLayoutBuilder(
-              builder: (context, constraints) {
-                if (portfolioState.isLoading && portfolioState.items.isEmpty) {
-                  return const SliverToBoxAdapter(
-                    child: _PortfolioSliverBox(
-                      child: Center(child: CircularProgressIndicator()),
+              SliverToBoxAdapter(
+                child: _PortfolioFrame(
+                  horizontalPadding: horizontalPadding,
+                  topPadding: AppSpacing.md,
+                  child: _CollectionOverview(
+                    totalValue: portfolioState.totalValue,
+                    itemCount: portfolioState.itemCount,
+                    valuedItemCount: _valuedItemCount(orderedItems),
+                    unvaluedItemCount: _unvaluedItemCount(orderedItems),
+                    categoryCount: _categoryCount(orderedItems),
+                  ),
+                ),
+              ),
+              if (portfolioState.items.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _PortfolioFrame(
+                    horizontalPadding: horizontalPadding,
+                    topPadding: AppSpacing.md,
+                    child: _PortfolioControls(
+                      searchQuery: _searchQuery,
+                      categoryFilter: _categoryFilter,
+                      onSearchChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                      onCategoryFilterChanged: (value) {
+                        setState(() {
+                          _categoryFilter = value;
+                        });
+                      },
                     ),
-                  );
-                }
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: _PortfolioFrame(
+                  horizontalPadding: horizontalPadding,
+                  topPadding: AppSpacing.sm,
+                  bottomPadding: AppSpacing.md,
+                  child: _PortfolioCommandBar(
+                    onSort: () => _showSortSheet(context),
+                    onFilter: () => _showFilterSheet(context),
+                    onAddItem: widget.onScanPressed,
+                    activeFilterCount: _activeFilterCount,
+                    sortLabel: _sortMode.label,
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  0,
+                  horizontalPadding,
+                  AppSpacing.xl,
+                ),
+                sliver: SliverLayoutBuilder(
+                  builder: (context, constraints) {
+                    if (portfolioState.isLoading &&
+                        portfolioState.items.isEmpty) {
+                      return const SliverToBoxAdapter(
+                        child: _PortfolioSliverBox(
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      );
+                    }
 
-                if (portfolioState.errorMessage != null) {
-                  return SliverToBoxAdapter(
-                    child: _PortfolioSliverBox(
-                      child: PortfolioErrorState(
-                        message: portfolioState.errorMessage!,
-                      ),
-                    ),
-                  );
-                }
+                    if (portfolioState.errorMessage != null) {
+                      return SliverToBoxAdapter(
+                        child: _PortfolioSliverBox(
+                          child: PortfolioErrorState(
+                            message: portfolioState.errorMessage!,
+                          ),
+                        ),
+                      );
+                    }
 
-                if (portfolioState.items.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: _PortfolioSliverBox(
-                      child: PortfolioEmptyState(
-                        onScanPressed: widget.onScanPressed,
-                      ),
-                    ),
-                  );
-                }
+                    if (portfolioState.items.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: _PortfolioSliverBox(
+                          child: PortfolioEmptyState(
+                            onScanPressed: widget.onScanPressed,
+                          ),
+                        ),
+                      );
+                    }
 
-                if (visibleItems.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: _PortfolioSliverBox(
-                      child: PortfolioNoSearchResultsState(
-                        onResetFilters: () {
-                          setState(() {
-                            _searchQuery = '';
-                            _categoryFilter = _PortfolioCategoryFilter.all;
-                            _confidenceFilter = _PortfolioConfidenceFilter.all;
-                            _trendFilter = _PortfolioTrendFilter.all;
-                            _sortMode = _PortfolioSortMode.newest;
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                }
+                    if (visibleItems.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: _PortfolioSliverBox(
+                          child: PortfolioNoSearchResultsState(
+                            onResetFilters: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _categoryFilter = _PortfolioCategoryFilter.all;
+                                _confidenceFilter =
+                                    _PortfolioConfidenceFilter.all;
+                                _trendFilter = _PortfolioTrendFilter.all;
+                                _sortMode = _PortfolioSortMode.newest;
+                              });
+                            },
+                          ),
+                        ),
+                      );
+                    }
 
-                final crossAxisCount = constraints.crossAxisExtent < 360
-                    ? 1
-                    : constraints.crossAxisExtent >= 720
-                    ? 3
-                    : 2;
-                final childAspectRatio = switch (crossAxisCount) {
-                  1 => 0.58,
-                  2 => 0.47,
-                  _ => 0.58,
-                };
+                    final crossAxisCount = constraints.crossAxisExtent < 360
+                        ? 1
+                        : constraints.crossAxisExtent >= 720
+                        ? 3
+                        : 2;
+                    final childAspectRatio = switch (crossAxisCount) {
+                      1 => 0.58,
+                      2 => 0.47,
+                      _ => 0.58,
+                    };
 
-                return SliverMainAxisGroup(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 960),
-                          child: Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppSpacing.sm,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Collection Items',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w900),
-                                  ),
+                    return SliverMainAxisGroup(
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 960),
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.sm,
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Text(
-                                  '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
-                                  style: Theme.of(context).textTheme.labelMedium
-                                      ?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w800,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Collection Items',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w900,
+                                            ),
                                       ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Text(
+                                      '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                    SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: AppSpacing.xl,
-                        crossAxisSpacing: AppSpacing.lg,
-                        childAspectRatio: childAspectRatio,
-                      ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final item = visibleItems[index];
+                        SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: AppSpacing.xl,
+                                crossAxisSpacing: AppSpacing.lg,
+                                childAspectRatio: childAspectRatio,
+                              ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final item = visibleItems[index];
 
-                        return MotionReveal(
-                          key: ValueKey('portfolio-grid-motion-${item.id}'),
-                          offset: 12,
-                          delay: Duration(milliseconds: index * 40),
-                          curve: Curves.easeOutCubic,
-                          child: PortfolioGridTile(
-                            key: ValueKey('portfolio-grid-item-${item.id}'),
-                            item: item,
-                            wishlistStatusLabel: _wishlistStatusLabel(
-                              wishlistStatusByItemId[item.id],
-                            ),
-                            onTap: () =>
-                                _openItem(context, item, portfolioController),
-                            onViewDetails: () =>
-                                _openItem(context, item, portfolioController),
-                            onEdit: () => _showEditComingSoon(context),
-                            onDelete: () => _confirmDelete(
-                              context,
-                              item.id,
-                              portfolioController,
-                            ),
-                          ),
-                        );
-                      }, childCount: visibleItems.length),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
+                            return MotionReveal(
+                              key: ValueKey('portfolio-grid-motion-${item.id}'),
+                              offset: 12,
+                              delay: Duration(milliseconds: index * 40),
+                              curve: Curves.easeOutCubic,
+                              child: PortfolioGridTile(
+                                key: ValueKey('portfolio-grid-item-${item.id}'),
+                                item: item,
+                                wishlistStatusLabel: _wishlistStatusLabel(
+                                  wishlistStatusByItemId[item.id],
+                                ),
+                                onTap: () => _openItem(
+                                  context,
+                                  item,
+                                  portfolioController,
+                                ),
+                                onViewDetails: () => _openItem(
+                                  context,
+                                  item,
+                                  portfolioController,
+                                ),
+                                onEdit: () => _showEditComingSoon(context),
+                                onDelete: () => _confirmDelete(
+                                  context,
+                                  item.id,
+                                  portfolioController,
+                                ),
+                              ),
+                            );
+                          }, childCount: visibleItems.length),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -387,6 +394,20 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       };
     });
     return filteredItems;
+  }
+
+  int get _activeFilterCount {
+    var count = 0;
+    if (_categoryFilter != _PortfolioCategoryFilter.all) {
+      count++;
+    }
+    if (_confidenceFilter != _PortfolioConfidenceFilter.all) {
+      count++;
+    }
+    if (_trendFilter != _PortfolioTrendFilter.all) {
+      count++;
+    }
+    return count;
   }
 
   bool _matchesCategoryFilter(
@@ -437,15 +458,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     };
   }
 
-  double _averageConfidence(List<CollectibleItem> items) {
-    if (items.isEmpty) {
-      return 0;
-    }
-
-    return items.fold<double>(0, (sum, item) => sum + item.confidence) /
-        items.length;
-  }
-
   int _categoryCount(List<CollectibleItem> items) {
     return {
       for (final item in items)
@@ -453,15 +465,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     }.length;
   }
 
-  String _topAssetTitle(List<CollectibleItem> items) {
-    if (items.isEmpty) {
-      return 'None yet';
-    }
-    final sorted = [...items]
-      ..sort(
-        (left, right) => right.estimatedValue.compareTo(left.estimatedValue),
-      );
-    return sorted.first.title;
+  int _valuedItemCount(List<CollectibleItem> items) {
+    return items.where(_hasDisplayableValuation).length;
+  }
+
+  int _unvaluedItemCount(List<CollectibleItem> items) {
+    return items.where((item) => !_hasDisplayableValuation(item)).length;
   }
 
   Future<bool> _confirmDelete(
@@ -1459,6 +1468,347 @@ class _PremiumSortTile<T> extends StatelessWidget {
   }
 }
 
+class _PortfolioFrame extends StatelessWidget {
+  const _PortfolioFrame({
+    required this.horizontalPadding,
+    required this.child,
+    this.topPadding = 0,
+    this.bottomPadding = 0,
+  });
+
+  final double horizontalPadding;
+  final double topPadding;
+  final double bottomPadding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            topPadding,
+            horizontalPadding,
+            bottomPadding,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionOverview extends StatelessWidget {
+  const _CollectionOverview({
+    required this.totalValue,
+    required this.itemCount,
+    required this.valuedItemCount,
+    required this.unvaluedItemCount,
+    required this.categoryCount,
+  });
+
+  final double totalValue;
+  final int itemCount;
+  final int valuedItemCount;
+  final int unvaluedItemCount;
+  final int categoryCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final valuationLabel = unvaluedItemCount == 0
+        ? 'All valued'
+        : '$unvaluedItemCount unvalued';
+
+    return Semantics(
+      container: true,
+      label:
+          'Portfolio summary. $itemCount items. ${_formatPortfolioMoney(totalValue)} total estimated value. $valuationLabel.',
+      child: DecoratedBox(
+        key: const ValueKey('portfolio-compact-snapshot'),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: colorScheme.outlineVariant),
+          boxShadow: AppElevation.level1,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Collection summary',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Estimated value uses saved item data only.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                key: const ValueKey('portfolio-compact-metrics-grid'),
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  _OverviewMetric(
+                    label: 'Total value',
+                    value: _formatPortfolioMoney(totalValue),
+                    icon: Icons.account_balance_wallet_outlined,
+                    emphasized: true,
+                  ),
+                  _OverviewMetric(
+                    label: 'Items',
+                    value: itemCount.toString(),
+                    icon: Icons.inventory_2_outlined,
+                  ),
+                  _OverviewMetric(
+                    label: 'Valued',
+                    value: valuedItemCount.toString(),
+                    icon: Icons.price_check_outlined,
+                  ),
+                  _OverviewMetric(
+                    label: 'Categories',
+                    value: categoryCount.toString(),
+                    icon: Icons.category_outlined,
+                  ),
+                ],
+              ),
+              if (unvaluedItemCount > 0) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _PartialValuationNote(count: unvaluedItemCount),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  const _OverviewMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 132, maxWidth: 220),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: emphasized
+              ? colorScheme.primary.withValues(alpha: 0.10)
+              : colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: emphasized
+                ? colorScheme.primary.withValues(alpha: 0.28)
+                : colorScheme.outlineVariant,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: colorScheme.primary),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PartialValuationNote extends StatelessWidget {
+  const _PartialValuationNote({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Icon(Icons.info_outline, size: 16, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            '$count item${count == 1 ? '' : 's'} still need reliable valuation data.',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PortfolioCommandBar extends StatelessWidget {
+  const _PortfolioCommandBar({
+    required this.onSort,
+    required this.onFilter,
+    required this.onAddItem,
+    required this.activeFilterCount,
+    required this.sortLabel,
+  });
+
+  final VoidCallback onSort;
+  final VoidCallback onFilter;
+  final VoidCallback? onAddItem;
+  final int activeFilterCount;
+  final String sortLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stack = constraints.maxWidth < 430;
+        final tools = Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _ToolButton(
+              key: const ValueKey('portfolio-action-sort'),
+              icon: Icons.sort,
+              label: 'Sort',
+              value: sortLabel,
+              onPressed: onSort,
+            ),
+            _ToolButton(
+              key: const ValueKey('portfolio-action-filter'),
+              icon: Icons.filter_alt_outlined,
+              label: 'Filter',
+              value: activeFilterCount == 0
+                  ? 'All'
+                  : '$activeFilterCount active',
+              onPressed: onFilter,
+            ),
+          ],
+        );
+        final addButton = PackLoxButton(
+          key: const ValueKey('portfolio-action-add-item'),
+          label: 'Add item',
+          onPressed: onAddItem,
+          leadingIcon: Icons.add,
+          variant: PackLoxButtonVariant.primary,
+          size: stack ? PackLoxButtonSize.fullWidth : PackLoxButtonSize.compact,
+          semanticLabel: 'Add item. Start a new scan',
+        );
+
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              tools,
+              const SizedBox(height: AppSpacing.sm),
+              addButton,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: tools),
+            const SizedBox(width: AppSpacing.md),
+            addButton,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ToolButton extends StatelessWidget {
+  const _ToolButton({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: '$label: $value',
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text('$label: $value', overflow: TextOverflow.ellipsis),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.onSurface,
+          side: BorderSide(color: colorScheme.outlineVariant),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PortfolioSliverBox extends StatelessWidget {
   const _PortfolioSliverBox({required this.child});
 
@@ -1482,6 +1832,25 @@ String? _wishlistStatusLabel(WishlistStatus? status) {
     WishlistStatus.missing => 'Missing',
     null => null,
   };
+}
+
+bool _hasDisplayableValuation(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => item.estimatedValue > 0,
+  };
+}
+
+String _formatPortfolioMoney(double value) {
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '\$$withCommas';
 }
 
 class _PortfolioControls extends StatelessWidget {
