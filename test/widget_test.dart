@@ -81,7 +81,11 @@ void main() {
 
     await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
-    expect(find.text('Total collection value'), findsOneWidget);
+    expect(find.text('Collection summary'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
+      findsOneWidget,
+    );
     expectNoFlutterError(tester);
 
     await tester.tap(find.text('Scan').last);
@@ -3319,8 +3323,6 @@ void main() {
     await tester.reveal(find.textContaining('Charizard'));
 
     expect(find.textContaining('Charizard'), findsWidgets);
-    expect(find.text('Total collection value'), findsOneWidget);
-    expect(find.text('Items'), findsOneWidget);
     expect(find.text(r'$1,850'), findsWidgets);
   });
 
