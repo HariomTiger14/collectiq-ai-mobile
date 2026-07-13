@@ -1,6 +1,6 @@
 # PackLox frontend reconstruction baseline
 
-Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen; Sprint 04 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
+Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen; Sprint 04 frozen; Sprint 05 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
 
 This directory is the execution control set for a presentation-only reconstruction. Preserve business logic and route contracts; require runtime visual approval before freeze.
 
@@ -14,9 +14,13 @@ Sprint 03 is **App Shell Presentation Reconstruction** and is **Frozen** at `a39
 
 Sprint 04 is **Home Presentation Reconstruction** and is **Frozen** at `625b9ca`. It preserves frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controller/provider ownership, local-first data flow, guest access, existing scanner entry action, portfolio links, backend contracts, and business logic. It reconstructs only Home presentation: approved Header, approved Hero, approved Hero action/Button, approved Entry Tiles, collection snapshot, recent real items, empty state, valuation note, responsive/accessibility behaviour, and validated Home/App Shell runtime performance.
 
-Next sprint: **Scanner Presentation Reconstruction**. It may own only scanner presentation: scanner entry state, camera/capture presentation, capture guidance, multi-image filmstrip, active preview, photo review, Original and AI Enhance selection, analysis handoff presentation, genuine scanner loading/error/permission states, responsive behaviour, accessibility, motion/reduced motion, and scanner lifecycle/camera performance.
+Sprint 05 is **Scanner Presentation Reconstruction** and is **Frozen** at `5b3c9b4`. It preserves frozen bootstrap, frozen onboarding, frozen App Shell navigation/lifecycle, frozen Home presentation, scanner controller/provider ownership, camera lifecycle ownership, capture-session state, analyzer integration, ordered multi-image data, active-preview ownership, primary-image intent, portfolio handoff, backend contracts, capture-plan logic, category and scan-mode behaviour, and existing scanner provider ownership.
 
-Sprint 05 must preserve frozen bootstrap, frozen onboarding, frozen App Shell navigation/lifecycle, frozen Home presentation, scanner controllers, scanner engine, capture-session state, analyzer integration, image ownership, portfolio handoff, backend contracts, capture-plan logic, multi-image data, category and scan-mode behaviour, and existing scanner provider ownership. It must not include Portfolio reconstruction, Detail reconstruction, Settings reconstruction, Authentication redesign, App Shell redesign, Home redesign, backend changes, or router migration unless separately justified and approved.
+Sprint 05 reconstructed only Scanner presentation and scanner-specific presentation states: Scan Hub, active workspace, capture guidance, multi-image filmstrip, active preview, Original/AI Enhance confirmation presentation, analysis handoff, result handoff, and genuine scanner loading/error/permission presentation. It removed stale pre-analysis `Auto Detect` / `Confidence` / `55%` sample-workspace metadata, fixed duplicate lost-picker recovery for the same recovered image, and did not promote Capture System v1 beyond **C. Candidate awaiting approval**.
+
+Next sprint: **Portfolio Presentation Reconstruction**. It may own only Portfolio presentation: Portfolio header and hierarchy, collection summary, search/filter/sort presentation, portfolio grid/list, primary-image thumbnails, gallery-image indicators, empty collection, no-results state, partial valuation, genuine loading/error states, item menus/actions, navigation to the existing Detail screen, responsiveness, accessibility, and performance.
+
+Sprint 06 must preserve `portfolioControllerProvider`, repositories and sync, item identity, ordering, sorting/filtering semantics, valuation semantics, multi-image gallery data, primary-image ownership, scanner-to-portfolio handoff, existing Detail navigation, guest/local behaviour, backend/Supabase contracts, and frozen App Shell lifecycle. It must not include Detail reconstruction, Settings reconstruction, Authentication redesign, Scanner redesign, Home redesign, App Shell redesign, backend changes, or router migration unless separately approved.
 
 Asset validation capability: **Declared but not implemented.** Do not count the asset validator as an operational platform gate until it inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
@@ -51,3 +55,7 @@ Asset validation capability: **Declared but not implemented.** Do not count the 
 - [Sprint 04 device diagnostics](sprint_04_device_diagnostics.md)
 - [Sprint 04 freeze record](sprint_04_freeze_record.md)
 - [Full test suite baseline debt](full_test_suite_baseline_debt.md)
+- [Sprint 05 specification](sprint_05_scanner_specification.md)
+- [Sprint 05 runtime comparison](sprint_05_runtime_comparison.md)
+- [Sprint 05 test regression analysis](sprint_05_test_regression_analysis.md)
+- [Sprint 05 freeze record](sprint_05_freeze_record.md)

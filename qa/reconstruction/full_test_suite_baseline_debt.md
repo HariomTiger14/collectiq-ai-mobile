@@ -39,6 +39,20 @@ The Sprint 04 initial run exposed six new failures in broad Home-facing widget t
 
 The remediated Sprint 04 full-suite result returned to the documented 19-failure baseline. The extra passing test reflects Sprint 04 Home coverage and expectation reconciliation. The full suite must not be described as passing.
 
+Sprint 05 pre-remediation:
+
+- 526 passed
+- 24 failed
+
+Sprint 05 remediated:
+
+- 534 passed
+- 16 failed
+
+Sprint 05 is non-regressive against the Sprint 04 remediated baseline. The remediated Sprint 05 failure count improved by three compared with Sprint 04, from 19 failures to 16 failures. New Scanner coverage increased passing tests, obsolete Scanner structure failures were removed, eight stale broad widget expectations were reconciled against actual Sprint 05 scanner contracts, and one genuine duplicate lost-picker recovery defect was fixed.
+
+The Sprint 05 full suite must not be described as entirely passing.
+
 Sprint 03 focused validation:
 
 - Sprint 01 bootstrap tests passed: 12
@@ -58,6 +72,14 @@ Sprint 04 focused validation:
 - Android local debug build: passed
 - Android install/launch on Samsung SM E625F: passed
 - physical Home/App Shell stress sequence: passed
+
+Sprint 05 focused validation:
+
+- eight target tests individually passed
+- eight target tests together passed
+- focused Scanner suite: 51 passed
+- frozen Sprint 01-04 suite: 45 passed
+- `flutter analyze`: passed
 
 The full suite must not be described as passing. Do not fix unrelated failures as part of Sprint freeze governance.
 
