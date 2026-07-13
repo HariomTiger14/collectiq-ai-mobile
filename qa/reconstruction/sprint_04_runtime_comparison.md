@@ -1,6 +1,6 @@
 # Sprint 04 Home runtime comparison
 
-Status: completed from source inspection, widget/runtime-adjacent tests, analyzer, and attempted Android build/device checks. Android device QA could not be completed because Flutter build and device discovery commands hung without usable output.
+Status: completed from source inspection, widget/runtime-adjacent tests, analyzer, full-suite remediation, and attempted Android build/device checks. Android device QA could not be completed because the connected Samsung device was unauthorized in ADB and Flutter `devices`/`doctor`/`build apk` probes hung before useful tool output.
 
 ## Intended Product Language composition
 
@@ -85,17 +85,36 @@ Sprint 04 removed Home `MotionElasticHero`, `MotionParallax`, and local `MotionR
 
 Android QA was attempted but not completed:
 
-- `flutter build apk --debug --flavor local` hung without output for several minutes and was stopped by terminating only the launched build process tree.
-- `flutter devices` also hung without output and was stopped by terminating only the launched devices process tree.
-- Because no debug APK was produced and device discovery did not complete, install/run QA on SM E625F was not verified.
+- ADB 37.0.0 was available at `C:\Users\hario\Downloads\platform-tools-latest-windows\platform-tools\adb.exe`.
+- `adb devices -l` detected `RZ8R213M8ZL` as `unauthorized` before and after an ADB server restart.
+- Direct Dart responded with SDK version `3.12.2`; `flutter analyze` and Flutter tests completed normally.
+- `flutter --version`, `flutter devices --device-timeout 30`, `flutter doctor -v`, and `flutter build apk --debug --flavor local -v` hung before useful Flutter output.
+- Process inspection during the build probe showed only the launched PowerShell wrapper and `cmd.exe` child for `flutter.bat`; no Gradle process appeared.
+- Each hung probe was stopped by terminating only the launched probe process tree.
+- Because no debug APK was produced and the device remained unauthorized, install/run QA on SM E625F was not verified.
 - No Android logcat stress-switch evidence was captured.
+
+Detailed diagnostics are recorded in `qa/reconstruction/sprint_04_device_diagnostics.md`.
 
 ## Corrections made during validation
 
 - Removed remaining local reveal/stagger wrappers from Home sections and recent rows.
 - Rebuilt `test/home_page_test.dart` around Sprint 04 composition and data-integrity contracts.
 - Updated frozen-sprint regression assertions that referenced removed Home headline copy while preserving their original shell/onboarding/bootstrap intent.
+- Remediated six broad Home-related `test/widget_test.dart` regressions caused by stale expectations for the removed Home custom hero/CTA surface.
 - Removed generated desktop plugin registrant churn caused by Flutter tooling.
+
+## Final validation
+
+- `flutter analyze`: passed.
+- `flutter test test\bootstrap_entry_presentation_test.dart --reporter=compact`: passed.
+- `flutter test test\onboarding_presentation_test.dart --reporter=compact`: passed.
+- `flutter test test\app_shell_presentation_test.dart --reporter=compact`: passed.
+- `flutter test test\home_page_test.dart --reporter=compact`: passed.
+- Full suite before remediation: 525 passed, 25 failed; captured in `qa/reconstruction/sprint_04_full_test_output.txt`.
+- Full suite after remediation: 531 passed, 19 failed.
+
+The remaining 19 full-suite failures are documented as baseline debt, not Sprint 04 Home regressions.
 
 ## Evidence paths
 
