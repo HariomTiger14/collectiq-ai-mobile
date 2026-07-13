@@ -1,6 +1,6 @@
 # Sprint 04 Home runtime comparison
 
-Status: completed from source inspection, widget/runtime-adjacent tests, analyzer, full-suite remediation, and attempted Android build/device checks. Android device QA could not be completed because the connected Samsung device was unauthorized in ADB and Flutter `devices`/`doctor`/`build apk` probes hung before useful tool output.
+Status: completed from source inspection, widget/runtime-adjacent tests, analyzer, full-suite remediation, Android build/install, physical-device Home validation, screenshots, hierarchy captures, and logcat review.
 
 ## Intended Product Language composition
 
@@ -83,16 +83,19 @@ Sprint 04 removed Home `MotionElasticHero`, `MotionParallax`, and local `MotionR
 
 ## Android log and device findings
 
-Android QA was attempted but not completed:
+Android QA completed on Samsung `SM E625F`, Android 13 / API 33, device id `RZ8R213M8ZL`.
 
-- ADB 37.0.0 was available at `C:\Users\hario\Downloads\platform-tools-latest-windows\platform-tools\adb.exe`.
-- `adb devices -l` detected `RZ8R213M8ZL` as `unauthorized` before and after an ADB server restart.
-- Direct Dart responded with SDK version `3.12.2`; `flutter analyze` and Flutter tests completed normally.
-- `flutter --version`, `flutter devices --device-timeout 30`, `flutter doctor -v`, and `flutter build apk --debug --flavor local -v` hung before useful Flutter output.
-- Process inspection during the build probe showed only the launched PowerShell wrapper and `cmd.exe` child for `flutter.bat`; no Gradle process appeared.
-- Each hung probe was stopped by terminating only the launched probe process tree.
-- Because no debug APK was produced and the device remained unauthorized, install/run QA on SM E625F was not verified.
-- No Android logcat stress-switch evidence was captured.
+- Initial ADB gate on this pass: `RZ8R213M8ZL device product:f62ins model:SM_E625F device:f62`.
+- Flutter CLI diagnosis: sandboxed direct Flutter tooling could not open `C:\Users\hario\Desktop\flutter\bin\cache\lockfile`; rerunning Flutter outside the sandbox resolved the previous apparent CLI hangs.
+- `flutter devices --device-timeout 30`: detected `SM E625F` plus desktop/web targets.
+- Build: `flutter build apk --debug --flavor local -v` succeeded. Gradle completed `assembleLocalDebug` in 37s.
+- APK: `build\app\outputs\flutter-apk\app-local-debug.apk`.
+- Install: `flutter install -d RZ8R213M8ZL --debug --flavor local` passed.
+- Launch: `adb shell monkey -p com.collectiq.ai.local -c android.intent.category.LAUNCHER 1` launched `com.collectiq.ai.local/com.collectiq.ai.MainActivity`.
+- Foreground check after launch and after stress retained `MainActivity`.
+- Stress sequence covered Home -> Portfolio, Home -> Scan, Home scroll, rapid tab switching, and return to Home.
+- No ANR, input-dispatch timeout, Flutter framework exception, `E/flutter`, uncaught app exception, blank final frame, route lock, or foreground loss was observed during the known Home/shell stress sequence.
+- Logcat contained unrelated device/service noise, including Bluetooth scan lines, Google Play/Auth warnings, and system `NullBinder`/`TransactionTooLargeException` entries. App-specific lines were normal input/window traces plus expected Scanner lost-picker recovery logs when visiting Scan.
 
 Detailed diagnostics are recorded in `qa/reconstruction/sprint_04_device_diagnostics.md`.
 
@@ -120,20 +123,30 @@ The remaining 19 full-suite failures are documented as baseline debt, not Sprint
 
 - Focused Home validation: `test/home_page_test.dart`.
 - Regression validation: `test/bootstrap_entry_presentation_test.dart`, `test/onboarding_presentation_test.dart`, `test/app_shell_presentation_test.dart`, `test/widget_test.dart`.
-- Evidence directory reserved for device/runtime captures: `qa/screenshots/reconstruction/sprint_04_home/`.
-
-No Android screenshots or logs were captured because build/device discovery did not complete.
+- Physical-device evidence directory: `qa/screenshots/reconstruction/sprint_04_home/`.
+- Empty Home first viewport: `qa/screenshots/reconstruction/sprint_04_home/empty_home_first_viewport.png` and `.xml`.
+- Empty Home lower content: `qa/screenshots/reconstruction/sprint_04_home/empty_home_lower_content.png`.
+- Scan action handoff: `qa/screenshots/reconstruction/sprint_04_home/scan_action_handoff.png` and `.xml`.
+- Portfolio action handoff: `qa/screenshots/reconstruction/sprint_04_home/portfolio_action_handoff.png` and `.xml`.
+- Post-stress Home: `qa/screenshots/reconstruction/sprint_04_home/home_after_tab_scroll_stress.png` and `.xml`.
+- Android logcat stress capture: `qa/screenshots/reconstruction/sprint_04_home/tab_scroll_stress_logcat.txt`.
 
 ## Verified scenarios
 
 - Approved Header/Hero/Button/Entry Tile composition.
-- Loaded data display.
+- Empty Home state on physical device.
 - Empty state.
+- Home entry through frozen App Shell on physical device.
 - Unavailable value behavior.
 - Zero-value market-estimate behavior.
 - Partial-value behavior.
-- Scan action handoff.
-- Portfolio action handoff.
+- Scan action handoff on physical device.
+- Portfolio action handoff on physical device.
+- Home -> Portfolio switching on physical device.
+- Home -> Scanner switching on physical device.
+- Home scrolling followed by tab switching on physical device.
+- Rapid tab switching on physical device.
+- No observed overflow, blank frame, route flicker, input lock, ANR, or foreground loss in the known physical-device stress sequence.
 - Detail navigation from top/latest and recent rows.
 - Guest/no-auth Home access in shell tests.
 - Light/dark, narrow, large-text, and reduced-motion widget paths.
@@ -141,9 +154,10 @@ No Android screenshots or logs were captured because build/device discovery did 
 
 ## Unverified scenarios
 
-- Android install/run on SM E625F.
-- Real device Home entry after onboarding.
-- Real device stress-switch passes.
-- Real device light/dark/large-text/reduced-motion checks.
-- Android logcat review.
-- Screenshot evidence.
+- Loaded Home state on physical device; this device had an honest empty local collection and data was not fabricated.
+- Partial-value Home state on physical device; no natural partial-value local data was available.
+- Recent-item detail action on physical device; no recent items existed in the local collection.
+- Real device dark-mode screenshot.
+- Real device large-text screenshot.
+- Real device reduced-motion setting.
+- Real device landscape screenshot.
