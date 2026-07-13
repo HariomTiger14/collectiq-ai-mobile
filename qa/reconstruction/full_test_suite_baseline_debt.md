@@ -53,6 +53,20 @@ Sprint 05 is non-regressive against the Sprint 04 remediated baseline. The remed
 
 The Sprint 05 full suite must not be described as entirely passing.
 
+Sprint 06 initial:
+
+- 532 passed
+- 18 failed
+
+Sprint 06 remediated:
+
+- 534 passed
+- 16 failed
+
+The Sprint 06 initial run exposed two stale broad Portfolio assertions that still expected removed legacy Portfolio summary copy. Those expectations were reconciled to the approved Sprint 06 Portfolio presentation without changing production code.
+
+The remediated Sprint 06 full-suite result returned to the Sprint 05 ceiling of 16 failures. The full suite must not be described as entirely passing.
+
 Sprint 03 focused validation:
 
 - Sprint 01 bootstrap tests passed: 12
@@ -80,6 +94,17 @@ Sprint 05 focused validation:
 - focused Scanner suite: 51 passed
 - frozen Sprint 01-04 suite: 45 passed
 - `flutter analyze`: passed
+
+Sprint 06 focused validation:
+
+- Sprint 01 bootstrap tests passed: 12
+- Sprint 02 onboarding tests passed: 10
+- Sprint 03 App Shell tests passed: 11
+- Sprint 04 Home tests passed: 12
+- Sprint 05 focused Scanner suite passed: 51
+- Sprint 06 focused Portfolio targeted checks passed: 7
+- stale Portfolio expectation remediation targets passed individually: 2
+- `flutter analyze`: passed during runtime validation
 
 The full suite must not be described as passing. Do not fix unrelated failures as part of Sprint freeze governance.
 

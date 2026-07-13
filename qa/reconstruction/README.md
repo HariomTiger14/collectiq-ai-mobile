@@ -1,6 +1,6 @@
 # PackLox frontend reconstruction baseline
 
-Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen; Sprint 04 frozen; Sprint 05 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
+Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen; Sprint 04 frozen; Sprint 05 frozen; Sprint 06 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
 
 This directory is the execution control set for a presentation-only reconstruction. Preserve business logic and route contracts; require runtime visual approval before freeze.
 
@@ -18,9 +18,11 @@ Sprint 05 is **Scanner Presentation Reconstruction** and is **Frozen** at `5b3c9
 
 Sprint 05 reconstructed only Scanner presentation and scanner-specific presentation states: Scan Hub, active workspace, capture guidance, multi-image filmstrip, active preview, Original/AI Enhance confirmation presentation, analysis handoff, result handoff, and genuine scanner loading/error/permission presentation. It removed stale pre-analysis `Auto Detect` / `Confidence` / `55%` sample-workspace metadata, fixed duplicate lost-picker recovery for the same recovered image, and did not promote Capture System v1 beyond **C. Candidate awaiting approval**.
 
-Next sprint: **Portfolio Presentation Reconstruction**. It may own only Portfolio presentation: Portfolio header and hierarchy, collection summary, search/filter/sort presentation, portfolio grid/list, primary-image thumbnails, gallery-image indicators, empty collection, no-results state, partial valuation, genuine loading/error states, item menus/actions, navigation to the existing Detail screen, responsiveness, accessibility, and performance.
+Sprint 06 is **Portfolio Presentation Reconstruction** and is **Frozen** at `fe66cae`. It preserves frozen bootstrap, frozen onboarding, frozen App Shell navigation/lifecycle, frozen Home presentation, frozen Scanner presentation, `portfolioControllerProvider`, repositories and sync, item identity, ordering, sorting/filtering semantics, valuation semantics, multi-image gallery data, primary-image ownership, scanner-to-portfolio handoff, existing Detail navigation, guest/local behaviour, backend/Supabase contracts, and frozen App Shell lifecycle.
 
-Sprint 06 must preserve `portfolioControllerProvider`, repositories and sync, item identity, ordering, sorting/filtering semantics, valuation semantics, multi-image gallery data, primary-image ownership, scanner-to-portfolio handoff, existing Detail navigation, guest/local behaviour, backend/Supabase contracts, and frozen App Shell lifecycle. It must not include Detail reconstruction, Settings reconstruction, Authentication redesign, Scanner redesign, Home redesign, App Shell redesign, backend changes, or router migration unless separately approved.
+Sprint 06 reconstructed only Portfolio presentation and Portfolio-specific presentation states: compact header, collection summary, search, filter/sort presentation, grid/item cards, primary-image thumbnails, gallery fallback, empty and no-results states, partial valuation cues, item menus/actions, Add Item handoff, existing Detail navigation handoff, responsiveness, accessibility, and runtime performance for tested paths. It did not promote Portfolio candidate treatments into frozen Product Language.
+
+Next sprint proposal: **Detail Presentation Reconstruction**. It may own only the existing Detail screen presentation if separately approved. It must preserve Portfolio item identity, image/gallery data, edit/delete behaviours, notes/favorite actions, repository/controller ownership, scanner handoff data, backend/Supabase contracts, and frozen Sprint 01-06 behaviour.
 
 Asset validation capability: **Declared but not implemented.** Do not count the asset validator as an operational platform gate until it inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
@@ -59,3 +61,8 @@ Asset validation capability: **Declared but not implemented.** Do not count the 
 - [Sprint 05 runtime comparison](sprint_05_runtime_comparison.md)
 - [Sprint 05 test regression analysis](sprint_05_test_regression_analysis.md)
 - [Sprint 05 freeze record](sprint_05_freeze_record.md)
+- [Sprint 06 specification](sprint_06_portfolio_specification.md)
+- [Sprint 06 runtime comparison](sprint_06_runtime_comparison.md)
+- [Sprint 06 test regression analysis](sprint_06_test_regression_analysis.md)
+- [Sprint 06 freeze record](sprint_06_freeze_record.md)
+- [Sprint 07 proposal](sprint_07_detail_proposal.md)
