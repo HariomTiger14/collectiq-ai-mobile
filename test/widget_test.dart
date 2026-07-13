@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
@@ -1382,10 +1383,21 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.text('Captured image'), findsNothing);
-    expect(find.text('Ready for AI analysis'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.selectedItemTitle, 'Captured image');
+    expect(scannerState.selectedItemStatus, 'Ready for AI analysis');
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
       findsOneWidget,
     );
     expect(
@@ -1819,7 +1831,18 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.text('Captured image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.captureImages.single.role, 'front');
+    expect(scannerState.selectedItemTitle, 'Captured image');
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('workspace-primary-photo-highlight')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('camera denied UI shows friendly message', (
@@ -1869,7 +1892,13 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.text('Captured image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.isPreparingImage, isFalse);
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1933,7 +1962,14 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.text('Captured image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(container.read(appShellTabControllerProvider), 2);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.selectedItemTitle, 'Captured image');
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1955,7 +1991,14 @@ void main() {
     );
 
     expect(find.text('AI Scanner'), findsNothing);
-    expect(find.text('Recovered image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(container.read(appShellTabControllerProvider), 2);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.selectedItemTitle, 'Recovered image');
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -1978,7 +2021,14 @@ void main() {
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
     );
 
-    expect(find.text('Gallery image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(container.read(appShellTabControllerProvider), 2);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.selectedItemTitle, 'Gallery image');
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
@@ -2074,8 +2124,15 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Sample Sports Card'), findsNothing);
-    expect(find.text('Ready for AI analysis'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, 'sample://sports-card');
+    expect(scannerState.selectedItemTitle, 'Sample Sports Card');
+    expect(scannerState.selectedItemStatus, 'Ready for AI analysis');
+    expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
 
     await tester.reveal(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
@@ -3518,7 +3575,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Captured image'), findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    );
+    final scannerState = container.read(scannerControllerProvider);
+    expect(container.read(appShellTabControllerProvider), 2);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(scannerState.selectedImagePath, isNotNull);
+    expect(scannerState.selectedItemTitle, 'Captured image');
     expect(
       find.byKey(const ValueKey('scan-primary-Analyze Image')),
       findsOneWidget,
