@@ -1,0 +1,23 @@
+﻿# Home Visual Deviation Matrix
+
+Scope: Home only. Differences are classified as defects, acceptable adaptations, approved ambiguity, or missing authority detail.
+
+| ID | Approved reference location | Current runtime location | Issue | Severity | Type | Classification | Root cause | Required change | Regression risk | Validation method |
+|---|---|---|---|---|---|---|---|---|---|---|
+| HVD-001 | S02 Empty Collection crop | 01_launch.png Hero area | Empty state uses blue Product Language Hero instead of approved dark empty collection card with illustration | Critical | wrong composition | Genuine implementation defect against S02 | Sprint 04 used Product Language Hero as screen composition authority | Replace empty leading surface with S02-aligned empty card | Medium: Scan callback placement | Fresh empty screenshot plus XML; widget test for empty state content/order |
+| HVD-002 | S02 Empty Collection crop | 01_launch.png first viewport | Popular Categories and secondary Try a Sample Scan are absent from first viewport | High | missing state | Genuine implementation defect unless product owner excludes these elements | Board authority was not mapped before Sprint 04 freeze | Add approved elements or record formal exclusion | Medium: sample action behavior may not exist | Fresh first-viewport comparison; behavior test for any added action |
+| HVD-003 | S03 Quick Actions / board primary actions | 01_launch.png action group | Runtime inserts two large EntryTiles before collection status | High | wrong hierarchy | Genuine implementation defect for first-viewport hierarchy | EntryTile component approval was treated as enough for Home composition | Replace or move large EntryTiles; use compact actions where approved | Low: existing callbacks can be retained | Screenshot and XML order check |
+| HVD-004 | S02 Empty Collection crop | 01_launch.png and XML | Collection snapshot is partly behind or below the nav-dominated fold | Medium | wrong spacing | Genuine implementation defect | Hero plus stacked actions consume first-viewport height | Reorder and reduce vertical weight so state content clears nav | Low | Screenshot bounds and XML content order |
+| HVD-005 | S01-S10 header | 01_launch.png header | Runtime uses Your collection / Collector instead of Good morning / Harry | Low | unsupported content | Acceptable responsive/data adaptation when profile data is unavailable | No profile data in current local runtime | Keep fallback but document profile-driven preferred copy | Low | Widget test for fallback and profile state if provider exists |
+| HVD-006 | S01-S10 notification icon | 01_launch.xml disabled notification button | Notification button is disabled in runtime | Medium | missing state | Approved design ambiguity for current notification implementation | Notifications feature is not in Home scope here | Either wire existing notifications or document disabled state before freeze | Medium if routing added | XML enabled state and behavior smoke |
+| HVD-007 | S03-S05 populated crops | No fresh populated recovery capture | Populated state was not freshly captured in this pass | Medium | missing state | Missing evidence, not a proven visual defect | Audit-only pass avoided mutating local app data | Capture populated fixture during remediation validation | Low | Seeded fixture or safe scan/save evidence with XML |
+| HVD-008 | S06-S08 loading/offline/sync crops | Current Home architecture | Approved Home has loading/offline/sync states, but current Home has no independent async state contract | Medium | missing state | Approved design ambiguity plus architecture mismatch | Sprint 04 froze local-first Home without Home-owned async state | Decide whether states are in Flutter scope or formally excluded | High if architecture changes | Architecture review plus state-specific screenshots if implemented |
+| HVD-009 | S02/S03 bottom nav in board | 01_launch.png current App Shell nav | Board shows five tabs including Search; runtime has four tabs | Medium | responsive mismatch | Not a Home-only defect; App Shell authority conflict | Sprint 03 shell freeze differs from board nav | Do not change in Home remediation unless App Shell is reopened | High: routing and shell scope | Separate App Shell authority review |
+| HVD-010 | S09/S10 insights/no valuation crops | Runtime valuation note | Runtime no-valuation/insight handling is limited to an unvalued-count note | High | missing state | Genuine implementation gap if S09/S10 are in Home scope | State-specific board variants were not mapped into Sprint 04 | Add S09/S10 state contracts or formally defer them | Medium | State fixture screenshots; widget tests |
+
+Severity count:
+
+- Critical: 1
+- High: 4
+- Medium: 4
+- Low: 1
