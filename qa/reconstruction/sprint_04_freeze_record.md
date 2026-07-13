@@ -434,3 +434,21 @@ Phase 1 validation summary:
 - `adb install -r build\app\outputs\flutter-apk\app-prod-debug.apk`: passed.
 - Focused Home/shared/app-shell regression validation: passed.
 - Full suite: `546 passed, 24 failed`; full suite is not green and remaining failures are outside this Home visual authority amendment.
+
+## 18. Phase 1 Home Fidelity Amendment
+
+Date: 2026-07-13
+
+The visual portion of this Sprint 04 freeze is amended by the later Phase 1 Approved Visual Authority correction. The Sprint 04 architecture and data-integrity decisions remain unchanged, but the original Hero/entry-tile visual approval is superseded for the empty Home first viewport.
+
+Current authority evidence:
+
+- `qa/reconstruction/home_phase1_fidelity_measurements.md`
+- `qa/reconstruction/home_phase1_fidelity_acceptance.md`
+- `qa/screenshots/approved_authority_remediation/home/comparison/phase1_fidelity_approved_vs_after.png`
+
+Updated validation result:
+
+- `flutter test --reporter=compact` completed with `554 passed, 16 failed` in `qa/reconstruction/phase1_fidelity_full_test_output.txt`.
+- Home-focused tests and affected broad Home regressions passed.
+- Remaining full-suite failures are outside Home authority fidelity scope.

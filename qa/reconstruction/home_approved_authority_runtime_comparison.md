@@ -125,3 +125,24 @@ Populated and partial-data Home behavior remain covered by focused Home widget f
 - `Try a Sample Scan` is present in the approved image but was not added to Home because the existing safe sample action is owned by Scan Hub/Scanner controller behavior, and adding a Home-owned callback would reopen App Shell/navigation ownership.
 - Unsupported Home-owned loading, offline, sync, AI status, and no-valuation insight states were not invented because the current Home screen has no independent asynchronous contract.
 - Notifications remain disabled as before.
+
+## Phase 1 Fidelity Correction Addendum
+
+Date: 2026-07-13
+
+Additional evidence was captured after the density correction requested for Phase 1 Home visual fidelity:
+
+- Authority crop: `qa/screenshots/approved_authority_remediation/home/authority/phase1_authority_h02_empty_collection_crop.png`
+- Before correction: `qa/screenshots/approved_authority_remediation/home/fidelity_current/phase1_fidelity_current_first_viewport.png`
+- After correction: `qa/screenshots/approved_authority_remediation/home/fidelity_after/phase1_fidelity_after_first_viewport.png`
+- Side-by-side: `qa/screenshots/approved_authority_remediation/home/comparison/phase1_fidelity_approved_vs_after.png`
+- Measurements: `qa/reconstruction/home_phase1_fidelity_measurements.md`
+- Acceptance: `qa/reconstruction/home_phase1_fidelity_acceptance.md`
+
+Updated outcome:
+
+- Hero/card proportions were reduced from the oversized first pass.
+- The primary scan button was narrowed and compacted.
+- Empty collection status no longer duplicates the scan action.
+- Popular Categories and compact quick actions are now visible in the first viewport on the validated Samsung device.
+- Full suite returned to `554 passed, 16 failed`; remaining failures are outside Home fidelity scope.
