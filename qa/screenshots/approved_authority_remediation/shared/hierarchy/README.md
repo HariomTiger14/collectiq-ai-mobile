@@ -1,5 +1,6 @@
 # shared/hierarchy
 
-Reserved for future shared remediation hierarchy evidence.
-
-Do not place generated evidence here until the corresponding implementation or validation phase runs. Use two-digit ordered filenames and include matching PNG/XML/log/comparison artifacts where applicable.
+Hierarchy dumps captured from RZ8R213M8ZL during Phase 0 runtime validation:
+- `phase0_home_initial.xml`
+- `phase0_portfolio_tab.xml`
+- `phase0_portfolio_relaunch.xml`

@@ -1,5 +1,3 @@
 # shared/logs
 
-Reserved for future shared remediation logs evidence.
-
-Do not place generated evidence here until the corresponding implementation or validation phase runs. Use two-digit ordered filenames and include matching PNG/XML/log/comparison artifacts where applicable.
+`phase0_runtime_logcat.txt` was captured after installing and launching the local debug APK on RZ8R213M8ZL during Phase 0 runtime validation.
