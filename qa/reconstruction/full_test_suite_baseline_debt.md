@@ -25,6 +25,20 @@ Sprint 03:
 
 The Sprint 03 failure count remained unchanged from the recorded Sprint 01 and Sprint 02 baseline. The eleven additional passing tests correspond to the new Sprint 03 app shell coverage. The existing 19 failures remain outside Sprint 03 app shell changes.
 
+Sprint 04 initial:
+
+- 525 passed
+- 25 failed
+
+Sprint 04 remediated:
+
+- 531 passed
+- 19 failed
+
+The Sprint 04 initial run exposed six new failures in broad Home-facing widget tests. Those tests still referenced stale Home copy, removed custom hero internals, or the removed Home-specific CTA key after the approved Home reconstruction. The expectations were reconciled to the approved Sprint 04 Home surface without weakening frozen Sprint 01, Sprint 02, or Sprint 03 contracts.
+
+The remediated Sprint 04 full-suite result returned to the documented 19-failure baseline. The extra passing test reflects Sprint 04 Home coverage and expectation reconciliation. The full suite must not be described as passing.
+
 Sprint 03 focused validation:
 
 - Sprint 01 bootstrap tests passed: 12
@@ -34,7 +48,18 @@ Sprint 03 focused validation:
 - `flutter analyze`: passed
 - Android local debug build: passed
 
-The full suite must not be described as passing. Do not fix unrelated failures as part of Sprint 03 freeze governance.
+Sprint 04 focused validation:
+
+- Sprint 01 bootstrap tests passed: 12
+- Sprint 02 onboarding tests passed: 10
+- Sprint 03 app shell tests passed: 11
+- Sprint 04 Home tests passed: 12
+- `flutter analyze`: passed
+- Android local debug build: passed
+- Android install/launch on Samsung SM E625F: passed
+- physical Home/App Shell stress sequence: passed
+
+The full suite must not be described as passing. Do not fix unrelated failures as part of Sprint freeze governance.
 
 ## Sprint 01 baseline context
 

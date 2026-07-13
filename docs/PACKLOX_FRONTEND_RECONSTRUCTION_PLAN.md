@@ -12,13 +12,12 @@ The revised implementation order is:
 2. Onboarding
 3. App Shell
 4. Home
-5. Authentication and Account Access
-6. Scanner
-7. Portfolio
-8. Detail
-9. Search
-10. Notifications
-11. Settings
+5. Scanner
+6. Portfolio
+7. Detail
+8. Search
+9. Notifications
+10. Settings
 
 Sprint 01 is **App Bootstrap and Entry Routing Presentation** and is **Frozen** at `0f5c93c`. It preserves `main()`, environment selection, feature flags, `CloudServiceRegistry`, `CloudAppStartup`, Supabase initialization behaviour, `ProviderScope`, `AuthDeepLinkCoordinator`, onboarding controller ownership, the `SharedPreferences` key `onboarding_completed_v1`, guest and signed-out local access, password-recovery behaviour, and the current `AppShell` handoff.
 
@@ -32,12 +31,18 @@ Sprint 03 is **App Shell Presentation Reconstruction** and is **Frozen** at `a39
 
 Sprint 03 reconstructed only the post-onboarding app frame and bottom navigation presentation. It records the shell navigation treatment as a composition of approved Product Language foundation primitives, not as an official standalone Product Language component. It did not add Search or Notifications, did not retain all tab trees, did not introduce an unconditional `IndexedStack`, did not redesign Home, Scanner, Portfolio, or Settings, did not add an auth guard, and did not migrate routing.
 
+Sprint 04 is **Home Presentation Reconstruction** and is **Frozen** at `625b9ca`. It preserves frozen Sprint 01 bootstrap/entry behaviour, frozen Sprint 02 onboarding completion behaviour, frozen Sprint 03 App Shell navigation/lifecycle, selected-tab ownership, Home controller/provider ownership, local-first portfolio data flow, guest access, existing scanner entry action, portfolio links, backend contracts, and business logic.
+
+Sprint 04 reconstructed only Home presentation: approved Header, approved Hero, approved primary Scan action through the Hero action slot and Button System, approved Entry Tiles, collection snapshot, recent real items, honest empty state, valuation note, responsive/accessibility behaviour, and validated Home/App Shell runtime performance. It did not move repository/service ownership into presentation, did not add a Home loading/error/retry contract, did not fabricate data, did not redesign Scanner/Portfolio/Settings/Auth/App Shell, did not add an auth guard, did not change backend contracts, and did not migrate routing.
+
 Asset validation capability: **Declared but not implemented.** The asset validator must not be treated as an operational validation gate until it actually inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
 No production UI, backend, Supabase contract, deep-link identifier or storage/schema configuration is authorized by this plan. Each screen uses the screen contract, focused commit and explicit visual freeze gate.
 
-Next sprint: **Home Presentation Reconstruction**. Scope is limited to Home presentation reconstruction: Home screen visual hierarchy, approved Header and Hero composition, metric and summary presentation, quick actions, insight cards, empty/loading/error states, responsive behaviour, accessibility, motion and reduced-motion behaviour, and Home-specific runtime performance.
+Next sprint: **Scanner Presentation Reconstruction**. Scope is limited to scanner presentation reconstruction: scanner entry state, camera/capture presentation, capture guidance, multi-image filmstrip, active preview, photo review, Original and AI Enhance selection, analysis handoff presentation, genuine scanner loading/error/permission states, responsive behaviour, accessibility, motion and reduced-motion behaviour, scanner lifecycle, and camera performance.
 
-Sprint 04 must preserve frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controller/provider ownership, existing business data, navigation actions, scanner entry action, portfolio links, guest behaviour, and backend contracts.
+Sprint 05 must preserve frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, frozen Home presentation, scanner engine, scanner controllers, capture-plan logic, capture-session state, controller/provider ownership, multi-image data, analyzer contracts, portfolio gallery handoff, category and scan-mode behaviour currently approved, image ownership, backend integration, and frozen App Shell lifecycle.
 
-Sprint 04 must not reconstruct Scanner, Portfolio, Settings, Authentication, or App Shell. It must not include authentication redesign, router migration, backend changes, or shell lifecycle redesign unless a verified Home integration defect requires a minimal correction.
+Sprint 05 must not include Portfolio reconstruction, Detail reconstruction, Settings reconstruction, Authentication redesign, App Shell redesign, Home redesign, backend changes, or router migration unless separately justified and approved.
+
+Do not begin Sprint 05 until its specification is written and approved.

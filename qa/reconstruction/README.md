@@ -1,6 +1,6 @@
 # PackLox frontend reconstruction baseline
 
-Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
+Status: Sprint 01 frozen; Sprint 02 frozen; Sprint 03 frozen; Sprint 04 frozen. Baselines: Flutter `c6bf0808360fbe58363737f212b842bc60ab0d05`, Product Language `PLX-PL-1.0` / `2995e1aae77eaee241e09eeb41625516eb61ff4f`.
 
 This directory is the execution control set for a presentation-only reconstruction. Preserve business logic and route contracts; require runtime visual approval before freeze.
 
@@ -12,9 +12,11 @@ Sprint 02 is **Onboarding Presentation Reconstruction** and is **Frozen** at `72
 
 Sprint 03 is **App Shell Presentation Reconstruction** and is **Frozen** at `a39dddf`. It preserves frozen bootstrap entry behaviour, frozen onboarding completion behaviour, AppShell handoff, selected-tab ownership, active-destination-only shell lifecycle, guest access, existing Navigator usage, and business logic. It reconstructs only the post-onboarding frame and shell-level bottom navigation presentation. Home, Scanner, Portfolio, Settings, authentication redesign, backend changes, router migration, Search, Notifications, and all-tab retained shell lifecycle remained out of scope.
 
-Next sprint: **Home Presentation Reconstruction**. It may own only Home screen presentation: Home visual hierarchy, approved Header and Hero composition, metric and summary presentation, quick actions, insight cards, empty/loading/error states, responsive behaviour, accessibility, motion/reduced-motion handling, and Home-specific runtime performance.
+Sprint 04 is **Home Presentation Reconstruction** and is **Frozen** at `625b9ca`. It preserves frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controller/provider ownership, local-first data flow, guest access, existing scanner entry action, portfolio links, backend contracts, and business logic. It reconstructs only Home presentation: approved Header, approved Hero, approved Hero action/Button, approved Entry Tiles, collection snapshot, recent real items, empty state, valuation note, responsive/accessibility behaviour, and validated Home/App Shell runtime performance.
 
-Sprint 04 must preserve frozen bootstrap behaviour, frozen onboarding behaviour, frozen App Shell navigation and lifecycle, selected-tab ownership, Home controllers, Home repositories, Home business logic, guest access, backend contracts, existing scanner entry action, and portfolio links. It must not reconstruct Scanner, Portfolio, Settings, Authentication, or App Shell. It must not include authentication redesign, router migration, backend changes, or shell lifecycle redesign unless a verified Home integration defect requires a minimal correction.
+Next sprint: **Scanner Presentation Reconstruction**. It may own only scanner presentation: scanner entry state, camera/capture presentation, capture guidance, multi-image filmstrip, active preview, photo review, Original and AI Enhance selection, analysis handoff presentation, genuine scanner loading/error/permission states, responsive behaviour, accessibility, motion/reduced motion, and scanner lifecycle/camera performance.
+
+Sprint 05 must preserve frozen bootstrap, frozen onboarding, frozen App Shell navigation/lifecycle, frozen Home presentation, scanner controllers, scanner engine, capture-session state, analyzer integration, image ownership, portfolio handoff, backend contracts, capture-plan logic, multi-image data, category and scan-mode behaviour, and existing scanner provider ownership. It must not include Portfolio reconstruction, Detail reconstruction, Settings reconstruction, Authentication redesign, App Shell redesign, Home redesign, backend changes, or router migration unless separately justified and approved.
 
 Asset validation capability: **Declared but not implemented.** Do not count the asset validator as an operational platform gate until it inspects asset references, missing files, dimensions, duplication, naming, and release eligibility.
 
@@ -43,4 +45,9 @@ Asset validation capability: **Declared but not implemented.** Do not count the 
 - [Sprint 03 specification](sprint_03_app_shell_specification.md)
 - [Sprint 03 runtime comparison](sprint_03_runtime_comparison.md)
 - [Sprint 03 freeze record](sprint_03_freeze_record.md)
+- [Sprint 04 specification](sprint_04_home_specification.md)
+- [Sprint 04 runtime comparison](sprint_04_runtime_comparison.md)
+- [Sprint 04 test regression analysis](sprint_04_test_regression_analysis.md)
+- [Sprint 04 device diagnostics](sprint_04_device_diagnostics.md)
+- [Sprint 04 freeze record](sprint_04_freeze_record.md)
 - [Full test suite baseline debt](full_test_suite_baseline_debt.md)
