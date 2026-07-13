@@ -3702,12 +3702,13 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Your Collections'), findsWidgets);
+    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('Portfolio'), findsWidgets);
+    expect(find.text('Collection summary'), findsOneWidget);
     expect(
-      find.text('Track, organize and grow your collection'),
+      find.text('Estimated value uses saved item data only.'),
       findsOneWidget,
     );
-    expect(find.text('Your collectible library'), findsOneWidget);
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-action-filter')),
@@ -3743,8 +3744,6 @@ void main() {
     expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('Trading Card'), findsOneWidget);
     expect(find.text('94%'), findsWidgets);
-    expect(find.text('Categories'), findsWidgets);
-    expect(find.text('Top asset'), findsWidgets);
   });
 
   testWidgets('portfolio empty state renders when no items exist', (
@@ -4008,7 +4007,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Total collection value'), findsOneWidget);
+    expect(find.text('Collection summary'), findsOneWidget);
     await tester.reveal(
       find.byKey(ValueKey('portfolio-grid-item-${demoItems.first.id}')),
     );
@@ -4063,7 +4062,13 @@ void main() {
     await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
-    await tester.enterText(find.byType(TextFormField).first, 'coin');
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-search-field')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      'coin',
+    );
     await tester.pump();
 
     await tester.reveal(
@@ -4078,7 +4083,14 @@ void main() {
       findsNothing,
     );
 
-    await tester.enterText(find.byType(TextFormField).first, 'watch');
+    await tester.scrollPortfolioToTop();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-search-field')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      'watch',
+    );
     await tester.pump();
 
     expect(find.text('No collectibles found'), findsOneWidget);
@@ -4100,6 +4112,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-filter-cards')),
+    );
     final chipScrollViews = tester.widgetList<SingleChildScrollView>(
       find.byType(SingleChildScrollView),
     );
@@ -4133,7 +4148,10 @@ void main() {
       findsNothing,
     );
 
-    await tester.scrollToTop();
+    await tester.scrollPortfolioToTop();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-filter-coins')),
+    );
     tester
         .widget<ChoiceChip>(
           find.byKey(const ValueKey('portfolio-filter-coins')),
@@ -4168,14 +4186,24 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.text('Filter'));
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-action-filter')),
+    );
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
     expect(find.text('Filter portfolio'), findsOneWidget);
     expect(find.text('Confidence'), findsOneWidget);
     expect(find.text('Trend'), findsOneWidget);
 
-    await tester.tap(find.text('80%+'));
-    await tester.tap(find.text('Rising'));
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-premium-confidence-chip-high')),
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-premium-trend-badges')),
+        matching: find.text('Rising'),
+      ),
+    );
     await tester.tap(find.text('Apply filters'));
     await tester.pumpAndSettle();
 
@@ -4195,11 +4223,21 @@ void main() {
       findsNothing,
     );
 
-    await tester.scrollToTop();
-    await tester.tap(find.text('Filter'));
+    await tester.scrollPortfolioToTop();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-action-filter')),
+    );
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Below 80%'));
-    await tester.tap(find.text('Cooling'));
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-premium-confidence-chip-low')),
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-premium-trend-badges')),
+        matching: find.text('Cooling'),
+      ),
+    );
     await tester.tap(find.text('Apply filters'));
     await tester.pumpAndSettle();
 
@@ -4231,7 +4269,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      await tester.tap(find.text('Filter'));
+      await tester.revealPortfolio(
+        find.byKey(const ValueKey('portfolio-action-filter')),
+      );
+      await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
       await tester.pumpAndSettle();
 
       expect(
@@ -4274,7 +4315,11 @@ void main() {
 
       await tester.tap(find.text('Apply filters'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sort'));
+      await tester.scrollPortfolioToTop();
+      await tester.revealPortfolio(
+        find.byKey(const ValueKey('portfolio-action-sort')),
+      );
+      await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
       await tester.pumpAndSettle();
 
       expect(
@@ -4330,8 +4375,11 @@ void main() {
       ),
     );
 
-    await tester.scrollToTop();
-    await tester.tap(find.text('Sort'));
+    await tester.scrollPortfolioToTop();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-action-sort')),
+    );
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
     await tester.pumpAndSettle();
     expect(find.text('Sort portfolio'), findsOneWidget);
     await tester.tap(find.text('Value (High -> Low)'));
@@ -4358,8 +4406,11 @@ void main() {
       ),
     );
 
-    await tester.scrollToTop();
-    await tester.tap(find.text('Sort'));
+    await tester.scrollPortfolioToTop();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-action-sort')),
+    );
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confidence'));
     await tester.pumpAndSettle();
@@ -5663,9 +5714,31 @@ extension on WidgetTester {
     throw TestFailure('Could not reveal $finder');
   }
 
-  Future<void> scrollToTop() async {
+  Future<void> revealPortfolio(Finder finder) async {
+    final portfolioScroll = find.byKey(
+      const PageStorageKey<String>('portfolio-scroll-position'),
+    );
+    for (var attempt = 0; attempt < 20; attempt += 1) {
+      await pump(const Duration(milliseconds: 50));
+      if (finder.evaluate().isNotEmpty) {
+        await ensureVisible(finder.first);
+        await pump();
+        return;
+      }
+
+      await drag(portfolioScroll, const Offset(0, -280));
+      await pump();
+    }
+
+    throw TestFailure('Could not reveal $finder in Portfolio');
+  }
+
+  Future<void> scrollPortfolioToTop() async {
+    final portfolioScroll = find.byKey(
+      const PageStorageKey<String>('portfolio-scroll-position'),
+    );
     for (var attempt = 0; attempt < 8; attempt += 1) {
-      await drag(find.byType(Scrollable).first, const Offset(0, 520));
+      await drag(portfolioScroll, const Offset(0, 520));
       await pump();
     }
   }
