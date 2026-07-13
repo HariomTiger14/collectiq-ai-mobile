@@ -55,11 +55,11 @@ void main() {
         expect(source, isNot(contains('class ScanHubHero')));
         expect(source, isNot(contains('class ScanHubEntryTile')));
         expect(source, isNot(contains('scan-hub-real-collectible-montage')));
-        expect(source, isNot(contains('Cards • Coins')));
+        expect(source, isNot(contains('Cards')));
       },
     );
 
-    test('camera and review use shared scanner controls', () {
+    test('camera and review preserve scanner capture contracts', () {
       final camera = _read(
         'lib/features/scanner/presentation/pages/camera_capture_page.dart',
       );
@@ -67,69 +67,80 @@ void main() {
         'lib/features/scanner/presentation/pages/image_enhancement_preview_page.dart',
       );
 
-      expect(camera, contains('ScannerCameraControl'));
-      expect(camera, contains('ScannerCameraShutter'));
-      expect(camera, contains('ScannerGuidancePanel'));
-      expect(camera, isNot(contains('IconButton.filled')));
-      expect(camera, isNot(contains('IconButton.filledTonal')));
-      expect(camera, contains('Place the collectible in the frame'));
-      expect(camera, contains('Starting camera…'));
+      expect(camera, contains('CameraCapturePage'));
+      expect(camera, contains('CameraPreview('));
+      expect(camera, contains('ImageEnhancementPreviewSurface'));
+      expect(camera, contains('camera-capture-button'));
+      expect(camera, contains('onTap: isCapturing ? null : onPressed'));
+      expect(
+        camera,
+        contains('Camera permission is required to capture scans.'),
+      );
+      expect(camera, contains('Camera permission is turned off.'));
+      expect(camera, contains('Open Settings'));
+      expect(camera, contains('Try Again'));
 
-      expect(review, contains('ScannerSegmentedSelector'));
-      expect(review, contains('ScannerSecondaryButton'));
-      expect(review, contains('ScannerPrimaryButton'));
-      expect(review, isNot(contains('OutlinedButton(')));
-      expect(review, contains("label: 'Use photo'"));
+      expect(review, contains('ImageEnhancementPreviewSurface'));
+      expect(review, contains('enhancement-preview-original'));
+      expect(review, contains('enhancement-preview-auto_enhance'));
+      expect(review, contains('ImageEnhancementPreset.original'));
+      expect(review, contains('ImageEnhancementPreset.autoEnhance'));
+      expect(review, isNot(contains('Readiness')));
+      expect(review, isNot(contains('Use Anyway')));
+      expect(review, contains("Text('Use Photo')"));
       expect(review, contains("label: 'Original'"));
-      expect(review, contains("label: 'Enhanced'"));
+      expect(review, contains("label: 'AI Enhance'"));
     });
 
     test(
-      'workspace uses approved copy, shared treatments, and no raw confidence',
+      'workspace uses canonical CaptureWorkspace and no fabricated confidence',
       () {
-        final source = _read(
-          'lib/features/scanner/presentation/pages/scan_workspace_screen.dart',
+        final screen = _read(
+          'lib/features/scanner/presentation/pages/scanner_screen.dart',
+        );
+        final workspace = _read(
+          'lib/features/scanner/presentation/widgets/capture_workspace.dart',
         );
 
-        expect(source, contains('ScannerStatusCard'));
-        expect(source, contains('ScannerPhotoThumbnail'));
-        expect(source, contains('ScannerSecondaryButton'));
-        expect(source, contains('ScannerTertiaryAction'));
-        expect(source, contains('Nice first photo'));
-        expect(source, contains('One more photo recommended'));
-        expect(source, contains('Take back photo'));
-        expect(source, contains('Analyze now'));
-        expect(source, contains('Add a different photo'));
-        expect(source, contains('Great — ready to analyze'));
-        expect(source, contains('Analyze collectible'));
-        expect(source, contains('Add another photo'));
-        expect(source, isNot(contains('raw confidence')));
-        expect(source, isNot(contains('Auto Detect')));
+        expect(screen, contains('CaptureWorkspace('));
+        expect(screen, contains('scannerState.captureImages'));
+        expect(screen, contains('selectedPath: selectedImagePath'));
+        expect(
+          screen,
+          contains('onPreview: scannerController.selectCapturedPhoto'),
+        );
+        expect(screen, contains('onUseAsPrimary:'));
+        expect(screen, contains('scannerController.useCapturedPhotoAsPrimary'));
+        expect(
+          screen,
+          contains('onDelete: scannerController.deleteCapturedImage'),
+        );
+        expect(screen, isNot(contains('_workspaceConfidence')));
 
-        _expectInOrder(source, const [
-          "label: _takePhotoLabel(nextBestRole)",
-          "label: 'Analyze now'",
-          "label: 'Add a different photo'",
-        ]);
-        _expectInOrder(source, const [
-          "label: 'Analyze collectible'",
-          "label: 'Add another photo'",
-        ]);
+        expect(workspace, contains('scan-image-filmstrip'));
+        expect(workspace, contains('workspace-filmstrip'));
+        expect(workspace, contains('photo-review-carousel'));
+        expect(workspace, contains('photo-review-page-view'));
+        expect(workspace, contains('photo-review-retake'));
+        expect(workspace, contains('photo-review-delete'));
+        expect(workspace, contains('photo-review-primary'));
+        expect(workspace, contains('Use as Primary'));
+        expect(workspace, isNot(contains('Auto Detect')));
+        expect(workspace, isNot(contains('raw confidence')));
       },
     );
 
-    test('analysing state uses approved progress copy', () {
+    test('analysis state stays controller-owned and avoids fake progress', () {
       final source = _read(
-        'lib/features/scanner/presentation/pages/scan_workspace_screen.dart',
+        'lib/features/scanner/presentation/pages/scanner_screen.dart',
       );
 
-      expect(source, contains('Analyzing your collectible…'));
-      expect(source, contains('ScannerAnalyzingIndicator'));
-      expect(source, contains('This may take a few moments.'));
-      expect(source, contains('Preparing photos'));
-      expect(source, contains('Identifying item'));
-      expect(source, contains('Estimating value'));
-      expect(source, contains('Finalizing results'));
+      expect(source, contains('onAnalyze: scannerController.analyzeWithAi'));
+      expect(source, contains('scan-busy-overlay'));
+      expect(source, contains('scan-primary-Analyze Image'));
+      expect(source, isNot(contains('50%')));
+      expect(source, isNot(contains('provider status')));
+      expect(source, isNot(contains('Future.delayed')));
     });
   });
 }
