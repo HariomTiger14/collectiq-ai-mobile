@@ -79,7 +79,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
 
     await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
@@ -110,7 +110,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
     expectNoFlutterError(tester);
   });
 
@@ -211,7 +211,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isTrue);
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
     await tester.drag(
       find.byKey(const PageStorageKey<String>('home-scroll-position')),
       const Offset(0, -520),
@@ -228,7 +228,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome to PackLox'), findsNothing);
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
   testWidgets('portfolio value trend widget renders with snapshot data', (
@@ -319,7 +319,7 @@ void main() {
   testWidgets('shows home dashboard content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
     expect(
       find.text(
         'Scan your first collectible and start building your collection.',
@@ -473,7 +473,7 @@ void main() {
       find.byKey(const ValueKey('home-small-portfolio-cta')),
       findsNothing,
     );
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
     await tester.reveal(find.text('Scan first collectible'));
     expect(find.text('Scan first collectible'), findsOneWidget);
 
@@ -5614,7 +5614,7 @@ void main() {
       });
 
       await tester.pumpCollectIqApp();
-      expect(find.text('Your collection, at a glance'), findsOneWidget);
+      expect(find.text('Collection snapshot'), findsOneWidget);
       expectNoFlutterError(tester);
 
       await tester.tap(find.text('Scan').last);

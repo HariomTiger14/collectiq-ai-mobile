@@ -19,7 +19,7 @@ void main() {
       find.byKey(const ValueKey('shell-destination-home')),
       findsOneWidget,
     );
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('shell-destination-portfolio')),
       findsNothing,
@@ -142,7 +142,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('shell-destination-scan')), findsNothing);
     expect(find.byKey(const ValueKey('scan-hub-capture-button')), findsNothing);
-    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
   testWidgets('selected semantics are announced by shell navigation', (

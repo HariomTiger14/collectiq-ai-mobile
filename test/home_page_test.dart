@@ -4,9 +4,7 @@ import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
@@ -25,55 +23,69 @@ void main() {
     _seedPortfolio(_portfolioItems());
   });
 
-  testWidgets('renders approved Header Hero Button and Entry Tile composition', (
-    tester,
-  ) async {
-    var scanTaps = 0;
+  testWidgets(
+    'renders approved empty Home structure without legacy blue Hero',
+    (tester) async {
+      _seedPortfolio(const []);
+      var scanTaps = 0;
 
-    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(PackLoxHeader), findsOneWidget);
-    expect(find.text('Your collection'), findsOneWidget);
-    expect(find.text('Collector'), findsOneWidget);
-    expect(find.byType(PackLoxHero), findsOneWidget);
-    expect(find.text('Your collection, at a glance'), findsOneWidget);
-    expect(find.byType(PackLoxEntryTile), findsNWidgets(2));
-    expect(find.byType(PackLoxButton), findsOneWidget);
-    expect(find.widgetWithText(PackLoxButton, 'Scan a collectible'), findsOneWidget);
-    expect(find.byType(MotionElasticHero), findsNothing);
-    expect(find.byType(MotionParallax), findsNothing);
-    expect(find.byType(MotionReveal), findsNothing);
+      expect(find.byType(PackLoxHeader), findsOneWidget);
+      expect(find.text('Your collection'), findsOneWidget);
+      expect(find.text('Collector'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('home-empty-authority-card')),
+        findsOneWidget,
+      );
+      expect(find.text('Your collection is waiting'), findsOneWidget);
+      expect(find.text('Scan your first item to get started.'), findsOneWidget);
+      expect(
+        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
+        findsOneWidget,
+      );
+      expect(find.text('Your collection starts here'), findsNothing);
+      expect(find.text('Start your collection'), findsNothing);
+      expect(find.text('Try a Sample Scan'), findsNothing);
+      expect(find.text('Popular Categories'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('home-popular-category-cards')),
+        findsOneWidget,
+      );
+      expect(find.byType(MotionElasticHero), findsNothing);
+      expect(find.byType(MotionParallax), findsNothing);
+      expect(find.byType(MotionReveal), findsNothing);
 
-    await tester.tap(find.widgetWithText(PackLoxButton, 'Scan a collectible'));
-    await tester.pump();
+      await tester.tap(
+        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
+      );
+      await tester.pump();
 
-    expect(scanTaps, 1);
-  });
+      expect(scanTaps, 1);
+    },
+  );
 
-  testWidgets('loaded data displays real collection values and recent content', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'loaded data displays real collection values and recent content',
+    (tester) async {
+      await tester.pumpWidget(_homeApp());
+      await tester.pumpAndSettle();
 
-    expect(find.text('\$2,275'), findsOneWidget);
-    expect(
-      find.text('You have 5 collectibles worth an estimated \$2,275.'),
-      findsOneWidget,
-    );
-
-    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
-
-    expect(find.text('\$2,275 estimated value'), findsOneWidget);
-    expect(find.text('5 collectibles'), findsOneWidget);
-    expect(find.text('3 categories'), findsOneWidget);
-    expect(find.textContaining('Last scan'), findsOneWidget);
-    expect(find.text('Top collectible'), findsOneWidget);
-    expect(find.text('Premium Charizard'), findsWidgets);
-    expect(find.text('Recent collectibles'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-recent-home-test-card')), findsOneWidget);
-  });
+      expect(find.text('Collection snapshot'), findsOneWidget);
+      expect(find.text('\$2,275 estimated value'), findsOneWidget);
+      expect(find.text('5 collectibles'), findsOneWidget);
+      expect(find.text('3 categories'), findsOneWidget);
+      expect(find.textContaining('Last scan'), findsOneWidget);
+      expect(find.text('Top collectible'), findsOneWidget);
+      expect(find.text('Premium Charizard'), findsWidgets);
+      expect(find.text('Recent collectibles'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('home-recent-home-test-card')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('unavailable values are not fabricated as zero', (tester) async {
     _seedPortfolio([
@@ -87,7 +99,7 @@ void main() {
 
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
-    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+    await _scrollUntilVisible(tester, find.text('Collection status'));
 
     expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('\$0'), findsNothing);
@@ -117,43 +129,53 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('\$0'), findsOneWidget);
     await _scrollUntilVisible(tester, find.text('Collection snapshot'));
     expect(find.text('\$0 estimated value'), findsOneWidget);
     expect(find.text('Value unavailable'), findsNothing);
     expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
   });
 
-  testWidgets('empty collection renders honest empty state and no fake metrics', (
-    tester,
-  ) async {
-    _seedPortfolio(const []);
-    var scanTaps = 0;
+  testWidgets(
+    'empty collection renders honest empty state and no fake metrics',
+    (tester) async {
+      _seedPortfolio(const []);
+      var scanTaps = 0;
 
-    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Your collection starts here'), findsOneWidget);
-    expect(
-      find.text('Scan your first collectible and start building your collection.'),
-      findsOneWidget,
-    );
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
-    expect(find.text('Recent collectibles'), findsNothing);
-    expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('home-empty-authority-card')),
+        findsOneWidget,
+      );
+      expect(find.text('Your collection is waiting'), findsOneWidget);
+      expect(find.text('Popular Categories'), findsOneWidget);
+      expect(find.text('Cards'), findsOneWidget);
+      expect(find.text('Coins'), findsOneWidget);
+      expect(find.text('Figures'), findsOneWidget);
+      expect(find.text('No collectibles saved yet'), findsOneWidget);
+      expect(find.text('Recent collectibles'), findsNothing);
+      expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
 
-    await _scrollUntilVisible(tester, find.text('Scan first collectible'));
-    await tester.tap(find.text('Scan first collectible'));
-    await tester.pump();
+      await tester.tap(
+        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
+      );
+      await tester.pump();
 
-    expect(scanTaps, 1);
-  });
+      expect(scanTaps, 1);
+    },
+  );
 
   testWidgets('partial-value data preserves valid collection content', (
     tester,
   ) async {
     _seedPortfolio([
-      _item(id: 'valued', title: 'Valued Card', category: 'Trading Card', value: 50),
+      _item(
+        id: 'valued',
+        title: 'Valued Card',
+        category: 'Trading Card',
+        value: 50,
+      ),
       _item(id: 'missing', title: 'Unvalued Coin', category: 'Coin', value: 0),
     ]);
 
@@ -173,35 +195,44 @@ void main() {
     expect(find.text('1 collectible still needs a valuation'), findsOneWidget);
   });
 
-  testWidgets('quick actions use existing callbacks and no unsupported actions', (
-    tester,
-  ) async {
-    var importTaps = 0;
-    var portfolioTaps = 0;
+  testWidgets(
+    'compact actions use existing callbacks and no unsupported actions',
+    (tester) async {
+      var importTaps = 0;
+      var portfolioTaps = 0;
 
-    await tester.pumpWidget(
-      _homeApp(
-        onImportPhotoPressed: () => importTaps++,
-        onPortfolioPressed: () => portfolioTaps++,
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _homeApp(
+          onImportPhotoPressed: () => importTaps++,
+          onPortfolioPressed: () => portfolioTaps++,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('home-secondary-import')), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-secondary-portfolio')), findsOneWidget);
-    expect(find.text('Import photo'), findsOneWidget);
-    expect(find.text('Open portfolio'), findsOneWidget);
-    expect(find.text('Coming soon'), findsNothing);
-    expect(find.text('Trends'), findsNothing);
-    expect(find.text('Notifications'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('home-quick-action-import')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-quick-action-portfolio')),
+        findsOneWidget,
+      );
+      expect(find.text('Import'), findsOneWidget);
+      expect(find.text('Portfolio'), findsOneWidget);
+      expect(find.text('Coming soon'), findsNothing);
+      expect(find.text('Trends'), findsNothing);
+      expect(find.text('Notifications'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('home-secondary-import')));
-    await tester.tap(find.byKey(const ValueKey('home-secondary-portfolio')));
-    await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('home-quick-action-import')));
+      await tester.tap(
+        find.byKey(const ValueKey('home-quick-action-portfolio')),
+      );
+      await tester.pump();
 
-    expect(importTaps, 1);
-    expect(portfolioTaps, 1);
-  });
+      expect(importTaps, 1);
+      expect(portfolioTaps, 1);
+    },
+  );
 
   testWidgets('detail rows open the existing collectible detail route', (
     tester,
@@ -232,35 +263,50 @@ void main() {
     expect(find.byType(CollectibleDetailPage), findsOneWidget);
   });
 
-  testWidgets('Home is reachable inside frozen App Shell and preserves handoffs', (
-    tester,
-  ) async {
-    await tester.pumpShell();
+  testWidgets(
+    'Home is reachable inside frozen App Shell and preserves handoffs',
+    (tester) async {
+      await tester.pumpShell();
 
-    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
-    expect(find.byKey(const ValueKey('shell-destination-home')), findsOneWidget);
-    expect(find.text('Sign in'), findsNothing);
+      expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('shell-destination-home')),
+        findsOneWidget,
+      );
+      expect(find.text('Sign in'), findsNothing);
 
-    await tester.tap(find.widgetWithText(PackLoxButton, 'Scan a collectible'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('shell-destination-scan')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('home-quick-action-scan')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('shell-destination-scan')),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('nav-home')));
-    await tester.pumpAndSettle();
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -120),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('home-secondary-portfolio')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('shell-destination-portfolio')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('nav-home')));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const PageStorageKey<String>('home-scroll-position')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('home-quick-action-portfolio')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('shell-destination-portfolio')),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('nav-home')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('shell-destination-home')), findsOneWidget);
-    expect(find.text('Your collection, at a glance'), findsOneWidget);
-  });
+      await tester.tap(find.byKey(const ValueKey('nav-home')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('shell-destination-home')),
+        findsOneWidget,
+      );
+      expect(find.text('Collection snapshot'), findsOneWidget);
+    },
+  );
 
   testWidgets('light dark large text narrow width and reduced motion render', (
     tester,
@@ -277,15 +323,59 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(PackLoxHero), findsOneWidget);
-    expect(find.text('Scan a collectible'), findsOneWidget);
+    expect(find.byType(PackLoxHeader), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-section-collection-snapshot')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(_homeApp(themeMode: ThemeMode.light));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PackLoxHero), findsOneWidget);
+    expect(find.byType(PackLoxHeader), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('first viewport section order follows approved Home authority', (
+    tester,
+  ) async {
+    _seedPortfolio(const []);
+    await tester.binding.setSurfaceSize(const Size(390, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    final headerTop = tester.getTopLeft(find.byType(PackLoxHeader)).dy;
+    final emptyTop = tester
+        .getTopLeft(find.byKey(const ValueKey('home-empty-authority-card')))
+        .dy;
+    final statusTop = tester.getTopLeft(find.text('Collection status')).dy;
+    final categoriesTop = tester.getTopLeft(find.text('Popular Categories')).dy;
+    final actionsTop = tester
+        .getTopLeft(find.byKey(const ValueKey('home-quick-action-import')))
+        .dy;
+
+    expect(headerTop, lessThan(emptyTop));
+    expect(emptyTop, lessThan(statusTop));
+    expect(statusTop, lessThan(categoriesTop));
+    expect(categoriesTop, lessThan(actionsTop));
+  });
+
+  testWidgets('rapid Scan taps trigger one navigation request', (tester) async {
+    _seedPortfolio(const []);
+    var scanTaps = 0;
+
+    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
+    await tester.pumpAndSettle();
+
+    final scan = find.widgetWithText(PackLoxButton, 'Scan a Collectible');
+    await tester.tap(scan);
+    await tester.tap(scan);
+    await tester.pump();
+
+    expect(scanTaps, 1);
   });
 
   testWidgets('unsupported loading retry and error UI are not invented', (
@@ -329,55 +419,63 @@ void main() {
     expect(recentTitle.overflow, TextOverflow.ellipsis);
   });
 
-  testWidgets('collection snapshot and recent surfaces use PackLox tokens in light mode', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.light));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'collection snapshot and recent surfaces use approved dark Home tokens when system is light',
+    (tester) async {
+      await tester.pumpWidget(_homeApp(themeMode: ThemeMode.light));
+      await tester.pumpAndSettle();
 
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-section-collection-snapshot')),
-    );
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-recent-home-test-card')),
-    );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-collection-snapshot')),
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-recent-home-test-card')),
+      );
 
-    expect(
-      _containerColor(tester, const ValueKey('home-section-collection-snapshot')),
-      _expectedPackLoxRaisedSurface(Brightness.light),
-    );
-    expect(
-      _containerColor(tester, const ValueKey('home-recent-home-test-card')),
-      _expectedPackLoxRaisedSurface(Brightness.light),
-    );
-  });
+      expect(
+        _containerColor(
+          tester,
+          const ValueKey('home-section-collection-snapshot'),
+        ),
+        _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+      expect(
+        _containerColor(tester, const ValueKey('home-recent-home-test-card')),
+        _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+    },
+  );
 
-  testWidgets('collection snapshot and recent surfaces use PackLox tokens in dark mode', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.dark));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'collection snapshot and recent surfaces use PackLox tokens in dark mode',
+    (tester) async {
+      await tester.pumpWidget(_homeApp(themeMode: ThemeMode.dark));
+      await tester.pumpAndSettle();
 
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-section-collection-snapshot')),
-    );
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-recent-home-test-card')),
-    );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-collection-snapshot')),
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-recent-home-test-card')),
+      );
 
-    expect(
-      _containerColor(tester, const ValueKey('home-section-collection-snapshot')),
-      _expectedPackLoxRaisedSurface(Brightness.dark),
-    );
-    expect(
-      _containerColor(tester, const ValueKey('home-recent-home-test-card')),
-      _expectedPackLoxRaisedSurface(Brightness.dark),
-    );
-  });
+      expect(
+        _containerColor(
+          tester,
+          const ValueKey('home-section-collection-snapshot'),
+        ),
+        _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+      expect(
+        _containerColor(tester, const ValueKey('home-recent-home-test-card')),
+        _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+    },
+  );
 }
 
 Widget _homeApp({
