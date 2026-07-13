@@ -11,8 +11,6 @@ class ScanWorkspaceScreen extends StatefulWidget {
   const ScanWorkspaceScreen({
     required this.photos,
     required this.primaryImagePath,
-    required this.detectedCategory,
-    required this.confidence,
     required this.nextBestRole,
     required this.isBusy,
     required this.errorMessage,
@@ -26,8 +24,6 @@ class ScanWorkspaceScreen extends StatefulWidget {
 
   final List<ScannerPhotoSlot> photos;
   final String? primaryImagePath;
-  final String detectedCategory;
-  final double confidence;
   final ScanCaptureRole nextBestRole;
   final bool isBusy;
   final String? errorMessage;
@@ -104,8 +100,6 @@ class _ScanWorkspaceScreenState extends State<ScanWorkspaceScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     WorkspaceMetadata(
-                      detectedCategory: widget.detectedCategory,
-                      confidence: widget.confidence,
                       photoCount: widget.photos.length,
                       nextBestRole: widget.nextBestRole,
                     ),
@@ -241,15 +235,11 @@ class WorkspaceFilmstrip extends StatelessWidget {
 
 class WorkspaceMetadata extends StatelessWidget {
   const WorkspaceMetadata({
-    required this.detectedCategory,
-    required this.confidence,
     required this.photoCount,
     required this.nextBestRole,
     super.key,
   });
 
-  final String detectedCategory;
-  final double confidence;
   final int photoCount;
   final ScanCaptureRole nextBestRole;
 
@@ -270,20 +260,6 @@ class WorkspaceMetadata extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: _RecommendedAngleBadge(role: nextBestRole),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _MetadataRow(
-              label: 'Auto Detect',
-              value: detectedCategory,
-              icon: Icons.auto_awesome_outlined,
-              valueKey: 'workspace-metadata-category-value',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _MetadataRow(
-              label: 'Confidence',
-              value: '${(confidence * 100).round()}%',
-              icon: Icons.verified_outlined,
-              valueKey: 'workspace-metadata-confidence-value',
             ),
             const SizedBox(height: AppSpacing.md),
             _MetadataRow(

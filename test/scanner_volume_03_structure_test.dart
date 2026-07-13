@@ -101,6 +101,9 @@ void main() {
         final workspace = _read(
           'lib/features/scanner/presentation/widgets/capture_workspace.dart',
         );
+        final legacyWorkspace = _read(
+          'lib/features/scanner/presentation/pages/scan_workspace_screen.dart',
+        );
 
         expect(screen, contains('CaptureWorkspace('));
         expect(screen, contains('scannerState.captureImages'));
@@ -127,6 +130,12 @@ void main() {
         expect(workspace, contains('Use as Primary'));
         expect(workspace, isNot(contains('Auto Detect')));
         expect(workspace, isNot(contains('raw confidence')));
+        expect(legacyWorkspace, isNot(contains('Auto Detect')));
+        expect(legacyWorkspace, isNot(contains("label: 'Confidence'")));
+        expect(
+          legacyWorkspace,
+          isNot(contains('workspace-metadata-confidence')),
+        );
       },
     );
 
