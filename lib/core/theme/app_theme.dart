@@ -6,6 +6,11 @@ class AppTheme {
   const AppTheme._();
 
   static const _seedColor = AppColors.accent;
+  static const _darkModalBarrierAlpha = 0.58;
+  static const _lightModalBarrierAlpha = 0.34;
+  static const _darkSheetShadowAlpha = 0.42;
+  static const _darkDialogShadowAlpha = 0.40;
+  static const _lightOverlayShadowAlpha = 0.16;
 
   static ThemeData get light {
     const colorScheme = ColorScheme(
@@ -171,9 +176,11 @@ class AppTheme {
         backgroundColor: overlaySurface,
         modalBackgroundColor: overlaySurface,
         surfaceTintColor: Colors.transparent,
-        shadowColor: colorScheme.shadow.withValues(alpha: isDark ? 0.42 : 0.16),
+        shadowColor: colorScheme.shadow.withValues(
+          alpha: isDark ? _darkSheetShadowAlpha : _lightOverlayShadowAlpha,
+        ),
         modalBarrierColor: colorScheme.scrim.withValues(
-          alpha: isDark ? 0.58 : 0.34,
+          alpha: isDark ? _darkModalBarrierAlpha : _lightModalBarrierAlpha,
         ),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
@@ -185,7 +192,9 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: overlaySurface,
         surfaceTintColor: Colors.transparent,
-        shadowColor: colorScheme.shadow.withValues(alpha: isDark ? 0.40 : 0.16),
+        shadowColor: colorScheme.shadow.withValues(
+          alpha: isDark ? _darkDialogShadowAlpha : _lightOverlayShadowAlpha,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.xl),
           side: BorderSide(color: colorScheme.outlineVariant),
