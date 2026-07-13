@@ -5050,11 +5050,17 @@ void main() {
     expect(find.text('Coin'), findsWidgets);
     expect(find.text('Needs Review'), findsOneWidget);
     expect(find.textContaining('62%'), findsWidgets);
-    expect(find.text('Unknown'), findsWidgets);
-    expect(find.text('AI Summary'), findsOneWidget);
+    expect(find.text('Rarity unavailable'), findsWidgets);
+    expect(find.text('AI Review'), findsOneWidget);
     expect(
       find.textContaining(
-        'Confidence is lower because some details may be unclear',
+        'No stored AI review is available for this collectible yet.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'No additional metadata has been saved for this collectible yet.',
       ),
       findsOneWidget,
     );
@@ -5304,7 +5310,7 @@ void main() {
     expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('High confidence (94%)'), findsOneWidget);
     expect(find.text('Primary Metadata'), findsOneWidget);
-    expect(find.text('AI Summary'), findsOneWidget);
+    expect(find.text('AI Review'), findsOneWidget);
     expect(find.text('Raw Diagnostics'), findsOneWidget);
     expect(find.text('Date Added'), findsNothing);
     expect(find.text('27/06/2026'), findsNothing);
@@ -5328,7 +5334,7 @@ void main() {
     expect(find.text('Stable'), findsWidgets);
     expect(find.text('Recent comparable sales'), findsOneWidget);
     expect(find.text(r'$1,443 - $2,257'), findsWidgets);
-    expect(find.text('Mock market blend'), findsOneWidget);
+    expect(find.text('Mock market blend'), findsWidgets);
     expect(find.text('Recommendation'), findsOneWidget);
 
     await tester.reveal(find.text('Wishlist Status'));
@@ -5344,26 +5350,29 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 4));
 
-    await tester.reveal(find.text('Price History'));
+    await tester.reveal(find.text('Value Evidence'));
     await tester.pump();
-    expect(find.text('Price History'), findsOneWidget);
-    expect(find.text('Current Value'), findsOneWidget);
-    expect(find.text('6-month Change'), findsOneWidget);
-    expect(find.text('Highest Value'), findsOneWidget);
-    expect(find.text('Lowest Value'), findsOneWidget);
-    expect(find.text(r'$1,200'), findsWidgets);
-    expect(find.text('Jan'), findsOneWidget);
-    expect(find.text('Jun'), findsOneWidget);
+    expect(find.text('Value Evidence'), findsOneWidget);
+    expect(
+      find.text(
+        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Estimated market value'), findsOneWidget);
+    expect(find.text('Pricing confidence'), findsOneWidget);
+    expect(find.text('Market trend'), findsOneWidget);
+    expect(find.text('85%'), findsWidgets);
 
     await tester.reveal(
       find.text(
-        'Market trend looks positive. Consider holding or grading before selling.',
+        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
       ),
     );
     await tester.pump();
     expect(
       find.text(
-        'Market trend looks positive. Consider holding or grading before selling.',
+        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
       ),
       findsOneWidget,
     );
