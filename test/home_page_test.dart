@@ -1,13 +1,20 @@
 import 'dart:convert';
 
-import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/navigation/app_shell.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
+import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -17,66 +24,155 @@ void main() {
     _seedPortfolio(_portfolioItems());
   });
 
-  testWidgets('compact hero renders collection context without old headline', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Good '), findsOneWidget);
-    expect(find.text('Ready to grow your collection?'), findsOneWidget);
-    expect(
-      find.text('You have 5 collectibles worth an estimated \$2,275.'),
-      findsOneWidget,
-    );
-    expect(find.text('Your Collection Hub'), findsNothing);
-    expect(find.byType(MotionParallax), findsOneWidget);
-
-    final heroContainer = tester.widget<Container>(
-      find.byKey(const ValueKey('home-hero-container')),
-    );
-    final heroDecoration = heroContainer.decoration! as BoxDecoration;
-    expect(heroDecoration.gradient, AppGradients.premiumHeroGradient);
-    expect(heroContainer.constraints?.minHeight, 156);
-
-    final heroMotion = tester.widget<MotionElasticHero>(
-      find.byKey(const ValueKey('home-hero-motion')),
-    );
-    expect(heroMotion.baseHeight, 156);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('home-hero-motion'))).height,
-      greaterThanOrEqualTo(156),
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('scan cta is primary and exposes accessibility semantics', (
+  testWidgets('renders approved Header Hero Button and Entry Tile composition', (
     tester,
   ) async {
     var scanTaps = 0;
-    final semantics = tester.ensureSemantics();
 
     await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('home-primary-scan-cta')), findsOneWidget);
-    expect(find.text('Scan a collectible'), findsOneWidget);
-    expect(find.text('Identify, value, and save an item'), findsOneWidget);
-    final node = tester.getSemantics(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    expect(node.label, contains('Scan a collectible'));
-    expect(node.hint, contains('Starts a new collectible scan'));
-    expect(node.flagsCollection.isButton, isTrue);
-    semantics.dispose();
+    expect(find.byType(PackLoxHeader), findsOneWidget);
+    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('Collector'), findsOneWidget);
+    expect(find.byType(PackLoxHero), findsOneWidget);
+    expect(find.text('Your collection, at a glance'), findsOneWidget);
+    expect(find.byType(PackLoxEntryTile), findsNWidgets(2));
+    expect(find.byType(PackLoxButton), findsOneWidget);
+    expect(find.widgetWithText(PackLoxButton, 'Scan a collectible'), findsOneWidget);
+    expect(find.byType(MotionElasticHero), findsNothing);
+    expect(find.byType(MotionParallax), findsNothing);
+    expect(find.byType(MotionReveal), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.widgetWithText(PackLoxButton, 'Scan a collectible'));
     await tester.pump();
 
     expect(scanTaps, 1);
   });
 
-  testWidgets('secondary actions are compact and functional only', (
+  testWidgets('loaded data displays real collection values and recent content', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('\$2,275'), findsOneWidget);
+    expect(
+      find.text('You have 5 collectibles worth an estimated \$2,275.'),
+      findsOneWidget,
+    );
+
+    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+
+    expect(find.text('\$2,275 estimated value'), findsOneWidget);
+    expect(find.text('5 collectibles'), findsOneWidget);
+    expect(find.text('3 categories'), findsOneWidget);
+    expect(find.textContaining('Last scan'), findsOneWidget);
+    expect(find.text('Top collectible'), findsOneWidget);
+    expect(find.text('Premium Charizard'), findsWidgets);
+    expect(find.text('Recent collectibles'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-recent-home-test-card')), findsOneWidget);
+  });
+
+  testWidgets('unavailable values are not fabricated as zero', (tester) async {
+    _seedPortfolio([
+      _item(
+        id: 'not-valued',
+        title: 'Mystery Promo',
+        category: 'Trading Card',
+        value: 0,
+      ),
+    ]);
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+
+    expect(find.text('Value unavailable'), findsWidgets);
+    expect(find.text('\$0'), findsNothing);
+    expect(find.text('\$0 estimated value'), findsNothing);
+    expect(find.text('Latest collectible'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-grounded-insight')),
+    );
+    expect(find.text('1 collectible still needs a valuation'), findsOneWidget);
+  });
+
+  testWidgets('zero-value market estimates remain distinct from unavailable', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item(
+        id: 'zero-market',
+        title: 'Zero Dollar Market Item',
+        category: 'Coin',
+        value: 0,
+        valuationStatus: 'market_estimated',
+      ),
+    ]);
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('\$0'), findsOneWidget);
+    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+    expect(find.text('\$0 estimated value'), findsOneWidget);
+    expect(find.text('Value unavailable'), findsNothing);
+    expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
+  });
+
+  testWidgets('empty collection renders honest empty state and no fake metrics', (
+    tester,
+  ) async {
+    _seedPortfolio(const []);
+    var scanTaps = 0;
+
+    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your collection starts here'), findsOneWidget);
+    expect(
+      find.text('Scan your first collectible and start building your collection.'),
+      findsOneWidget,
+    );
+    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('Recent collectibles'), findsNothing);
+    expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
+
+    await _scrollUntilVisible(tester, find.text('Scan first collectible'));
+    await tester.tap(find.text('Scan first collectible'));
+    await tester.pump();
+
+    expect(scanTaps, 1);
+  });
+
+  testWidgets('partial-value data preserves valid collection content', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item(id: 'valued', title: 'Valued Card', category: 'Trading Card', value: 50),
+      _item(id: 'missing', title: 'Unvalued Coin', category: 'Coin', value: 0),
+    ]);
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+
+    expect(find.text('\$50 estimated value'), findsOneWidget);
+    expect(find.text('2 collectibles'), findsOneWidget);
+    expect(find.text('Valued Card'), findsWidgets);
+    expect(find.text('Unvalued Coin'), findsWidgets);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-grounded-insight')),
+    );
+    expect(find.text('1 collectible still needs a valuation'), findsOneWidget);
+  });
+
+  testWidgets('quick actions use existing callbacks and no unsupported actions', (
     tester,
   ) async {
     var importTaps = 0;
@@ -91,14 +187,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('home-secondary-import')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('home-secondary-portfolio')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('home-secondary-portfolio')), findsOneWidget);
     expect(find.text('Import photo'), findsOneWidget);
     expect(find.text('Open portfolio'), findsOneWidget);
-    expect(find.text('PI (Soon)'), findsNothing);
-    expect(find.text('Trends Planned'), findsNothing);
+    expect(find.text('Coming soon'), findsNothing);
+    expect(find.text('Trends'), findsNothing);
+    expect(find.text('Notifications'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('home-secondary-import')));
     await tester.tap(find.byKey(const ValueKey('home-secondary-portfolio')));
@@ -108,69 +202,9 @@ void main() {
     expect(portfolioTaps, 1);
   });
 
-  testWidgets('duplicate standalone metrics panel is absent', (tester) async {
-    await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('home-stats-surface')), findsNothing);
-    expect(find.text('Total value'), findsNothing);
-    expect(find.text('Portfolio Overview'), findsNothing);
-    expect(find.text('Trend'), findsNothing);
-  });
-
-  testWidgets(
-    'collection snapshot shows real count value and top collectible',
-    (tester) async {
-      await tester.pumpWidget(_homeApp());
-      await tester.pumpAndSettle();
-
-      await _scrollUntilVisible(tester, find.text('Collection snapshot'));
-
-      expect(find.text('Collection snapshot'), findsOneWidget);
-      expect(find.text('\$2,275 estimated value'), findsOneWidget);
-      expect(find.text('5 collectibles'), findsOneWidget);
-      expect(find.text('3 categories'), findsOneWidget);
-      expect(find.text('Top collectible'), findsOneWidget);
-      expect(find.text('Premium Charizard'), findsWidgets);
-
-      final topThumbnail = tester.widget<PortfolioThumbnail>(
-        find.descendant(
-          of: find.byKey(const ValueKey('home-top-collectible-home-test-card')),
-          matching: find.byType(PortfolioThumbnail),
-        ),
-      );
-      expect(topThumbnail.size, 72);
-    },
-  );
-
-  testWidgets('unavailable values are honest and do not show misleading zero', (
+  testWidgets('detail rows open the existing collectible detail route', (
     tester,
   ) async {
-    _seedPortfolio([
-      _item(
-        id: 'not-valued',
-        title: 'Mystery Promo',
-        category: 'Trading Card',
-        value: 0,
-      ),
-    ]);
-
-    await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
-
-    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
-
-    expect(find.text('Value unavailable'), findsWidgets);
-    expect(find.text('\$0 estimated value'), findsNothing);
-    expect(find.text('\$0'), findsNothing);
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-grounded-insight')),
-    );
-    expect(find.byKey(const ValueKey('home-grounded-insight')), findsOneWidget);
-  });
-
-  testWidgets('top collectible and recent rows open detail', (tester) async {
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
@@ -197,24 +231,83 @@ void main() {
     expect(find.byType(CollectibleDetailPage), findsOneWidget);
   });
 
-  testWidgets('recent collectibles are compact and view all opens portfolio', (
+  testWidgets('Home is reachable inside frozen App Shell and preserves handoffs', (
     tester,
   ) async {
-    var portfolioTaps = 0;
+    await tester.pumpShell();
+
+    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell-destination-home')), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+
+    await tester.tap(find.widgetWithText(PackLoxButton, 'Scan a collectible'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shell-destination-scan')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('nav-home')));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home-secondary-portfolio')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shell-destination-portfolio')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('nav-home')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shell-destination-home')), findsOneWidget);
+    expect(find.text('Your collection, at a glance'), findsOneWidget);
+  });
+
+  testWidgets('light dark large text narrow width and reduced motion render', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      _homeApp(onPortfolioPressed: () => portfolioTaps++),
+      _homeApp(
+        themeMode: ThemeMode.dark,
+        textScale: 1.8,
+        disableAnimations: true,
+      ),
     );
     await tester.pumpAndSettle();
 
-    await _scrollUntilVisible(tester, find.text('Recent collectibles'));
+    expect(find.byType(PackLoxHero), findsOneWidget);
+    expect(find.text('Scan a collectible'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
-    expect(find.text('Recent collectibles'), findsOneWidget);
-    expect(find.text('Recent Activity'), findsNothing);
-    expect(find.text('View all'), findsOneWidget);
-    expect(
+    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.light));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PackLoxHero), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('unsupported loading retry and error UI are not invented', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Retry'), findsNothing);
+    expect(find.textContaining('Unable to load'), findsNothing);
+    expect(find.textContaining('Loading'), findsNothing);
+  });
+
+  testWidgets('recent rows remain compact and use existing thumbnails', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(
+      tester,
       find.byKey(const ValueKey('home-recent-home-test-card')),
-      findsOneWidget,
     );
 
     final recentThumbnail = tester.widget<PortfolioThumbnail>(
@@ -233,80 +326,6 @@ void main() {
     );
     expect(recentTitle.maxLines, 2);
     expect(recentTitle.overflow, TextOverflow.ellipsis);
-
-    await tester.tap(find.text('View all'));
-    await tester.pump();
-    expect(portfolioTaps, 1);
-  });
-
-  testWidgets('empty portfolio state is clean and keeps scan entrypoints', (
-    tester,
-  ) async {
-    _seedPortfolio(const []);
-    var scanTaps = 0;
-
-    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Scan your first collectible and start building your collection.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
-    expect(find.text('Recent collectibles'), findsNothing);
-    expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
-
-    await tester.tap(find.text('Scan first collectible'));
-    await tester.pump();
-    expect(scanTaps, 1);
-  });
-
-  testWidgets('layout passes at 320px with long collectible titles', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(320, 640)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    _seedPortfolio([
-      _item(
-        id: 'very-long-title',
-        title:
-            'Extremely Long Collectible Name With Many Words That Must Wrap Cleanly In A Tiny Phone Layout',
-        category: 'Trading Card',
-        value: 42,
-      ),
-    ]);
-
-    await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
-
-    expect(find.text('Ready to grow your collection?'), findsOneWidget);
-    expect(find.text('Scan a collectible'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('layout passes at normal phone width and in dark mode', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(390, 844)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.dark));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Ready to grow your collection?'), findsOneWidget);
-    expect(find.text('Scan a collectible'), findsOneWidget);
-    expect(find.byType(MotionReveal), findsWidgets);
-    expect(find.byType(MotionTapScale), findsWidgets);
-    expect(tester.takeException(), isNull);
   });
 }
 
@@ -315,16 +334,29 @@ Widget _homeApp({
   VoidCallback? onImportPhotoPressed,
   VoidCallback? onPortfolioPressed,
   ThemeMode themeMode = ThemeMode.light,
+  double textScale = 1,
+  bool disableAnimations = false,
 }) {
   return ProviderScope(
     child: MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      home: HomePage(
-        onScanPressed: onScanPressed,
-        onImportPhotoPressed: onImportPhotoPressed,
-        onPortfolioPressed: onPortfolioPressed,
+      home: Builder(
+        builder: (context) {
+          final mediaQuery = MediaQuery.of(context).copyWith(
+            disableAnimations: disableAnimations,
+            textScaler: TextScaler.linear(textScale),
+          );
+          return MediaQuery(
+            data: mediaQuery,
+            child: HomePage(
+              onScanPressed: onScanPressed,
+              onImportPhotoPressed: onImportPhotoPressed,
+              onPortfolioPressed: onPortfolioPressed,
+            ),
+          );
+        },
       ),
     ),
   );
@@ -402,6 +434,7 @@ Map<String, Object?> _item({
   required String category,
   required double value,
   String condition = 'Near Mint',
+  String? valuationStatus,
   DateTime? createdAt,
 }) {
   return {
@@ -414,6 +447,39 @@ Map<String, Object?> _item({
     'recommendation': 'Keep tracking.',
     'imagePath': 'sample://$id',
     'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
-    'valuationStatus': value > 0 ? 'market_estimated' : 'unavailable',
+    'valuationStatus':
+        valuationStatus ?? (value > 0 ? 'market_estimated' : 'unavailable'),
   };
+}
+
+extension _ShellPump on WidgetTester {
+  Future<void> pumpShell() async {
+    await pumpWidget(
+      ProviderScope(
+        overrides: [
+          onboardingRepositoryProvider.overrideWithValue(
+            const _ImmediateOnboardingRepository(completed: true),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          home: const AppShell(),
+        ),
+      ),
+    );
+    await pumpAndSettle();
+  }
+}
+
+class _ImmediateOnboardingRepository implements OnboardingRepository {
+  const _ImmediateOnboardingRepository({required this.completed});
+
+  final bool completed;
+
+  @override
+  Future<bool> hasCompletedOnboarding() async => completed;
+
+  @override
+  Future<void> setOnboardingCompleted(bool completed) async {}
 }

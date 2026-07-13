@@ -35,7 +35,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
-    expect(find.text('Ready to grow your collection?'), findsOneWidget);
+    expect(find.text('Your collection starts here'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
 

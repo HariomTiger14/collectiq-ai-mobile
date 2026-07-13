@@ -95,7 +95,7 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(repository.writeCalls, 1);
-    expect(find.text('Ready to grow your collection?'), findsOneWidget);
+    expect(find.text('Your collection starts here'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
 
