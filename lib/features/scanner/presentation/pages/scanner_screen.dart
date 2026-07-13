@@ -11,9 +11,9 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
-import 'package:collectiq_ai/features/scanner/presentation/pages/scan_workspace_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/camera_overlay.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_suggestions.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/exposure_slider.dart';
 import 'package:flutter/material.dart';
@@ -220,25 +220,72 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         );
       }
       if (workspacePhotos.isNotEmpty) {
-        return ScanWorkspaceScreen(
-          photos: workspacePhotos,
-          primaryImagePath: scannerState.primaryImagePath ?? selectedImagePath,
-          detectedCategory: _workspaceDetectedCategory(scannerState),
-          confidence: _workspaceConfidence(scannerState),
-          nextBestRole: workspaceRole,
-          isBusy: scannerState.isLoading || scannerState.isPreparingImage,
-          errorMessage: scannerState.errorMessage,
-          onClose: scannerController.resetScan,
-          onSelectPhoto: scannerController.selectCapturedPhoto,
-          onCaptureNext: () => setState(() {
-            _showCaptureLoopScan = true;
-            _captureLoopRoleId = workspaceRole.id;
-          }),
-          onAddPhoto: () => scannerController.pickImageFromGallery(
-            context: context,
-            imageRole: workspaceRole.id,
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Scan Workspace'),
+            leading: IconButton(
+              key: const ValueKey('workspace-close'),
+              onPressed: scannerController.resetScan,
+              icon: const Icon(Icons.close),
+              tooltip: 'Close',
+            ),
           ),
-          onAnalyze: scannerController.analyzeWithAi,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CaptureWorkspace(
+                    goal: activeGoal,
+                    category: scannerState.captureCategory,
+                    plan: activePlan,
+                    slots: scannerState.photoSlots,
+                    captureImages: workspacePhotos,
+                    isBusy:
+                        scannerState.isLoading || scannerState.isPreparingImage,
+                    hasResult: false,
+                    selectedPath: selectedImagePath,
+                    activeRoleId:
+                        scannerState.activeCaptureRole ?? workspaceRole.id,
+                    selectedItemTitle: scannerState.selectedItemTitle,
+                    selectedItemStatus: scannerState.selectedItemStatus,
+                    categoryLabel: scannerState.captureCategory.title,
+                    hasManualCategory: scannerState.hasManualCaptureCategory,
+                    onPrimaryCapture: () => setState(() {
+                      _showCaptureLoopScan = true;
+                      _captureLoopRoleId = workspaceRole.id;
+                    }),
+                    onAnalyze: scannerController.analyzeWithAi,
+                    onCamera: (role) => scannerController.startCameraScan(
+                      context,
+                      imageRole: role,
+                    ),
+                    onGallery: (role) => scannerController.pickImageFromGallery(
+                      context: context,
+                      imageRole: role,
+                    ),
+                    onSelectRole: scannerController.selectCaptureRole,
+                    onPreview: scannerController.selectCapturedPhoto,
+                    onUseAsPrimary: scannerController.useCapturedPhotoAsPrimary,
+                    onEnhance: scannerController.applyEnhancementToPhoto,
+                    onDelete: scannerController.deleteCapturedImage,
+                    onSample: scannerController.useSampleScan,
+                    onReset: scannerController.resetScan,
+                  ),
+                  if (scannerState.errorMessage != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _ScannerWorkspaceError(message: scannerState.errorMessage!),
+                  ],
+                ],
+              ),
+            ),
+          ),
         );
       }
       return Scaffold(
@@ -379,13 +426,6 @@ ScanCaptureRole _nextWorkspaceRole(
   );
 }
 
-String _workspaceDetectedCategory(ScannerState state) {
-  if (state.hasManualCaptureCategory) {
-    return state.captureCategory.title;
-  }
-  return _workspaceCategoryForPhotos(state.captureImages);
-}
-
 String _workspaceCategoryForPhotos(List<ScannerPhotoSlot> photos) {
   final roles = photos.map((slot) => slot.role.toLowerCase());
   final sources = photos.map((slot) => slot.path.toLowerCase());
@@ -408,19 +448,43 @@ String _workspaceCategoryForPhotos(List<ScannerPhotoSlot> photos) {
   return 'Collectible';
 }
 
-double _workspaceConfidence(ScannerState state) {
-  final photos = state.captureImages;
-  if (photos.isEmpty) {
-    return 0;
+class _ScannerWorkspaceError extends StatelessWidget {
+  const _ScannerWorkspaceError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colorScheme.error.withValues(alpha: 0.32)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
-  final roleCount = photos.map((slot) => slot.role).toSet().length;
-  final enhancedCount = photos.where((slot) => slot.isEnhanced).length;
-  final confidence =
-      0.55 +
-      ((photos.length - 1) * 0.1) +
-      (roleCount > 1 ? 0.08 : 0) +
-      (enhancedCount > 0 ? 0.06 : 0);
-  return confidence.clamp(0.55, 0.92).toDouble();
 }
 
 class _SnapchatScanSurface extends StatefulWidget {

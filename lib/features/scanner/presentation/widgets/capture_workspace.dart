@@ -193,31 +193,34 @@ class CaptureWorkspace extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
-          ScanImageFilmstrip(
-            roles: roles,
-            recommendedRoleId: recommendedRole?.id,
-            slots: slots,
-            captureImages: captureImages,
-            roleCounts: roleCounts,
-            selectedPath: selectedPath ?? activeSlot?.path,
-            selectedRoleId: activeSlot == null ? activeRole.id : null,
-            canAddPhoto: recommendedRole != null,
-            isBusy: isBusy,
-            onTapImage: (slot) => _openPhotoReview(
-              context,
-              initialSlot: slot,
-              photos: captureImages,
-              onSelect: onPreview,
+          KeyedSubtree(
+            key: const ValueKey('workspace-filmstrip'),
+            child: ScanImageFilmstrip(
+              roles: roles,
+              recommendedRoleId: recommendedRole?.id,
+              slots: slots,
+              captureImages: captureImages,
+              roleCounts: roleCounts,
+              selectedPath: selectedPath ?? activeSlot?.path,
+              selectedRoleId: activeSlot == null ? activeRole.id : null,
+              canAddPhoto: recommendedRole != null,
+              isBusy: isBusy,
+              onTapImage: (slot) => _openPhotoReview(
+                context,
+                initialSlot: slot,
+                photos: captureImages,
+                onSelect: onPreview,
+                onRetake: (slot) => onCamera(slot.role),
+                onDelete: (slot) => onDelete(slot.path),
+                onUseAsPrimary: onUseAsPrimary,
+                onEnhance: onEnhance,
+              ),
+              onSelectRole: onSelectRole,
+              onCaptureRole: onCamera,
               onRetake: (slot) => onCamera(slot.role),
               onDelete: (slot) => onDelete(slot.path),
-              onUseAsPrimary: onUseAsPrimary,
-              onEnhance: onEnhance,
+              onAddPhoto: isBusy ? null : onPrimaryCapture,
             ),
-            onSelectRole: onSelectRole,
-            onCaptureRole: onCamera,
-            onRetake: (slot) => onCamera(slot.role),
-            onDelete: (slot) => onDelete(slot.path),
-            onAddPhoto: isBusy ? null : onPrimaryCapture,
           ),
           const SizedBox(height: AppSpacing.sm),
           _CaptureProgress(
@@ -1448,103 +1451,116 @@ class _FilmstripPhotoTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final warning = _hasWarning(slot.qualityMetadata);
-    return SizedBox(
-      width: 124,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: selected
-                  ? colorScheme.primary
-                  : warning
-                  ? colorScheme.tertiary
-                  : colorScheme.outlineVariant,
-              width: selected ? 2 : 1,
+    final status = slot.isEnhanced
+        ? slot.enhancementPreset.label
+        : warning
+        ? 'Review'
+        : 'Captured';
+    return Semantics(
+      button: true,
+      selected: selected,
+      label:
+          '${role.title} photo, $status${selected ? ', selected' : ''}. Double tap to review.',
+      child: SizedBox(
+        width: 124,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: DecoratedBox(
+            key: selected
+                ? const ValueKey('workspace-primary-photo-highlight')
+                : null,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: selected
+                    ? colorScheme.primary
+                    : warning
+                    ? colorScheme.tertiary
+                    : colorScheme.outlineVariant,
+                width: selected ? 2 : 1,
+              ),
+              boxShadow: selected ? AppElevation.level1 : null,
             ),
-            boxShadow: selected ? AppElevation.level1 : null,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Stack(
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            child: ScanThumbnail(imagePath: slot.path),
+                          ),
+                        ),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: _TinyCountPill(label: '$countForRole'),
+                        ),
+                        if (slot.isEnhanced)
+                          const Positioned(
+                            left: 6,
+                            bottom: 6,
+                            child: _EnhancedBadge(compact: true),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    role.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
                     children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                          child: ScanThumbnail(imagePath: slot.path),
+                      Expanded(
+                        child: Text(
+                          status,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: warning
+                                ? colorScheme.tertiary
+                                : colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: _TinyCountPill(label: '$countForRole'),
-                      ),
-                      if (slot.isEnhanced)
-                        const Positioned(
-                          left: 6,
-                          bottom: 6,
-                          child: _EnhancedBadge(compact: true),
+                      SizedBox.square(
+                        dimension: 26,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Add another ${role.title}',
+                          onPressed: onRetake,
+                          icon: const Icon(
+                            Icons.add_a_photo_outlined,
+                            size: 15,
+                          ),
                         ),
+                      ),
+                      SizedBox.square(
+                        dimension: 26,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Delete photo',
+                          onPressed: onDelete,
+                          icon: const Icon(Icons.close, size: 15),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  role.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        slot.isEnhanced
-                            ? slot.enhancementPreset.label
-                            : warning
-                            ? 'Review'
-                            : 'Captured',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: warning
-                              ? colorScheme.tertiary
-                              : colorScheme.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    SizedBox.square(
-                      dimension: 26,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        tooltip: 'Add another ${role.title}',
-                        onPressed: onRetake,
-                        icon: const Icon(Icons.add_a_photo_outlined, size: 15),
-                      ),
-                    ),
-                    SizedBox.square(
-                      dimension: 26,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        tooltip: 'Delete photo',
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.close, size: 15),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
