@@ -564,10 +564,7 @@ class _RecentCollectiblesSection extends StatelessWidget {
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(height: AppSpacing.sm),
-            MotionReveal(
-              delay: Duration(milliseconds: i * 30),
-              child: _RecentCollectibleTile(item: items[i]),
-            ),
+            _RecentCollectibleTile(item: items[i]),
           ],
         ],
       ),
@@ -680,32 +677,30 @@ class _GroundedInsightCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final count = data.unvaluedCount;
 
-    return MotionReveal(
-      child: Container(
-        key: const ValueKey('home-grounded-insight'),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.50),
-          ),
+    return Container(
+      key: const ValueKey('home-grounded-insight'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.50),
         ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: colorScheme.primary),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Text(
-                '$count ${count == 1 ? 'collectible still needs' : 'collectibles still need'} a valuation',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
-                ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              '$count ${count == 1 ? 'collectible still needs' : 'collectibles still need'} a valuation',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -726,41 +721,39 @@ class _SectionSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return MotionReveal(
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.52),
-          ),
-          boxShadow: AppElevation.level1,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.52),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                    ),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                ?trailing,
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            child,
-          ],
-        ),
+              ),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          child,
+        ],
       ),
     );
   }
