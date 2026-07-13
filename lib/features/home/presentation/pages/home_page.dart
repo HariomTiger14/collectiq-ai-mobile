@@ -61,6 +61,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final homeData = _HomeViewData.fromInsights(insights);
     final recentItems = homeData.recentItems.take(3).toList(growable: false);
 
+    // Home follows the approved dark authority independent of system brightness.
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
