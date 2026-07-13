@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/main.dart';
 import 'package:collectiq_ai/features/ai/domain/entities/recognition_result.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
@@ -50,6 +51,7 @@ import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -3762,6 +3764,175 @@ void main() {
     expect(find.text('Scan Collectible'), findsWidgets);
   });
 
+  testWidgets(
+    'portfolio root uses PackLox background and protects the header inset',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items':
+            '[{"id":"persisted-1","title":"Persisted Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000"}]',
+      });
+
+      await tester.pumpCollectIqApp();
+      await tester.tap(find.text('Portfolio').last);
+      await tester.pump();
+      await tester.pump();
+
+      final scaffold = tester.widget<Scaffold>(
+        find.byKey(const ValueKey('portfolio-screen-scaffold')),
+      );
+      expect(scaffold.backgroundColor, PackLoxTokens.background);
+
+      final surface = tester.widget<ColoredBox>(
+        find.byKey(const ValueKey('portfolio-screen-surface')),
+      );
+      expect(surface.color, PackLoxTokens.background);
+
+      final safeArea = tester.widget<SafeArea>(
+        find.descendant(
+          of: find.byKey(const ValueKey('portfolio-screen-scaffold')),
+          matching: find.byType(SafeArea),
+        ),
+      );
+      expect(safeArea.top, isTrue);
+      expect(safeArea.bottom, isFalse);
+      expect(
+        tester.getTopLeft(find.text('Your collection')).dy,
+        greaterThanOrEqualTo(0),
+      );
+    },
+  );
+
+  testWidgets('portfolio tab entry returns to the visible top header', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        for (var index = 0; index < 12; index += 1)
+          {
+            'id': 'tab-scroll-$index',
+            'title': 'Tab Scroll Item $index',
+            'category': 'Trading Card',
+            'estimatedValue': 100 + index,
+            'confidence': 0.84,
+            'condition': 'Near Mint',
+            'recommendation': 'Track it.',
+            'imagePath': 'sample://card-$index',
+            'createdAt':
+                '2026-06-${(10 + index).toString().padLeft(2, '0')}T00:00:00.000',
+          },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(
+      find.byKey(const ValueKey('portfolio-scroll-view')),
+      const Offset(0, -900),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Home').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Your collection'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Your collection')).dy,
+      greaterThanOrEqualTo(0),
+    );
+    expect(find.text('Collection summary'), findsOneWidget);
+  });
+
+  testWidgets('portfolio detail return preserves live scroll position', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'portfolio_items': jsonEncode([
+        for (var index = 0; index < 10; index += 1)
+          {
+            'id': 'detail-return-$index',
+            'title': 'Detail Return Item $index',
+            'category': 'Trading Card',
+            'estimatedValue': 100 + index,
+            'confidence': 0.84,
+            'condition': 'Near Mint',
+            'recommendation': 'Track it.',
+            'imagePath': 'sample://card-$index',
+            'createdAt':
+                '2026-06-${(10 + index).toString().padLeft(2, '0')}T00:00:00.000',
+          },
+      ]),
+    });
+
+    await tester.pumpCollectIqApp();
+    await tester.tap(find.text('Portfolio').last);
+    await tester.pump();
+    await tester.pump();
+    await tester.revealPortfolio(
+      find.byKey(const ValueKey('portfolio-grid-item-detail-return-8')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-detail-return-8')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detail Return Item 8'), findsWidgets);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-detail-return-8')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'portfolio empty and no-results surfaces use PackLox tokens in light and dark',
+    (WidgetTester tester) async {
+      for (final themeMode in [ThemeMode.light, ThemeMode.dark]) {
+        final brightness = themeMode == ThemeMode.dark
+            ? Brightness.dark
+            : Brightness.light;
+
+        await tester.pumpWidget(
+          _portfolioSurfaceTestApp(
+            themeMode: themeMode,
+            child: const PortfolioEmptyState(),
+          ),
+        );
+        await tester.pump();
+        expect(
+          _containerColor(
+            tester,
+            const ValueKey('portfolio-empty-state-surface'),
+          ),
+          _expectedPackLoxRaisedSurface(brightness),
+        );
+
+        await tester.pumpWidget(
+          _portfolioSurfaceTestApp(
+            themeMode: themeMode,
+            child: const PortfolioNoSearchResultsState(),
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          _containerColor(
+            tester,
+            const ValueKey('portfolio-no-results-surface'),
+          ),
+          _expectedPackLoxRaisedSurface(brightness),
+        );
+      }
+    },
+  );
+
   testWidgets('portfolio grid renders local thumbnail and overflow actions', (
     WidgetTester tester,
   ) async {
@@ -5543,6 +5714,31 @@ void expectNoFlutterError(WidgetTester tester) {
   fail(exception.toString());
 }
 
+Color? _containerColor(WidgetTester tester, ValueKey<String> key) {
+  final container = tester.widget<Container>(find.byKey(key));
+  final decoration = container.decoration as BoxDecoration?;
+  return decoration?.color;
+}
+
+Color _expectedPackLoxRaisedSurface(Brightness brightness) {
+  return PackLoxTokens.surfaceRaised.withValues(
+    alpha: brightness == Brightness.dark ? 0.94 : 0.90,
+  );
+}
+
+Widget _portfolioSurfaceTestApp({
+  required ThemeMode themeMode,
+  required Widget child,
+}) {
+  return MaterialApp(
+    key: ValueKey('portfolio-surface-test-${themeMode.name}'),
+    theme: AppTheme.light,
+    darkTheme: AppTheme.dark,
+    themeMode: themeMode,
+    home: Scaffold(body: child),
+  );
+}
+
 extension on WidgetTester {
   Future<void> pumpCollectIqApp({
     AIRecognitionService aiRecognitionService =
@@ -5726,9 +5922,7 @@ extension on WidgetTester {
   }
 
   Future<void> revealPortfolio(Finder finder) async {
-    final portfolioScroll = find.byKey(
-      const PageStorageKey<String>('portfolio-scroll-position'),
-    );
+    final portfolioScroll = find.byKey(const ValueKey('portfolio-scroll-view'));
     for (var attempt = 0; attempt < 20; attempt += 1) {
       await pump(const Duration(milliseconds: 50));
       if (finder.evaluate().isNotEmpty) {
@@ -5745,9 +5939,7 @@ extension on WidgetTester {
   }
 
   Future<void> scrollPortfolioToTop() async {
-    final portfolioScroll = find.byKey(
-      const PageStorageKey<String>('portfolio-scroll-position'),
-    );
+    final portfolioScroll = find.byKey(const ValueKey('portfolio-scroll-view'));
     for (var attempt = 0; attempt < 8; attempt += 1) {
       await drag(portfolioScroll, const Offset(0, 520));
       await pump();

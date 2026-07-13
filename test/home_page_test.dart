@@ -7,6 +7,7 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
@@ -327,6 +328,56 @@ void main() {
     expect(recentTitle.maxLines, 2);
     expect(recentTitle.overflow, TextOverflow.ellipsis);
   });
+
+  testWidgets('collection snapshot and recent surfaces use PackLox tokens in light mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.light));
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-collection-snapshot')),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-recent-home-test-card')),
+    );
+
+    expect(
+      _containerColor(tester, const ValueKey('home-section-collection-snapshot')),
+      _expectedPackLoxRaisedSurface(Brightness.light),
+    );
+    expect(
+      _containerColor(tester, const ValueKey('home-recent-home-test-card')),
+      _expectedPackLoxRaisedSurface(Brightness.light),
+    );
+  });
+
+  testWidgets('collection snapshot and recent surfaces use PackLox tokens in dark mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp(themeMode: ThemeMode.dark));
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-collection-snapshot')),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-recent-home-test-card')),
+    );
+
+    expect(
+      _containerColor(tester, const ValueKey('home-section-collection-snapshot')),
+      _expectedPackLoxRaisedSurface(Brightness.dark),
+    );
+    expect(
+      _containerColor(tester, const ValueKey('home-recent-home-test-card')),
+      _expectedPackLoxRaisedSurface(Brightness.dark),
+    );
+  });
 }
 
 Widget _homeApp({
@@ -374,6 +425,18 @@ Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
   }
   await tester.pumpAndSettle();
+}
+
+Color? _containerColor(WidgetTester tester, ValueKey<String> key) {
+  final container = tester.widget<Container>(find.byKey(key));
+  final decoration = container.decoration as BoxDecoration?;
+  return decoration?.color;
+}
+
+Color _expectedPackLoxRaisedSurface(Brightness brightness) {
+  return PackLoxTokens.surfaceRaised.withValues(
+    alpha: brightness == Brightness.dark ? 0.94 : 0.90,
+  );
 }
 
 void _seedPortfolio(List<Map<String, Object?>> items) {
