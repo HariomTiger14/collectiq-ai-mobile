@@ -3,6 +3,7 @@ import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -72,7 +73,9 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 }
 
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController(
+    keepScrollOffset: false,
+  );
   String _searchQuery = '';
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
@@ -115,243 +118,259 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               );
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: LayoutBuilder(
-        builder: (context, viewport) {
-          final horizontalPadding = viewport.maxWidth <= 360
-              ? AppSpacing.md
-              : AppSpacing.lg;
+      key: const ValueKey('portfolio-screen-scaffold'),
+      backgroundColor: PackLoxTokens.background,
+      body: SafeArea(
+        bottom: false,
+        child: ColoredBox(
+          key: const ValueKey('portfolio-screen-surface'),
+          color: PackLoxTokens.background,
+          child: LayoutBuilder(
+            builder: (context, viewport) {
+              final horizontalPadding = viewport.maxWidth <= 360
+                  ? AppSpacing.md
+                  : AppSpacing.lg;
 
-          return CustomScrollView(
-            key: const PageStorageKey<String>('portfolio-scroll-position'),
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _PortfolioFrame(
-                  horizontalPadding: horizontalPadding,
-                  topPadding: AppSpacing.md,
-                  child: const PackLoxHeader(
-                    firstName: '',
-                    fallbackName: 'Portfolio',
-                    greetingText: 'Your collection',
-                    onNotifications: null,
-                  ),
+              return CustomScrollView(
+                key: const ValueKey('portfolio-scroll-view'),
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: _PortfolioFrame(
-                  horizontalPadding: horizontalPadding,
-                  topPadding: AppSpacing.md,
-                  child: _CollectionOverview(
-                    totalValue: portfolioState.totalValue,
-                    itemCount: portfolioState.itemCount,
-                    valuedItemCount: _valuedItemCount(orderedItems),
-                    unvaluedItemCount: _unvaluedItemCount(orderedItems),
-                    categoryCount: _categoryCount(orderedItems),
-                  ),
-                ),
-              ),
-              if (portfolioState.items.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: _PortfolioFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.md,
-                    child: _PortfolioControls(
-                      searchQuery: _searchQuery,
-                      categoryFilter: _categoryFilter,
-                      onSearchChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                      onCategoryFilterChanged: (value) {
-                        setState(() {
-                          _categoryFilter = value;
-                        });
-                      },
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _PortfolioFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.md,
+                      child: const PackLoxHeader(
+                        firstName: '',
+                        fallbackName: 'Portfolio',
+                        greetingText: 'Your collection',
+                        onNotifications: null,
+                      ),
                     ),
                   ),
-                ),
-              SliverToBoxAdapter(
-                child: _PortfolioFrame(
-                  horizontalPadding: horizontalPadding,
-                  topPadding: AppSpacing.sm,
-                  bottomPadding: AppSpacing.md,
-                  child: _PortfolioCommandBar(
-                    onSort: () => _showSortSheet(context),
-                    onFilter: () => _showFilterSheet(context),
-                    onAddItem: widget.onScanPressed,
-                    activeFilterCount: _activeFilterCount,
-                    sortLabel: _sortMode.label,
+                  SliverToBoxAdapter(
+                    child: _PortfolioFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.md,
+                      child: _CollectionOverview(
+                        totalValue: portfolioState.totalValue,
+                        itemCount: portfolioState.itemCount,
+                        valuedItemCount: _valuedItemCount(orderedItems),
+                        unvaluedItemCount: _unvaluedItemCount(orderedItems),
+                        categoryCount: _categoryCount(orderedItems),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  0,
-                  horizontalPadding,
-                  AppSpacing.xl,
-                ),
-                sliver: SliverLayoutBuilder(
-                  builder: (context, constraints) {
-                    if (portfolioState.isLoading &&
-                        portfolioState.items.isEmpty) {
-                      return const SliverToBoxAdapter(
-                        child: _PortfolioSliverBox(
-                          child: Center(child: CircularProgressIndicator()),
+                  if (portfolioState.items.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _PortfolioFrame(
+                        horizontalPadding: horizontalPadding,
+                        topPadding: AppSpacing.md,
+                        child: _PortfolioControls(
+                          searchQuery: _searchQuery,
+                          categoryFilter: _categoryFilter,
+                          onSearchChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                          onCategoryFilterChanged: (value) {
+                            setState(() {
+                              _categoryFilter = value;
+                            });
+                          },
                         ),
-                      );
-                    }
+                      ),
+                    ),
+                  SliverToBoxAdapter(
+                    child: _PortfolioFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.sm,
+                      bottomPadding: AppSpacing.md,
+                      child: _PortfolioCommandBar(
+                        onSort: () => _showSortSheet(context),
+                        onFilter: () => _showFilterSheet(context),
+                        onAddItem: widget.onScanPressed,
+                        activeFilterCount: _activeFilterCount,
+                        sortLabel: _sortMode.label,
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      0,
+                      horizontalPadding,
+                      AppSpacing.xl,
+                    ),
+                    sliver: SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        if (portfolioState.isLoading &&
+                            portfolioState.items.isEmpty) {
+                          return const SliverToBoxAdapter(
+                            child: _PortfolioSliverBox(
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                          );
+                        }
 
-                    if (portfolioState.errorMessage != null) {
-                      return SliverToBoxAdapter(
-                        child: _PortfolioSliverBox(
-                          child: PortfolioErrorState(
-                            message: portfolioState.errorMessage!,
-                          ),
-                        ),
-                      );
-                    }
+                        if (portfolioState.errorMessage != null) {
+                          return SliverToBoxAdapter(
+                            child: _PortfolioSliverBox(
+                              child: PortfolioErrorState(
+                                message: portfolioState.errorMessage!,
+                              ),
+                            ),
+                          );
+                        }
 
-                    if (portfolioState.items.isEmpty) {
-                      return SliverToBoxAdapter(
-                        child: _PortfolioSliverBox(
-                          child: PortfolioEmptyState(
-                            onScanPressed: widget.onScanPressed,
-                          ),
-                        ),
-                      );
-                    }
+                        if (portfolioState.items.isEmpty) {
+                          return SliverToBoxAdapter(
+                            child: _PortfolioSliverBox(
+                              child: PortfolioEmptyState(
+                                onScanPressed: widget.onScanPressed,
+                              ),
+                            ),
+                          );
+                        }
 
-                    if (visibleItems.isEmpty) {
-                      return SliverToBoxAdapter(
-                        child: _PortfolioSliverBox(
-                          child: PortfolioNoSearchResultsState(
-                            onResetFilters: () {
-                              setState(() {
-                                _searchQuery = '';
-                                _categoryFilter = _PortfolioCategoryFilter.all;
-                                _confidenceFilter =
-                                    _PortfolioConfidenceFilter.all;
-                                _trendFilter = _PortfolioTrendFilter.all;
-                                _sortMode = _PortfolioSortMode.newest;
-                              });
-                            },
-                          ),
-                        ),
-                      );
-                    }
+                        if (visibleItems.isEmpty) {
+                          return SliverToBoxAdapter(
+                            child: _PortfolioSliverBox(
+                              child: PortfolioNoSearchResultsState(
+                                onResetFilters: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _categoryFilter =
+                                        _PortfolioCategoryFilter.all;
+                                    _confidenceFilter =
+                                        _PortfolioConfidenceFilter.all;
+                                    _trendFilter = _PortfolioTrendFilter.all;
+                                    _sortMode = _PortfolioSortMode.newest;
+                                  });
+                                },
+                              ),
+                            ),
+                          );
+                        }
 
-                    final crossAxisCount = constraints.crossAxisExtent < 360
-                        ? 1
-                        : constraints.crossAxisExtent >= 720
-                        ? 3
-                        : 2;
-                    final childAspectRatio = switch (crossAxisCount) {
-                      1 => 0.58,
-                      2 => 0.47,
-                      _ => 0.58,
-                    };
+                        final crossAxisCount = constraints.crossAxisExtent < 360
+                            ? 1
+                            : constraints.crossAxisExtent >= 720
+                            ? 3
+                            : 2;
+                        final childAspectRatio = switch (crossAxisCount) {
+                          1 => 0.58,
+                          2 => 0.47,
+                          _ => 0.58,
+                        };
 
-                    return SliverMainAxisGroup(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 960),
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  bottom: AppSpacing.sm,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Collection Items',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                      ),
+                        return SliverMainAxisGroup(
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 960,
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.sm,
                                     ),
-                                    const SizedBox(width: AppSpacing.sm),
-                                    Text(
-                                      '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelMedium
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                            fontWeight: FontWeight.w800,
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            'Collection Items',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w900,
+                                                ),
                                           ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(
+                                          '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelMedium
+                                              ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                        SliverGrid(
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                mainAxisSpacing: AppSpacing.xl,
-                                crossAxisSpacing: AppSpacing.lg,
-                                childAspectRatio: childAspectRatio,
-                              ),
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            final item = visibleItems[index];
+                            SliverGrid(
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    mainAxisSpacing: AppSpacing.xl,
+                                    crossAxisSpacing: AppSpacing.lg,
+                                    childAspectRatio: childAspectRatio,
+                                  ),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final item = visibleItems[index];
 
-                            return MotionReveal(
-                              key: ValueKey('portfolio-grid-motion-${item.id}'),
-                              offset: 12,
-                              delay: Duration(milliseconds: index * 40),
-                              curve: Curves.easeOutCubic,
-                              child: PortfolioGridTile(
-                                key: ValueKey('portfolio-grid-item-${item.id}'),
-                                item: item,
-                                wishlistStatusLabel: _wishlistStatusLabel(
-                                  wishlistStatusByItemId[item.id],
-                                ),
-                                onTap: () => _openItem(
-                                  context,
-                                  item,
-                                  portfolioController,
-                                ),
-                                onViewDetails: () => _openItem(
-                                  context,
-                                  item,
-                                  portfolioController,
-                                ),
-                                onEdit: () => _showEditComingSoon(context),
-                                onDelete: () => _confirmDelete(
-                                  context,
-                                  item.id,
-                                  portfolioController,
-                                ),
-                              ),
-                            );
-                          }, childCount: visibleItems.length),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
+                                return MotionReveal(
+                                  key: ValueKey(
+                                    'portfolio-grid-motion-${item.id}',
+                                  ),
+                                  offset: 12,
+                                  delay: Duration(milliseconds: index * 40),
+                                  curve: Curves.easeOutCubic,
+                                  child: PortfolioGridTile(
+                                    key: ValueKey(
+                                      'portfolio-grid-item-${item.id}',
+                                    ),
+                                    item: item,
+                                    wishlistStatusLabel: _wishlistStatusLabel(
+                                      wishlistStatusByItemId[item.id],
+                                    ),
+                                    onTap: () => _openItem(
+                                      context,
+                                      item,
+                                      portfolioController,
+                                    ),
+                                    onViewDetails: () => _openItem(
+                                      context,
+                                      item,
+                                      portfolioController,
+                                    ),
+                                    onEdit: () => _showEditComingSoon(context),
+                                    onDelete: () => _confirmDelete(
+                                      context,
+                                      item.id,
+                                      portfolioController,
+                                    ),
+                                  ),
+                                );
+                              }, childCount: visibleItems.length),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
