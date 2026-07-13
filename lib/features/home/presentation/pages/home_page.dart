@@ -430,11 +430,9 @@ class _TopCollectiblePreview extends StatelessWidget {
         key: ValueKey('home-top-collectible-${item!.id}'),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
+          color: _packLoxRaisedSurfaceColor(colorScheme),
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.48),
-          ),
+          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
         ),
         child: Row(
           children: [
@@ -593,11 +591,9 @@ class _RecentCollectibleTile extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 86),
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
+          color: _packLoxRaisedSurfaceColor(colorScheme),
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.44),
-          ),
+          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
         ),
         child: Row(
           children: [
@@ -681,11 +677,9 @@ class _GroundedInsightCard extends StatelessWidget {
       key: const ValueKey('home-grounded-insight'),
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.50),
-        ),
+        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
       ),
       child: Row(
         children: [
@@ -722,14 +716,13 @@ class _SectionSurface extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
+      key: ValueKey('home-section-${title.toLowerCase().replaceAll(' ', '-')}'),
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.52),
-        ),
+        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
         boxShadow: AppElevation.level1,
       ),
       child: Column(
@@ -757,6 +750,18 @@ class _SectionSurface extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _packLoxRaisedSurfaceColor(ColorScheme colorScheme) {
+  return PackLoxTokens.surfaceRaised.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.94 : 0.90,
+  );
+}
+
+Color _packLoxSurfaceBorderColor(ColorScheme colorScheme) {
+  return PackLoxTokens.border.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.82 : 0.68,
+  );
 }
 
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {

@@ -1,5 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
@@ -256,12 +257,13 @@ class PortfolioEmptyState extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      key: const ValueKey('portfolio-empty-state-surface'),
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
         boxShadow: AppElevation.level1,
       ),
       child: Column(
@@ -312,12 +314,13 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
+      key: const ValueKey('portfolio-no-results-surface'),
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
         boxShadow: AppElevation.level1,
       ),
       child: Column(
@@ -351,6 +354,18 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _packLoxRaisedSurfaceColor(ColorScheme colorScheme) {
+  return PackLoxTokens.surfaceRaised.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.94 : 0.90,
+  );
+}
+
+Color _packLoxSurfaceBorderColor(ColorScheme colorScheme) {
+  return PackLoxTokens.border.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.82 : 0.68,
+  );
 }
 
 /// Error state shown when local portfolio loading fails.
