@@ -1121,7 +1121,12 @@ class ScannerController extends Notifier<ScannerState> {
         image: persistedImage,
         qualityMetadata: quality.toMetadataJson(),
       );
-      final captureImages = _appendCaptureImage(capturedSlot);
+      final wasAlreadyRecovered = state.captureImages.any(
+        (slot) => slot.path == selectedImagePath && slot.source == 'recovered',
+      );
+      final captureImages = wasAlreadyRecovered
+          ? state.captureImages
+          : _appendCaptureImage(capturedSlot);
       _setState(
         state.copyWith(
           isLoading: false,
