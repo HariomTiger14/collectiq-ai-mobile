@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
@@ -235,7 +236,15 @@ class _AppShellState extends ConsumerState<AppShell>
                 systemNavigationBarIconBrightness: Brightness.light,
                 systemNavigationBarContrastEnforced: false,
               )
-            : SystemUiOverlayStyle.dark;
+            : const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+                systemNavigationBarColor: PackLoxTokens.background,
+                systemNavigationBarDividerColor: PackLoxTokens.background,
+                systemNavigationBarIconBrightness: Brightness.light,
+                systemNavigationBarContrastEnforced: false,
+              );
 
         return PackLoxEntryTransition(
           stateKey: 'entry-shell',
