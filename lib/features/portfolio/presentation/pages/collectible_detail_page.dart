@@ -11,6 +11,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhanceme
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +98,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const PackLoxHeader(
+                          firstName: '',
+                          fallbackName: 'Detail',
+                          greetingText: 'Collectible record',
+                          onNotifications: null,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
                         _PremiumDetailHero(
                           item: currentItem,
                           selectedImage: selectedImage,
@@ -1492,13 +1500,19 @@ class _AiSummarySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final summary = _storedAiSummaryFor(item);
     return AppProfileSection(
-      title: 'AI Summary',
+      title: 'AI Review',
       children: [
-        Text(
-          _aiSummaryFor(item),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        if (summary == null)
+          Text(
+            'No stored AI review is available for this collectible yet.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          Text(summary, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );
   }
@@ -1516,14 +1530,22 @@ class _KeyAttributeChipsSection extends StatelessWidget {
     return AppProfileSection(
       title: 'Key Attributes',
       children: [
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            for (final chip in chips)
-              _DetailChip(icon: Icons.sell_outlined, label: chip),
-          ],
-        ),
+        if (chips.isEmpty)
+          Text(
+            'No additional metadata has been saved for this collectible yet.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final chip in chips)
+                _DetailChip(icon: Icons.sell_outlined, label: chip),
+            ],
+          ),
       ],
     );
   }
@@ -2627,18 +2649,34 @@ class _PriceHistorySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final prices = _pricesFor(item);
-    final currentValue = prices.last.value;
-    final lowestValue = prices
-        .map((point) => point.value)
-        .reduce((current, next) => current < next ? current : next);
-    final highestValue = prices
-        .map((point) => point.value)
-        .reduce((current, next) => current > next ? current : next);
-    final change = currentValue - prices.first.value;
-    final changePercent = prices.first.value == 0
-        ? 0
-        : change / prices.first.value * 100;
+    final pricing = item.pricing;
+    final market = item.marketSummary;
+    final metadata = <AppMetadataItem>[
+      if (pricing != null) ...[
+        AppMetadataItem(
+          label: 'Estimated market value',
+          value: _formatMoney(pricing.estimatedMarketValue, pricing.currency),
+        ),
+        AppMetadataItem(
+          label: 'Estimated range',
+          value:
+              '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+        ),
+        AppMetadataItem(label: 'Pricing source', value: pricing.pricingSource),
+        AppMetadataItem(
+          label: 'Pricing confidence',
+          value: '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+        ),
+      ],
+      if (market != null) ...[
+        AppMetadataItem(label: 'Market trend', value: market.trendLabel),
+        AppMetadataItem(label: 'Recent sales', value: '${market.salesCount}'),
+        AppMetadataItem(
+          label: 'Market confidence',
+          value: '${(market.confidence * 100).toStringAsFixed(0)}%',
+        ),
+      ],
+    ];
 
     return Container(
       width: double.infinity,
@@ -2653,295 +2691,30 @@ class _PriceHistorySection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Price History',
+            'Value Evidence',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Item value summary with accessible labels and local trend estimates.',
+            'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _ItemValueSummaryVisual(item: item),
-          const SizedBox(height: AppSpacing.xl),
-          AppResponsiveMetricGroup(
-            metrics: [
-              AppMetricData(
-                label: 'Current Value',
-                value: _formatAud(currentValue.toDouble()),
-              ),
-              AppMetricData(
-                label: '6-month Change',
-                value:
-                    '+${_formatAud(change.toDouble())} (${changePercent.toStringAsFixed(0)}%)',
-              ),
-              AppMetricData(
-                label: 'Highest Value',
-                value: _formatAud(highestValue.toDouble()),
-              ),
-              AppMetricData(
-                label: 'Lowest Value',
-                value: _formatAud(lowestValue.toDouble()),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          _PriceBars(points: prices, highestValue: highestValue),
-          const SizedBox(height: AppSpacing.xl),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.38),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Text(
-              'Market trend looks positive. Consider holding or grading before selling.',
+          if (metadata.isEmpty)
+            Text(
+              'No market pricing evidence has been saved for this collectible.',
               style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
               ),
-            ),
-          ),
+            )
+          else
+            AppCompactMetadata(items: metadata),
         ],
       ),
     );
   }
-}
-
-class _PricePoint {
-  const _PricePoint({required this.month, required this.value});
-
-  final String month;
-  final int value;
-}
-
-class _ItemValueSummaryVisual extends StatelessWidget {
-  const _ItemValueSummaryVisual({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final pricing = item.pricing;
-    final current = pricing?.estimatedMarketValue ?? item.estimatedValue;
-    final low = pricing?.lowEstimate ?? current * 0.82;
-    final high = pricing?.highEstimate ?? current * 1.18;
-    final span = high - low;
-    final position = span <= 0 ? 0.5 : ((current - low) / span).clamp(0.0, 1.0);
-
-    return Semantics(
-      label:
-          'Item value summary. Current value ${_formatMoney(current, pricing?.currency ?? 'AUD')}. Range ${_formatMoney(low, pricing?.currency ?? 'AUD')} to ${_formatMoney(high, pricing?.currency ?? 'AUD')}.',
-      container: true,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final dense = constraints.maxWidth < 360;
-                return Wrap(
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.sm,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: _valueGold.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                      child: const Icon(
-                        Icons.stacked_line_chart_outlined,
-                        color: _valueGold,
-                      ),
-                    ),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: dense
-                            ? (constraints.maxWidth - 58).clamp(
-                                180.0,
-                                constraints.maxWidth,
-                              )
-                            : 520,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Item Value Summary',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _formatMoney(current, pricing?.currency ?? 'AUD'),
-                              style: textTheme.titleLarge?.copyWith(
-                                color: _valueGold,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: LinearProgressIndicator(
-                value: position,
-                minHeight: 10,
-                backgroundColor: colorScheme.outlineVariant,
-                valueColor: const AlwaysStoppedAnimation<Color>(_valueGold),
-                semanticsLabel: 'Current value position in estimated range',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.xs,
-              alignment: WrapAlignment.spaceBetween,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: Text(
-                    'Low ${_formatMoney(low, pricing?.currency ?? 'AUD')}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: Text(
-                    'High ${_formatMoney(high, pricing?.currency ?? 'AUD')}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PriceBars extends StatelessWidget {
-  const _PriceBars({required this.points, required this.highestValue});
-
-  final List<_PricePoint> points;
-  final int highestValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SizedBox(
-      height: 156,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (final point in points) ...[
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      _formatAud(point.value.toDouble()),
-                      maxLines: 1,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    width: 24,
-                    height: 88 * point.value / highestValue,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    point.month,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (point != points.last) const SizedBox(width: AppSpacing.sm),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-List<_PricePoint> _pricesFor(CollectibleItem item) {
-  final current = (item.pricing?.estimatedMarketValue ?? item.estimatedValue)
-      .round()
-      .clamp(1, 1000000000)
-      .toInt();
-  final factors = [
-    1200 / 1850,
-    1350 / 1850,
-    1480 / 1850,
-    1620 / 1850,
-    1760 / 1850,
-    1.0,
-  ];
-  final values = factors
-      .map((factor) => (current * factor).round().clamp(1, 1000000000).toInt())
-      .toList(growable: false);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-  return [
-    for (var index = 0; index < months.length; index++)
-      _PricePoint(month: months[index], value: values[index]),
-  ];
 }
 
 class _PriceAlertSection extends ConsumerWidget {
@@ -3283,22 +3056,16 @@ String _confidencePercent(double confidence) {
   return '${(bounded * 100).toStringAsFixed(0)}%';
 }
 
-String _aiSummaryFor(CollectibleItem item) {
-  final category = _fallback(item.category).toLowerCase();
-  final evidence = <String>{
-    if (_clean(item.brand) != null) 'visible branding',
-    if (_clean(item.year) != null) 'date cues',
-    if (_clean(item.condition) != null) 'condition details',
-    if (_clean(item.rarity) != null || _clean(item.edition) != null)
-      'variant cues',
-    'category cues',
-  }.join(', ');
-  final title = _fallback(item.title, fallback: 'this collectible');
-  final confidenceNote = item.confidence < 0.70
-      ? ' Confidence is lower because some details may be unclear in the image.'
-      : ' Review year, variant, and condition before making sale or grading decisions.';
-
-  return '$title appears to be a $category identified from $evidence.$confidenceNote';
+String? _storedAiSummaryFor(CollectibleItem item) {
+  final parts = [
+    _clean(item.aiReasoning),
+    _clean(item.confidenceExplanation),
+    _clean(item.detectionQuality),
+  ].whereType<String>().toList(growable: false);
+  if (parts.isEmpty) {
+    return null;
+  }
+  return parts.join('\n\n');
 }
 
 List<String> _attributeChipsFor(CollectibleItem item) {
@@ -3315,9 +3082,6 @@ List<String> _attributeChipsFor(CollectibleItem item) {
     _clean(item.playerOrCharacter),
   }.whereType<String>().toList(growable: false);
 
-  if (chips.isEmpty) {
-    return const ['Unknown'];
-  }
   return chips.take(8).toList(growable: false);
 }
 
@@ -3413,16 +3177,7 @@ String _rarityLabel(CollectibleItem item) {
   if (explicit != null) {
     return explicit;
   }
-  if (item.confidence >= 0.95) {
-    return 'Ultra Rare';
-  }
-  if (item.confidence >= 0.88) {
-    return 'Rare';
-  }
-  if (item.confidence >= 0.72) {
-    return 'Uncommon';
-  }
-  return 'Common';
+  return 'Rarity unavailable';
 }
 
 Color _confidenceMeterColor(BuildContext context, double confidence) {
