@@ -153,7 +153,12 @@ void main() {
       expect(find.text('Cards'), findsOneWidget);
       expect(find.text('Coins'), findsOneWidget);
       expect(find.text('Figures'), findsOneWidget);
-      expect(find.text('No collectibles saved yet'), findsOneWidget);
+      expect(find.text('No saved items yet'), findsOneWidget);
+      expect(
+        find.text('Value, condition, and saved history will appear here.'),
+        findsOneWidget,
+      );
+      expect(find.text('Scan first collectible'), findsNothing);
       expect(find.text('Recent collectibles'), findsNothing);
       expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
 
@@ -337,7 +342,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first viewport section order follows approved Home authority', (
+  testWidgets('first viewport density follows approved Home authority ratios', (
     tester,
   ) async {
     _seedPortfolio(const []);
@@ -347,20 +352,57 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
+    const viewportHeight = 1000.0;
     final headerTop = tester.getTopLeft(find.byType(PackLoxHeader)).dy;
-    final emptyTop = tester
-        .getTopLeft(find.byKey(const ValueKey('home-empty-authority-card')))
-        .dy;
+    final emptyRect = tester.getRect(
+      find.byKey(const ValueKey('home-empty-authority-card')),
+    );
+    final primaryScanRect = tester.getRect(
+      find.byKey(const ValueKey('home-primary-scan')),
+    );
+    final statusRect = tester.getRect(
+      find.byKey(const ValueKey('home-section-collection-status')),
+    );
+    final categoriesRect = tester.getRect(
+      find.byKey(const ValueKey('home-section-popular-categories')),
+    );
+    final cardsRect = tester.getRect(
+      find.byKey(const ValueKey('home-popular-category-cards')),
+    );
+    final moreRect = tester.getRect(
+      find.byKey(const ValueKey('home-popular-category-more')),
+    );
+    final scanActionRect = tester.getRect(
+      find.byKey(const ValueKey('home-quick-action-scan')),
+    );
+    final importActionRect = tester.getRect(
+      find.byKey(const ValueKey('home-quick-action-import')),
+    );
+    final portfolioActionRect = tester.getRect(
+      find.byKey(const ValueKey('home-quick-action-portfolio')),
+    );
     final statusTop = tester.getTopLeft(find.text('Collection status')).dy;
     final categoriesTop = tester.getTopLeft(find.text('Popular Categories')).dy;
-    final actionsTop = tester
-        .getTopLeft(find.byKey(const ValueKey('home-quick-action-import')))
-        .dy;
+    final actionsTop = importActionRect.top;
 
-    expect(headerTop, lessThan(emptyTop));
-    expect(emptyTop, lessThan(statusTop));
+    expect(headerTop, lessThan(emptyRect.top));
+    expect(emptyRect.top, lessThan(statusTop));
     expect(statusTop, lessThan(categoriesTop));
     expect(categoriesTop, lessThan(actionsTop));
+    expect(emptyRect.height / viewportHeight, inInclusiveRange(0.18, 0.30));
+    expect(primaryScanRect.height, inInclusiveRange(40, 52));
+    expect(
+      primaryScanRect.width / emptyRect.width,
+      inInclusiveRange(0.68, 0.84),
+    );
+    expect(statusRect.height / viewportHeight, lessThan(0.16));
+    expect(categoriesRect.height / viewportHeight, lessThan(0.18));
+    expect(cardsRect.height, lessThanOrEqualTo(64));
+    expect(moreRect.left, greaterThan(cardsRect.left));
+    expect(scanActionRect.height, lessThanOrEqualTo(82));
+    expect(importActionRect.height, lessThanOrEqualTo(82));
+    expect(portfolioActionRect.height, lessThanOrEqualTo(82));
+    expect(actionsTop, lessThan(viewportHeight));
   });
 
   testWidgets('rapid Scan taps trigger one navigation request', (tester) async {

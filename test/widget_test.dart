@@ -217,7 +217,7 @@ void main() {
       const Offset(0, -520),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Scan a collectible'), findsOneWidget);
+    expect(find.text('Scan a Collectible'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
 
@@ -320,28 +320,29 @@ void main() {
     await tester.pumpCollectIqApp();
 
     expect(find.text('Your collection is waiting'), findsOneWidget);
-    expect(
-      find.text(
-        'Scan your first collectible and start building your collection.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Scan your first item to get started.'), findsOneWidget);
     expect(find.byType(MotionElasticHero), findsNothing);
     expect(find.text('Your collection'), findsOneWidget);
     expect(find.text('Collector'), findsOneWidget);
-    expect(find.text('Scan a collectible'), findsOneWidget);
-    expect(find.text('Import photo'), findsOneWidget);
-    expect(find.text('Open portfolio'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-secondary-import')), findsOneWidget);
+    expect(find.text('Scan a Collectible'), findsOneWidget);
+    expect(find.text('Import'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('home-secondary-portfolio')),
+      find.byKey(const ValueKey('home-quick-action-portfolio')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-quick-action-import')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-quick-action-portfolio')),
       findsOneWidget,
     );
     expect(find.text('PI (Soon)'), findsNothing);
     expect(find.textContaining('Soon'), findsNothing);
-    await tester.reveal(find.text('Collection snapshot'));
-    expect(find.text('Collection snapshot'), findsWidgets);
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    await tester.reveal(find.text('Collection status'));
+    expect(find.text('Collection status'), findsWidgets);
+    expect(find.text('No saved items yet'), findsOneWidget);
     expect(find.text('Recent collectibles'), findsNothing);
     expect(find.text('AI Insights'), findsNothing);
     expect(find.text('Starter Categories'), findsNothing);
@@ -474,8 +475,9 @@ void main() {
       findsNothing,
     );
     expect(find.text('Your collection is waiting'), findsOneWidget);
-    await tester.reveal(find.text('Scan first collectible'));
-    expect(find.text('Scan first collectible'), findsOneWidget);
+    await tester.reveal(find.text('No saved items yet'));
+    expect(find.text('No saved items yet'), findsOneWidget);
+    expect(find.text('Scan first collectible'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     SharedPreferences.setMockInitialValues({
@@ -592,7 +594,7 @@ void main() {
   testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsNothing);
@@ -613,10 +615,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.byKey(const ValueKey('home-secondary-import')),
+      find.byKey(const ValueKey('home-quick-action-import')),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-secondary-import')));
+    await tester.tap(find.byKey(const ValueKey('home-quick-action-import')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     await tester.acceptEnhancementPreview();
@@ -632,7 +634,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsNothing);
 
@@ -642,9 +644,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
-    expect(find.text('Scan a collectible'), findsOneWidget);
+    expect(find.text('Scan a Collectible'), findsOneWidget);
 
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsNothing);
@@ -1958,7 +1960,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-hub-capture-button')),
@@ -2017,7 +2019,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -3559,7 +3561,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan a collectible'));
+    await tester.tap(find.text('Scan a Collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsNothing);
