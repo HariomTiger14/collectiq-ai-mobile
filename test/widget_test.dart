@@ -319,30 +319,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    final heroMotion = tester.widget<MotionElasticHero>(
-      find.byKey(const ValueKey('home-hero-motion')),
-    );
-    expect(heroMotion.baseHeight, 156);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Text &&
-            (widget.data == 'Good morning' ||
-                widget.data == 'Good afternoon' ||
-                widget.data == 'Good evening'),
-      ),
-      findsOneWidget,
-    );
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
+    expect(find.byType(MotionElasticHero), findsNothing);
+    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('Collector'), findsOneWidget);
     expect(find.text('Scan a collectible'), findsOneWidget);
     expect(find.text('Import photo'), findsOneWidget);
-    expect(find.text('Use gallery'), findsOneWidget);
     expect(find.text('Open portfolio'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-primary-scan-cta')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-secondary-import')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-secondary-portfolio')),
@@ -603,16 +585,7 @@ void main() {
   testWidgets('home scan button selects Scan tab', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsNothing);
@@ -652,16 +625,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
     expect(find.text('AI Scanner'), findsNothing);
 
@@ -671,18 +635,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('scan-left-filmstrip')), findsNothing);
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
     expect(find.text('Scan a collectible'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('AI Scanner'), findsNothing);
@@ -1968,16 +1923,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(cameraService: _SelectedCameraService());
 
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
     await tester.pumpUntilFound(
       find.byKey(const ValueKey('scan-hub-capture-button')),
@@ -2022,16 +1968,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
     await tester.reveal(find.byKey(const ValueKey('scan-secondary-Gallery')));
     await tester.pump();
@@ -3561,16 +3498,7 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-primary-scan-cta')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-primary-scan-cta')));
+    await tester.tap(find.text('Scan a collectible'));
     await tester.pumpAndSettle();
 
     expect(find.text('Sample Sports Card'), findsNothing);
