@@ -399,3 +399,38 @@ Approved statuses:
 - Visual fidelity: approved from Samsung physical-device evidence.
 - Runtime behaviour: approved.
 - Overall: frozen.
+
+## 29. Phase 1 approved authority amendment
+
+Date: 2026-07-13
+
+The visual approval in this Sprint 04 freeze record is amended for Home first-viewport authority alignment by Phase 1 of the Core Screen Visual Remediation Program.
+
+Superseding amendment:
+
+- `qa/reconstruction/home_visual_freeze_amendment.md`
+
+Runtime comparison:
+
+- `qa/reconstruction/home_approved_authority_runtime_comparison.md`
+
+Evidence:
+
+- `qa/screenshots/approved_authority_remediation/home/comparison/phase1_home_authority_before_after_first_viewport.png`
+- `qa/screenshots/approved_authority_remediation/home/after/phase1_home_after_empty_first_viewport.png`
+- `qa/screenshots/approved_authority_remediation/home/after/phase1_home_after_empty_mid_scroll.png`
+- `qa/screenshots/approved_authority_remediation/home/after/phase1_home_after_empty_end_scroll.png`
+- `qa/screenshots/approved_authority_remediation/home/after/phase1_home_after_tab_stress.png`
+
+Phase 1 supersedes the earlier approved large blue Hero/Entry Tile first-viewport treatment with the approved dark empty collection card, collection status, Popular Categories, and compact lower-order quick actions.
+
+The amendment does not reopen or alter Scanner, Portfolio, Detail, Settings, Authentication, backend, routing, App Shell lifecycle, or Product Language definitions.
+
+Phase 1 validation summary:
+
+- `adb devices -l`: `RZ8R213M8ZL` reported as `device`.
+- `flutter analyze`: passed.
+- `flutter build apk --debug`: passed.
+- `adb install -r build\app\outputs\flutter-apk\app-prod-debug.apk`: passed.
+- Focused Home/shared/app-shell regression validation: passed.
+- Full suite: `546 passed, 24 failed`; full suite is not green and remaining failures are outside this Home visual authority amendment.
