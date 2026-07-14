@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -28,114 +29,125 @@ class ScanResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final imagePath = activeSlot?.path ?? result.thumbnail;
     final isEnhanced = activeSlot?.isEnhanced == true;
-    return Scaffold(
-      key: ValueKey('scan-result-${result.id}'),
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: const Text('Analysis Complete'),
-        actions: [
-          IconButton(
-            key: const ValueKey('result-scan-another'),
-            onPressed: onScanAnother,
-            icon: const Icon(Icons.close),
-            tooltip: 'Scan another',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ResultHeroImage(path: imagePath, isEnhanced: isEnhanced),
-              const SizedBox(height: 20),
-              _FadeInMetadata(
-                delay: Duration.zero,
-                child: Text(
-                  result.title,
-                  key: const ValueKey('result-item-name'),
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
+    return ScannerFocusTheme(
+      child: Scaffold(
+        key: ValueKey('scan-result-${result.id}'),
+        backgroundColor: ScannerVisualTheme.background,
+        appBar: AppBar(
+          title: const Text('Analysis Complete'),
+          actions: [
+            IconButton(
+              key: const ValueKey('result-scan-another'),
+              onPressed: onScanAnother,
+              icon: const Icon(Icons.close),
+              tooltip: 'Scan another',
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (isSaved) ...[
+                  const ScannerStatusCard(
+                    title: 'Saved to Portfolio',
+                    body: 'Your item has been added successfully.',
+                    icon: Icons.check_circle_outline,
+                    success: true,
                   ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _FadeInMetadata(
-                delay: const Duration(milliseconds: 30),
-                child: Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    _ResultChip(
-                      key: const ValueKey('result-category-chip'),
-                      icon: Icons.category_outlined,
-                      label: result.category,
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                _ResultHeroImage(path: imagePath, isEnhanced: isEnhanced),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: Duration.zero,
+                  child: Text(
+                    result.title,
+                    key: const ValueKey('result-item-name'),
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                      color: ScannerVisualTheme.textPrimary,
                     ),
-                    _ResultChip(
-                      key: const ValueKey('result-rarity-indicator'),
-                      icon: Icons.diamond_outlined,
-                      label: _rarityLabel(result),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _FadeInMetadata(
-                delay: const Duration(milliseconds: 60),
-                child: _ConfidenceMeter(confidence: result.confidence),
-              ),
-              const SizedBox(height: 20),
-              _FadeInMetadata(
-                delay: const Duration(milliseconds: 90),
-                child: _ValueCard(
-                  value: _formatScanValue(
-                    result.estimatedValue,
-                    result.valuationStatus,
-                  ),
-                  source: _valueSourceLabel(result),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _SlideInAction(
-                child: FilledButton.icon(
-                  key: const ValueKey('result-primary-add-to-portfolio'),
-                  onPressed: isSaved || isSaving ? null : onSave,
-                  icon: Icon(
-                    isSaving
-                        ? Icons.hourglass_top_outlined
-                        : isSaved
-                        ? Icons.check_circle_outline
-                        : Icons.bookmark_add_outlined,
-                  ),
-                  label: Text(
-                    isSaving
-                        ? 'Saving...'
-                        : isSaved
-                        ? 'Saved to Portfolio'
-                        : 'Add to Portfolio',
                   ),
                 ),
-              ),
-              if (isSaved && onViewPortfolio != null) ...[
                 const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: onViewPortfolio,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('View Portfolio'),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 30),
+                  child: Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      _ResultChip(
+                        key: const ValueKey('result-category-chip'),
+                        icon: Icons.category_outlined,
+                        label: result.category,
+                      ),
+                      _ResultChip(
+                        key: const ValueKey('result-rarity-indicator'),
+                        icon: Icons.diamond_outlined,
+                        label: _rarityLabel(result),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 60),
+                  child: _ConfidenceMeter(confidence: result.confidence),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 90),
+                  child: _ValueCard(
+                    value: _formatScanValue(
+                      result.estimatedValue,
+                      result.valuationStatus,
+                    ),
+                    source: _valueSourceLabel(result),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _SlideInAction(
+                  child: FilledButton.icon(
+                    key: const ValueKey('result-primary-add-to-portfolio'),
+                    onPressed: isSaved || isSaving ? null : onSave,
+                    icon: Icon(
+                      isSaving
+                          ? Icons.hourglass_top_outlined
+                          : isSaved
+                          ? Icons.check_circle_outline
+                          : Icons.bookmark_add_outlined,
+                    ),
+                    label: Text(
+                      isSaving
+                          ? 'Saving...'
+                          : isSaved
+                          ? 'Saved to Portfolio'
+                          : 'Add to Portfolio',
+                    ),
+                  ),
+                ),
+                if (isSaved && onViewPortfolio != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    onPressed: onViewPortfolio,
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('View Portfolio'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -190,9 +202,9 @@ class _ConfidenceMeter extends StatelessWidget {
     return DecoratedBox(
       key: const ValueKey('result-confidence-meter'),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: ScannerVisualTheme.surfaceElevated,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(color: ScannerVisualTheme.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),

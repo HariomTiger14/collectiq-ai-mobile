@@ -7,6 +7,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -1152,6 +1153,15 @@ class AiResultCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isSaved) ...[
+              ScannerStatusCard(
+                title: 'Saved to Portfolio',
+                body: 'Your item has been added successfully.',
+                icon: Icons.check_circle_outline,
+                success: true,
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
             _ScanResultHeroGallery(
               imagePath: imagePath,
               galleryImages: galleryImages,
