@@ -82,3 +82,82 @@ Full-suite output:
 Home visual fidelity is amended from the earlier Sprint 04 freeze to this Phase 1 approved authority alignment for the validated empty first viewport, scroll sequence, and App Shell handoffs.
 
 Overall Home status after this amendment: approved for the validated Phase 1 scope with the limitations above.
+
+## Owner V1 Empty-State Finalization
+
+Date: 2026-07-14
+
+Authority version: `home_empty_state_v1`
+
+Owner-approved authority:
+
+- `C:\Users\hario\Desktop\projects\packlox-design-platform\releases\v1.0\design_bible\owner_amendments\home_empty_state_v1.png`
+- Dimensions: `853 x 1844`
+- SHA-256: `117F5E10BAA05EB1AAB71006BBDACC3AE989F1BD88A3225556D0BE52FD0628E3`
+
+The owner-approved amendment supersedes the original Home S02 composition where they conflict.
+
+Authority record:
+
+- `qa/reconstruction/home_owner_v1_authority_record.md`
+
+Measurement contract:
+
+- `qa/reconstruction/home_owner_v1_measurements.md`
+
+Runtime comparison:
+
+- `qa/reconstruction/home_owner_v1_runtime_comparison.md`
+
+Samsung runtime evidence:
+
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_runtime.png`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_runtime.xml`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_logcat.txt`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_vs_runtime.png`
+
+Implemented visual changes:
+
+- aligned Home horizontal inset and first-viewport density to owner V1;
+- rebuilt the empty hero as a horizontal icon/copy/CTA composition;
+- changed empty Collection Status to four metric columns: `0 Items`, `- Est. value`, `- Avg. condition`, and `0 Scans`;
+- converted Popular Categories into a titled surface with four one-row category tiles;
+- converted Quick Actions into a titled surface with three horizontal icon-label-chevron actions;
+- preserved bottom-navigation clearance and the existing App Shell structure.
+
+Data-honesty notes:
+
+- no fabricated collection value or condition was added;
+- unavailable values remain `-`, distinct from genuine zero values;
+- the empty-state `Scans` tile is an honest empty-state `0` placeholder only and does not introduce a new scan-history data contract;
+- Import, Scan, and Portfolio actions use the existing callbacks;
+- the notification affordance remains disabled because Home has no notification behavior contract;
+- no backend, analytics, provider, routing, authentication, or Product Language definition was changed.
+
+Responsive adaptations accepted:
+
+- Samsung status bar content is device-owned and differs from the owner PNG;
+- Flutter text metrics produce small proportional differences in hero copy and CTA width;
+- the runtime uses existing dark surfaces and borders without introducing a smoky bitmap background asset.
+
+Final validation:
+
+- `flutter analyze`: passed.
+- `flutter test test/shared_visual_foundations_test.dart --reporter=compact`: passed, 12 tests.
+- `flutter test test/home_page_test.dart --reporter=compact`: passed, 16 tests.
+- Focused broad Home/widget smoke pattern: passed, 4 tests.
+- Frozen bootstrap/onboarding/app-shell/product-language/scan-hub group: passed, 58 tests.
+- Scanner/camera focused regression group: passed, 23 tests.
+- `flutter test --reporter=compact`: completed with `554 passed, 16 failed`; the full suite is not green and must not be described as passing.
+
+Visual approval:
+
+- Overall composition: `MATCH`.
+- First viewport: `MATCH`.
+- Hero: `MATCH`.
+- Collection Status: `MATCH`.
+- Popular Categories: `MATCH`.
+- Quick Actions: `MATCH`.
+- Spacing, surfaces, icons, and buttons: `MATCH` or `ACCEPTABLE RESPONSIVE ADAPTATION`.
+
+Final owner-v1 status: visually approved for the validated Home empty-state first viewport with the honest substitutions and responsive adaptations above.

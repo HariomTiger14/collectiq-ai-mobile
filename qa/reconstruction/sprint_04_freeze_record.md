@@ -452,3 +452,44 @@ Updated validation result:
 - `flutter test --reporter=compact` completed with `554 passed, 16 failed` in `qa/reconstruction/phase1_fidelity_full_test_output.txt`.
 - Home-focused tests and affected broad Home regressions passed.
 - Remaining full-suite failures are outside Home authority fidelity scope.
+
+## 30. Owner V1 Home Empty-State Amendment
+
+Date: 2026-07-14
+
+The Sprint 04 visual freeze is further amended by the owner-approved Home empty-state authority image.
+
+Owner authority:
+
+- Version: `home_empty_state_v1`
+- Path: `C:\Users\hario\Desktop\projects\packlox-design-platform\releases\v1.0\design_bible\owner_amendments\home_empty_state_v1.png`
+- Dimensions: `853 x 1844`
+- SHA-256: `117F5E10BAA05EB1AAB71006BBDACC3AE989F1BD88A3225556D0BE52FD0628E3`
+
+This owner-approved amendment supersedes the original Home S02 composition wherever they conflict.
+
+Sprint 04 architecture, data integrity, App Shell lifecycle, scanner ownership, portfolio ownership, detail ownership, backend contracts, router contracts, authentication contracts, and Product Language definitions remain frozen and unchanged.
+
+Owner V1 evidence and records:
+
+- `qa/reconstruction/home_owner_v1_authority_record.md`
+- `qa/reconstruction/home_owner_v1_measurements.md`
+- `qa/reconstruction/home_owner_v1_runtime_comparison.md`
+- `qa/reconstruction/home_owner_v1_full_test_output.txt`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_runtime.png`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_runtime.xml`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_logcat.txt`
+- `qa/screenshots/approved_authority_remediation/home/owner_v1/owner_v1_vs_runtime.png`
+
+Owner V1 validation result:
+
+- `flutter analyze`: passed.
+- `flutter test test/shared_visual_foundations_test.dart --reporter=compact`: passed.
+- `flutter test test/home_page_test.dart --reporter=compact`: passed.
+- Focused broad Home/widget smoke pattern: passed.
+- Frozen Sprint 01-07 focused regression groups: passed.
+- `flutter test --reporter=compact`: `554 passed, 16 failed`.
+
+The full suite remains at the accepted 16-failure baseline and is not green. The remaining failures are outside the Home owner-v1 visual amendment scope.
+
+Final Owner V1 Home status: visually approved for the validated empty first viewport with documented responsive adaptations and honest substitutions.
