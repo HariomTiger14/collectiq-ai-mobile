@@ -23,8 +23,9 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
 
-      await _showRawDiagnostics(tester, entry.value);
+      await _showNotesStatus(tester, entry.value);
       expect(find.text(entry.value), findsOneWidget);
     }
   });
@@ -47,26 +48,32 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await _showRawDiagnostics(tester, 'Sync failed');
+    await _showNotesStatus(tester, 'Sync failed');
     expect(find.text('Sync failed'), findsOneWidget);
     expect(find.text('Upload failed for this item.'), findsOneWidget);
   });
 }
 
-Future<void> _showRawDiagnostics(
-  WidgetTester tester,
-  String expectedValue,
-) async {
+Future<void> _showNotesStatus(WidgetTester tester, String expectedValue) async {
   if (find.text(expectedValue).evaluate().isNotEmpty) {
     return;
   }
-  await tester.tap(find.text('Raw Diagnostics'));
+  final notesTab = find.byKey(const ValueKey('collectible-detail-tab-notes'));
+  final tabStrip = find.byKey(
+    const ValueKey('collectible-detail-authority-tabs'),
+  );
+  for (var attempt = 0; attempt < 6 && notesTab.evaluate().isEmpty; attempt++) {
+    await tester.drag(tabStrip, const Offset(-240, 0));
+    await tester.pumpAndSettle();
+  }
+  tester.widget<ChoiceChip>(notesTab).onSelected?.call(true);
   await tester.pumpAndSettle();
 }
 
 void _setTallDetailSurface(WidgetTester tester) {
-  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);

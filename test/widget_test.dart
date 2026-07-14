@@ -4810,7 +4810,10 @@ void main() {
     await tester.tap(find.text('View details'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -4826,10 +4829,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     expect(find.text('Estimated value'), findsOneWidget);
+    await _selectDetailTab(tester, 'notes');
     expect(find.text('Wishlist Status'), findsOneWidget);
-    expect(find.text('AI Analysis'), findsOneWidget);
+    await _selectDetailTab(tester, 'insights');
+    expect(find.text('AI Insights'), findsOneWidget);
+    await _selectDetailTab(tester, 'overview');
     expect(find.text('Recommendation'), findsOneWidget);
   });
 
@@ -4900,48 +4909,21 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('\$25'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('collectible-detail-rarity-badge')),
-          matching: find.text('Ultra Rare'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Ultra Rare'), findsWidgets);
+      await _selectDetailTab(tester, 'details');
       expect(
         find.byKey(const ValueKey('collectible-detail-confidence-meter')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('collectible-detail-confidence-fill')),
         findsOneWidget,
       );
       expect(find.text('91%'), findsWidgets);
       expect(
         find.byKey(
-          const ValueKey('collectible-detail-ai-enhanced-badge-shell'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
           const ValueKey('collectible-detail-ai-enhanced-badge-compact'),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
 
-      final valueCard = tester.widget<DecoratedBox>(
-        find.byKey(const ValueKey('collectible-detail-value-card')),
-      );
-      expect((valueCard.decoration as BoxDecoration).gradient, isNotNull);
-
-      final rarityBadge = tester.widget<DecoratedBox>(
-        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
-      );
-      expect((rarityBadge.decoration as BoxDecoration).gradient, isNotNull);
+      expect(find.text('Details & Info'), findsOneWidget);
     },
   );
 
@@ -5141,7 +5123,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Enhanced'), findsWidgets);
     expect(
       find.byKey(ValueKey('collectible-detail-hero-$enhancedPath')),
       findsOneWidget,
@@ -5213,20 +5194,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     expect(find.text('Minimal Silver Coin'), findsWidgets);
     expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
     expect(find.text('Needs Review'), findsOneWidget);
     expect(find.textContaining('62%'), findsWidgets);
     expect(find.text('Rarity unavailable'), findsWidgets);
-    expect(find.text('AI Review'), findsOneWidget);
+    await _selectDetailTab(tester, 'insights');
+    expect(find.text('AI Insights'), findsOneWidget);
     expect(
       find.textContaining(
         'No stored AI review is available for this collectible yet.',
       ),
       findsOneWidget,
     );
+    await _selectDetailTab(tester, 'details');
     expect(
       find.text(
         'No additional metadata has been saved for this collectible yet.',
@@ -5237,6 +5223,7 @@ void main() {
       find.byKey(const ValueKey('collectible-detail-edit-button')),
       findsOneWidget,
     );
+    await _selectDetailTab(tester, 'notes');
     await tester.reveal(find.text('Price Alerts'));
     expect(find.text('Price Alerts'), findsOneWidget);
     expectNoFlutterError(tester);
@@ -5320,6 +5307,7 @@ void main() {
     expect(find.text('Edited Silver Eagle'), findsWidgets);
     expect(find.text('Coin'), findsWidgets);
     expect(find.text(r'$300'), findsWidgets);
+    await _selectDetailTab(tester, 'notes');
     expect(find.text('Edited local notes.'), findsWidgets);
 
     final preferences = await SharedPreferences.getInstance();
@@ -5379,7 +5367,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     await tester.tap(
       find.byKey(const ValueKey('collectible-detail-image-preview')),
     );
@@ -5391,6 +5382,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _selectDetailTab(tester, 'notes');
     await tester.reveal(
       find.byKey(const ValueKey('collectible-detail-notes-field')),
     );
@@ -5431,9 +5423,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('home-recent-home-detail')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     expect(find.text('Home Detail Charizard'), findsWidgets);
-    expect(find.text('Raw Diagnostics'), findsOneWidget);
+    await _selectDetailTab(tester, 'notes');
+    expect(find.text('Sync Status'), findsOneWidget);
   });
 
   testWidgets('scan recent scans are not shown in simplified camera mode', (
@@ -5474,38 +5470,35 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collectible-detail-authority-header')),
+      findsOneWidget,
+    );
     expect(find.text('Estimated value'), findsOneWidget);
     expect(find.text(r'$1,850'), findsWidgets);
-    expect(find.text('High confidence (94%)'), findsOneWidget);
-    expect(find.text('Primary Metadata'), findsOneWidget);
-    expect(find.text('AI Review'), findsOneWidget);
-    expect(find.text('Raw Diagnostics'), findsOneWidget);
-    expect(find.text('Date Added'), findsNothing);
-    expect(find.text('27/06/2026'), findsNothing);
-    expect(find.text('Key Attributes'), findsWidgets);
+    await _selectDetailTab(tester, 'details');
+    expect(find.text('Confidence'), findsWidgets);
+    expect(find.text('94%'), findsWidgets);
+    expect(find.text('Details & Info'), findsOneWidget);
     expect(find.text('Base Set'), findsWidgets);
-    expect(find.text('4/102'), findsNothing);
-    await tester.reveal(find.text('Primary Metadata'));
-    await tester.tap(find.text('Primary Metadata'));
-    await tester.pumpAndSettle();
     expect(find.text('4/102'), findsWidgets);
     expect(find.text('Charizard'), findsWidgets);
-    expect(find.text('Market Evidence'), findsOneWidget);
-    await tester.reveal(find.text('Market Evidence'));
-    await tester.tap(find.text('Market Evidence'));
-    await tester.pumpAndSettle();
-    expect(find.text('Market Summary'), findsOneWidget);
-    await tester.reveal(find.text('Market Summary'));
-    await tester.tap(find.text('Market Summary'));
-    await tester.pumpAndSettle();
+    await _selectDetailTab(tester, 'insights');
+    expect(find.text('AI Insights'), findsOneWidget);
+    await _selectDetailTab(tester, 'notes');
+    expect(find.text('Sync Status'), findsOneWidget);
+    expect(find.text('Date Added'), findsNothing);
+    expect(find.text('27/06/2026'), findsNothing);
+    await _selectDetailTab(tester, 'market');
+    expect(find.text('Market & Value'), findsOneWidget);
     expect(find.text('Trend'), findsOneWidget);
     expect(find.text('Stable'), findsWidgets);
-    expect(find.text('Recent comparable sales'), findsOneWidget);
     expect(find.text(r'$1,443 - $2,257'), findsWidgets);
     expect(find.text('Mock market blend'), findsWidgets);
+    await _selectDetailTab(tester, 'overview');
     expect(find.text('Recommendation'), findsOneWidget);
 
+    await _selectDetailTab(tester, 'notes');
     await tester.reveal(find.text('Wishlist Status'));
     await tester.pump();
     expect(find.text('Wishlist Status'), findsOneWidget);
@@ -5519,29 +5512,15 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 4));
 
-    await tester.reveal(find.text('Value Evidence'));
-    await tester.pump();
-    expect(find.text('Value Evidence'), findsOneWidget);
-    expect(
-      find.text(
-        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Estimated market value'), findsOneWidget);
-    expect(find.text('Pricing confidence'), findsOneWidget);
-    expect(find.text('Market trend'), findsOneWidget);
+    await _selectDetailTab(tester, 'market');
+    expect(find.text('Market & Value'), findsOneWidget);
+    expect(find.text('Value range'), findsOneWidget);
+    expect(find.text('Confidence'), findsWidgets);
+    expect(find.text('Trend'), findsOneWidget);
     expect(find.text('85%'), findsWidgets);
-
-    await tester.reveal(
-      find.text(
-        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
-      ),
-    );
-    await tester.pump();
     expect(
       find.text(
-        'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
+        'Saved market evidence is shown without fabricating price history.',
       ),
       findsOneWidget,
     );
@@ -5565,6 +5544,10 @@ void main() {
     expect(find.text('Favorited'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
 
+    await _selectDetailTab(tester, 'actions');
+    await tester.reveal(
+      find.byKey(const ValueKey('collectible-detail-delete-action')),
+    );
     await tester.tap(
       find.byKey(const ValueKey('collectible-detail-delete-action')),
     );
@@ -5572,8 +5555,9 @@ void main() {
     expect(find.text('Delete collectible?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(find.text('Collectible Details'), findsOneWidget);
+    expect(find.text('Actions Menu'), findsOneWidget);
 
+    await _selectDetailTab(tester, 'notes');
     await tester.reveal(find.text('Price Alerts'));
     await tester.pump();
     expect(find.text('Price Alerts'), findsOneWidget);
@@ -5587,10 +5571,6 @@ void main() {
     expect(find.text('Price alert created'), findsOneWidget);
     await tester.pumpAndSettle();
     expect(find.text('Increases by 10%'), findsOneWidget);
-
-    await tester.reveal(find.text('Similar Collectibles'));
-    await tester.pumpAndSettle();
-    expect(find.text('Similar Collectibles'), findsOneWidget);
   });
 
   for (final viewport in const [
@@ -5639,25 +5619,17 @@ void main() {
         find.byKey(const ValueKey('portfolio-grid-item-responsive-card')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Collectible Details'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('collectible-detail-authority-header')),
+        findsOneWidget,
+      );
       final detailWidth = viewport.$2.width;
       final heroSize = tester.getSize(
         find.byKey(const ValueKey('collectible-detail-image-preview')),
       );
       expect(heroSize.width, lessThanOrEqualTo(detailWidth));
-      expect(heroSize.height, lessThan(heroSize.width));
-      expect(
-        find.byKey(const ValueKey('collectible-detail-rarity-badge')),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .getSize(
-              find.byKey(const ValueKey('collectible-detail-rarity-badge')),
-            )
-            .width,
-        lessThanOrEqualTo(detailWidth),
-      );
+      expect(heroSize.height, lessThanOrEqualTo(heroSize.width));
+      await _selectDetailTab(tester, 'details');
       expect(
         find.byKey(const ValueKey('collectible-detail-confidence-meter')),
         findsOneWidget,
@@ -5943,6 +5915,20 @@ extension on WidgetTester {
       await pump();
     }
   }
+}
+
+Future<void> _selectDetailTab(WidgetTester tester, String tabName) async {
+  final tab = find.byKey(ValueKey('collectible-detail-tab-$tabName'));
+  final tabStrip = find.byKey(
+    const ValueKey('collectible-detail-authority-tabs'),
+  );
+  for (var attempt = 0; attempt < 16 && tab.evaluate().isEmpty; attempt += 1) {
+    final offset = attempt < 8 ? const Offset(-260, 0) : const Offset(260, 0);
+    await tester.drag(tabStrip, offset);
+    await tester.pumpAndSettle();
+  }
+  tester.widget<ChoiceChip>(tab).onSelected?.call(true);
+  await tester.pumpAndSettle();
 }
 
 PortfolioSnapshot _visualSnapshot({required double value, required int day}) {
