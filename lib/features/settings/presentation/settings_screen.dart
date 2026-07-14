@@ -4,7 +4,6 @@ import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
-import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/network/api_client.dart' as network;
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
@@ -14,7 +13,7 @@ import 'package:collectiq_ai/core/widgets/glass_card.dart';
 import 'package:collectiq_ai/core/widgets/modern_settings_row.dart';
 import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/features/auth/presentation/widgets/auth_access_panel.dart';
+import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
 import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
@@ -44,29 +43,13 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _scrollController = ScrollController();
-  Timer? _resendCountdownTimer;
   bool _isManualCloudSyncing = false;
   bool _isUpdatingDemoData = false;
 
   @override
-  void initState() {
-    super.initState();
-    _resendCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-  }
-
-  @override
   void dispose() {
-    _resendCountdownTimer?.cancel();
     _scrollController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -79,9 +62,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       if (previous?.status == AuthFlowStatus.signingIn &&
           next.status == AuthFlowStatus.signedIn) {
-        ref
-            .read(appShellTabControllerProvider.notifier)
-            .selectTab(AppShellTabController.homeTab, reason: 'auth-sign-in');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text(AuthMessages.signedIn)));
@@ -165,35 +145,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       _SettingsRow(
         icon: Icons.lock_outline,
-        title: 'Password',
+        title: authState.isSignedIn ? 'Password' : 'Sign In',
         subtitle: authState.isSignedIn
             ? 'Password is managed securely for this account.'
-            : 'Use email and password to create or access an account.',
-        trailing: authState.isSignedIn ? 'Managed' : 'Optional',
+            : 'Open Authentication to use email and password.',
+        trailing: authState.isSignedIn ? 'Managed' : 'Open',
+        onTap: authState.isSignedIn
+            ? null
+            : () => Navigator.of(context).push(AuthSignInScreen.route()),
       ),
       _SettingsRow(
         icon: Icons.logout_outlined,
         title: 'Sign Out',
         subtitle: authState.isSignedIn
-            ? 'Use the Account Access panel below to sign out.'
+            ? 'Sign out of cloud auth. Local collection data remains on this device.'
             : 'You are currently using local-first guest access.',
         trailing: authState.isSignedIn ? 'Available' : 'Guest',
+        onTap: authState.isSignedIn
+            ? () => ref.read(authControllerProvider.notifier).signOut()
+            : null,
       ),
     ];
-
-    final accountAccessPanel = AuthAccessPanel(
-      emailController: _emailController,
-      passwordController: _passwordController,
-      authState: authState,
-      onSignIn: () => _submitEmailAuth(signUp: false),
-      onSignUp: () => _submitEmailAuth(signUp: true),
-      onResendConfirmation: () => _resendConfirmationEmail(),
-      onForgotPassword: () => _sendPasswordResetEmail(),
-      onSignOut: authState.isSignedIn
-          ? () => ref.read(authControllerProvider.notifier).signOut()
-          : null,
-      syncStatusLabel: syncState.status.statusLabel,
-    );
 
     final syncTiles = [
       _SettingsRow(
@@ -375,11 +347,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               accountTiles,
               topSpacing: AppSpacing.xl,
             ),
-            sliverBox(
-              const SizedBox(height: AppSpacing.md),
-              padding: EdgeInsets.zero,
-            ),
-            sliverBox(accountAccessPanel),
             if (showDeveloperTools)
               sliverBox(
                 _SettingsCompatibilityLabels(
@@ -594,38 +561,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return '${minutes}m';
     }
     return '${minutes}m ${remainingSeconds}s';
-  }
-
-  Future<void> _submitEmailAuth({required bool signUp}) async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    if (signUp) {
-      await ref
-          .read(authControllerProvider.notifier)
-          .signUpWithEmailPassword(email: email, password: password);
-      return;
-    }
-
-    await ref
-        .read(authControllerProvider.notifier)
-        .signInWithEmailPassword(email: email, password: password);
-  }
-
-  Future<void> _resendConfirmationEmail() async {
-    final authState = ref.read(authControllerProvider);
-    await ref
-        .read(authControllerProvider.notifier)
-        .resendConfirmationEmail(
-          email:
-              authState.pendingConfirmationEmail ??
-              _emailController.text.trim(),
-        );
-  }
-
-  Future<void> _sendPasswordResetEmail() async {
-    await ref
-        .read(authControllerProvider.notifier)
-        .sendPasswordResetEmail(email: _emailController.text.trim());
   }
 
   Future<void> _resetOnboarding(BuildContext context) async {

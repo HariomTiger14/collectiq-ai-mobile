@@ -1,0 +1,978 @@
+﻿
+WINDOW MANAGER LAST ANR (dumpsys window lastanr)
+  <no ANR has occurred since boot>
+
+WINDOW MANAGER POLICY STATE (dumpsys window policy)
+    mSafeMode=false mSystemReady=true mSystemBooted=true
+    mCameraLensCoverState=CAMERA_LENS_COVER_ABSENT
+    mWakeGestureEnabledSetting=true
+    mUiMode=UI_MODE_TYPE_NORMALmEnableCarDockHomeCapture=true
+    mLidKeyboardAccessibility=0 mLidNavigationAccessibility=0 getLidBehavior=LID_BEHAVIOR_NONE
+    mLongPressOnBackBehavior=LONG_PRESS_BACK_NOTHING
+    mLongPressOnHomeBehavior=LONG_PRESS_HOME_ASSIST
+    mDoubleTapOnHomeBehavior=DOUBLE_TAP_HOME_NOTHING
+    mShortPressOnPowerBehavior=SHORT_PRESS_POWER_GO_TO_SLEEP
+    mLongPressOnPowerBehavior=LONG_PRESS_POWER_GLOBAL_ACTIONS
+    mLongPressOnPowerAssistantTimeoutMs=500
+    mVeryLongPressOnPowerBehavior=VERY_LONG_PRESS_POWER_NOTHING
+    mDoublePressOnPowerBehavior=MULTI_PRESS_POWER_SIDE_KEY_ACTION
+    mTriplePressOnPowerBehavior=MULTI_PRESS_POWER_PANIC_CALL
+    mPowerVolUpBehavior=POWER_VOLUME_UP_BEHAVIOR_NOTHING
+    mShortPressOnSleepBehavior=SHORT_PRESS_SLEEP_GO_TO_SLEEP
+    mShortPressOnWindowBehavior=SHORT_PRESS_WINDOW_PICTURE_IN_PICTURE
+    mShortPressOnStemPrimaryBehavior=SHORT_PRESS_PRIMARY_NOTHING
+    mDoublePressOnStemPrimaryBehavior=DOUBLE_PRESS_PRIMARY_NOTHING
+    mTriplePressOnStemPrimaryBehavior=TRIPLE_PRESS_PRIMARY_NOTHING
+    mLongPressOnStemPrimaryBehavior=LONG_PRESS_PRIMARY_NOTHING
+    mAllowStartActivityForLongPressOnPowerDuringSetup=false
+    mHasSoftInput=true mHapticTextHandleEnabled=true
+    mDismissImeOnBackKeyPressed=false mIncallPowerBehavior=sleep
+    mIncallBackBehavior=<nothing> mEndcallBehavior=sleep
+    mDisplayHomeButtonHandlers=mDisplayId = -1, mHomePressed = false
+mDisplayId = 0, mHomePressed = false
+    mKeyguardOccluded=false mKeyguardOccludedChanged=false mPendingKeyguardOccluded=false
+    mAllowLockscreenWhenOnDisplays=false mLockScreenTimeout=600000 mLockScreenTimerActive=false
+    mKeyMapping.size=0
+    KeyCombination rules:
+      KEYCODE_VOLUME_UP + KEYCODE_POWER
+      KEYCODE_APP_SWITCH + KEYCODE_BACK
+      KEYCODE_VOLUME_DOWN + KEYCODE_POWER
+      KEYCODE_VOLUME_DOWN + KEYCODE_VOLUME_UP
+    SingleKey rules:
+      KeyCode=KEYCODE_POWER, LongPress=true, MaxMultiPressCount=5
+    WakeGestureListener
+      mTriggerRequested=false
+      mSensor=null
+    KeyguardServiceDelegate
+      showing=false
+      showingAndNotOccluded=true
+      inputRestricted=false
+      occluded=false
+      secure=true
+      dreaming=false
+      systemIsReady=true
+      deviceHasKeyguard=true
+      enabled=true
+      offReason=OFF_BECAUSE_OF_TIMEOUT
+      currentUser=0
+      bootCompleted=true
+      screenState=SCREEN_STATE_ON
+      interactiveState=INTERACTIVE_STATE_AWAKE
+      KeyguardStateMonitor
+        mIsShowing=false
+        mSimSecure=false
+        mInputRestricted=false
+        mTrusted=false
+        mCurrentUserId=0
+    Looper state:
+      Looper (android.ui, tid 26) {c390758}
+        (Total messages: 0, polling=true, quitting=false)
+
+    --- PhoneWindowManagerExt ---
+
+    KeyCustomization info state: 2.1
+    All KeyCustomizationInfo
+    KEY_PRESS_LONG ---
+        KEY_CODE(26) :
+          ID_SETTING_UI_SIDE_KEY, keyCode: 26, 0, Intent { act=android.intent.action.MAIN cmp=globalAction/globalAction }
+    KEY_PRESS_DOUBLE ---
+        KEY_CODE(26) :
+          ID_SETTING_UI_SIDE_KEY, keyCode: 26, ACTION_START_ACTIVITY, Intent { act=android.intent.action.MAIN cmp=com.sec.android.app.camera/.Camera }
+
+    Last KeyCustomizationInfo
+    KEY_PRESS_LONG ---
+          ID_SETTING_UI_SIDE_KEY, keyCode: 26, 0, Intent { act=android.intent.action.MAIN cmp=globalAction/globalAction }
+    KEY_PRESS_DOUBLE ---
+          ID_SETTING_UI_SIDE_KEY, keyCode: 26, ACTION_START_ACTIVITY, Intent { act=android.intent.action.MAIN cmp=com.sec.android.app.camera/.Camera }
+    UserId:0
+    XmlFileErrorCode=SUCCESS
+    migrationCodeSide=SIDE_KEY_BOTH
+    maxMultiPressPowerCount=5
+    mWakingUpReason=wake_motion
+    mFocusedWindow=com.collectiq.ai.local/com.collectiq.ai.MainActivity
+    mTopActivityWindow=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      KEYCODE_HOME=[com.samsung.android.calendar/com.samsung.android.app.calendarnotification.view.AlertPopupActivity]
+      KEYCODE_ENDCALL=[]
+      KEYCODE_SYSRQ=[]
+      1064=[]
+      1001=[com.samsung.android.calendar/com.samsung.android.app.calendarnotification.view.AlertPopupActivity]
+      KEYCODE_POWER=[com.samsung.android.calendar/com.samsung.android.app.calendarnotification.view.AlertPopupActivity]
+      KEYCODE_APP_SWITCH=[com.samsung.android.calendar/com.samsung.android.app.calendarnotification.view.AlertPopupActivity]
+    mIsInteractionControlEnabled=false mIsPowerKeyBlocked=true mIsVolumeKeyBlocked=true
+    mIsScreenshotTriggered=false
+    bixbyComponentName=ComponentInfo{com.samsung.android.bixby.agent/com.samsung.android.bixby.WinkService}
+    mQuadruplePressOnPowerBehavior=0
+    mQuintuplePressOnPowerBehavior=103
+    mIsHapticsEnabled=true mIsAssistHapticEnabled=false mIsHapticsSupported=false mNavBarVirtualKeyHapticFeedbackEnabled=true
+    mWakeAndUnlockTriggered=false mWakeAndUnfoldedTriggered=false
+    mIsPogoKeyboardConnected=false
+    mIsDoubleTapToWakeUpSupported=true mIsDoubleTapToWakeUp=true
+    cameraSensorToggleSupported=false    micSensorToggleSupported=true
+    mLockTaskModeState=0
+    mIsCallOpenDictation=false
+
+WINDOW MANAGER ANIMATOR STATE (dumpsys window animator)
+    DisplayContentsAnimator #0:
+      Window #0: WindowStateAnimator{ae47b79 com.android.systemui.ImageWallpaper}
+      Window #1: WindowStateAnimator{82f54bf com.sec.android.app.clockpackage/com.sec.android.app.clockpackage.ClockPackage}
+      Window #2: WindowStateAnimator{3a70eac com.collectiq.ai/com.collectiq.ai.MainActivity}
+      Window #3: WindowStateAnimator{b49dd58 com.sec.android.app.launcher/com.sec.android.app.launcher.activities.LauncherActivity}
+      Window #4: WindowStateAnimator{9a1d775 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      Window #5: WindowStateAnimator{3017ad4 InputMethod}
+      Window #6: WindowStateAnimator{d496541 StatusBar}
+      Window #7: WindowStateAnimator{b8ea71a NotificationShade}
+      Window #8: WindowStateAnimator{73ef2b7 com.samsung.android.app.cocktailbarservice/com.samsung.android.app.cocktailbarservice.CocktailBarService}
+      Window #9: WindowStateAnimator{5a3b22f Bouncer}
+      Window #10: WindowStateAnimator{a7cfe09 NavigationBar0}
+      Window #11: WindowStateAnimator{7cc2bd3 com.samsung.android.spay.pay.HintService}
+      Window #12: WindowStateAnimator{71ebed5 KeyguardBiometricToastView}
+      Window #13: WindowStateAnimator{ec88e0d ShellDropTarget}
+      Window #14: WindowStateAnimator{962a0a4 LockscreenShortcutBlur}
+
+
+
+WINDOW MANAGER SESSIONS (dumpsys window sessions)
+  Session Session{91d7e 5847:u0a10590}:
+    mNumWindow=1 mCanAddInternalSystemWindow=false mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@30c930a
+    mPackageName=com.collectiq.ai
+    mWinSurfaceVisibleCount=0
+  Session Session{2d0cd2 28681:u0a10270}:
+    mNumWindow=1 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@2a55d00
+    mPackageName=com.samsung.android.spay
+    mWinSurfaceVisibleCount=0
+  Session Session{554787 13913:u0a10592}:
+    mNumWindow=1 mCanAddInternalSystemWindow=false mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@4e3d77b
+    mPackageName=com.collectiq.ai.local
+    mWinSurfaceVisibleCount=1
+  Session Session{1757280 3149:1000}:
+    mNumWindow=0 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@1bcbdbe
+    mPackageName=android
+    mWinSurfaceVisibleCount=0
+  Session Session{5035337 23257:u0a10073}:
+    mNumWindow=1 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@7db98d
+    mPackageName=com.samsung.android.app.cocktailbarservice
+    mWinSurfaceVisibleCount=1
+  Session Session{6aed015 9058:u0a10182}:
+    mNumWindow=1 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@f3ae8df
+    mPackageName=com.samsung.android.honeyboard
+    mWinSurfaceVisibleCount=0
+  Session Session{b552ccb 15585:u0a10263}:
+    mNumWindow=0 mCanAddInternalSystemWindow=false mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@e460353
+    mPackageName=com.google.android.permissioncontroller
+    mWinSurfaceVisibleCount=0
+  Session Session{c1c755d 14451:u0a10179}:
+    mNumWindow=1 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@b0e7ddb
+    mPackageName=com.sec.android.app.clockpackage
+    mWinSurfaceVisibleCount=0
+  Session Session{d52ba97 3511:u0a10062}:
+    mNumWindow=8 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@a0f33fb
+    mPackageName=com.android.systemui
+    mWinSurfaceVisibleCount=2
+  Session Session{f3bf61e 13347:u0a10142}:
+    mNumWindow=1 mCanAddInternalSystemWindow=true mAppOverlaySurfaces={} mAlertWindowSurfaces={} mClientDead=false mSurfaceSession=android.view.SurfaceSession@5fecf96
+    mPackageName=com.sec.android.app.launcher
+    mWinSurfaceVisibleCount=0
+
+WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
+  mLastOrientationSource=WindowedMagnification:0:31@64481268
+  deepestLastOrientationSource=ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252}
+  overrideConfig={1.0 405mcc872mnc [en_GB] ldltr sw384dp w384dp h772dp 450dpi nrml long hdr widecg port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 92 - 1080, 2265) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOver=undefined mStageConfig=undefined mFreeformTaskPinningState=undefined mFreeformStashState=undefined} s.16231 fontWeightAdjustment=0 ff=0 bf=0 bts=0 themeSeq=0 nightDim=0}
+  Display: mDisplayId=0 rootTasks=9
+    init=1080x2400 450dpi mMinSizeOfResizeableTaskDp=220 cur=1080x2400 app=1080x2173 rng=1080x1012-2173x2173
+    deferred=false mLayoutNeeded=false mTouchExcludeRegion=SkRegion((0,0,1080,2400))
+
+    initCutout=DisplayCutout{insets=Rect(0, 92 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(478, 0 - 602, 92), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2400 physicalDisplayWidth=1080 physicalDisplayHeight=2400 density={2.8125} cutoutSpec={M 0,0 H -22.0444444444444 V 32.71111111111111 H 22.0444444444444 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}}}
+    baseCutout=DisplayCutout{insets=Rect(0, 92 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(478, 0 - 602, 92), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2400 physicalDisplayWidth=1080 physicalDisplayHeight=2400 density={2.8125} cutoutSpec={M 0,0 H -22.0444444444444 V 32.71111111111111 H 22.0444444444444 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}}}
+
+  mLayoutSeq=48295
+  mCurrentFocus=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  mFocusedApp=ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252}
+
+  displayId=0
+  mWallpaperTarget=null
+  mLastWallpaperX=0.5 mLastWallpaperY=0.5
+  mLastWallpaperDisplayOffsetX=0 mLastWallpaperDisplayOffsetY=0
+
+  Display areas in top down Z order:
+    * Leaf:36:36
+    * HideDisplayCutout:32:35
+      * OneHanded:34:35
+        * FullscreenMagnification:34:35
+          * Leaf:34:35
+      * FullscreenMagnification:33:33
+        * Leaf:33:33
+      * OneHanded:32:32
+        * Leaf:32:32
+    * WindowedMagnification:0:31
+      * HideDisplayCutout:26:31
+        * OneHanded:26:31
+          * FullscreenMagnification:29:31
+            * Leaf:29:31
+          * Leaf:28:28
+          * FullscreenMagnification:26:27
+            * Leaf:26:27
+      * Leaf:24:25
+      * HideDisplayCutout:18:23
+        * OneHanded:18:23
+          * FullscreenMagnification:18:23
+            * Leaf:18:23
+      * OneHanded:17:17
+        * FullscreenMagnification:17:17
+          * Leaf:17:17
+      * HideDisplayCutout:16:16
+        * OneHanded:16:16
+          * FullscreenMagnification:16:16
+            * Leaf:16:16
+      * OneHanded:15:15
+        * FullscreenMagnification:15:15
+          * Leaf:15:15
+      * HideDisplayCutout:0:14
+        * OneHanded:0:14
+          * ImePlaceholder:13:14
+            * ImeContainer
+          * FullscreenMagnification:0:12
+            * Leaf:3:12
+            * DefaultTaskDisplayArea
+            * Leaf:0:1
+
+  Task display areas in top down Z order:
+    TaskDisplayArea DefaultTaskDisplayArea
+      overrideConfig={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mMaxBounds=Rect(0, 0 - 0, 0) mDisplayRotation=undefined mWindowingMode=undefined mDisplayWindowingMode=undefined mActivityType=undefined mAlwaysOnTop=undefined mRotation=undefined mPopOver=undefined mStageConfig=undefined mFreeformTaskPinningState=unpinned mFreeformStashState=undefined} ?fontWeightAdjustment ff=0 bf=-1 bts=-1 themeSeq=0 nightDim=-1}
+      mPreferredTopFocusableRootTask=Task{c5722be #1252 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      mLastFocusedRootTask=Task{c5722be #1252 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      Application tokens in top down Z order:
+      * Task{c5722be #1252 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252}
+      * Task{77eda6f #1 type=home ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2400]
+        * Task{32f2500 #558 type=home A=10142:com.sec.android.app.launcher.activities.LauncherActivity U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+          bounds=[0,0][1080,2400]
+          * ActivityRecord{b23e301 u0 com.sec.android.app.launcher/.activities.LauncherActivity} t558}
+      * Task{392035 #1235 type=standard I=com.collectiq.ai/.MainActivity U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{fdf026c u0 com.collectiq.ai/.MainActivity} t1235}
+      * Task{d0e23ba #1193 type=standard A=10179:com.sec.android.app.clockpackage U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{b417ce5 u0 com.sec.android.app.clockpackage/.ClockPackage} t1193}
+      * Task{4e7327c #1110 type=standard I=com.collectiq.ai.sit/com.collectiq.ai.MainActivity U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{5e65150 u0 com.collectiq.ai.sit/com.collectiq.ai.MainActivity} t1110}
+      * Task{23f5bdd #1112 type=standard A=10365:com.facebook.orca U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=2}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{b017453 u0 com.facebook.orca/com.facebook.messaging.auth.LaunchScreenActivity} t1112}
+        * ActivityRecord{17fc3b4 u0 com.facebook.orca/.auth.StartScreenActivity} t1112}
+      * Task{1c58c #1108 type=standard A=10339:com.instagram.android U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        bounds=[0,0][1080,2400]
+        * ActivityRecord{7ae1abf u0 com.instagram.android/.activity.MainTabActivity} t1108}
+      * Task{86b037c #2 type=undefined ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=0}
+        bounds=[0,0][1080,2400]
+      * Task{c4db57d #3 type=undefined ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=2}
+        bounds=[0,0][1080,2400]
+        * Task{5a8f641 #5 type=undefined ?? U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window stage=side/bottom translucent=true sz=0}
+          bounds=[0,1258][1080,2400]
+        * Task{5277928 #4 type=undefined ?? U=0 rootTaskId=3 visible=false visibleRequested=false mode=multi-window stage=main/top translucent=true sz=0}
+          bounds=[0,0][1080,1235]
+
+  no ScreenRotationAnimation
+
+  rootHomeTask=Task=1
+
+  PinnedTaskController
+    mIsImeShowing=false
+    mImeHeight=0
+    mMinAspectRatio=0.41841003
+    mMaxAspectRatio=2.39
+  rootMainStageTask=Task=4
+  rootSideStageTask=Task=5
+
+  DisplayFrames w=1080 h=2400 r=0
+
+  DisplayPolicy
+    mCarDockEnablesAccelerometer=true mDeskDockEnablesAccelerometer=true
+    mDockMode=EXTRA_DOCK_STATE_UNDOCKED mLidState=LID_ABSENT
+    mAwake=true mScreenOnEarly=true mScreenOnFully=true
+    mKeyguardDrawComplete=true mWindowManagerDrawComplete=true
+    mHdmiPlugged=false
+    mLastBehavior=DEFAULT
+    mShowingDream=false mDreamingLockscreen=false
+    mStatusBar=Window{91fcee5 u0 StatusBar}
+    mExpandedPanel=Window{50beffe u0 NotificationShade}
+    isKeyguardShowing=false
+    mNavigationBar=Window{a793e53 u0 NavigationBar0}
+    mNavBarOpacityMode=0
+    mNavigationBarCanMove=true
+    mNavigationBarPosition=4
+    mCurrentUserResources
+     .mUserId=0
+     .getAssets().getApkPaths()=[/system/framework/framework-res.apk, /product/overlay/CaptivePortalLoginFrameworkOverlay.apk, /product/overlay/GmsConfigOverlayASI.apk, /product/overlay/GmsConfigOverlayCommon.apk, /product/overlay/GmsConfigOverlayGSA.apk, /product/overlay/GmsConfigOverlayGeotz.apk, /product/overlay/GoogleExtServicesConfigOverlay.apk, /product/overlay/GooglePermissionControllerFrameworkOverlay.apk, /product/overlay/ModuleMetadataGoogleOverlay.apk, /vendor/overlay/framework-res__auto_generated_rro_vendor.apk, /product/overlay/framework-res__auto_generated_rro_product.apk, /system/system_ext/overlay/smartfaceservice_overlay.apk, /system/framework/framework-res.apk, /product/overlay/NavigationBarMode3Button/NavigationBarMode3ButtonOverlay.apk, /data/resource-cache/android-SemWT_android-DE6l.frro, /data/resource-cache/android-SemWT_MonetPalette-QyoO.frro]
+     .getConfiguration()={1.0 405mcc872mnc [en_GB] ldltr sw384dp w384dp h772dp 450dpi nrml long hdr widecg port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 92 - 1080, 2265) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOver=undefined mStageConfig=undefined mFreeformTaskPinningState=undefined mFreeformStashState=undefined} as.2 s.16046 fontWeightAdjustment=0 ff=0 bf=0 bts=0 themeSeq=0 nightDim=0}
+     .getDimensionPixelSize(R.dimen.navigation_bar_height)=135
+     mLastUpdatedUserId=0
+     mLastUpdatedUiContextPackageName=android
+     mLastUpdatedCallers=com.android.server.wm.DisplayPolicy.getCurrentUserResources:2864 com.android.server.wm.DisplayPolicy.onConfigurationChanged:2656
+    mFocusedWindow=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mTopFullscreenOpaqueWindowState=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mNavBarColorWindowCandidate=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mNavBarBackgroundWindow=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mLastStatusBarAppearanceRegions=
+      AppearanceRegion{ bounds=[0,0][1080,2400]}
+    mStatusBarBackgroundWindows=
+      Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mTopIsFullscreen=false
+    mForceShowNavigationBarEnabled=false mAllowLockscreenWhenOn=false
+    mRemoteInsetsControllerControlsSystemBars=false
+    mForceFreeformOverlappingWithNavBar=false
+    SystemGestures:
+      mDisplayCutoutTouchableRegionSize=34
+      mSwipeStartThreshold=Rect(68, 126 - 68, 68)
+      mSwipeDistanceThreshold=68
+    Looper state:
+      Looper (android.ui, tid 26) {c390758}
+        (Total messages: 0, polling=true, quitting=false)
+    mStatusBarHeightForRotation=[92, 68, 92, 68]
+    UiContextResourcesConfig=
+    {1.0 405mcc872mnc [en_GB] ldltr sw384dp w384dp h772dp 450dpi nrml long hdr widecg port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 92 - 1080, 2265) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOver=undefined mStageConfig=undefined mFreeformTaskPinningState=undefined mFreeformStashState=undefined} as.2 s.16046 fontWeightAdjustment=0 ff=0 bf=0 bts=0 themeSeq=0 nightDim=0}
+    UiContextResourcesMetrics=
+    DisplayMetrics{density=2.8125, width=1080, height=2173, scaledDensity=2.8125, xdpi=391.885, ydpi=393.29}
+
+    DisplayPolicyExt
+      mPayHandlerWin=Window{bf465f5 u0 com.samsung.android.spay.pay.HintService} mLastPayHandlerVisible=false mLastPayHandlerFrame=Rect(0, 0 - 0, 0)
+      mIsOneHandOpEnabled=false
+      mHasOneHandOpSpec=false
+      mIsInputFilterRegistered=false
+      mReasonToStart=SYSTEM_BOOTED
+      mOneHandOpController=null      mOneHandOpHandler=null
+
+  DisplayRotation
+    mCurrentAppOrientation=SCREEN_ORIENTATION_UNSPECIFIED
+    mLastOrientation=-1
+    mRotation=0 mDeferredRotationPauseCount=0
+    mLandscapeRotation=ROTATION_90 mSeascapeRotation=ROTATION_270
+    mPortraitRotation=ROTATION_0 mUpsideDownRotation=ROTATION_180
+    mSupportAutoRotation=true
+    WindowOrientationListener
+      mEnabled=true
+      mCurrentRotation=ROTATION_0
+      mSensorType=null
+      mSensor={Sensor name="AutoRotation Sensor", vendor="Samsung Electronics", version=16, type=27, maxRange=255.0, resolution=1.0, power=0.001, minDelay=0}
+      mRate=2
+      OrientationSensorJudge
+        mDesiredRotation=-1
+        mProposedRotation=-1
+        mTouching=false
+        mTouchEndedTimestampNanos=1461809425887040
+        mLastRotationResolution=-1
+
+    mCarDockRotation=-1 mDeskDockRotation=-1
+    mUserRotationMode=USER_ROTATION_FREE mUserRotation=ROTATION_0 mCameraRotationMode=0 mAllowAllRotations=false
+    mDemoHdmiRotation=ROTATION_90 mDemoHdmiRotationLock=false mUndockedHdmiRotation=-1
+    mLidOpenRotation=-1
+    mFixedToUserRotation=false
+
+    RotationHistory
+      07-13 20:24:57.921 ROTATION_0 to ROTATION_270
+        source=ActivityRecord{c17d48d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1188} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_270
+      07-13 20:25:02.179 ROTATION_270 to ROTATION_0
+        source=ActivityRecord{c17d48d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1188} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+      07-13 20:25:04.922 ROTATION_0 to ROTATION_90
+        source=ActivityRecord{c17d48d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1188} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_90
+      07-13 20:25:11.247 ROTATION_90 to ROTATION_0
+        source=ActivityRecord{c17d48d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1188} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+      07-14 18:04:39.430 ROTATION_0 to ROTATION_270
+        source=ActivityRecord{97db345 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1243} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_270
+      07-14 18:04:44.419 ROTATION_270 to ROTATION_0
+        source=ActivityRecord{97db345 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1243} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+      07-14 19:35:09.873 ROTATION_0 to ROTATION_90
+        source=ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_90
+      07-14 19:35:12.032 ROTATION_90 to ROTATION_0
+        source=ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252} SCREEN_ORIENTATION_UNSPECIFIED
+        mode=USER_ROTATION_FREE user=ROTATION_0 sensor=ROTATION_0
+        mRotatingSeamlessly=false mSeamlessRotationCount=0
+
+  InputConsumers:
+    name=recents_animation_input_consumer pid=13347 user=UserHandle{0}
+
+  WindowInsetsStateController
+    InsetsState
+      mDisplayFrame=Rect(0, 0 - 1080, 2400)
+      mDisplayCutout=DisplayCutout{insets=Rect(0, 92 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(478, 0 - 602, 92), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2400 physicalDisplayWidth=1080 physicalDisplayHeight=2400 density={2.8125} cutoutSpec={M 0,0 H -22.0444444444444 V 32.71111111111111 H 22.0444444444444 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}}}
+      mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=90, center=Point(90, 90)}, RoundedCorner{position=TopRight, radius=90, center=Point(990, 90)}, RoundedCorner{position=BottomRight, radius=90, center=Point(990, 2310)}, RoundedCorner{position=BottomLeft, radius=90, center=Point(90, 2310)}]}
+      mRoundedCornerFrame=Rect(0, 0 - 0, 0)
+      mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(956, 0 - 1080, 92) rotation=0}
+        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,92] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_LEFT_GESTURES frame=[0,0][0,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_RIGHT_GESTURES frame=[1080,0][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,126] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_LEFT_DISPLAY_CUTOUT frame=[0,0][-100000,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_TOP_DISPLAY_CUTOUT frame=[0,0][1080,92] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_RIGHT_DISPLAY_CUTOUT frame=[100000,0][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_BOTTOM_DISPLAY_CUTOUT frame=[0,100000][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,92] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false insetsRoundedCornerFrame=false
+    Control map:
+      ITYPE_IME -> Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      ITYPE_NAVIGATION_BAR -> Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      ITYPE_STATUS_BAR -> Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    InsetsSourceProviders:
+      ImeInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false insetsRoundedCornerFrame=false
+        mControl=InsetsSourceControl type=ITYPE_IME mLeash=Surface(name=Surface(name=fbca33d InputMethod)/@0x907bc83 - animation-leash of insets_animation)/@0xcddf4a2 mSurfacePosition=Point(0, 92) mInsetsHint=Insets{left=0, top=0, right=0, bottom=1008} mSkipAnimationOnce=false mControlledByPolicy=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{fbca33d u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=fbca33d InputMethod)/@0x907bc83 - animation-leash of insets_animation)/@0xcddf4a2
+        mControlTarget=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        mImeShowing=false
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_BOTTOM_TAPPABLE_ELEMENT frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{a793e53 u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,92] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{91fcee5 u0 StatusBar}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_BOTTOM_MANDATORY_GESTURES frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{a793e53 u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,126] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{91fcee5 u0 StatusBar}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_RIGHT_GESTURES frame=[1080,0][1080,2400] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{a793e53 u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_LEFT_GESTURES frame=[0,0][0,2400] visible=true insetsRoundedCornerFrame=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{a793e53 u0 NavigationBar0}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2265][1080,2400] visible=true insetsRoundedCornerFrame=false
+        mControl=InsetsSourceControl type=ITYPE_NAVIGATION_BAR mLeash=Surface(name=Surface(name=a793e53 NavigationBar0)/@0xc2d033e - animation-leash of insets_animation)/@0x8e06b0b mSurfacePosition=Point(0, 2265) mInsetsHint=Insets{left=0, top=0, right=0, bottom=135} mSkipAnimationOnce=false mControlledByPolicy=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,2265][1080,2400]
+        mWindowContainer=Window{a793e53 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=a793e53 NavigationBar0)/@0xc2d033e - animation-leash of insets_animation)/@0x8e06b0b
+        mControlTarget=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      WindowContainerInsetsSourceProvider
+        mSource=InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,92] visible=true insetsRoundedCornerFrame=false
+        mControl=InsetsSourceControl type=ITYPE_STATUS_BAR mLeash=Surface(name=Surface(name=91fcee5 StatusBar)/@0x1819843 - animation-leash of insets_animation)/@0xd5dbc85 mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=92, right=0, bottom=0} mSkipAnimationOnce=false mControlledByPolicy=false
+        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]
+        mWindowContainer=Window{91fcee5 u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=91fcee5 StatusBar)/@0x1819843 - animation-leash of insets_animation)/@0xd5dbc85
+        mControlTarget=Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+
+  mIsDisplayDecorationSupported=false
+
+WINDOW MANAGER TOKENS (dumpsys window tokens)
+  All tokens:
+  Display #0
+  WallpaperWindowToken{8ba1759 token=android.os.Binder@ea28fa0}
+  WindowToken{8fd148b type=2015 android.os.BinderProxy@c9f5a5a}
+  WindowToken{b0f1be0 type=2009 android.os.BinderProxy@ce445e3}
+  WindowToken{e1ea829 type=2016 android.os.BinderProxy@f335d7b}
+  ActivityRecord{b23e301 u0 com.sec.android.app.launcher/.activities.LauncherActivity} t558}
+  ActivityRecord{b017453 u0 com.facebook.orca/com.facebook.messaging.auth.LaunchScreenActivity} t1112}
+  WindowToken{188c72c type=2024 android.os.BinderProxy@d0f9edf}
+  WindowToken{55561c2 type=2226 android.os.BinderProxy@9164e0d}
+  WindowToken{e9c9474 type=2011 android.os.Binder@c58b447}
+  WindowToken{2097fb9 type=2040 android.os.BinderProxy@ba18a03}
+  WindowToken{e98b6b3 type=2038 android.os.BinderProxy@fc90c22}
+  ActivityRecord{fdf026c u0 com.collectiq.ai/.MainActivity} t1235}
+  ActivityRecord{7ae1abf u0 com.instagram.android/.activity.MainTabActivity} t1108}
+  WindowToken{3247db7 type=2019 android.os.BinderProxy@7fac51}
+  ActivityRecord{b417ce5 u0 com.sec.android.app.clockpackage/.ClockPackage} t1193}
+  ActivityRecord{17fc3b4 u0 com.facebook.orca/.auth.StartScreenActivity} t1112}
+  WindowToken{e2cee0d type=2228 android.os.BinderProxy@1c80a4}
+  WindowToken{26d7ddc type=2000 android.os.BinderProxy@e1254ae}
+  ActivityRecord{70ac579 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1252}
+  ActivityRecord{5e65150 u0 com.collectiq.ai.sit/com.collectiq.ai.MainActivity} t1110}
+
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #0 Window{e864968 u0 LockscreenShortcutBlur}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@c9f5a5a
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=TOP CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=shortEdges ty=SECURE_SYSTEM_OVERLAY fmt=TRANSLUCENT
+      fl=1000538
+      pfl=12000010
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE naviIconColor=0}
+    Requested w=1080 h=2400 mLayoutSeq=46335
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{962a0a4 LockscreenShortcutBlur}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #1 Window{95a00f3 u0 ShellDropTarget}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@5741762
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} layoutInDisplayCutoutMode=always ty=DRAG fmt=TRANSLUCENT
+      fl=1000208
+      pfl=92000050
+      bhv=DEFAULT naviIconColor=0 mwfl=10}
+    Requested w=1080 h=2400 mLayoutSeq=5
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{ec88e0d ShellDropTarget}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #2 Window{4b781c2 u0 KeyguardBiometricToastView}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@1c80a4
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(wrapxwrap) gr=TOP CENTER_VERTICAL sim={adjust=pan} ty=2228 fmt=TRANSLUCENT
+      fl=1000118
+      pfl=2000010
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS CAPTION_BAR naviIconColor=0
+      sfl=20000}
+    Requested w=-1 h=-1 mLayoutSeq=46142
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{71ebed5 KeyguardBiometricToastView}:
+      mShownAlpha=0.0 mAlpha=1.0 mLastAlpha=0.0
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #3 Window{bf465f5 u0 com.samsung.android.spay.pay.HintService}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{2d0cd2 28681:u0a10270} mClient=android.os.BinderProxy@d0f9edf
+    mOwnerUid=10270 showForAllUsers=true package=com.samsung.android.spay appop=NONE
+    mAttrs={(0,0)(522x67) gr=BOTTOM CENTER sim={adjust=pan} layoutInDisplayCutoutMode=shortEdges ty=NAVIGATION_BAR_PANEL fmt=TRANSLUCENT
+      fl=1800308
+      pfl=12000040
+      bhv=DEFAULT
+      fitTypes=NAVIGATION_BARS
+      fitSides=LEFT RIGHT naviIconColor=0}
+    Requested w=522 h=67 mLayoutSeq=48230
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{7cc2bd3 com.samsung.android.spay.pay.HintService}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #4 Window{a793e53 u0 NavigationBar0}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@4833cb6
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx135) gr=BOTTOM CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR fmt=TRANSLUCENT receive insets ignoring z-order
+      fl=20840068
+      pfl=33002000
+      bhv=DEFAULT
+ providedInternalInsets=null Insets{left=0, top=0, right=0, bottom=0} null null null null null null null null null null null null null null null null null null null null null null
+      paramsForRotation=
+      rot[0]={(0,0)(fillx135) gr=BOTTOM CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR fmt=TRANSLUCENT receive insets ignoring z-order
+  fl=20840068
+  pfl=31002000
+  bhv=DEFAULT
+ providedInternalInsets=null Insets{left=0, top=0, right=0, bottom=0} null null null null null null null null null null null null null null null null null null null null null null naviIconColor=0}
+      rot[1]={(0,0)(135xfill) gr=RIGHT CENTER_HORIZONTAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR fmt=TRANSLUCENT receive insets ignoring z-order
+  fl=20840068
+  pfl=31002000
+  bhv=DEFAULT
+ providedInternalInsets=null null null null null null null null null null null null null null null null null null null null null null null null naviIconColor=0}
+      rot[2]={(0,0)(fillx135) gr=BOTTOM CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR fmt=TRANSLUCENT receive insets ignoring z-order
+  fl=20840068
+  pfl=31002000
+  bhv=DEFAULT
+ providedInternalInsets=null Insets{left=0, top=0, right=0, bottom=0} null null null null null null null null null null null null null null null null null null null null null null naviIconColor=0}
+      rot[3]={(0,0)(135xfill) gr=LEFT CENTER_HORIZONTAL layoutInDisplayCutoutMode=always ty=NAVIGATION_BAR fmt=TRANSLUCENT receive insets ignoring z-order
+  fl=20840068
+  pfl=31002000
+  bhv=DEFAULT
+ providedInternalInsets=null null null null null null null null null null null null null null null null null null null null null null null null naviIconColor=0} naviIconColor=0}
+    Requested w=1080 h=135 mLayoutSeq=48295
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=a793e53 NavigationBar0)/@0xc2d033e - animation-leash of insets_animation)/@0x8e06b0b mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@4cc6998
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=a793e53 NavigationBar0)/@0xc2d033e - animation-leash of insets_animation)/@0x8e06b0b
+    WindowStateAnimator{a7cfe09 NavigationBar0}:
+      Surface: shown=true layer=0 alpha=1.0 rect=(0.0,0.0)  transform=(1.0, 0.0, 0.0, 1.0)
+    mLastFreezeDuration=+335ms
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=true
+    isVisible=true
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #5 Window{f2d4e99 u0 Bouncer}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@ce445e3
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx0) gr=TOP CENTER_VERTICAL sim={adjust=resize} layoutInDisplayCutoutMode=shortEdges ty=KEYGUARD_DIALOG fmt=TRANSLUCENT if=INPUT_FEATURE_DISABLE_USER_ACTIVITY userActivityTimeout=10000
+      fl=85000548
+      pfl=12000000
+      vsysui=500
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+ dimAmount=0.0 screenDimDuration=0 naviIconColor=0
+      sfl=40000}
+    Requested w=1080 h=0 mLayoutSeq=47137
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{5a3b22f Bouncer}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #6 Window{72febd3 u0 com.samsung.android.app.cocktailbarservice/com.samsung.android.app.cocktailbarservice.CocktailBarService}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{5035337 23257:u0a10073} mClient=android.os.BinderProxy@9164e0d
+    mOwnerUid=10073 showForAllUsers=true package=com.samsung.android.app.cocktailbarservice appop=NONE
+    mAttrs={(0,370)(67x501) gr=TOP LEFT CENTER sim={adjust=nothing} layoutInDisplayCutoutMode=shortEdges ty=2226 fmt=TRANSPARENT
+      fl=81800508
+      pfl=2000050
+      vsysui=2000
+      apr=LIGHT_STATUS_BARS
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+      fitTypes=NAVIGATION_BARS CAPTION_BAR
+ dimAmount=0.0 dimDuration=0 naviIconColor=0
+      sfl=620000}
+    Requested w=67 h=501 mLayoutSeq=48295
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    WindowStateAnimator{73ef2b7 com.samsung.android.app.cocktailbarservice/com.samsung.android.app.cocktailbarservice.CocktailBarService}:
+      Surface: shown=true layer=0 alpha=1.0 rect=(0.0,0.0)  transform=(1.0, 0.0, 0.0, 1.0)
+    mLastFreezeDuration=+152ms
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=true
+    isVisible=true
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #7 Window{50beffe u0 NotificationShade}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@d26dd80
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=TOP CENTER_VERTICAL sim={adjust=resize} layoutInDisplayCutoutMode=always ty=NOTIFICATION_SHADE fmt=TRANSLUCENT
+      fl=81840048
+      pfl=1b000000
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+ dimAmount=0.0 naviIconColor=0
+      sfl=40000}
+    Requested w=1080 h=2400 mLayoutSeq=48289
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{b8ea71a NotificationShade}:
+    mLastFreezeDuration=+12m20s186ms
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    mDrawLock=WakeLock{ac3424b held=false, refCount=35804}
+    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #8 Window{91fcee5 u0 StatusBar}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@2f424f
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(fillx92) gr=TOP CENTER_VERTICAL sim={adjust=pan} layoutInDisplayCutoutMode=always ty=STATUS_BAR fmt=TRANSLUCENT
+      fl=81000008
+      pfl=13000000
+      bhv=DEFAULT
+      paramsForRotation=
+      rot[0]={(0,0)(fillx92) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR fmt=TRANSLUCENT
+  fl=80000008
+  pfl=11000000
+  bhv=DEFAULT naviIconColor=0}
+      rot[1]={(0,0)(fillx68) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR fmt=TRANSLUCENT
+  fl=80000008
+  pfl=11000000
+  bhv=DEFAULT naviIconColor=0}
+      rot[2]={(0,0)(fillx92) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR fmt=TRANSLUCENT
+  fl=80000008
+  pfl=11000000
+  bhv=DEFAULT naviIconColor=0}
+      rot[3]={(0,0)(fillx68) gr=TOP CENTER_VERTICAL layoutInDisplayCutoutMode=always ty=STATUS_BAR fmt=TRANSLUCENT
+  fl=80000008
+  pfl=11000000
+  bhv=DEFAULT naviIconColor=0} naviIconColor=0}
+    Requested w=1080 h=92 mLayoutSeq=48295
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=91fcee5 StatusBar)/@0x1819843 - animation-leash of insets_animation)/@0xd5dbc85 mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@6c575f1
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=91fcee5 StatusBar)/@0x1819843 - animation-leash of insets_animation)/@0xd5dbc85
+    WindowStateAnimator{d496541 StatusBar}:
+      Surface: shown=true layer=0 alpha=1.0 rect=(0.0,0.0)  transform=(1.0, 0.0, 0.0, 1.0)
+    mLastFreezeDuration=+333ms
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=true
+    isVisible=true
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #9 Window{fbca33d u0 InputMethod}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{6aed015 9058:u0a10182} mClient=android.os.BinderProxy@8d20c94
+    mOwnerUid=10182 showForAllUsers=false package=com.samsung.android.honeyboard appop=NONE
+    mAttrs={(0,0)(fillxfill) gr=BOTTOM CENTER_VERTICAL sim={adjust=pan} ty=INPUT_METHOD fmt=TRANSPARENT wanim=0x7f1301aa preferredMinDisplayRefreshRate=60.0 receive insets ignoring z-order
+      fl=81800108
+      pfl=12000000
+      vsysui=10
+      apr=LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitTypes=STATUS_BARS NAVIGATION_BARS
+      fitSides=LEFT TOP RIGHT
+      fitIgnoreVis dimDuration=150 naviIconColor=0}
+    Requested w=1080 h=2308 mLayoutSeq=47053
+    mIsImWindow=true mIsWallpaper=false mIsFloatingLayer=true
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    ContainerAnimator:
+      mLeash=Surface(name=Surface(name=fbca33d InputMethod)/@0x907bc83 - animation-leash of insets_animation)/@0xcddf4a2 mAnimationType=insets_animation
+      Animation: com.android.server.wm.InsetsSourceProvider$ControlAdapter@568d5d6
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=fbca33d InputMethod)/@0x907bc83 - animation-leash of insets_animation)/@0xcddf4a2
+    WindowStateAnimator{3017ad4 InputMethod}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #10 Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}:
+    mDisplayId=0 rootTaskId=1252 mSession=Session{554787 13913:u0a10592} mClient=android.os.BinderProxy@54ba2dd
+    mOwnerUid=10592 showForAllUsers=false package=com.collectiq.ai.local appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=resize} ty=BASE_APPLICATION fmt=TRANSLUCENT wanim=0x1030001
+      fl=81810100
+      pfl=12020040
+      vsysui=500
+      bhv=DEFAULT
+      fitSides= naviIconColor=0}
+    Requested w=1080 h=2400 mLayoutSeq=48295
+    mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
+    WindowStateAnimator{9a1d775 com.collectiq.ai.local/com.collectiq.ai.MainActivity}:
+      Surface: shown=true layer=0 alpha=1.0 rect=(0.0,0.0)  transform=(1.0, 0.0, 0.0, 1.0)
+    mLastFreezeDuration=+175ms
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=true
+    isVisible=true
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #11 Window{922aaf6 u0 com.sec.android.app.launcher/com.sec.android.app.launcher.activities.LauncherActivity}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{f3bf61e 13347:u0a10142} mClient=android.os.BinderProxy@fddb1b8
+    mOwnerUid=10142 showForAllUsers=false package=com.sec.android.app.launcher appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=nothing} layoutInDisplayCutoutMode=shortEdges ty=BASE_APPLICATION fmt=TRANSPARENT wanim=0x10302f4
+      fl=81910100
+      pfl=1e020040
+      vsysui=1700
+      bhv=SHOW_TRANSIENT_BARS_BY_SWIPE
+      fitSides= naviIconColor=0}
+    Requested w=1080 h=2400 mLayoutSeq=48241
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{b49dd58 com.sec.android.app.launcher/com.sec.android.app.launcher.activities.LauncherActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    mWallpaperX=0.5 mWallpaperY=0.5
+    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #12 Window{5a489f5 u0 com.collectiq.ai/com.collectiq.ai.MainActivity}:
+    mDisplayId=0 rootTaskId=1235 mSession=Session{91d7e 5847:u0a10590} mClient=android.os.BinderProxy@912fb2c
+    mOwnerUid=10590 showForAllUsers=false package=com.collectiq.ai appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={adjust=resize forwardNavigation} ty=BASE_APPLICATION fmt=TRANSLUCENT wanim=0x1030001
+      fl=81810100
+      pfl=12020040
+      vsysui=500
+      bhv=DEFAULT
+      fitSides= naviIconColor=0}
+    Requested w=1080 h=2400 mLayoutSeq=47463
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{3a70eac com.collectiq.ai/com.collectiq.ai.MainActivity}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #13 Window{bbc6ea0 u0 com.sec.android.app.clockpackage/com.sec.android.app.clockpackage.ClockPackage}:
+    mDisplayId=0 rootTaskId=1193 mSession=Session{c1c755d 14451:u0a10179} mClient=android.os.BinderProxy@8fc2ba3
+    mOwnerUid=10179 showForAllUsers=false package=com.sec.android.app.clockpackage appop=NONE
+    mAttrs={(0,0)(fillxfill) sim={state=always_hidden adjust=nothing forwardNavigation} layoutInDisplayCutoutMode=shortEdges ty=BASE_APPLICATION wanim=0x10302f4 sysuil=true
+      fl=81810100
+      pfl=12020040
+      vsysui=2010
+      apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS
+      bhv=DEFAULT
+      fitSides= naviIconColor=0}
+    Requested w=1080 h=2400 mLayoutSeq=46854
+    mHasSurface=false isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{82f54bf com.sec.android.app.clockpackage/com.sec.android.app.clockpackage.ClockPackage}:
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+  Window #14 Window{facff4b u0 com.android.systemui.ImageWallpaper}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{d52ba97 3511:u0a10062} mClient=android.os.BinderProxy@7b9f2f
+    mOwnerUid=10062 showForAllUsers=true package=com.android.systemui appop=NONE
+    mAttrs={(0,0)(2400x2400) gr=TOP START CENTER layoutInDisplayCutoutMode=always ty=WALLPAPER fmt=RGBX_8888 wanim=0x103031a
+      fl=14318
+      pfl=2000014
+      bhv=DEFAULT naviIconColor=0
+      sfl=8}
+    Requested w=2400 h=2400 mLayoutSeq=48231
+    mIsImWindow=false mIsWallpaper=true mIsFloatingLayer=true
+    mHasSurface=true isReadyForDisplay()=false mWindowRemovalAllowed=false
+    WindowStateAnimator{ae47b79 com.android.systemui.ImageWallpaper}:
+      Surface: shown=false layer=0 alpha=1.0 rect=(0.0,0.0)  transform=(1.0, 0.0, 0.0, 1.0)
+    mOrientationChanging=false configOrientationChanging=false mAppFreezing=false mReportOrientationChanged=true
+    mForceSeamlesslyRotate=false seamlesslyRotate: pending=null    mWallpaperX=0.5 mWallpaperY=0.5
+    mWallpaperZoomOut=0.0
+    mWallpaperDisplayOffsetX=0 mWallpaperDisplayOffsetY=0
+    isOnScreen=false
+    isVisible=false
+    keepClearAreas: restricted=[], unrestricted=[]
+    mHiddenWhileProfileLockedState=false
+
+  mGlobalConfiguration={1.0 405mcc872mnc [en_GB] ldltr sw384dp w384dp h772dp 450dpi nrml long hdr widecg port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 92 - 1080, 2265) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0 mPopOver=undefined mStageConfig=undefined mFreeformTaskPinningState=undefined mFreeformStashState=undefined} s.16231 fontWeightAdjustment=0 ff=0 bf=0 bts=0 themeSeq=0 nightDim=0}
+  mHasPermanentDpad=false
+  mTopFocusedDisplayId=0
+  imeLayeringTarget in display# 0 Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  imeInputTarget in display# 0 Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  imeControlTarget in display# 0 Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  Minimum task size of display#0 220  mInTouchMode=true
+  mBlurEnabled=false
+  mLastDisplayFreezeDuration=+194ms due to Window{c1de52 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  mLastWakeLockHoldingWindow=null mLastWakeLockObscuringWindow=null
+  mHighResTaskSnapshotScale=1.0
+  mTaskSnapshotEnabled=true
+  SnapshotCache
+    Entry taskId=1235
+      topApp=ActivityRecord{fdf026c u0 com.collectiq.ai/.MainActivity} t1235}
+      snapshot=TaskSnapshot{ mId=1784010198645 mTopActivityComponent=com.collectiq.ai/.MainActivity mSnapshot=android.hardware.HardwareBuffer@84e7057 (1080x2400) mColorSpace=Display P3 (id=7, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2400) mContentInsets=[0,92][0,135] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=0 mIsTranslucent=true mHasImeSurface=false
+    Entry taskId=1193
+      topApp=ActivityRecord{b417ce5 u0 com.sec.android.app.clockpackage/.ClockPackage} t1193}
+      snapshot=TaskSnapshot{ mId=1784000572573 mTopActivityComponent=com.sec.android.app.clockpackage/.ClockPackage mSnapshot=android.hardware.HardwareBuffer@9ea8744 (1080x2400) mColorSpace=Display P3 (id=7, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2400) mContentInsets=[0,92][0,135] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=24 mIsTranslucent=false mHasImeSurface=false
+    Entry taskId=1
+      topApp=ActivityRecord{b23e301 u0 com.sec.android.app.launcher/.activities.LauncherActivity} t558}
+      snapshot=TaskSnapshot{ mId=1783830532095 mTopActivityComponent=com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher mSnapshot=android.hardware.HardwareBuffer@64c5e4f (1080x2400) mColorSpace=Display P3 (id=7, model=RGB) mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2400) mContentInsets=[0,92][0,135] mLetterboxInsets=[0,0][0,0] mIsLowResolution=false mIsRealSnapshot=true mWindowingMode=1 mAppearance=0 mIsTranslucent=true mHasImeSurface=false
+  MaxSnapshotCache=6
+  SplitModeMaxCacheSize=0
+
+WINDOW MANAGER EXTENSION (dumpsys window extension)
+  dumpCriticalInfo
+    2021-03-20 00:59:00.878: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=1682, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-03-20 01:01:27.229: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=1682, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-04-02 21:48:54.556: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=5813, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-04-07 11:03:01.832: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=25146, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-04-07 11:07:21.906: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=25146, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-04-07 11:53:14.864: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=25146, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-04-21 04:46:28.642: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=9694, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-07-10 13:45:32.850: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=18270, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-07-10 14:07:20.854: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=18270, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-07-10 14:09:19.781: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=18270, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-07-18 20:38:57.057: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:275, Pid=28269, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-07-29 21:08:40.323: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=2523, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-08-16 19:25:17.011: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=10056, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-08-16 21:46:09.600: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=10056, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-09-21 21:12:26.311: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=18871, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-09-21 21:14:26.255: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=18871, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-09-21 21:15:45.200: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=18871, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-10-04 21:56:26.851: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=8473, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2021-10-04 22:03:26.816: com.android.server.wm.WindowManagerServiceExt.clearForcedDisplaySizeDensity:283, Pid=8473, processName=com.samsung.android.smartmirroring, displayId=0, bSave=true
+    2022-04-22 11:33:02.329: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-04-27 16:13:33.129: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-04-27 16:38:35.799: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-04-27 16:38:35.924: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-04-27 17:24:25.246: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-06-29 14:51:49.686: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-06-29 14:52:15.826: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3264 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3205 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6193
+    2022-07-23 14:05:01.566: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-07-23 14:05:01.819: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-07-23 14:05:01.922: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-07-23 21:57:10.008: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-07-24 18:39:56.362: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-07-24 19:07:27.040: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-08-27 10:12:29.971: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-02 23:14:25.940: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 13:40:26.497: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 13:54:54.160: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:25:31.515: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:31:38.315: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:32:34.374: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:34:00.178: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:35:00.174: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:44:37.036: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 14:46:56.571: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-08 15:44:52.073: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2022-11-09 01:03:20.791: com.android.server.wm.LockTaskController.stopLockTaskMode:452, task:null, callingProcess:com.android.systemui Uid=10062 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:452 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3265 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3206 android.app.IActivityTaskManager$Stub.onTransact:1850 com.android.server.wm.ActivityTaskManagerService.onTransact:6223
+    2023-02-19 10:56:23.495: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 11:08:26.846: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 11:08:27.007: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 11:09:33.085: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 11:53:10.646: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 11:53:11.502: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:02:30.210: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:12:38.299: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:13:39.918: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:28:06.120: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:29:32.552: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:30:09.196: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:32:16.011: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:35:05.906: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:35:26.261: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-02-19 12:35:40.934: com.android.server.wm.LockTaskController.stopLockTaskMode:511, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:511 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3422 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3378 android.app.IActivityTaskManager$Stub.onTransact:1790 com.android.server.wm.ActivityTaskManagerService.onTransact:6538
+    2023-05-14 18:08:38.989: Pid=13736, ProcessName=com.samsung.android.smartmirroring, displayId=0, caller=com.android.server.wm.MultiResolutionController.clearForcedDisplaySizeDensity:159 com.android.server.wm.WindowManagerService.clearForcedDisplaySizeDensity:10707 android.view.IWindowManager$Stub.onTransact:3390 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1316  [E625FDDU3CWC2]
+    2023-06-18 14:46:50.882: Pid=27564, ProcessName=com.samsung.android.smartmirroring, displayId=0, caller=com.android.server.wm.MultiResolutionController.clearForcedDisplaySizeDensity:159 com.android.server.wm.WindowManagerService.clearForcedDisplaySizeDensity:10707 android.view.IWindowManager$Stub.onTransact:3390 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1321  [E625FDDU3CWC2]
+    2023-06-18 16:19:17.711: Pid=13078, ProcessName=com.samsung.android.smartmirroring, displayId=0, Size=1080x1920, Density=450, caller=com.android.server.wm.MultiResolutionController.setForcedDisplaySizeDensity:176 com.android.server.wm.WindowManagerService.setForcedDisplaySizeDensityWithInfo:10731 android.view.IWindowManager$Stub.onTransact:3418 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1321  [E625FDDU3CWC2]
+    2023-06-18 16:19:20.895: Pid=13078, ProcessName=com.samsung.android.smartmirroring, displayId=0, caller=com.android.server.wm.MultiResolutionController.clearForcedDisplaySizeDensity:159 com.android.server.wm.WindowManagerService.clearForcedDisplaySizeDensity:10707 android.view.IWindowManager$Stub.onTransact:3390 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1321  [E625FDDU3CWC2]
+    2023-07-12 08:08:41.366: Pid=29534, ProcessName=com.samsung.android.smartmirroring, displayId=0, caller=com.android.server.wm.MultiResolutionController.clearForcedDisplaySizeDensity:159 com.android.server.wm.WindowManagerService.clearForcedDisplaySizeDensity:10707 android.view.IWindowManager$Stub.onTransact:3390 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1321  [E625FDDU4CWF1]
+    2023-07-14 08:37:45.049: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-07-29 16:15:34.742: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-04 21:51:14.626: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-04 21:51:14.696: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-06 21:30:51.222: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-07 15:43:27.247: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-07 15:43:27.663: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-07 15:43:27.711: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-07 15:43:58.562: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-15 11:41:51.613: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-19 23:20:43.492: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-19 23:21:09.022: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-20 00:05:05.909: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-26 23:48:02.998: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-08-26 23:49:33.392: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-07 22:38:52.963: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:10:34.897: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:10:35.012: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:11:10.908: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:12:03.530: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:13:35.169: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:14:41.387: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:14:41.495: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:16:14.809: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 14:20:34.667: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 15:14:01.758: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 15:35:41.939: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 17:00:30.710: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 17:03:55.802: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-09-08 17:17:34.588: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-11-15 14:58:09.271: Pid=16021, ProcessName=com.samsung.android.smartmirroring, displayId=0, caller=com.android.server.wm.MultiResolutionController.clearForcedDisplaySizeDensity:159 com.android.server.wm.WindowManagerService.clearForcedDisplaySizeDensity:10707 android.view.IWindowManager$Stub.onTransact:3390 com.android.server.wm.WindowManagerService.onTransact:1601 android.os.Binder.execTransactInternal:1321  [E625FDDU4CWI1]
+    2023-11-19 13:30:20.379: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-12-02 00:43:36.077: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-12-17 02:38:28.037: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2023-12-31 07:33:59.922: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3466 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3422 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6588
+    2024-03-31 15:50:07.074: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3467 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3423 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6590
+    2024-03-31 15:50:21.101: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3467 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3423 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6590
+    2024-03-31 15:50:59.403: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3467 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3423 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6590
+    2024-03-31 16:04:16.043: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3467 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3423 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6590
+    2025-05-08 23:20:53.324: com.android.server.wm.LockTaskController.stopLockTaskMode:521, task:null Uid=10062 IsSystemCaller=true LockTaskModeState=0 Caller: com.android.server.wm.LockTaskController.stopLockTaskMode:521 com.android.server.wm.ActivityTaskManagerService.stopLockTaskModeInternal:3476 com.android.server.wm.ActivityTaskManagerService.stopSystemLockTaskMode:3432 android.app.IActivityTaskManager$Stub.onTransact:1800 com.android.server.wm.ActivityTaskManagerService.onTransact:6599
+
+  deadzone enabled=false deadzone_v3 enabled=false
+  PolicyControl.sImmersiveStatusFilter=null
+  PolicyControl.sImmersiveNavigationFilter=null
+WINDOW MANAGER TRACE (dumpsys window trace)
+Status: Disabled
+Log level: 1
+Buffer size: 10485760 bytes
+Buffer usage: 0 bytes
+Elements in the buffer: 0
+WINDOW MANAGER LOGGING (dumpsys window logging)
+ProtoLog status: Disabled
+Enabled log groups:
+  Proto: TEST_GROUP WM_DEBUG_ADD_REMOVE WM_DEBUG_ANIM WM_DEBUG_APP_TRANSITIONS WM_DEBUG_APP_TRANSITIONS_ANIM WM_DEBUG_BACK_PREVIEW WM_DEBUG_BOOT WM_DEBUG_CONFIGURATION WM_DEBUG_CONTAINERS WM_DEBUG_CONTENT_RECORDING WM_DEBUG_DRAW WM_DEBUG_FOCUS WM_DEBUG_FOCUS_LIGHT WM_DEBUG_IME WM_DEBUG_IMMERSIVE WM_DEBUG_KEEP_SCREEN_ON WM_DEBUG_LOCKTASK WM_DEBUG_ORIENTATION WM_DEBUG_RECENTS_ANIMATIONS WM_DEBUG_REMOTE_ANIMATIONS WM_DEBUG_RESIZE WM_DEBUG_SCREEN_ON WM_DEBUG_STARTING_WINDOW WM_DEBUG_STATES WM_DEBUG_SWITCH WM_DEBUG_SYNC_ENGINE WM_DEBUG_TASKS WM_DEBUG_WALLPAPER WM_DEBUG_WINDOW_INSETS WM_DEBUG_WINDOW_MOVEMENT WM_DEBUG_WINDOW_ORGANIZER WM_DEBUG_WINDOW_TRANSITIONS WM_ERROR WM_FORCE_DEBUG_ADD_REMOVE WM_FORCE_DEBUG_ANIM WM_FORCE_DEBUG_APP_TRANSITIONS WM_FORCE_DEBUG_APP_TRANSITIONS_ANIM WM_FORCE_DEBUG_BOOT WM_FORCE_DEBUG_CONFIGURATION WM_FORCE_DEBUG_DRAW WM_FORCE_DEBUG_FOCUS WM_FORCE_DEBUG_FOCUS_LIGHT WM_FORCE_DEBUG_IME WM_FORCE_DEBUG_KEEP_SCREEN_ON WM_FORCE_DEBUG_ORIENTATION WM_FORCE_DEBUG_RECENTS_ANIMATIONS WM_FORCE_DEBUG_REMOTE_ANIMATIONS WM_FORCE_DEBUG_RESIZE WM_FORCE_DEBUG_SCREEN_ON WM_FORCE_DEBUG_STARTING_WINDOW WM_FORCE_DEBUG_WINDOW_MOVEMENT WM_FORCE_SHOW_SURFACE_ALLOC WM_FORCE_SHOW_TRANSACTIONS WM_SHOW_SURFACE_ALLOC WM_SHOW_TRANSACTIONS
+  Logcat: WM_DEBUG_BACK_PREVIEW WM_DEBUG_CONTENT_RECORDING WM_DEBUG_RECENTS_ANIMATIONS WM_DEBUG_REMOTE_ANIMATIONS WM_DEBUG_STARTING_WINDOW WM_DEBUG_SYNC_ENGINE WM_DEBUG_WINDOW_TRANSITIONS WM_ERROR WM_FORCE_DEBUG_ADD_REMOVE WM_FORCE_DEBUG_ANIM WM_FORCE_DEBUG_APP_TRANSITIONS WM_FORCE_DEBUG_APP_TRANSITIONS_ANIM WM_FORCE_DEBUG_BOOT WM_FORCE_DEBUG_CONFIGURATION WM_FORCE_DEBUG_DRAW WM_FORCE_DEBUG_FOCUS WM_FORCE_DEBUG_FOCUS_LIGHT WM_FORCE_DEBUG_IME WM_FORCE_DEBUG_KEEP_SCREEN_ON WM_FORCE_DEBUG_ORIENTATION WM_FORCE_DEBUG_RECENTS_ANIMATIONS WM_FORCE_DEBUG_REMOTE_ANIMATIONS WM_FORCE_DEBUG_RESIZE WM_FORCE_DEBUG_SCREEN_ON WM_FORCE_DEBUG_STARTING_WINDOW WM_FORCE_DEBUG_WINDOW_MOVEMENT WM_FORCE_SHOW_SURFACE_ALLOC WM_FORCE_SHOW_TRANSACTIONS
+Logging definitions loaded: 0
+WINDOW MANAGER HIGH REFRESH RATE BLACKLIST (dumpsys window refresh)
+High Refresh Rate Denylist
+  Packages:
+INSTALLED PACKAGES HAVING APP-SPECIFIC CONFIGURATIONS
+Current user ID : 0
+
+    PackageName : com.google.android.apps.maps
+        NightMode : null
+        Locales : [en_IN]
+
+    PackageName : com.android.chrome
+        NightMode : null
+        Locales : [en_GB]
+WINDOW MANAGER CONSTANTS (dumpsys window constants):
+  system_gesture_exclusion_log_debounce_millis=1500
+  system_gesture_exclusion_limit_dp=200
+  system_gestures_excluded_by_pre_q_sticky_immersive=false

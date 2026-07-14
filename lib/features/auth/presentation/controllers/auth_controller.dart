@@ -349,7 +349,7 @@ class AuthController extends Notifier<AuthState> {
   static const maxResendAttemptsPerWindow = 3;
   static const authRequestTimeout = Duration(seconds: 20);
 
-  late final AuthRepository _repository;
+  late AuthRepository _repository;
 
   @override
   AuthState build() {

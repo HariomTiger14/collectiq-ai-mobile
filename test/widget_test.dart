@@ -47,9 +47,7 @@ import 'package:collectiq_ai/features/subscription/domain/repositories/usage_rep
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
-import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -717,29 +715,27 @@ void main() {
     expect(find.text('Account'), findsOneWidget);
     expect(find.text('Profile info'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
     expect(find.text('Sign Out'), findsOneWidget);
-    await tester.reveal(find.text('Account Access'));
-    expect(find.text('Account Access'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-auth-email-field')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('settings-auth-password-field')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('settings-auth-sign-in-button')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('settings-auth-sign-up-button')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-      findsOneWidget,
+      findsNothing,
     );
 
     await tester.reveal(find.text('Backup & Sync'));
@@ -897,253 +893,6 @@ void main() {
     expect(find.text('Welcome to PackLox'), findsOneWidget);
   });
 
-  testWidgets('settings signs in with mocked email auth repository', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpCollectIqApp(authRepository: _InteractiveAuthRepository());
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthCredentials(
-      email: 'harry@example.com',
-      password: 'password123',
-    );
-    final signInButton = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('settings-auth-sign-in-button')),
-    );
-    signInButton.onPressed!();
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    final navigation = tester.widget<GlassBottomNavBar>(
-      find.byType(GlassBottomNavBar),
-    );
-    expect(navigation.currentIndex, 0);
-    expect(find.text(AuthMessages.signedIn), findsOneWidget);
-
-    await tester.openSettings();
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-auth-account-panel')),
-    );
-    await tester.pump();
-
-    expect(find.text('harry@example.com'), findsWidgets);
-    expect(find.text('Connected'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-email-field')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-in-button')),
-      findsNothing,
-    );
-  });
-
-  testWidgets('settings blocks empty Sign Up before repository call', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository();
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    final signUpButton = find.byKey(
-      const ValueKey('settings-auth-sign-up-button'),
-    );
-    await tester.reveal(signUpButton);
-    await tester.pump();
-    await tester.tap(signUpButton);
-    await tester.pump();
-
-    expect(find.text('Enter an email address.'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-    expect(authRepository.signUpCalls, 0);
-  });
-
-  testWidgets('settings blocks empty Sign In before repository call', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository();
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    final signInButton = find.byKey(
-      const ValueKey('settings-auth-sign-in-button'),
-    );
-    await tester.reveal(signInButton);
-    await tester.pump();
-    await tester.tap(signInButton);
-    await tester.pump();
-
-    expect(find.text('Enter an email address.'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-    expect(authRepository.signInCalls, 0);
-  });
-
-  testWidgets('settings shows email confirmation message after Sign Up', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationRequiredException(),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthCredentials();
-    final signUpButton = tester.widget<OutlinedButton>(
-      find.byKey(const ValueKey('settings-auth-sign-up-button')),
-    );
-    signUpButton.onPressed!();
-    await tester.pump();
-    await tester.pump();
-
-    expect(
-      find.text(SupabaseEmailConfirmationRequiredException.message),
-      findsWidgets,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-in-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-      findsOneWidget,
-    );
-    expect(authRepository.signUpCalls, 1);
-    expect(authRepository.signInCalls, 0);
-  });
-
-  testWidgets('settings resends confirmation only when confirmation required', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationRequiredException(),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    expect(
-      find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-      findsNothing,
-    );
-    await tester.enterSettingsAuthCredentials();
-    tester
-        .widget<OutlinedButton>(
-          find.byKey(const ValueKey('settings-auth-sign-up-button')),
-        )
-        .onPressed!();
-    await tester.pump();
-    await tester.pump();
-
-    final resendButton = tester.widget<OutlinedButton>(
-      find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-    );
-    resendButton.onPressed!();
-    await tester.pump();
-    await tester.pump();
-
-    expect(find.text(AuthMessages.confirmationEmailSent), findsWidgets);
-    expect(find.textContaining('Resend available in'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-in-button')),
-      findsOneWidget,
-    );
-    final blockedResendButton = tester.widget<OutlinedButton>(
-      find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-    );
-    expect(blockedResendButton.onPressed, isNull);
-    expect(authRepository.signUpCalls, 1);
-    expect(authRepository.resendCalls, 1);
-    expect(authRepository.lastResendEmail, 'collector@example.com');
-  });
-
-  testWidgets('settings shows resend after unconfirmed Sign In', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      signInError: const SupabaseAuthException(
-        'Please confirm your email before signing in.',
-      ),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthCredentials();
-    tester
-        .widget<FilledButton>(
-          find.byKey(const ValueKey('settings-auth-sign-in-button')),
-        )
-        .onPressed!();
-    await tester.pump();
-    await tester.pump();
-
-    expect(
-      find.text('Please confirm your email before signing in.'),
-      findsWidgets,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-  });
-
-  testWidgets('settings resend rate limit shows clear wait message', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationRequiredException(),
-      resendError: const SupabaseConfirmationRateLimitedException(
-        cooldown: Duration(minutes: 5),
-        cooldownSource: 'fallback',
-      ),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthCredentials();
-    tester
-        .widget<OutlinedButton>(
-          find.byKey(const ValueKey('settings-auth-sign-up-button')),
-        )
-        .onPressed!();
-    await tester.pump();
-    await tester.pump();
-    tester
-        .widget<OutlinedButton>(
-          find.byKey(
-            const ValueKey('settings-auth-resend-confirmation-button'),
-          ),
-        )
-        .onPressed!();
-    await tester.pump();
-    await tester.pump();
-
-    expect(find.text(AuthMessages.confirmationRateLimited), findsWidgets);
-    expect(find.text(AuthMessages.confirmationEmailSent), findsNothing);
-    expect(find.textContaining('Resend available in'), findsOneWidget);
-    expect(authRepository.resendCalls, 1);
-  });
-
   testWidgets('settings shows SIT resend diagnostics', (
     WidgetTester tester,
   ) async {
@@ -1164,168 +913,6 @@ void main() {
     expect(find.text('Cooldown source'), findsOneWidget);
     expect(find.text(AuthMessages.confirmationTestingTip), findsOneWidget);
   });
-
-  testWidgets('settings sends password reset email', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository();
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthEmail('reset@example.com');
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text(AuthMessages.passwordResetSentWithCooldown), findsWidgets);
-    expect(authRepository.passwordResetCalls, 1);
-    expect(authRepository.lastPasswordResetEmail, 'reset@example.com');
-    final forgotPasswordButton = tester.widget<TextButton>(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    expect(forgotPasswordButton.onPressed, isNull);
-  });
-
-  testWidgets('settings shows password reset rate-limit message', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      passwordResetError: const SupabasePasswordResetRateLimitedException(
-        cooldown: Duration(minutes: 5),
-        cooldownSource: 'fallback',
-      ),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthEmail('reset@example.com');
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text(AuthMessages.passwordResetRateLimited), findsWidgets);
-    expect(authRepository.passwordResetCalls, 1);
-  });
-
-  testWidgets('settings shows password reset errors cleanly', (
-    WidgetTester tester,
-  ) async {
-    final authRepository = _InteractiveAuthRepository(
-      passwordResetError: const SupabaseAuthException(
-        'Unable to reach Supabase. Check your internet connection.',
-      ),
-    );
-    await tester.pumpCollectIqApp(authRepository: authRepository);
-
-    await tester.openSettings();
-    await tester.enterSettingsAuthEmail('reset@example.com');
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('settings-auth-forgot-password-button')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Unable to reach Supabase. Check your internet connection.'),
-      findsWidgets,
-    );
-    expect(authRepository.passwordResetCalls, 1);
-  });
-
-  testWidgets('settings does not show Sign Out for anonymous cloud session', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpCollectIqApp(
-      authRepository: _InteractiveAuthRepository(
-        initialUser: const AppUser(
-          id: 'anonymous-user',
-          displayName: 'Anonymous Collector',
-          email: null,
-          isAnonymous: true,
-          provider: AuthProviderType.supabaseAnonymous,
-        ),
-      ),
-    );
-
-    await tester.openSettings();
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-auth-signed-out-panel')),
-    );
-    await tester.pump();
-
-    expect(
-      find.byKey(const ValueKey('settings-auth-signed-out-panel')),
-      findsOneWidget,
-    );
-    expect(find.text('Anonymous'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('settings-auth-sign-out-button')),
-      findsNothing,
-    );
-  });
-
-  testWidgets(
-    'settings shows account panel instead of auth form when signed in',
-    (WidgetTester tester) async {
-      await tester.pumpCollectIqApp(
-        authRepository: _InteractiveAuthRepository(
-          initialUser: const AppUser(
-            id: 'email-user',
-            displayName: 'Signed In Collector',
-            email: 'collector@example.com',
-            provider: AuthProviderType.emailPassword,
-          ),
-        ),
-      );
-
-      await tester.openSettings();
-      final accountPanel = find.byKey(
-        const ValueKey('settings-auth-account-panel'),
-      );
-      final settingsScrollView = find.byType(Scrollable).last;
-      for (var attempt = 0; attempt < 12; attempt += 1) {
-        if (accountPanel.evaluate().isNotEmpty) {
-          break;
-        }
-        await tester.drag(settingsScrollView, const Offset(0, -320));
-        await tester.pump();
-      }
-      await tester.pump();
-
-      expect(
-        find.byKey(const ValueKey('settings-auth-resend-confirmation-button')),
-        findsNothing,
-      );
-      expect(accountPanel, findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-auth-email-field')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const ValueKey('settings-auth-sign-in-button')),
-        findsNothing,
-      );
-      expect(find.text('collector@example.com'), findsWidgets);
-      expect(find.text('Auth status connected'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-auth-sign-out-button')),
-        findsOneWidget,
-      );
-    },
-  );
 
   testWidgets('settings hides configured AI provider internals', (
     WidgetTester tester,
@@ -5841,25 +5428,6 @@ extension on WidgetTester {
     await pumpAndSettle();
   }
 
-  Future<void> enterSettingsAuthEmail(String email) async {
-    final emailField = find.byKey(const ValueKey('settings-auth-email-field'));
-    await reveal(emailField);
-    await enterText(emailField, email);
-    await pump();
-  }
-
-  Future<void> enterSettingsAuthCredentials({
-    String email = 'collector@example.com',
-    String password = 'password123',
-  }) async {
-    await enterSettingsAuthEmail(email);
-    await enterText(
-      find.byKey(const ValueKey('settings-auth-password-field')),
-      password,
-    );
-    await pump();
-  }
-
   Future<void> reveal(Finder finder) async {
     for (var attempt = 0; attempt < 20; attempt += 1) {
       await pump(const Duration(milliseconds: 50));
@@ -6236,126 +5804,6 @@ class _FailingAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() {
     throw const AuthException('Auth unavailable during local save test.');
-  }
-}
-
-class _InteractiveAuthRepository implements AuthRepository {
-  _InteractiveAuthRepository({
-    AppUser? initialUser,
-    this.signInError,
-    this.signUpError,
-    this.resendError,
-    this.passwordResetError,
-  }) : _user = initialUser;
-
-  AppUser? _user;
-  final Object? signInError;
-  final Object? signUpError;
-  final Object? resendError;
-  final Object? passwordResetError;
-  var signInCalls = 0;
-  var signUpCalls = 0;
-  var resendCalls = 0;
-  var passwordResetCalls = 0;
-  String? lastResendEmail;
-  String? lastPasswordResetEmail;
-
-  @override
-  Future<AppUser?> currentUser() async {
-    return _user ??
-        const AppUser(
-          id: 'local-anonymous-user',
-          displayName: 'Local Collector',
-          email: null,
-          isAnonymous: true,
-          isLocalOnly: true,
-          provider: AuthProviderType.localAnonymous,
-        );
-  }
-
-  @override
-  Future<AppUser> signIn() async {
-    return signInAnonymously();
-  }
-
-  @override
-  Future<AppUser> signInAnonymously() async {
-    _user = const AppUser(
-      id: 'local-anonymous-user',
-      displayName: 'Local Collector',
-      email: null,
-      isAnonymous: true,
-      isLocalOnly: true,
-      provider: AuthProviderType.localAnonymous,
-    );
-    return _user!;
-  }
-
-  @override
-  Future<AppUser> signInWithEmailPassword({
-    required String email,
-    required String password,
-  }) async {
-    signInCalls += 1;
-    final error = signInError;
-    if (error != null) {
-      throw error;
-    }
-    _user = AppUser(
-      id: 'email-user',
-      displayName: email,
-      email: email,
-      provider: AuthProviderType.emailPassword,
-    );
-    return _user!;
-  }
-
-  @override
-  Future<AppUser> signUpWithEmailPassword({
-    required String email,
-    required String password,
-  }) async {
-    signUpCalls += 1;
-    final error = signUpError;
-    if (error != null) {
-      throw error;
-    }
-    return signInWithEmailPassword(email: email, password: password);
-  }
-
-  @override
-  Future<void> resendEmailConfirmation({required String email}) async {
-    resendCalls += 1;
-    lastResendEmail = email;
-    final error = resendError;
-    if (error != null) {
-      throw error;
-    }
-  }
-
-  @override
-  Future<void> sendPasswordResetEmail({required String email}) async {
-    passwordResetCalls += 1;
-    lastPasswordResetEmail = email;
-    final error = passwordResetError;
-    if (error != null) {
-      throw error;
-    }
-  }
-
-  @override
-  Future<AppUser> signInWithGoogle() {
-    throw const AuthException('Google sign-in is coming soon.');
-  }
-
-  @override
-  Future<AppUser> signInWithApple() {
-    throw const AuthException('Apple sign-in is coming soon.');
-  }
-
-  @override
-  Future<void> signOut() async {
-    _user = null;
   }
 }
 
