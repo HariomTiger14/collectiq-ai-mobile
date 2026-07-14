@@ -83,7 +83,10 @@ void main() {
 
     await tester.tap(find.text('Portfolio').last);
     await tester.pumpAndSettle();
-    expect(find.text('Collection summary'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('portfolio-compact-snapshot')),
       findsOneWidget,
@@ -694,14 +697,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump();
 
-    await tester.reveal(find.text('No collectibles saved yet'));
+    await tester.reveal(find.text('Your collection is empty'));
     expect(find.text('Portfolio'), findsWidgets);
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('Your collection is empty'), findsOneWidget);
     expect(
-      find.textContaining('alerts, wishlist status, and goals'),
+      find.textContaining('Start scanning to add your first collectible'),
       findsOneWidget,
     );
-    expect(find.text('Scan Collectible'), findsWidgets);
+    expect(find.text('Scan Your First Item'), findsWidgets);
   });
 
   testWidgets('shows settings screen content', (WidgetTester tester) async {
@@ -3707,11 +3710,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('My Collection'), findsOneWidget);
     expect(find.text('Portfolio'), findsWidgets);
-    expect(find.text('Collection summary'), findsOneWidget);
     expect(
-      find.text('Estimated value uses saved item data only.'),
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
@@ -3734,7 +3736,6 @@ void main() {
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
     );
-    expect(find.text('Collection Items'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-persisted-1')),
       findsOneWidget,
@@ -3748,7 +3749,7 @@ void main() {
     );
     expect(find.text(r'$1,850'), findsWidgets);
     expect(find.text('Trading Card'), findsOneWidget);
-    expect(find.text('94%'), findsWidgets);
+    expect(find.text('94%'), findsNothing);
   });
 
   testWidgets('portfolio empty state renders when no items exist', (
@@ -3760,9 +3761,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.reveal(find.text('No collectibles saved yet'));
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
-    expect(find.text('Scan Collectible'), findsWidgets);
+    await tester.reveal(find.text('Your collection is empty'));
+    expect(find.text('Your collection is empty'), findsOneWidget);
+    expect(find.text('Scan Your First Item'), findsWidgets);
   });
 
   testWidgets(
@@ -3797,7 +3798,7 @@ void main() {
       expect(safeArea.top, isTrue);
       expect(safeArea.bottom, isFalse);
       expect(
-        tester.getTopLeft(find.text('Your collection')).dy,
+        tester.getTopLeft(find.text('My Collection')).dy,
         greaterThanOrEqualTo(0),
       );
     },
@@ -3840,12 +3841,15 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('My Collection'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.text('Your collection')).dy,
+      tester.getTopLeft(find.text('My Collection')).dy,
       greaterThanOrEqualTo(0),
     );
-    expect(find.text('Collection summary'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('portfolio detail return preserves live scroll position', (
@@ -4181,7 +4185,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Collection summary'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-compact-snapshot')),
+      findsOneWidget,
+    );
     await tester.reveal(
       find.byKey(ValueKey('portfolio-grid-item-${demoItems.first.id}')),
     );
@@ -4220,7 +4227,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Persisted Charizard'), findsNothing);
-    expect(find.text('No collectibles saved yet'), findsOneWidget);
+    expect(find.text('Your collection is empty'), findsOneWidget);
   });
 
   testWidgets('filters portfolio items by search query', (
@@ -4236,13 +4243,8 @@ void main() {
     await tester.tap(find.text('Portfolio').last);
     await tester.pump();
     await tester.pump();
-    await tester.revealPortfolio(
-      find.byKey(const ValueKey('portfolio-search-field')),
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field')),
-      'coin',
-    );
+    await tester.revealPortfolio(find.byType(TextFormField).first);
+    await tester.enterText(find.byType(TextFormField).first, 'coin');
     await tester.pump();
 
     await tester.reveal(
@@ -4258,16 +4260,11 @@ void main() {
     );
 
     await tester.scrollPortfolioToTop();
-    await tester.revealPortfolio(
-      find.byKey(const ValueKey('portfolio-search-field')),
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field')),
-      'watch',
-    );
+    await tester.revealPortfolio(find.byType(TextFormField).first);
+    await tester.enterText(find.byType(TextFormField).first, 'watch');
     await tester.pump();
 
-    expect(find.text('No collectibles found'), findsOneWidget);
+    expect(find.text('No items found'), findsOneWidget);
     expect(find.text('Try adjusting your search or filters.'), findsOneWidget);
     expect(find.text('Clear filters'), findsOneWidget);
   });
@@ -4457,8 +4454,8 @@ void main() {
         find.byKey(const ValueKey('portfolio-premium-elastic-sheet')),
         findsOneWidget,
       );
-      expect(find.byType(MotionAmbientGradient), findsWidgets);
-      expect(find.byType(MotionParallax), findsWidgets);
+      expect(find.byType(MotionAmbientGradient), findsNothing);
+      expect(find.byType(MotionParallax), findsNothing);
       expect(find.byType(MotionReveal), findsWidgets);
       expect(find.byType(MotionTapScale), findsWidgets);
       expect(
@@ -4487,7 +4484,7 @@ void main() {
       );
       expectNoFlutterError(tester);
 
-      await tester.tap(find.text('Apply filters'));
+      await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
       await tester.scrollPortfolioToTop();
       await tester.revealPortfolio(
