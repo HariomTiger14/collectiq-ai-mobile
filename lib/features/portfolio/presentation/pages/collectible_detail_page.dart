@@ -11,7 +11,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhanceme
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -38,6 +38,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
   bool _isFavorited = false;
   String? _selectedGalleryPath;
+  _DetailAuthoritySection _selectedSection = _DetailAuthoritySection.overview;
 
   @override
   void initState() {
@@ -62,52 +63,51 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     final galleryImages = currentItem.effectiveGalleryImages;
     final selectedImage = _selectedImageFor(currentItem, _selectedGalleryPath);
     _selectedGalleryPath ??= selectedImage?.path;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        leading: const BackButton(),
-        title: const Text('Collectible Details'),
-        actions: [
-          IconButton(
-            key: const ValueKey('collectible-detail-edit-button'),
-            tooltip: 'Edit collectible',
-            onPressed: () => _showEditCollectibleDialog(
-              context: context,
-              ref: ref,
-              item: currentItem,
-            ),
-            icon: const Icon(Icons.edit_outlined),
-          ),
-        ],
-      ),
+      backgroundColor: PackLoxTokens.background,
       body: SafeArea(
         child: CustomScrollView(
+          key: const ValueKey('collectible-detail-scroll-view'),
           controller: _scrollController,
           slivers: [
             SliverPadding(
               padding: EdgeInsets.symmetric(
                 horizontal: _responsiveDetailPadding(context),
-                vertical: AppSpacing.lg,
+                vertical: AppSpacing.sm,
               ),
               sliver: SliverToBoxAdapter(
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 960),
+                    constraints: const BoxConstraints(maxWidth: 520),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const PackLoxHeader(
-                          firstName: '',
-                          fallbackName: 'Detail',
-                          greetingText: 'Collectible record',
-                          onNotifications: null,
+                        _DetailAuthorityHeader(
+                          item: currentItem,
+                          isFavorited: _isFavorited,
+                          onBack: () => Navigator.of(context).maybePop(),
+                          onEdit: () => _showEditCollectibleDialog(
+                            context: context,
+                            ref: ref,
+                            item: currentItem,
+                          ),
+                          onShare: () => _shareItem(context, currentItem),
+                          onFavorite: () {
+                            setState(() => _isFavorited = !_isFavorited);
+                            _showDetailSnackBar(
+                              context,
+                              _isFavorited
+                                  ? 'Added to favorites'
+                                  : 'Removed from favorites',
+                            );
+                          },
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _PremiumDetailHero(
+                        const SizedBox(height: AppSpacing.sm),
+                        _DetailAuthorityOverview(
                           item: currentItem,
                           selectedImage: selectedImage,
+                          isFavorited: _isFavorited,
                           onImageSelected: (image) {
                             setState(() => _selectedGalleryPath = image.path);
                           },
@@ -123,22 +123,36 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                                 ),
                         ),
                         if (currentItem.confidence < 0.70) ...[
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.sm),
                           const _LowConfidenceBanner(),
                         ],
-                        const SizedBox(height: AppSpacing.lg),
-                        _AiSummarySection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        _KeyAttributeChipsSection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        if (galleryImages.length == 1)
-                          _SingleImageHint(image: galleryImages.single),
-                        if (galleryImages.length == 1)
-                          const SizedBox(height: AppSpacing.lg),
-                        _NotesCard(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        _DetailActionSection(
+                        const SizedBox(height: AppSpacing.sm),
+                        _DetailAuthorityTabs(
+                          selected: _selectedSection,
+                          onSelected: (section) {
+                            setState(() => _selectedSection = section);
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        _DetailAuthoritySectionBody(
+                          section: _selectedSection,
+                          item: currentItem,
+                          galleryImages: galleryImages,
                           isFavorited: _isFavorited,
+                          selectedImage: selectedImage,
+                          onImageSelected: (image) {
+                            setState(() => _selectedGalleryPath = image.path);
+                          },
+                          onImageTap: selectedImage == null
+                              ? null
+                              : () => _showImageViewer(
+                                  context,
+                                  item: currentItem,
+                                  initialImage: selectedImage,
+                                  onUseAsPrimary: _setPrimaryImage,
+                                  onDelete: _deleteGalleryImage,
+                                  onEdit: _editGalleryImage,
+                                ),
                           onEdit: () => _showEditCollectibleDialog(
                             context: context,
                             ref: ref,
@@ -162,14 +176,6 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                                   widget.onDelete!,
                                 ),
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _WishlistStatusSection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        _DetailSections(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        _PriceAlertSection(item: currentItem),
-                        const SizedBox(height: AppSpacing.lg),
-                        const _SimilarCollectiblesSection(),
                         const SizedBox(height: AppSpacing.xxl),
                       ],
                     ),
@@ -468,134 +474,1201 @@ double _responsiveDetailPadding(BuildContext context) {
   return 20;
 }
 
-class _PremiumDetailHero extends StatelessWidget {
-  const _PremiumDetailHero({
+enum _DetailAuthoritySection {
+  overview('Overview', Icons.dashboard_outlined),
+  gallery('Gallery', Icons.photo_library_outlined),
+  details('Details', Icons.tune_outlined),
+  market('Market', Icons.query_stats_outlined),
+  insights('Insights', Icons.psychology_alt_outlined),
+  notes('Notes', Icons.edit_note_outlined),
+  actions('Actions', Icons.more_horiz);
+
+  const _DetailAuthoritySection(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class _DetailAuthorityHeader extends StatelessWidget {
+  const _DetailAuthorityHeader({
+    required this.item,
+    required this.isFavorited,
+    required this.onBack,
+    required this.onEdit,
+    required this.onShare,
+    required this.onFavorite,
+  });
+
+  final CollectibleItem item;
+  final bool isFavorited;
+  final VoidCallback onBack;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final VoidCallback onFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      container: true,
+      label: 'Collectible Details. ${item.title}.',
+      child: SizedBox(
+        key: const ValueKey('collectible-detail-authority-header'),
+        height: 56,
+        child: Row(
+          children: [
+            _DetailIconButton(
+              tooltip: 'Back',
+              icon: Icons.arrow_back,
+              onPressed: onBack,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Item Overview',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: PackLoxTokens.textSecondary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: PackLoxTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-favorite-action'),
+              tooltip: isFavorited ? 'Favorited' : 'Favorite',
+              icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+              selected: isFavorited,
+              onPressed: onFavorite,
+            ),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-share-action'),
+              tooltip: 'Share',
+              icon: Icons.ios_share_outlined,
+              onPressed: onShare,
+            ),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-edit-button'),
+              tooltip: 'Edit collectible',
+              icon: Icons.edit_outlined,
+              onPressed: onEdit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailIconButton extends StatelessWidget {
+  const _DetailIconButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.selected = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox.square(
+        dimension: 42,
+        child: IconButton(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          style: IconButton.styleFrom(
+            foregroundColor: selected
+                ? colorScheme.primary
+                : PackLoxTokens.textPrimary,
+            backgroundColor: selected
+                ? colorScheme.primary.withValues(alpha: 0.16)
+                : PackLoxTokens.surfaceRaised.withValues(alpha: 0.82),
+            side: BorderSide(
+              color: selected
+                  ? colorScheme.primary.withValues(alpha: 0.62)
+                  : PackLoxTokens.border.withValues(alpha: 0.72),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailAuthorityOverview extends StatelessWidget {
+  const _DetailAuthorityOverview({
     required this.item,
     required this.selectedImage,
+    required this.isFavorited,
     required this.onImageSelected,
     required this.onImageTap,
   });
 
   final CollectibleItem item;
   final CollectibleImage? selectedImage;
+  final bool isFavorited;
   final ValueChanged<CollectibleImage> onImageSelected;
   final VoidCallback? onImageTap;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final images = item.effectiveGalleryImages;
     final textTheme = Theme.of(context).textTheme;
 
+    return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-authority-overview'),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Semantics(
+                  button: selectedImage != null,
+                  label:
+                      'Open image preview. ${selectedImage == null ? 'No image available' : _galleryRoleLabel(selectedImage!)}.',
+                  child: InkWell(
+                    key: const ValueKey('collectible-detail-image-preview'),
+                    onTap: onImageTap,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    child: AspectRatio(
+                      aspectRatio: 1.05,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _DetailImageSurface(
+                              key: ValueKey(
+                                'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                              ),
+                              item: item,
+                              image: selectedImage,
+                            ),
+                            Positioned(
+                              left: AppSpacing.xs,
+                              top: AppSpacing.xs,
+                              child: _ReviewPill(
+                                label: images.isEmpty
+                                    ? 'No image'
+                                    : '${images.indexWhere((image) => image.path == selectedImage?.path) + 1}/${images.length}',
+                              ),
+                            ),
+                            if (selectedImage?.isPrimary ?? false)
+                              const Positioned(
+                                right: AppSpacing.xs,
+                                top: AppSpacing.xs,
+                                child: _PrimaryImageBadge(compact: true),
+                              ),
+                            if (_isAiEnhanced(selectedImage))
+                              const Positioned(
+                                right: AppSpacing.xs,
+                                bottom: AppSpacing.xs,
+                                child: _AiEnhancedDetailBadge(compact: true),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      key: const ValueKey('collectible-detail-title'),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleLarge?.copyWith(
+                        color: PackLoxTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        height: 1.08,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        _DetailAuthorityBadge(
+                          icon: Icons.category_outlined,
+                          label: _fallback(item.category),
+                        ),
+                        _DetailAuthorityBadge(
+                          icon: isFavorited
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          label: isFavorited ? 'Favorited' : 'Saved',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _DetailAuthorityValueBlock(item: item),
+                    const SizedBox(height: AppSpacing.sm),
+                    _DetailAuthorityConditionMini(item: item),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (images.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _DetailGalleryFilmstrip(
+              item: item,
+              selectedPath: selectedImage?.path,
+              onSelected: onImageSelected,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailAuthorityTabs extends StatelessWidget {
+  const _DetailAuthorityTabs({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final _DetailAuthoritySection selected;
+  final ValueChanged<_DetailAuthoritySection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('collectible-detail-authority-tabs'),
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _DetailAuthoritySection.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final section = _DetailAuthoritySection.values[index];
+          final isSelected = selected == section;
+          return ChoiceChip(
+            key: ValueKey('collectible-detail-tab-${section.name}'),
+            selected: isSelected,
+            avatar: Icon(section.icon, size: 16),
+            label: Text(section.label),
+            onSelected: (_) => onSelected(section),
+            backgroundColor: PackLoxTokens.surfaceRaised.withValues(
+              alpha: 0.74,
+            ),
+            selectedColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.20),
+            side: BorderSide(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : PackLoxTokens.border.withValues(alpha: 0.70),
+            ),
+            labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DetailAuthoritySectionBody extends StatelessWidget {
+  const _DetailAuthoritySectionBody({
+    required this.section,
+    required this.item,
+    required this.galleryImages,
+    required this.isFavorited,
+    required this.selectedImage,
+    required this.onImageSelected,
+    required this.onImageTap,
+    required this.onEdit,
+    required this.onShare,
+    required this.onFavorite,
+    required this.onDelete,
+  });
+
+  final _DetailAuthoritySection section;
+  final CollectibleItem item;
+  final List<CollectibleImage> galleryImages;
+  final bool isFavorited;
+  final CollectibleImage? selectedImage;
+  final ValueChanged<CollectibleImage> onImageSelected;
+  final VoidCallback? onImageTap;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final VoidCallback onFavorite;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 120),
+      child: KeyedSubtree(
+        key: ValueKey('collectible-detail-section-${section.name}'),
+        child: switch (section) {
+          _DetailAuthoritySection.overview => _DetailOverviewSection(
+            item: item,
+          ),
+          _DetailAuthoritySection.gallery => _DetailGallerySection(
+            item: item,
+            galleryImages: galleryImages,
+            selectedImage: selectedImage,
+            onImageSelected: onImageSelected,
+            onImageTap: onImageTap,
+          ),
+          _DetailAuthoritySection.details => _DetailInfoSection(item: item),
+          _DetailAuthoritySection.market => _DetailMarketSection(item: item),
+          _DetailAuthoritySection.insights => _DetailInsightsSection(
+            item: item,
+          ),
+          _DetailAuthoritySection.notes => _DetailNotesAndStatusSection(
+            item: item,
+          ),
+          _DetailAuthoritySection.actions => _DetailActionsMenuSection(
+            item: item,
+            isFavorited: isFavorited,
+            onEdit: onEdit,
+            onShare: onShare,
+            onFavorite: onFavorite,
+            onDelete: onDelete,
+          ),
+        },
+      ),
+    );
+  }
+}
+
+class _DetailAuthorityPanel extends StatelessWidget {
+  const _DetailAuthorityPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    super.key,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      clipBehavior: Clip.antiAlias,
+      padding: padding,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: AppElevation.level2,
+        color: PackLoxTokens.surfaceRaised.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.76)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _DetailAuthorityBadge extends StatelessWidget {
+  const _DetailAuthorityBadge({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.72)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailAuthorityValueBlock extends StatelessWidget {
+  const _DetailAuthorityValueBlock({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      key: const ValueKey('collectible-detail-value-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.32),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            button: true,
-            label: 'Open image preview',
-            child: InkWell(
-              key: const ValueKey('collectible-detail-image-preview'),
-              onTap: onImageTap,
-              child: AspectRatio(
-                aspectRatio: 16 / 11,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _HeroImageUpdateAnimation(
-                      imageKey: selectedImage?.path ?? item.imagePath,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 150),
-                        reverseDuration: const Duration(milliseconds: 100),
-                        switchInCurve: Curves.easeOut,
-                        switchOutCurve: Curves.easeIn,
-                        child: _DetailImageSurface(
-                          key: ValueKey(
-                            'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
-                          ),
-                          item: item,
-                          image: selectedImage,
-                        ),
-                      ),
-                    ),
-                    if (_isAiEnhanced(selectedImage))
-                      const Positioned(
-                        left: AppSpacing.md,
-                        top: AppSpacing.md,
-                        child: _AiEnhancedDetailBadge(),
-                      ),
-                  ],
-                ),
-              ),
+          Text(
+            'Estimated value',
+            style: textTheme.labelSmall?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          _DetailGalleryFilmstrip(
-            item: item,
-            selectedPath: selectedImage?.path,
-            onSelected: onImageSelected,
+          const SizedBox(height: 2),
+          Text(
+            _detailValueLabel(context, item),
+            key: const ValueKey('collectible-detail-value-card-value'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleLarge?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final dense = constraints.maxWidth < 380;
-              final contentPadding = dense ? AppSpacing.md : AppSpacing.lg;
-              return Padding(
-                padding: EdgeInsets.all(contentPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _AnimatedDetailMetadata(
-                      id: 'summary-chips',
-                      value:
-                          '${item.category}-${item.confidence}-${item.rarity}',
-                      child: Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          _DetailChip(
-                            icon: Icons.category_outlined,
-                            label: _fallback(item.category),
-                          ),
-                          _DetailChip(
-                            icon: Icons.verified_outlined,
-                            label:
-                                '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
-                          ),
-                          _DetailRarityBadge(label: _rarityLabel(item)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _AnimatedDetailMetadata(
-                      id: 'title',
-                      value: item.title,
-                      child: AppTwoLineTitle(
-                        item.title,
-                        style: textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          height: 1.12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _DetailConfidenceMeter(confidence: item.confidence),
-                    const SizedBox(height: AppSpacing.md),
-                    _PremiumDetailValueCard(value: item.estimatedValue),
-                  ],
-                ),
-              );
-            },
+          const SizedBox(height: 2),
+          Text(
+            _detailValueStatusLabel(item),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelSmall?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _DetailAuthorityConditionMini extends StatelessWidget {
+  const _DetailAuthorityConditionMini({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _DetailMiniStat(
+            label: 'Condition',
+            value: _fallback(item.condition, fallback: 'Unspecified'),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: _DetailMiniStat(
+            label: 'Confidence',
+            value: _confidencePercent(item.confidence),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailMiniStat extends StatelessWidget {
+  const _DetailMiniStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surface.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.64)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: PackLoxTokens.textPrimary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailOverviewSection extends StatelessWidget {
+  const _DetailOverviewSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(title: 'At a glance', icon: Icons.info_outline),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailAuthorityRows(
+            rows: [
+              _DetailInfoRowData('Category', _fallback(item.category)),
+              _DetailInfoRowData('Rarity', _rarityLabel(item)),
+              _DetailInfoRowData(
+                'Confidence',
+                '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
+              ),
+              _DetailInfoRowData('Recommendation', item.recommendation),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailGallerySection extends StatelessWidget {
+  const _DetailGallerySection({
+    required this.item,
+    required this.galleryImages,
+    required this.selectedImage,
+    required this.onImageSelected,
+    required this.onImageTap,
+  });
+
+  final CollectibleItem item;
+  final List<CollectibleImage> galleryImages;
+  final CollectibleImage? selectedImage;
+  final ValueChanged<CollectibleImage> onImageSelected;
+  final VoidCallback? onImageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Image Gallery',
+            icon: Icons.photo_library_outlined,
+            trailing: galleryImages.isEmpty
+                ? 'No images'
+                : '${galleryImages.length} image${galleryImages.length == 1 ? '' : 's'}',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (galleryImages.isEmpty)
+            const _DetailEmptyCopy('No saved image is available for this item.')
+          else ...[
+            AspectRatio(
+              aspectRatio: 1.35,
+              child: InkWell(
+                onTap: onImageTap,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  child: _DetailImageSurface(item: item, image: selectedImage),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _DetailGalleryFilmstrip(
+              item: item,
+              selectedPath: selectedImage?.path,
+              onSelected: onImageSelected,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailInfoSection extends StatelessWidget {
+  const _DetailInfoSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _detailMetadataRows(item);
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(title: 'Details & Info', icon: Icons.tune),
+          const SizedBox(height: AppSpacing.sm),
+          if (rows.isEmpty)
+            const _DetailEmptyCopy(
+              'No additional metadata has been saved for this collectible yet.',
+            )
+          else
+            _DetailAuthorityRows(rows: rows),
+          const SizedBox(height: AppSpacing.md),
+          _DetailSectionTitle(
+            title: 'Condition',
+            icon: Icons.fact_check_outlined,
+            compact: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailConfidenceMeter(confidence: item.confidence),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailMarketSection extends StatelessWidget {
+  const _DetailMarketSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = _detailMarketRows(item);
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(title: 'Market & Value', icon: Icons.paid),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailAuthorityValueBlock(item: item),
+          const SizedBox(height: AppSpacing.md),
+          if (rows.isEmpty)
+            const _DetailEmptyCopy(
+              'No market pricing evidence has been saved for this collectible.',
+            )
+          else
+            _DetailAuthorityRows(rows: rows),
+          const SizedBox(height: AppSpacing.md),
+          _DetailEmptyCopy(
+            item.marketSummary == null
+                ? 'No saved price-history series is available yet.'
+                : 'Saved market evidence is shown without fabricating price history.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailInsightsSection extends StatelessWidget {
+  const _DetailInsightsSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = _storedAiSummaryFor(item);
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'AI Insights',
+            icon: Icons.psychology_alt_outlined,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              SizedBox.square(
+                dimension: 72,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: item.confidence.clamp(0.0, 1.0),
+                      strokeWidth: 7,
+                      color: _confidenceMeterColor(context, item.confidence),
+                      backgroundColor: PackLoxTokens.surface,
+                    ),
+                    Center(
+                      child: Text(
+                        _confidencePercent(item.confidence),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: PackLoxTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: summary == null
+                    ? const _DetailEmptyCopy(
+                        'No stored AI review is available for this collectible yet.',
+                      )
+                    : Text(
+                        summary,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: PackLoxTokens.textPrimary,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailNotesAndStatusSection extends StatelessWidget {
+  const _DetailNotesAndStatusSection({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _NotesCard(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _WishlistStatusSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailSyncStatusPanel(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _PriceAlertSection(item: item),
+      ],
+    );
+  }
+}
+
+class _DetailSyncStatusPanel extends StatelessWidget {
+  const _DetailSyncStatusPanel({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailAuthorityPanel(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Sync Status',
+            icon: Icons.cloud_sync_outlined,
+            compact: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailAuthorityRows(
+            rows: [
+              _DetailInfoRowData('Status', _syncStatusLabel(item.syncStatus)),
+              if (item.lastSyncedAt != null)
+                _DetailInfoRowData(
+                  'Last synced',
+                  _formatDate(item.lastSyncedAt!),
+                ),
+            ],
+          ),
+          if (item.syncStatus == CloudItemSyncStatus.failed &&
+              (item.syncError ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              item.syncError!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailActionsMenuSection extends StatelessWidget {
+  const _DetailActionsMenuSection({
+    required this.item,
+    required this.isFavorited,
+    required this.onEdit,
+    required this.onShare,
+    required this.onFavorite,
+    required this.onDelete,
+  });
+
+  final CollectibleItem item;
+  final bool isFavorited;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final VoidCallback onFavorite;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailAuthorityPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(title: 'Actions Menu', icon: Icons.more_horiz),
+          const SizedBox(height: AppSpacing.sm),
+          _DetailActionMenuRow(
+            key: const ValueKey('collectible-detail-primary-edit-action'),
+            icon: Icons.edit_outlined,
+            label: 'Edit item',
+            description: 'Update saved details',
+            onTap: onEdit,
+          ),
+          _DetailActionMenuRow(
+            key: const ValueKey('collectible-detail-action-favorite-row'),
+            icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+            label: isFavorited ? 'Favorited' : 'Add to Wishlist',
+            description: 'Save for quick access',
+            onTap: onFavorite,
+          ),
+          _DetailActionMenuRow(
+            key: const ValueKey('collectible-detail-action-share-row'),
+            icon: Icons.ios_share_outlined,
+            label: 'Share item',
+            description: 'Uses real saved item data',
+            onTap: onShare,
+          ),
+          if (onDelete != null)
+            _DetailActionMenuRow(
+              key: const ValueKey('collectible-detail-delete-action'),
+              icon: Icons.delete_outline,
+              label: 'Delete item',
+              description: 'Remove permanently',
+              destructive: true,
+              onTap: onDelete!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailActionMenuRow extends StatelessWidget {
+  const _DetailActionMenuRow({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.onTap,
+    this.destructive = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive
+        ? Theme.of(context).colorScheme.error
+        : PackLoxTokens.textPrimary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: PackLoxTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: PackLoxTokens.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailSectionTitle extends StatelessWidget {
+  const _DetailSectionTitle({
+    required this.title,
+    required this.icon,
+    this.trailing,
+    this.compact = false,
+  });
+
+  final String title;
+  final IconData icon;
+  final String? trailing;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: compact ? 16 : 18,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            title,
+            style:
+                (compact
+                        ? Theme.of(context).textTheme.titleSmall
+                        : Theme.of(context).textTheme.titleMedium)
+                    ?.copyWith(
+                      color: PackLoxTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+          ),
+        ),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DetailEmptyCopy extends StatelessWidget {
+  const _DetailEmptyCopy(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      message,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: PackLoxTokens.textSecondary,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _DetailInfoRowData {
+  const _DetailInfoRowData(this.label, this.value);
+
+  final String label;
+  final String value;
+}
+
+class _DetailAuthorityRows extends StatelessWidget {
+  const _DetailAuthorityRows({required this.rows});
+
+  final List<_DetailInfoRowData> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final row in rows) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 116,
+                child: Text(
+                  row.label,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: PackLoxTokens.textSecondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  row.value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: PackLoxTokens.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (row != rows.last)
+            Divider(color: PackLoxTokens.border.withValues(alpha: 0.44)),
+        ],
+      ],
+    );
+  }
+}
+
+List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
+  final rows = [
+    _detailRow('Brand', item.brand),
+    _detailRow('Series', item.series),
+    _detailRow('Year', item.year),
+    _detailRow('Set', item.setName),
+    _detailRow('Card #', item.cardNumber),
+    _detailRow('Character', item.playerOrCharacter),
+    _detailRow('Rarity', item.rarity),
+    _detailRow('Grade', item.estimatedGrade),
+    _detailRow('Language', item.language),
+    _detailRow('Edition', item.edition),
+    _detailRow('Country', item.country),
+    _detailRow('Mint', item.mint),
+    _detailRow('Material', item.material),
+  ].whereType<_DetailInfoRowData>().toList(growable: false);
+  return rows;
+}
+
+List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
+  final pricing = item.pricing;
+  final market = item.marketSummary;
+  return [
+    if (pricing != null) ...[
+      _DetailInfoRowData(
+        'Value range',
+        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+      ),
+      _DetailInfoRowData('Source', pricing.pricingSource),
+      _DetailInfoRowData(
+        'Confidence',
+        '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+      ),
+      _DetailInfoRowData('Updated', _formatPricingDate(pricing.lastUpdated)),
+    ],
+    if (market != null) ...[
+      _DetailInfoRowData('Trend', market.trendLabel),
+      _DetailInfoRowData('Sales', '${market.salesCount}'),
+      _DetailInfoRowData('Sources', market.sources.join(', ')),
+    ],
+  ];
+}
+
+_DetailInfoRowData? _detailRow(String label, String? value) {
+  final clean = _clean(value);
+  if (clean == null) {
+    return null;
+  }
+  return _DetailInfoRowData(label, clean);
+}
+
+String _detailValueLabel(BuildContext context, CollectibleItem item) {
+  final shouldShowValue = switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => item.estimatedValue > 0,
+  };
+  if (!shouldShowValue) {
+    return 'Value unavailable';
+  }
+  if (item.estimatedValue == 0) {
+    return '${_currencySymbolForLocale(Localizations.localeOf(context))}0';
+  }
+  return _formatPortfolioValue(context, item.estimatedValue);
+}
+
+String _detailValueStatusLabel(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated => 'Estimated from saved market data',
+    ValuationStatus.aiEstimated => 'AI estimate from saved scan data',
+    ValuationStatus.providerNotConfigured => 'Pricing source not configured',
+    ValuationStatus.noMarketMatch => 'No saved market match',
+    ValuationStatus.lookupFailed => 'Pricing lookup unavailable',
+    ValuationStatus.unavailable => 'No valuation saved',
+  };
+}
+
+String _syncStatusLabel(CloudItemSyncStatus status) {
+  return switch (status) {
+    CloudItemSyncStatus.localOnly => 'Local only',
+    CloudItemSyncStatus.pendingUpload => 'Pending upload',
+    CloudItemSyncStatus.synced => 'Synced',
+    CloudItemSyncStatus.failed => 'Sync failed',
+  };
 }
 
 class _DetailImageSurface extends StatelessWidget {
@@ -875,162 +1948,6 @@ class _AnimatedDetailMetadata extends StatelessWidget {
       child: KeyedSubtree(
         key: ValueKey('collectible-detail-metadata-$id-$value'),
         child: child,
-      ),
-    );
-  }
-}
-
-class _HeroImageUpdateAnimation extends StatelessWidget {
-  const _HeroImageUpdateAnimation({
-    required this.imageKey,
-    required this.child,
-  });
-
-  final String imageKey;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      key: ValueKey('collectible-detail-hero-scale-$imageKey'),
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        final scale = value < 0.5
-            ? 1 + (value * 0.04)
-            : 1.02 - ((value - 0.5) * 0.04);
-        return Transform.scale(scale: scale, child: child);
-      },
-      child: child,
-    );
-  }
-}
-
-class _PremiumDetailValueCard extends StatelessWidget {
-  const _PremiumDetailValueCard({required this.value});
-
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      key: const ValueKey('collectible-detail-value-card-animation'),
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-      builder: (context, opacity, child) {
-        return Opacity(opacity: opacity, child: child);
-      },
-      child: DecoratedBox(
-        key: const ValueKey('collectible-detail-value-card'),
-        decoration: BoxDecoration(
-          gradient: AppGradients.premium,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: AppElevation.level2,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: _AnimatedDetailMetadata(
-            id: 'value',
-            value: value,
-            child: _ValueCardContent(value: value),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ValueCardContent extends StatelessWidget {
-  const _ValueCardContent({required this.value});
-
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Estimated value',
-          style: textTheme.labelLarge?.copyWith(
-            color: Colors.white.withValues(alpha: 0.86),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          _formatPortfolioValue(context, value),
-          key: const ValueKey('collectible-detail-value-card-value'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.headlineMedium?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DetailRarityBadge extends StatelessWidget {
-  const _DetailRarityBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return TweenAnimationBuilder<double>(
-      key: ValueKey('collectible-detail-rarity-badge-animation-$label'),
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-      builder: (context, opacity, child) {
-        return Opacity(opacity: opacity, child: child);
-      },
-      child: DecoratedBox(
-        key: const ValueKey('collectible-detail-rarity-badge'),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.tertiary,
-              colorScheme.primary.withValues(alpha: 0.84),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: AppElevation.level1,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          child: Wrap(
-            spacing: 4,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Icon(
-                Icons.diamond_outlined,
-                size: 14,
-                color: colorScheme.onPrimary,
-              ),
-              Text(
-                label,
-                key: const ValueKey('collectible-detail-rarity-badge-label'),
-                softWrap: true,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1427,23 +2344,6 @@ class _AiEnhancedDetailBadge extends StatelessWidget {
   }
 }
 
-class _SingleImageHint extends StatelessWidget {
-  const _SingleImageHint({required this.image});
-
-  final CollectibleImage image;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '${_shortGalleryRoleLabel(image)} image saved',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
 class _LowConfidenceBanner extends StatelessWidget {
   const _LowConfidenceBanner();
 
@@ -1489,64 +2389,6 @@ class _LowConfidenceBanner extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _AiSummarySection extends StatelessWidget {
-  const _AiSummarySection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = _storedAiSummaryFor(item);
-    return AppProfileSection(
-      title: 'AI Review',
-      children: [
-        if (summary == null)
-          Text(
-            'No stored AI review is available for this collectible yet.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          )
-        else
-          Text(summary, style: Theme.of(context).textTheme.bodyMedium),
-      ],
-    );
-  }
-}
-
-class _KeyAttributeChipsSection extends StatelessWidget {
-  const _KeyAttributeChipsSection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = _attributeChipsFor(item);
-
-    return AppProfileSection(
-      title: 'Key Attributes',
-      children: [
-        if (chips.isEmpty)
-          Text(
-            'No additional metadata has been saved for this collectible yet.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          )
-        else
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final chip in chips)
-                _DetailChip(icon: Icons.sell_outlined, label: chip),
-            ],
-          ),
-      ],
     );
   }
 }
@@ -1619,132 +2461,6 @@ class _NotesCardState extends ConsumerState<_NotesCard> {
     if (mounted) {
       _showDetailSnackBar(context, 'Notes saved');
     }
-  }
-}
-
-class _DetailActionSection extends StatelessWidget {
-  const _DetailActionSection({
-    required this.isFavorited,
-    required this.onEdit,
-    required this.onShare,
-    required this.onFavorite,
-    required this.onDelete,
-  });
-
-  final bool isFavorited;
-  final VoidCallback onEdit;
-  final VoidCallback onShare;
-  final VoidCallback onFavorite;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppProfileSection(
-      title: 'Actions',
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: const ValueKey('collectible-detail-primary-edit-action'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Edit'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            OutlinedButton.icon(
-              key: const ValueKey('collectible-detail-share-action'),
-              onPressed: onShare,
-              icon: const Icon(Icons.ios_share_outlined),
-              label: const Text('Share'),
-            ),
-            OutlinedButton.icon(
-              key: const ValueKey('collectible-detail-favorite-action'),
-              onPressed: onFavorite,
-              icon: Icon(
-                isFavorited ? Icons.favorite : Icons.favorite_border_outlined,
-              ),
-              label: Text(isFavorited ? 'Favorited' : 'Favorite'),
-            ),
-            if (onDelete != null)
-              OutlinedButton.icon(
-                key: const ValueKey('collectible-detail-delete-action'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete'),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SimilarCollectiblesSection extends StatelessWidget {
-  const _SimilarCollectiblesSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppProfileSection(
-      title: 'Similar Collectibles',
-      children: [
-        Text(
-          'Similar collectible suggestions will appear here as PackLox learns more from your portfolio.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DetailChip extends StatelessWidget {
-  const _DetailChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
-      ),
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 2,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Icon(icon, size: AppIconSizes.sm, color: colorScheme.primary),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
-            child: Text(
-              label,
-              softWrap: true,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -2127,6 +2843,9 @@ class _WishlistStatusOption extends StatelessWidget {
   }
 }
 
+// Retained for historical comparison while Phase 3 routes runtime detail
+// presentation through the approved authority tabs above.
+// ignore: unused_element
 class _DetailSections extends StatelessWidget {
   const _DetailSections({required this.item});
 
@@ -3066,23 +3785,6 @@ String? _storedAiSummaryFor(CollectibleItem item) {
     return null;
   }
   return parts.join('\n\n');
-}
-
-List<String> _attributeChipsFor(CollectibleItem item) {
-  final chips = <String?>{
-    _clean(item.year),
-    _clean(item.setName),
-    _clean(item.edition),
-    _clean(item.rarity),
-    _clean(item.estimatedGrade),
-    _clean(item.condition),
-    _clean(item.language),
-    _clean(item.country),
-    _clean(item.material),
-    _clean(item.playerOrCharacter),
-  }.whereType<String>().toList(growable: false);
-
-  return chips.take(8).toList(growable: false);
 }
 
 String? _clean(String? value) {
