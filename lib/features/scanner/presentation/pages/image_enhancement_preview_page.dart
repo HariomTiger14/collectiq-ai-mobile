@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:flutter/material.dart';
@@ -72,19 +73,21 @@ class ImageEnhancementPreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: ImageEnhancementPreviewSurface(
-          image: image,
-          initialPreset: initialPreset,
-          title: title,
-          subtitle: subtitle,
-          enhancementService: enhancementService,
-          assessmentService: assessmentService,
-          onCancel: () => Navigator.of(context).pop(),
-          onRetake: () => Navigator.of(context).pop(),
-          onUsePhoto: (result) => Navigator.of(context).pop(result),
+    return ScannerFocusTheme(
+      child: Scaffold(
+        backgroundColor: ScannerVisualTheme.backgroundDeep,
+        body: SafeArea(
+          child: ImageEnhancementPreviewSurface(
+            image: image,
+            initialPreset: initialPreset,
+            title: title,
+            subtitle: subtitle,
+            enhancementService: enhancementService,
+            assessmentService: assessmentService,
+            onCancel: () => Navigator.of(context).pop(),
+            onRetake: () => Navigator.of(context).pop(),
+            onUsePhoto: (result) => Navigator.of(context).pop(result),
+          ),
         ),
       ),
     );
@@ -269,7 +272,8 @@ class _ImageEnhancementPreviewSurfaceState
       fit: StackFit.expand,
       children: [
         ColoredBox(
-          color: Colors.black,
+          key: const ValueKey('review-photo-authority-surface'),
+          color: ScannerVisualTheme.backgroundDeep,
           child: Center(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
@@ -457,8 +461,8 @@ class _EnhancementTile extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          width: 132,
-          constraints: const BoxConstraints(minHeight: 72),
+          width: 126,
+          constraints: const BoxConstraints(minHeight: 64),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
             vertical: 10,

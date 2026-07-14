@@ -9,6 +9,7 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/smart_scan_guidance_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -119,9 +120,11 @@ class CaptureWorkspace extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        color: ScannerVisualTheme.surfaceGlass,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: ScannerVisualTheme.border.withValues(alpha: 0.78),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,7 +416,7 @@ class _ScanImageFilmstripState extends State<ScanImageFilmstrip> {
         ),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
-          height: 172,
+          height: 132,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length + (widget.canAddPhoto ? 1 : 0),
@@ -487,16 +490,18 @@ class _ActiveCapturePreview extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: ScannerVisualTheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
+          border: Border.all(
+            color: ScannerVisualTheme.border.withValues(alpha: 0.78),
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
-              aspectRatio: 16 / 9,
+              aspectRatio: 4 / 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -1132,9 +1137,11 @@ class _CompactCaptureGuidance extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: ScannerVisualTheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: ScannerVisualTheme.border.withValues(alpha: 0.78),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1462,7 +1469,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
       label:
           '${role.title} photo, $status${selected ? ', selected' : ''}. Double tap to review.',
       child: SizedBox(
-        width: 124,
+        width: 96,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1471,7 +1478,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
                 ? const ValueKey('workspace-primary-photo-highlight')
                 : null,
             decoration: BoxDecoration(
-              color: colorScheme.surface,
+              color: ScannerVisualTheme.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: selected
@@ -1590,13 +1597,13 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return SizedBox(
       key: ValueKey('filmstrip-${role.id}'),
-      width: 116,
+      width: 92,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.64),
+            color: ScannerVisualTheme.surfaceElevated.withValues(alpha: 0.74),
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: selected || recommended
@@ -1672,7 +1679,7 @@ class _AddPhotoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       key: const ValueKey('filmstrip-add-photo'),
-      width: 104,
+      width: 84,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
