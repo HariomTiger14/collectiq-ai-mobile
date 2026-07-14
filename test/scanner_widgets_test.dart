@@ -102,6 +102,16 @@ void main() {
     expect(find.text('Captured'), findsOneWidget);
     expect(find.text('Recommended'), findsOneWidget);
     expect(find.text('Optional'), findsOneWidget);
+
+    final filmstripPhotoSize = tester.getSize(
+      find.byKey(const ValueKey('filmstrip-photo-front-sample://front')),
+    );
+    expect(filmstripPhotoSize.width, lessThanOrEqualTo(96));
+    expect(filmstripPhotoSize.height, lessThanOrEqualTo(132));
+    expect(
+      tester.getSize(find.byKey(const ValueKey('filmstrip-add-photo'))).width,
+      lessThanOrEqualTo(84),
+    );
   });
 
   testWidgets('empty filmstrip tile captures the correct role', (
@@ -345,6 +355,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('photo-review-carousel')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('photo-review-page-view')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('photo-review-primary')), findsOneWidget);
+    expect(find.byKey(const ValueKey('photo-review-delete')), findsOneWidget);
     expect(find.text('Photo 1 of 2'), findsOneWidget);
     expect(find.textContaining('Front'), findsWidgets);
   });
@@ -653,6 +669,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Analyze 1 photo'), findsOneWidget);
+      expect(find.byKey(const ValueKey('workspace-filmstrip')), findsOneWidget);
+      expect(find.textContaining('Auto Detect'), findsNothing);
+      expect(find.textContaining('55%'), findsNothing);
+      expect(find.textContaining('readiness'), findsNothing);
       await tester.ensureVisible(
         find.byKey(const ValueKey('scan-primary-Analyze Image')),
       );
@@ -829,6 +849,7 @@ void main() {
       find.byKey(const ValueKey('scan-result-hero-sample://front')),
       findsOneWidget,
     );
+    expect(find.text('Saved to Portfolio'), findsNothing);
 
     final detailTile = find.byKey(
       const ValueKey('scan-result-gallery-sample://detail'),
@@ -839,6 +860,49 @@ void main() {
 
     expect(
       find.byKey(const ValueKey('scan-result-hero-sample://detail')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('result saved state shows approved confirmation card', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: AiResultCard(
+                item: 'Hot Wheels Audi RS 6 Avant',
+                category: 'Toy Car',
+                estimatedValue: 'Value unavailable',
+                confidence: '92%',
+                condition: 'Packaged',
+                imagePath: 'sample://front',
+                confidenceScore: 0.92,
+                rawEstimatedValue: 0,
+                primaryMatch: 'Hot Wheels Audi RS 6 Avant',
+                alternativeMatches: const <ScanAlternativeMatch>[],
+                confidenceExplanation: 'Strong packaging and model match.',
+                detectionQuality: 'Clear',
+                aiReasoning: 'Recognized the model and package text.',
+                pricing: _pricing(),
+                recommendation: 'Keep the complete capture set.',
+                isSaved: true,
+                isSaving: false,
+                onScanAnother: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Saved to Portfolio'), findsWidgets);
+    expect(find.byKey(const ValueKey('scanner-status-card')), findsOneWidget);
+    expect(find.text('Your item has been added successfully.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
       findsOneWidget,
     );
   });

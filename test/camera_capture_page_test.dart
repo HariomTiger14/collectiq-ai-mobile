@@ -30,6 +30,23 @@ void main() {
       expect(cameraService.openCount, 0);
       expect(find.byType(CameraPreview), findsOneWidget);
       expect(
+        find.byKey(const ValueKey('camera-authority-viewfinder')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('camera-guidance-pill')),
+        findsOneWidget,
+      );
+      final viewfinderRect = tester.getRect(
+        find.byKey(const ValueKey('camera-authority-viewfinder')),
+      );
+      final shutterRect = tester.getRect(
+        find.byKey(const ValueKey('camera-capture-button')),
+      );
+      expect(viewfinderRect.top, greaterThan(0));
+      expect(viewfinderRect.bottom, lessThan(shutterRect.top));
+      expect(shutterRect.size, const Size(78, 78));
+      expect(
         find.byKey(const ValueKey('camera-preview-initializing-black')),
         findsNothing,
       );

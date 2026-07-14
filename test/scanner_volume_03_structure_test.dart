@@ -66,12 +66,20 @@ void main() {
       final review = _read(
         'lib/features/scanner/presentation/pages/image_enhancement_preview_page.dart',
       );
+      final scannerVisualTheme = _read(
+        'lib/features/scanner/presentation/scanner_visual_theme.dart',
+      );
 
       expect(camera, contains('CameraCapturePage'));
       expect(camera, contains('CameraPreview('));
       expect(camera, contains('ImageEnhancementPreviewSurface'));
-      expect(camera, contains('camera-capture-button'));
-      expect(camera, contains('onTap: isCapturing ? null : onPressed'));
+      expect(camera, contains('ScannerCameraShutter'));
+      expect(camera, contains('camera-authority-viewfinder'));
+      expect(scannerVisualTheme, contains('camera-capture-button'));
+      expect(
+        scannerVisualTheme,
+        contains('onTap: isCapturing ? null : onPressed'),
+      );
       expect(
         camera,
         contains('Camera permission is required to capture scans.'),
