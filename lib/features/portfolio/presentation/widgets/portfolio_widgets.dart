@@ -5,6 +5,7 @@ import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insig
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 
 class PortfolioThumbnail extends StatelessWidget {
@@ -259,7 +260,7 @@ class PortfolioEmptyState extends StatelessWidget {
     return Container(
       key: const ValueKey('portfolio-empty-state-surface'),
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -275,24 +276,32 @@ class PortfolioEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No collectibles saved yet',
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            'Your collection is empty',
+            style: textTheme.titleMedium?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Start with Camera or Gallery, analyze the collectible, then save it here to track value, alerts, wishlist status, and goals.',
+            'Start scanning to add your first collectible.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onScanPressed,
-              icon: const Icon(Icons.document_scanner_outlined),
-              label: const Text('Scan Collectible'),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('portfolio-empty-scan-first'),
+                onPressed: onScanPressed,
+                icon: const Icon(Icons.document_scanner_outlined),
+                label: const Text('Scan Your First Item'),
+              ),
             ),
           ),
         ],
@@ -316,7 +325,7 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
     return Container(
       key: const ValueKey('portfolio-no-results-surface'),
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: _packLoxRaisedSurfaceColor(colorScheme),
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -328,25 +337,31 @@ class PortfolioNoSearchResultsState extends StatelessWidget {
           Icon(Icons.search_off, size: 44, color: colorScheme.primary),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No collectibles found',
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            'No items found',
+            style: textTheme.titleMedium?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Try adjusting your search or filters.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+              color: PackLoxTokens.textSecondary,
             ),
           ),
           if (onResetFilters != null) ...[
             const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onResetFilters,
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('Clear filters'),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onResetFilters,
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('Clear filters'),
+                ),
               ),
             ),
           ],
@@ -486,16 +501,16 @@ class PortfolioGridTile extends StatelessWidget {
             child: Ink(
               key: ValueKey('portfolio-grid-premium-surface-${item.id}'),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                color: _packLoxRaisedSurfaceColor(colorScheme),
                 borderRadius: BorderRadius.circular(AppRadius.xl),
                 border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+                  color: _packLoxSurfaceBorderColor(colorScheme),
                 ),
-                boxShadow: AppElevation.level2,
+                boxShadow: AppElevation.level1,
               ),
               child: Padding(
                 padding: EdgeInsets.all(
-                  compact ? AppSpacing.md : AppSpacing.lg,
+                  compact ? AppSpacing.sm : AppSpacing.md,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -507,6 +522,7 @@ class PortfolioGridTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleSmall?.copyWith(
+                        color: PackLoxTokens.textPrimary,
                         fontWeight: FontWeight.w900,
                         height: 1.14,
                       ),
@@ -521,17 +537,14 @@ class PortfolioGridTile extends StatelessWidget {
                           label: item.category,
                           icon: _categoryIcon(item.category),
                         ),
-                        PremiumBadge.confidence(
-                          label:
-                              '${(item.confidence * 100).toStringAsFixed(0)}%',
-                        ),
-                        PremiumBadge.trend(
-                          label: _trendLabel(item),
-                          icon: _trendIcon(item),
-                        ),
                         if (wishlistStatusLabel != null &&
                             wishlistStatusLabel!.trim().isNotEmpty)
                           PremiumBadge.wishlist(label: wishlistStatusLabel!),
+                        if (_galleryCount(item) > 1)
+                          PremiumBadge.category(
+                            label: '${_galleryCount(item)} images',
+                            icon: Icons.collections_outlined,
+                          ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -545,7 +558,7 @@ class PortfolioGridTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                              color: PackLoxTokens.textSecondary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -556,10 +569,12 @@ class PortfolioGridTile extends StatelessWidget {
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerRight,
                             child: Text(
-                              _formatAud(item.estimatedValue),
+                              _valuationLabel(item),
                               maxLines: 1,
                               style: textTheme.titleSmall?.copyWith(
-                                color: colorScheme.primary,
+                                color: _hasDisplayableValuation(item)
+                                    ? colorScheme.primary
+                                    : PackLoxTokens.textSecondary,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -569,7 +584,7 @@ class PortfolioGridTile extends StatelessWidget {
                         Icon(
                           Icons.chevron_right,
                           size: 18,
-                          color: colorScheme.onSurfaceVariant.withValues(
+                          color: PackLoxTokens.textSecondary.withValues(
                             alpha: 0.62,
                           ),
                         ),
@@ -617,11 +632,9 @@ class _PortfolioGridThumbnail extends StatelessWidget {
         child: DecoratedBox(
           key: ValueKey('portfolio-grid-thumbnail-frame-${item.id}'),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
+            color: _packLoxRaisedSurfaceColor(colorScheme),
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.72),
-            ),
+            border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
             boxShadow: [
               BoxShadow(
                 color: colorScheme.shadow.withValues(alpha: 0.10),
@@ -1133,6 +1146,41 @@ String _formatAud(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+bool _hasDisplayableValuation(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => item.estimatedValue > 0,
+  };
+}
+
+String _valuationLabel(CollectibleItem item) {
+  if (_hasDisplayableValuation(item)) {
+    return _formatAud(item.estimatedValue);
+  }
+  if (item.estimatedValue == 0) {
+    return '-';
+  }
+  return _formatAud(item.estimatedValue);
+}
+
+int _galleryCount(CollectibleItem item) {
+  final paths = <String>{};
+  final primaryPath = item.imagePath.trim();
+  if (primaryPath.isNotEmpty) {
+    paths.add(primaryPath);
+  }
+  for (final image in item.galleryImages) {
+    final path = image.path.trim();
+    if (path.isNotEmpty) {
+      paths.add(path);
+    }
+  }
+  return paths.length;
 }
 
 String _displayImagePath(CollectibleItem item) {
