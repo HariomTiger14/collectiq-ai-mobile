@@ -161,3 +161,64 @@ Visual approval:
 - Spacing, surfaces, icons, and buttons: `MATCH` or `ACCEPTABLE RESPONSIVE ADAPTATION`.
 
 Final owner-v1 status: visually approved for the validated Home empty-state first viewport with the honest substitutions and responsive adaptations above.
+
+## Home Visual Weight and Category Semantics Correction
+
+Date: 2026-07-14
+
+Scope: narrow post-freeze Home visual-weight correction only.
+
+This amendment does not reopen Home architecture, business logic, portfolio ownership, scanner ownership, routing, backend, Settings, Authentication, Scanner, Portfolio, Detail, App Shell, or Product Language definitions.
+
+Correction scope:
+
+- reduced empty hero icon-circle visual dominance;
+- reduced empty hero vertical footprint;
+- corrected `Collection Status` to read as a compact dashboard summary;
+- replaced incorrect Popular Categories semantic icons;
+- tightened Popular Categories tile spacing;
+- preserved Quick Actions hierarchy and callbacks.
+
+Implemented icon semantic corrections:
+
+- Cards: `Icons.style_outlined`, stacked-card semantics.
+- Coins: `Icons.album_outlined`, collectible coin/medallion semantics.
+- Figures: `Icons.smart_toy_outlined`, figurine/collectible character semantics.
+- More: `Icons.grid_view_outlined`, grid/more semantics.
+
+Collection Status contract:
+
+- Items is real and displays genuine zero.
+- Estimated value is unavailable and displays `-`.
+- Average condition is unavailable and displays `-`.
+- Scans remains an empty-state zero placeholder and does not introduce scan-history analytics.
+- No collection values, condition averages, category counts, trends, readiness, or confidence are fabricated.
+
+Measurement record:
+
+- `qa/reconstruction/home_visual_weight_correction_measurements.md`
+
+Metric contract:
+
+- `qa/reconstruction/home_collection_status_contract_clarification.md`
+
+Tests:
+
+- `flutter test test/home_page_test.dart --reporter=compact`: passed, 19 tests.
+- `flutter test --reporter=compact`: completed with `589 passed, 9 failed`; the failures are the known baseline failures and the suite must not be described as fully passing.
+
+Samsung runtime evidence:
+
+- `qa/screenshots/approved_authority_remediation/home/visual_weight_correction/`
+
+Comparison result:
+
+- `qa/reconstruction/home_visual_weight_fidelity_acceptance.md`
+- `qa/screenshots/approved_authority_remediation/home/visual_weight_correction/comparison/home_visual_weight_before_after.png`
+
+Remaining limitations:
+
+- The correction uses existing Material icons rather than adding new assets.
+- Physical evidence covers the local empty Home state; populated Home states remain covered by focused widget tests and existing runtime evidence.
+
+Final visual approval status: approved for the narrow Home visual-weight and category-semantics correction. Phase 6C was not started.
