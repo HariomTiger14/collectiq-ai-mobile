@@ -218,6 +218,33 @@ Sprint 07 may only begin after explicit approval. It should preserve Portfolio i
 
 Sprint 07 is not started by this freeze record.
 
+## 13A. Phase 2 approved visual authority amendment
+
+On 2026-07-14, Portfolio visual freeze was amended under the approved authority program.
+
+Primary authority:
+
+`C:\Users\hario\Desktop\projects\packlox-design-platform\releases\v1.0\design_bible\Volume_06_Portfolio\images\portfolio_flow_master.png`
+
+Evidence:
+
+- `qa/reconstruction/portfolio_phase2_measurements.md`
+- `qa/reconstruction/portfolio_phase2_contract_clarifications.md`
+- `qa/reconstruction/portfolio_phase2_runtime_comparison.md`
+- `qa/reconstruction/portfolio_phase2_fidelity_acceptance.md`
+- `qa/reconstruction/portfolio_visual_freeze_amendment.md`
+- `qa/screenshots/approved_authority_remediation/portfolio/comparison/phase2_portfolio_authority_vs_runtime.png`
+
+Supported Portfolio states are amended as approved. Bulk select, collection grouping, share collection, export/backup, and five-tab Search remain deferred product contracts.
+
+Final Phase 2 validation on 2026-07-14:
+
+- `flutter analyze`: passed, no issues found.
+- Focused visual and screen tests passed: shared visual foundations 12, Home 16, Portfolio 8.
+- Frozen regression bundles passed: Sprint 01-05 bundle 58, focused Scanner suite 42 in the current suite shape.
+- Full suite result: 562 passed, 16 failed. This matches the recorded Phase 2 result and remains within the accepted 16-failure ceiling; the full suite is not entirely passing.
+- Android local debug build, install, launch, Portfolio runtime smoke, scanner-to-Portfolio handoff, Detail navigation/return, and logcat crash/ANR check passed on Samsung SM-E625F `RZ8R213M8ZL`.
+
 ## 14. Freeze declaration
 
 Sprint 06, Portfolio Presentation Reconstruction, is frozen at `fe66cae245c7aa9fb7b0c6c3775bae38091a0378` pending this governance commit.
