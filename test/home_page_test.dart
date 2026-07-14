@@ -158,8 +158,24 @@ void main() {
       expect(find.text('Avg. condition'), findsOneWidget);
       expect(find.text('Scans'), findsOneWidget);
       expect(
-        find.text('Value, condition, and saved history will appear here.'),
+        find.text(
+          'Value and condition stay unavailable until items are saved.',
+        ),
         findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('home-section-collection-status')),
+          matching: find.text('Scan your first item to get started.'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('home-section-collection-status')),
+          matching: find.text('Your collection is waiting'),
+        ),
+        findsNothing,
       );
       expect(find.text('Scan first collectible'), findsNothing);
       expect(find.text('Recent collectibles'), findsNothing);
@@ -396,26 +412,26 @@ void main() {
     expect(statusTop, lessThan(categoriesTop));
     expect(categoriesTop, lessThan(actionsTop));
     expect(emptyRect.height / viewportHeight, inInclusiveRange(0.12, 0.19));
-    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.34, 0.48));
+    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.29, 0.43));
     expect(
       primaryScanRect.left,
-      greaterThan(emptyRect.left + emptyRect.width * 0.34),
+      greaterThan(emptyRect.left + emptyRect.width * 0.27),
     );
     expect(primaryScanRect.height, inInclusiveRange(40, 52));
     expect(
       primaryScanRect.width / emptyRect.width,
-      inInclusiveRange(0.44, 0.64),
+      inInclusiveRange(0.44, 0.72),
     );
-    expect(statusRect.height / viewportHeight, inInclusiveRange(0.15, 0.22));
+    expect(statusRect.height / viewportHeight, inInclusiveRange(0.11, 0.18));
     expect(
       categoriesRect.height / viewportHeight,
-      inInclusiveRange(0.13, 0.20),
+      inInclusiveRange(0.10, 0.17),
     );
     expect(
       quickActionsRect.height / viewportHeight,
       inInclusiveRange(0.13, 0.20),
     );
-    expect(cardsRect.height, inInclusiveRange(70, 92));
+    expect(cardsRect.height, inInclusiveRange(60, 78));
     expect(moreRect.left, greaterThan(cardsRect.left));
     expect(scanActionRect.height, inInclusiveRange(58, 74));
     expect(importActionRect.height, inInclusiveRange(58, 74));
@@ -423,6 +439,130 @@ void main() {
     expect(scanActionRect.top, greaterThan(actionsTop));
     expect(quickActionsRect.bottom, lessThan(viewportHeight));
   });
+
+  testWidgets('visual weight correction keeps hero icon secondary', (
+    tester,
+  ) async {
+    _seedPortfolio(const []);
+    await tester.binding.setSurfaceSize(const Size(390, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    final heroRect = tester.getRect(
+      find.byKey(const ValueKey('home-empty-authority-card')),
+    );
+    final circleRect = tester.getRect(
+      find.byKey(const ValueKey('home-empty-hero-icon-circle')),
+    );
+    final icon = tester.widget<Icon>(
+      find.byKey(const ValueKey('home-empty-hero-archive-icon')),
+    );
+    final heading = tester.widget<Text>(
+      find.text('Your collection is waiting'),
+    );
+
+    expect(heroRect.height / 1000, inInclusiveRange(0.11, 0.17));
+    expect(circleRect.width, inInclusiveRange(76, 80));
+    expect(circleRect.height, inInclusiveRange(76, 80));
+    expect(icon.icon, Icons.inventory_2_outlined);
+    expect(icon.size, inInclusiveRange(35, 37));
+    expect(circleRect.height / heroRect.height, lessThan(0.70));
+    expect(heading.style?.fontWeight, FontWeight.w900);
+  });
+
+  testWidgets('Collection Status uses compact real dashboard metrics', (
+    tester,
+  ) async {
+    _seedPortfolio(const []);
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    final status = find.byKey(const ValueKey('home-section-collection-status'));
+
+    expect(
+      find.descendant(of: status, matching: find.text('Items')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: status, matching: find.text('0')), findsWidgets);
+    expect(
+      find.descendant(of: status, matching: find.text('Est. value')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: status, matching: find.text('Avg. condition')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: status, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: status, matching: find.text('Scans')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: status,
+        matching: find.text('Scan your first item to get started.'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: status,
+        matching: find.text('Your collection is waiting'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'Popular Categories use collectible semantics and compact tiles',
+    (tester) async {
+      _seedPortfolio(const []);
+      await tester.pumpWidget(_homeApp());
+      await tester.pumpAndSettle();
+
+      final cardsIcon = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-popular-category-cards-icon')),
+      );
+      final coinsIcon = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-popular-category-coins-icon')),
+      );
+      final figuresIcon = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-popular-category-figures-icon')),
+      );
+      final moreIcon = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-popular-category-more-icon')),
+      );
+
+      expect(cardsIcon.icon, Icons.style_outlined);
+      expect(coinsIcon.icon, Icons.album_outlined);
+      expect(coinsIcon.icon, isNot(Icons.attach_money_rounded));
+      expect(coinsIcon.icon, isNot(Icons.monetization_on_outlined));
+      expect(figuresIcon.icon, Icons.smart_toy_outlined);
+      expect(figuresIcon.icon, isNot(Icons.directions_car_outlined));
+      expect(figuresIcon.icon, isNot(Icons.toys_outlined));
+      expect(moreIcon.icon, Icons.grid_view_outlined);
+
+      for (final icon in [cardsIcon, coinsIcon, figuresIcon, moreIcon]) {
+        expect(icon.size, inInclusiveRange(28, 32));
+      }
+
+      for (final key in const [
+        ValueKey('home-popular-category-cards'),
+        ValueKey('home-popular-category-coins'),
+        ValueKey('home-popular-category-figures'),
+        ValueKey('home-popular-category-more'),
+      ]) {
+        final rect = tester.getRect(find.byKey(key));
+        expect(rect.height, inInclusiveRange(60, 78));
+        expect(rect.width, greaterThanOrEqualTo(44));
+      }
+    },
+  );
 
   testWidgets('rapid Scan taps trigger one navigation request', (tester) async {
     _seedPortfolio(const []);
