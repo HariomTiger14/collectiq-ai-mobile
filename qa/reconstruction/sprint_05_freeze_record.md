@@ -440,6 +440,27 @@ Sprint 06 must not include Detail reconstruction, Settings reconstruction, Authe
 
 Sprint 06 is not started by this freeze record.
 
+## 24A. Scanner Phase 4 visual amendment
+
+Date: 2026-07-14
+
+Scanner visual freeze is amended by Phase 4 approved-authority remediation.
+
+Phase 4 scope was limited to Scanner presentation alignment against the approved Volume 03 Scanner authority. It did not reopen Home, Portfolio, Detail, Settings, Search, Notifications, App Shell architecture, backend, auth, routing, Product Language definitions, or Capture System definitions.
+
+Phase 4 evidence:
+
+- `qa/reconstruction/scanner_phase4_measurements.md`
+- `qa/reconstruction/scanner_phase4_contract_clarifications.md`
+- `qa/reconstruction/scanner_phase4_runtime_comparison.md`
+- `qa/reconstruction/scanner_phase4_fidelity_acceptance.md`
+- `qa/reconstruction/scanner_visual_freeze_amendment.md`
+- `qa/screenshots/reconstruction/phase_04_scanner_authority/`
+
+Physical runtime was reproduced on Samsung SM-E625F using the current local debug build. Covered runtime states include Scan Hub, Camera after permission grant, sample Workspace, Result, save action, and post-save state.
+
+Known out-of-scope runtime note: the current debug build emitted a Home startup layout assertion before Scanner navigation. Phase 4 did not modify Home.
+
 ## 25. Freeze declaration
 
 Sprint 05, Scanner Presentation Reconstruction, is frozen at `5b3c9b42aea0675923c1c8ad06401573488ebe48` pending this governance commit.
