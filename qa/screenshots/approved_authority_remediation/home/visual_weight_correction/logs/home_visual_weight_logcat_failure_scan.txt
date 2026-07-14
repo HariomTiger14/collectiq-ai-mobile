@@ -1,0 +1,9 @@
+Home visual-weight logcat failure scan - 2026-07-14T22:04:47.2014371+10:00
+Package under test: com.collectiq.ai.local
+Global fatal/input matches: none.
+Global process-death matches:
+07-14 22:04:36.621 I/ActivityManager( 3149): Process com.samsung.android.rubin.app (pid 1031) has died: cch+99 SVC (17,1903)
+07-14 22:04:36.867 I/ActivityManager( 3149): Process com.sec.android.provider.badge (pid 19094) has died: cch+99 CEM (28,1897)
+07-14 22:04:37.186 I/ActivityManager( 3149): Process com.sec.android.provider.badge (pid 19176) has died: cch+99 CEM (19,1897)
+07-14 22:04:40.046 I/ActivityManager( 3149): Process com.samsung.android.networkdiagnostic (pid 19499) has died: cch+75 CEM (114,1801)
+App-specific result: PASS - no PackLox Home fatal/runtime/input/process-death patterns found.
