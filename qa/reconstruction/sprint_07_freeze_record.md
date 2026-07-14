@@ -9,9 +9,13 @@ Authority:
 Phase 3 freeze result:
 - Detail is now frozen around a compact section-based authority structure.
 - Detail does not own Home, Portfolio, Scanner, App Shell, backend, auth, or Product Language changes.
-- Remaining broad full-suite failures are outside this Phase 3 Detail visual remediation scope.
+- Full-suite regression blocker reconciled: current final suite is `567 passed, 15 failed`, below the accepted Phase 2 ceiling of `562 passed, 16 failed`.
+- No newly failing Detail test exists at current HEAD; remaining broad failures are analyzer/backend/SIT/scanner/enhancement baseline debt outside Phase 3 Detail visual remediation scope.
+- `flutter analyze` passed with no issues found.
+- Regression approval and Detail visual-freeze approval are final for Phase 3. The full suite is not entirely passing.
 
 Companion records:
+- `phase_3_detail_test_regression_analysis.md`
 - `detail_phase3_measurements.md`
 - `detail_phase3_contract_clarifications.md`
 - `detail_phase3_runtime_comparison.md`

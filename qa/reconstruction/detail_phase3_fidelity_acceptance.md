@@ -9,5 +9,11 @@ Accepted for Phase 3:
 Known limits:
 - Runtime screenshots were not regenerated in this pass; existing approved reference/current runtime folders remain the evidence baseline.
 - Similar Items and Price History remain non-fabricated empty copy unless saved data exists.
+- The full suite is not green; 15 non-Detail baseline failures remain.
 
-Acceptance decision: approved for Detail Phase 3 visual remediation scope.
+Regression acceptance, 2026-07-14:
+- Final full-suite validation completed with `567 passed, 15 failed`, below the accepted Phase 2 ceiling of `562 passed, 16 failed`.
+- No newly failing Detail test exists in the current failure inventory.
+- Focused Detail, Detail sync-status, migrated Detail widget, App Shell/Home/Portfolio/Detail, and frozen Scanner validation groups passed.
+
+Acceptance decision: approved for Detail Phase 3 visual remediation scope, with final regression approval granted.
