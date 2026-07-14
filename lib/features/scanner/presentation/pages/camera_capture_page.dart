@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
@@ -294,42 +295,45 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
         }
         await _closeCamera();
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: capturedImage == null
-              ? _CameraLiveView(
-                  cameraService: _cameraService,
-                  isInitializing: _isInitializing,
-                  isCapturing: _isCapturing,
-                  isFlashEnabled: _isFlashEnabled,
-                  errorMessage: _errorMessage,
-                  isPermissionPermanentlyDenied: _isPermissionPermanentlyDenied,
-                  liveEnhanceEnabled: _liveEnhanceEnabled,
-                  onClose: _closeCamera,
-                  onCapture: _captureImage,
-                  onFlash: _toggleFlash,
-                  onGallery: _openGalleryFallback,
-                  onFlip: _flipCamera,
-                  onEnhanceToggle: () => setState(() {
-                    _liveEnhanceEnabled = !_liveEnhanceEnabled;
-                  }),
-                  onRetryPermission: _initializeCamera,
-                  onOpenSettings: _cameraService?.openSettings,
-                )
-              : ImageEnhancementPreviewSurface(
-                  image: capturedImage,
-                  initialPreset: _liveEnhanceEnabled
-                      ? ImageEnhancementPreset.autoEnhance
-                      : ImageEnhancementPreset.original,
-                  title: 'Review Photo',
-                  subtitle: '',
-                  enhancementService: _enhancementService,
-                  assessmentService: _assessmentService,
-                  onRetake: _retake,
-                  onCancel: _closeCamera,
-                  onUsePhoto: _usePhoto,
-                ),
+      child: ScannerFocusTheme(
+        child: Scaffold(
+          backgroundColor: ScannerVisualTheme.backgroundDeep,
+          body: SafeArea(
+            child: capturedImage == null
+                ? _CameraLiveView(
+                    cameraService: _cameraService,
+                    isInitializing: _isInitializing,
+                    isCapturing: _isCapturing,
+                    isFlashEnabled: _isFlashEnabled,
+                    errorMessage: _errorMessage,
+                    isPermissionPermanentlyDenied:
+                        _isPermissionPermanentlyDenied,
+                    liveEnhanceEnabled: _liveEnhanceEnabled,
+                    onClose: _closeCamera,
+                    onCapture: _captureImage,
+                    onFlash: _toggleFlash,
+                    onGallery: _openGalleryFallback,
+                    onFlip: _flipCamera,
+                    onEnhanceToggle: () => setState(() {
+                      _liveEnhanceEnabled = !_liveEnhanceEnabled;
+                    }),
+                    onRetryPermission: _initializeCamera,
+                    onOpenSettings: _cameraService?.openSettings,
+                  )
+                : ImageEnhancementPreviewSurface(
+                    image: capturedImage,
+                    initialPreset: _liveEnhanceEnabled
+                        ? ImageEnhancementPreset.autoEnhance
+                        : ImageEnhancementPreset.original,
+                    title: 'Review Photo',
+                    subtitle: '',
+                    enhancementService: _enhancementService,
+                    assessmentService: _assessmentService,
+                    onRetake: _retake,
+                    onCancel: _closeCamera,
+                    onUsePhoto: _usePhoto,
+                  ),
+          ),
         ),
       ),
     );
@@ -379,13 +383,29 @@ class _CameraLiveView extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: _CameraPreviewBody(
-            controller: isReady ? controller : null,
-            isInitializing: isInitializing,
-            errorMessage: errorMessage,
-            isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
-            onRetryPermission: onRetryPermission,
-            onOpenSettings: onOpenSettings,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 56, 12, 112),
+            child: DecoratedBox(
+              key: const ValueKey('camera-authority-viewfinder'),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: ScannerVisualTheme.border.withValues(alpha: 0.72),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(23),
+                child: _CameraPreviewBody(
+                  controller: isReady ? controller : null,
+                  isInitializing: isInitializing,
+                  errorMessage: errorMessage,
+                  isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
+                  onRetryPermission: onRetryPermission,
+                  onOpenSettings: onOpenSettings,
+                ),
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -421,14 +441,23 @@ class _CameraLiveView extends StatelessWidget {
           ),
         if (isReady)
           Positioned(
+            left: 24,
+            right: 24,
+            bottom: 100,
+            child: const ScannerGuidancePanel(
+              label: 'Position the item in the frame',
+            ),
+          ),
+        if (isReady)
+          Positioned(
             left: 20,
             right: 20,
             bottom: 16,
             child: Row(
               children: [
-                IconButton.filledTonal(
+                ScannerCameraControl(
                   onPressed: onGallery,
-                  icon: const Icon(Icons.photo_library_outlined),
+                  icon: Icons.photo_library_outlined,
                   tooltip: 'Choose from gallery',
                 ),
                 Expanded(
@@ -439,9 +468,9 @@ class _CameraLiveView extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton.filledTonal(
+                ScannerCameraControl(
                   onPressed: onFlip,
-                  icon: const Icon(Icons.cameraswitch_outlined),
+                  icon: Icons.cameraswitch_outlined,
                   tooltip: 'Flip camera',
                 ),
               ],
@@ -575,33 +604,6 @@ class _CaptureButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      key: const ValueKey('camera-capture-button'),
-      onTap: isCapturing ? null : onPressed,
-      child: Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
-        ),
-        child: Center(
-          child: Container(
-            width: 58,
-            height: 58,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: isCapturing
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-          ),
-        ),
-      ),
-    );
+    return ScannerCameraShutter(isCapturing: isCapturing, onPressed: onPressed);
   }
 }
