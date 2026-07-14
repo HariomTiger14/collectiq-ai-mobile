@@ -34,7 +34,7 @@ const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
 );
 
-/// Settings screen for account and sync placeholders.
+/// Settings screen for account, app preferences, and supported local/cloud state.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -129,27 +129,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       IdentityBlock(authState: authState),
       _SettingsRow(
         icon: Icons.account_circle_outlined,
-        title: 'Profile info',
+        title: authState.isSignedIn ? 'Manage Account' : 'Account & Profile',
         subtitle: authState.isSignedIn
-            ? authState.user?.displayName ?? 'Cloud profile'
-            : 'Guest profile keeps local collection access available.',
-        trailing: authState.isSignedIn ? 'Cloud' : 'Guest',
+            ? 'Cloud account details are read from the active session.'
+            : 'Guest access keeps scanning and Portfolio available locally.',
+        trailing: authState.isSignedIn ? 'Session' : 'Guest',
       ),
       _SettingsRow(
         icon: Icons.alternate_email_outlined,
         title: 'Email',
         subtitle:
             authState.user?.email ??
-            'Add an email account to enable cloud sync.',
-        trailing: authState.isSignedIn ? 'Verified' : 'Not set',
+            'No cloud account email is linked on this device.',
+        trailing: authState.isSignedIn ? 'Current' : 'Not set',
       ),
       _SettingsRow(
-        icon: Icons.lock_outline,
-        title: authState.isSignedIn ? 'Password' : 'Sign In',
+        icon: authState.isSignedIn ? Icons.verified_user_outlined : Icons.login,
+        title: authState.isSignedIn ? 'Account status' : 'Sign In',
         subtitle: authState.isSignedIn
-            ? 'Password is managed securely for this account.'
-            : 'Open Authentication to use email and password.',
-        trailing: authState.isSignedIn ? 'Managed' : 'Open',
+            ? 'Signed in through the existing authentication controller.'
+            : 'Open the separate Authentication screen.',
+        trailing: authState.isSignedIn ? 'Signed in' : 'Open',
         onTap: authState.isSignedIn
             ? null
             : () => Navigator.of(context).push(AuthSignInScreen.route()),
@@ -167,37 +167,120 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final preferencesTiles = [
+      const _SettingsRow(
+        icon: Icons.language_outlined,
+        title: 'App language',
+        subtitle: 'PackLox currently follows the device language.',
+        trailing: 'System',
+      ),
+      const _SettingsRow(
+        icon: Icons.straighten_outlined,
+        title: 'Measurement units',
+        subtitle: 'Package measurements use the current app defaults.',
+        trailing: 'Default',
+      ),
+      const _SettingsRow(
+        icon: Icons.document_scanner_outlined,
+        title: 'Default scan mode',
+        subtitle: 'Scanner opens through the frozen Scan tab workflow.',
+        trailing: 'Scan',
+      ),
+      const _SettingsRow(
+        icon: Icons.hdr_auto_outlined,
+        title: 'Auto Enhance',
+        subtitle: 'Enhancement remains owned by the Scanner review flow.',
+        trailing: 'Review',
+      ),
+      _SettingsRow(
+        icon: Icons.palette_outlined,
+        title: 'Theme',
+        subtitle: 'PackLox follows the system light or dark theme.',
+        trailing: 'System',
+        message: 'Theme is owned by the app theme and follows the device.',
+      ),
+    ];
+
+    final notificationTiles = [
+      _SettingsRow(
+        icon: Icons.notifications_none_outlined,
+        title: 'Price alerts',
+        subtitle: notificationState.settingsSubtitle,
+        trailing: notificationState.settingsStatusLabel,
+      ),
+      _SettingsRow(
+        icon: Icons.admin_panel_settings_outlined,
+        title: 'Notification permission',
+        subtitle: 'Only the supported price-alert permission is available.',
+        trailing: notificationState.permissionStatus.label,
+      ),
+      _NotificationActionsPanel(
+        state: notificationState,
+        onToggleEnabled: (enabled) => ref
+            .read(priceAlertNotificationControllerProvider.notifier)
+            .setEnabled(enabled),
+        onRequestPermission: () => ref
+            .read(priceAlertNotificationControllerProvider.notifier)
+            .requestPermission(),
+      ),
+      const _SettingsRow(
+        icon: Icons.campaign_outlined,
+        title: 'Marketing notifications',
+        subtitle: 'No marketing notification delivery is implemented.',
+        trailing: 'Unavailable',
+      ),
+    ];
+
+    final privacyTiles = [
+      const _SettingsRow(
+        icon: Icons.visibility_outlined,
+        title: 'Profile visibility',
+        subtitle: 'No public profile visibility service is implemented.',
+        trailing: 'Private',
+      ),
+      const _SettingsRow(
+        icon: Icons.lock_outline,
+        title: 'Biometric lock',
+        subtitle: 'Device biometric app lock is not implemented in this build.',
+        trailing: 'Unavailable',
+      ),
+      const _SettingsRow(
+        icon: Icons.download_outlined,
+        title: 'Download my data',
+        subtitle: 'Data export needs separate product and backend approval.',
+        trailing: 'Deferred',
+      ),
+    ];
+
     final syncTiles = [
       _SettingsRow(
         icon: Icons.cloud_sync_outlined,
         title: 'Backup & Sync',
         subtitle: canRunCloudSync
-            ? 'Keep your collection backed up across devices.'
-            : 'Sign in to prepare backup and restore for your collection.',
-        trailing: canRunCloudSync ? 'Ready' : 'Local only',
+            ? syncState.errorMessage ?? syncState.status.message
+            : authState.isSignedIn
+            ? 'Cloud services are not configured for backup in this build.'
+            : 'Signed out. Your collection remains local on this device.',
+        trailing: canRunCloudSync ? syncState.status.statusLabel : 'Local only',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
         ),
       ),
       _SettingsRow(
         icon: Icons.cloud_done_outlined,
-        title: 'Backup status',
+        title: 'Cloud account',
         subtitle: canRunCloudSync
-            ? syncState.errorMessage ?? syncState.status.message
-            : 'Your collection is saved locally. Sign in to prepare backup and restore.',
-        trailing: syncState.status.statusLabel,
+            ? 'Cloud portfolio sync is available for the current session.'
+            : 'Sign in and configure cloud services before syncing.',
+        trailing: canRunCloudSync ? 'Available' : 'Required',
       ),
       _SettingsRow(
         icon: Icons.backup_outlined,
-        title: 'Backup',
-        subtitle: 'Portfolio details and images are prepared for safe backup.',
+        title: 'Backup status',
+        subtitle: canRunCloudSync
+            ? 'Use Sync Now to ask the configured service for real status.'
+            : 'No cloud backup success or last-sync time is available.',
         trailing: syncState.status.isCloudBackupEnabled ? 'On' : 'Off',
-      ),
-      _SettingsRow(
-        icon: Icons.restore_outlined,
-        title: 'Restore',
-        subtitle: 'Restore saved items when you sign in on another device.',
-        trailing: canRunCloudSync ? 'Ready' : 'Unavailable',
       ),
       _SettingsRow(
         icon: Icons.pending_actions_outlined,
@@ -212,63 +295,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             syncState.isLoading ||
             imageSyncState.isUploading,
         onSync: () => _manualCloudSync(ref, cloudRegistry),
-      ),
-    ];
-
-    final scanTiles = [
-      const _SettingsRow(
-        icon: Icons.document_scanner_outlined,
-        title: 'Scan quality',
-        subtitle: 'Use clear, well-lit photos for the best estimates.',
-        trailing: 'High',
-      ),
-      const _SettingsRow(
-        icon: Icons.verified_outlined,
-        title: 'Estimate guidance',
-        subtitle: 'AI values are helpful starting points; verify before sale.',
-        trailing: 'Review',
-      ),
-    ];
-
-    final appearanceTiles = [
-      _SettingsRow(
-        icon: Icons.palette_outlined,
-        title: 'Theme',
-        subtitle: 'PackLox follows your system appearance.',
-        trailing: 'System',
-        message: 'Theme follows the system setting for now.',
-      ),
-      _SettingsRow(
-        icon: Icons.tips_and_updates_outlined,
-        title: 'First-launch onboarding',
-        subtitle: 'Replay the welcome guide and first scan tips.',
-        trailing: 'Available',
-        message: 'Use Reset Onboarding below to replay it.',
-      ),
-      _OnboardingResetPanel(onReset: () => _resetOnboarding(context)),
-    ];
-
-    final notificationTiles = [
-      _SettingsRow(
-        icon: Icons.notifications_none_outlined,
-        title: 'Price alerts',
-        subtitle: notificationState.settingsSubtitle,
-        trailing: notificationState.settingsStatusLabel,
-      ),
-      _SettingsRow(
-        icon: Icons.admin_panel_settings_outlined,
-        title: 'Permissions',
-        subtitle: 'Allow PackLox to notify you about item price alerts.',
-        trailing: notificationState.permissionStatus.label,
-      ),
-      _NotificationActionsPanel(
-        state: notificationState,
-        onToggleEnabled: (enabled) => ref
-            .read(priceAlertNotificationControllerProvider.notifier)
-            .setEnabled(enabled),
-        onRequestPermission: () => ref
-            .read(priceAlertNotificationControllerProvider.notifier)
-            .requestPermission(),
       ),
     ];
 
@@ -287,29 +313,112 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
-    final infoTiles = [
+    final supportTiles = [
+      const _SettingsRow(
+        icon: Icons.help_outline_rounded,
+        title: 'Help Center',
+        subtitle: 'Help articles are not linked in this local build.',
+        trailing: 'Soon',
+        message: 'Help Center links are not configured for this build.',
+      ),
+      const _SettingsRow(
+        icon: Icons.bug_report_outlined,
+        title: 'Report an Issue',
+        subtitle: 'Issue reporting destination is not configured yet.',
+        trailing: 'Soon',
+        message: 'Issue reporting is coming soon.',
+      ),
+      const _SettingsRow(
+        icon: Icons.feedback_outlined,
+        title: 'Feedback',
+        subtitle: 'Feedback destination is not configured yet.',
+        trailing: 'Soon',
+        message: 'Feedback is coming soon.',
+      ),
+    ];
+
+    final aboutTiles = [
       _SettingsRow(
         icon: Icons.info_outline_rounded,
         title: 'About PackLox',
-        subtitle: 'Version, product details, and collection privacy basics.',
+        subtitle: 'Version 1.0.0 (1)',
         trailing: 'Open',
         onTap: () => Navigator.of(
           context,
         ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen())),
       ),
       const _SettingsRow(
-        icon: Icons.file_download_outlined,
-        title: 'Export portfolio',
-        subtitle: 'Portfolio export will be available in a future release.',
-        trailing: 'Soon',
-        message: 'Portfolio export is coming soon.',
+        icon: Icons.inventory_2_outlined,
+        title: 'Storage',
+        subtitle: 'Collection data starts in local device storage.',
+        trailing: 'Local',
       ),
       const _SettingsRow(
-        icon: Icons.mail_outline,
-        title: 'Contact',
-        subtitle: 'Support contact details will be added before release.',
+        icon: Icons.cloud_done_outlined,
+        title: 'Backup',
+        subtitle: 'Optional account backup when cloud services are configured.',
+        trailing: 'Optional',
+      ),
+    ];
+
+    final legalTiles = [
+      const _SettingsRow(
+        icon: Icons.description_outlined,
+        title: 'Terms of Service',
+        subtitle: 'Terms destination is not configured yet.',
         trailing: 'Soon',
-        message: 'Contact support is coming soon.',
+        message: 'Terms of Service is coming soon.',
+      ),
+      const _SettingsRow(
+        icon: Icons.privacy_tip_outlined,
+        title: 'Privacy Policy',
+        subtitle: 'Images stay local unless cloud services are configured.',
+        trailing: 'Local',
+      ),
+      const _SettingsRow(
+        icon: Icons.workspace_premium_outlined,
+        title: 'Open Source Licenses',
+        subtitle: 'Flutter license details remain available from the platform.',
+        trailing: 'App',
+      ),
+    ];
+
+    final dangerTiles = [
+      _DangerNotice(),
+      _SettingsRow(
+        icon: Icons.restart_alt_outlined,
+        title: 'Reset Onboarding',
+        subtitle: 'Replay the welcome guide on the next launch.',
+        trailing: 'Confirm',
+        onTap: () => _confirmDangerAction(
+          context,
+          title: 'Reset Onboarding?',
+          message:
+              'The welcome guide will show the next time you open PackLox.',
+          confirmLabel: 'Reset',
+          action: () => _resetOnboarding(context),
+        ),
+      ),
+      _SettingsRow(
+        icon: Icons.cleaning_services_outlined,
+        title: 'Clear Local Collection',
+        subtitle: 'Remove portfolio items stored locally on this device.',
+        trailing: 'Confirm',
+        onTap: () => _confirmDangerAction(
+          context,
+          title: 'Clear Local Collection?',
+          message:
+              'This removes local portfolio items from this device. Cloud account deletion is not supported here.',
+          confirmLabel: 'Clear',
+          action: _clearLocalCollection,
+        ),
+      ),
+      const _SettingsRow(
+        icon: Icons.delete_forever_outlined,
+        title: 'Delete Account',
+        subtitle:
+            'Account deletion requires separate product and security approval.',
+        trailing: 'Unavailable',
       ),
     ];
 
@@ -343,7 +452,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             ...sectionSlivers(
-              'Account',
+              'Account & Profile',
               accountTiles,
               topSpacing: AppSpacing.xl,
             ),
@@ -360,10 +469,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   apiConfig: apiConfig,
                 ),
               ),
-            ...sectionSlivers('Backup & Sync', syncTiles),
-            ...sectionSlivers('Scanning', scanTiles),
+            ...sectionSlivers('Preferences', preferencesTiles),
             ...sectionSlivers('Notifications', notificationTiles),
-            ...sectionSlivers('Appearance', appearanceTiles),
+            ...sectionSlivers('Privacy & Security', privacyTiles),
+            ...sectionSlivers('Backup & Sync', syncTiles),
             if (demoSeedEnabled) ...sectionSlivers('Demo Data', demoDataTiles),
             if (showDeveloperTools) ...[
               sliverBox(
@@ -393,7 +502,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
-            ...sectionSlivers('Help & About', infoTiles),
+            ...sectionSlivers('Support & Help', supportTiles),
+            ...sectionSlivers('About PackLox', aboutTiles),
+            ...sectionSlivers('Legal', legalTiles),
+            ...sectionSlivers('Danger Zone', dangerTiles),
             const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
@@ -516,6 +628,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _clearLocalCollection() async {
+    await ref.read(portfolioControllerProvider.notifier).clearPortfolio();
+    if (mounted) {
+      _showSettingsSnackBar('Local collection cleared on this device.');
+    }
+  }
+
+  Future<void> _confirmDangerAction(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required FutureOr<void> Function() action,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('settings-danger-confirm-button'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(confirmLabel),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    await action();
+  }
+
   void _showSettingsSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -571,6 +723,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Onboarding will show the next time you open PackLox.'),
+      ),
+    );
+  }
+}
+
+class _DangerNotice extends StatelessWidget {
+  const _DangerNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      key: const ValueKey('settings-danger-zone-notice'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.44)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Caution',
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.error,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'These actions need confirmation. Unsupported account deletion is not exposed as an active action.',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -644,40 +844,6 @@ class _NotificationActionsPanel extends StatelessWidget {
                   ? 'Checking...'
                   : 'Request Notification Permission',
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _OnboardingResetPanel extends StatelessWidget {
-  const _OnboardingResetPanel({required this.onReset});
-
-  final VoidCallback onReset;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Useful when handing the app to a new tester or reviewing the first-run flow.',
-          style: textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            key: const ValueKey('settings-reset-onboarding-button'),
-            onPressed: onReset,
-            icon: const Icon(Icons.restart_alt_outlined),
-            label: const Text('Reset Onboarding'),
           ),
         ),
       ],
