@@ -325,11 +325,8 @@ void main() {
     expect(find.text('Your collection'), findsOneWidget);
     expect(find.text('Collector'), findsOneWidget);
     expect(find.text('Scan a Collectible'), findsOneWidget);
+    await tester.reveal(find.byKey(const ValueKey('home-quick-action-import')));
     expect(find.text('Import'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('home-quick-action-portfolio')),
-      findsOneWidget,
-    );
     expect(
       find.byKey(const ValueKey('home-quick-action-import')),
       findsOneWidget,
@@ -342,7 +339,8 @@ void main() {
     expect(find.textContaining('Soon'), findsNothing);
     await tester.reveal(find.text('Collection status'));
     expect(find.text('Collection status'), findsWidgets);
-    expect(find.text('No saved items yet'), findsOneWidget);
+    expect(find.text('Items'), findsOneWidget);
+    expect(find.text('Est. value'), findsOneWidget);
     expect(find.text('Recent collectibles'), findsNothing);
     expect(find.text('AI Insights'), findsNothing);
     expect(find.text('Starter Categories'), findsNothing);
@@ -475,8 +473,9 @@ void main() {
       findsNothing,
     );
     expect(find.text('Your collection is waiting'), findsOneWidget);
-    await tester.reveal(find.text('No saved items yet'));
-    expect(find.text('No saved items yet'), findsOneWidget);
+    await tester.reveal(find.text('Collection status'));
+    expect(find.text('Items'), findsOneWidget);
+    expect(find.text('Est. value'), findsOneWidget);
     expect(find.text('Scan first collectible'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());

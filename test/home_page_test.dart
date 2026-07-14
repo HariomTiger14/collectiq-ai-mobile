@@ -153,7 +153,10 @@ void main() {
       expect(find.text('Cards'), findsOneWidget);
       expect(find.text('Coins'), findsOneWidget);
       expect(find.text('Figures'), findsOneWidget);
-      expect(find.text('No saved items yet'), findsOneWidget);
+      expect(find.text('Items'), findsOneWidget);
+      expect(find.text('Est. value'), findsOneWidget);
+      expect(find.text('Avg. condition'), findsOneWidget);
+      expect(find.text('Scans'), findsOneWidget);
       expect(
         find.text('Value, condition, and saved history will appear here.'),
         findsOneWidget,
@@ -342,7 +345,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first viewport density follows approved Home authority ratios', (
+  testWidgets('first viewport density follows owner v1 Home authority ratios', (
     tester,
   ) async {
     _seedPortfolio(const []);
@@ -366,6 +369,9 @@ void main() {
     final categoriesRect = tester.getRect(
       find.byKey(const ValueKey('home-section-popular-categories')),
     );
+    final quickActionsRect = tester.getRect(
+      find.byKey(const ValueKey('home-section-quick-actions')),
+    );
     final cardsRect = tester.getRect(
       find.byKey(const ValueKey('home-popular-category-cards')),
     );
@@ -383,26 +389,39 @@ void main() {
     );
     final statusTop = tester.getTopLeft(find.text('Collection status')).dy;
     final categoriesTop = tester.getTopLeft(find.text('Popular Categories')).dy;
-    final actionsTop = importActionRect.top;
+    final actionsTop = tester.getTopLeft(find.text('Quick actions')).dy;
 
     expect(headerTop, lessThan(emptyRect.top));
     expect(emptyRect.top, lessThan(statusTop));
     expect(statusTop, lessThan(categoriesTop));
     expect(categoriesTop, lessThan(actionsTop));
-    expect(emptyRect.height / viewportHeight, inInclusiveRange(0.18, 0.30));
+    expect(emptyRect.height / viewportHeight, inInclusiveRange(0.12, 0.19));
+    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.34, 0.48));
+    expect(
+      primaryScanRect.left,
+      greaterThan(emptyRect.left + emptyRect.width * 0.34),
+    );
     expect(primaryScanRect.height, inInclusiveRange(40, 52));
     expect(
       primaryScanRect.width / emptyRect.width,
-      inInclusiveRange(0.68, 0.84),
+      inInclusiveRange(0.44, 0.64),
     );
-    expect(statusRect.height / viewportHeight, lessThan(0.16));
-    expect(categoriesRect.height / viewportHeight, lessThan(0.18));
-    expect(cardsRect.height, lessThanOrEqualTo(64));
+    expect(statusRect.height / viewportHeight, inInclusiveRange(0.15, 0.22));
+    expect(
+      categoriesRect.height / viewportHeight,
+      inInclusiveRange(0.13, 0.20),
+    );
+    expect(
+      quickActionsRect.height / viewportHeight,
+      inInclusiveRange(0.13, 0.20),
+    );
+    expect(cardsRect.height, inInclusiveRange(70, 92));
     expect(moreRect.left, greaterThan(cardsRect.left));
-    expect(scanActionRect.height, lessThanOrEqualTo(82));
-    expect(importActionRect.height, lessThanOrEqualTo(82));
-    expect(portfolioActionRect.height, lessThanOrEqualTo(82));
-    expect(actionsTop, lessThan(viewportHeight));
+    expect(scanActionRect.height, inInclusiveRange(58, 74));
+    expect(importActionRect.height, inInclusiveRange(58, 74));
+    expect(portfolioActionRect.height, inInclusiveRange(58, 74));
+    expect(scanActionRect.top, greaterThan(actionsTop));
+    expect(quickActionsRect.bottom, lessThan(viewportHeight));
   });
 
   testWidgets('rapid Scan taps trigger one navigation request', (tester) async {
@@ -471,17 +490,17 @@ void main() {
         tester,
         find.byKey(const ValueKey('home-section-collection-snapshot')),
       );
-      await _scrollUntilVisible(
-        tester,
-        find.byKey(const ValueKey('home-recent-home-test-card')),
-      );
-
       expect(
         _containerColor(
           tester,
           const ValueKey('home-section-collection-snapshot'),
         ),
         _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-recent-home-test-card')),
       );
       expect(
         _containerColor(tester, const ValueKey('home-recent-home-test-card')),
@@ -500,17 +519,17 @@ void main() {
         tester,
         find.byKey(const ValueKey('home-section-collection-snapshot')),
       );
-      await _scrollUntilVisible(
-        tester,
-        find.byKey(const ValueKey('home-recent-home-test-card')),
-      );
-
       expect(
         _containerColor(
           tester,
           const ValueKey('home-section-collection-snapshot'),
         ),
         _expectedPackLoxRaisedSurface(Brightness.dark),
+      );
+
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-recent-home-test-card')),
       );
       expect(
         _containerColor(tester, const ValueKey('home-recent-home-test-card')),
