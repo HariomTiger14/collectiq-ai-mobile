@@ -1,129 +1,32 @@
-# Full test suite baseline debt
+﻿# Full Test Suite Baseline Debt
 
-Date: 2026-07-13
+Date: 2026-07-14
+Branch: rebuild/product-language-v1
+Phase 5 full suite command: `C:\Users\hario\Desktop\flutter\bin\flutter.bat test --reporter=compact`
+Result: 574 passed, 9 failed.
+Acceptance: unchanged from accepted Phase 4 baseline and within Phase 5 gate of no more than 9 failures.
 
-Sprint 01 HEAD: `0f5c93c39abdc747770205ff0eb51715d602b34e`
+## Remaining Failures
 
-## History
+| File | Test | Classification |
+| --- | --- | --- |
+| `test/analyzer_service_test.dart` | `MockAnalyzerProvider consumes the backend analyzer contract when configured` | Existing backend analyzer contract debt; expected `selectedProvider` is null. |
+| `test/domain_unit_test.dart` | `DioAiBackendApiService FastAPI detail error preserves analyzer error code` | Existing backend error-message mapping debt. |
+| `test/domain_unit_test.dart` | `Supabase foundation SIT scripts pass required dart defines without hardcoded secrets` | Existing SIT script config debt; script still hardcodes mock AI provider. |
+| `test/widget_test.dart` | `camera denied UI shows friendly message` | Existing stale scanner expectation; expects `Try again`. |
+| `test/widget_test.dart` | `gallery import confirms enhancement before adding photo` | Existing stale enhancement-preview expectation. |
+| `test/widget_test.dart` | `gallery import follows review workspace analyze result portfolio flow` | Existing stale review-workspace expectation. |
+| `test/widget_test.dart` | `enhancement preview shows only Original and Enhanced` | Existing stale enhancement-preview expectation. |
+| `test/widget_test.dart` | `enhancement preview can switch Enhanced back to Original` | Existing stale enhancement-preview expectation. |
+| `test/widget_test.dart` | `saving enhanced scan preserves portfolio gallery metadata` | Existing stale enhancement metadata expectation. |
 
-Sprint 01:
+## Focused Phase 5 Runs
 
-- 509 passed
-- 19 failed
+Passed:
+- `test/shared_visual_foundations_test.dart` (12 tests)
+- `test/bootstrap_entry_presentation_test.dart test/onboarding_presentation_test.dart test/app_shell_presentation_test.dart`
+- `test/home_page_test.dart test/portfolio_screen_test.dart test/detail_screen_test.dart test/cloud_sync_status_widget_test.dart`
+- `test/scan_hub_page_test.dart test/camera_capture_page_test.dart test/scanner_widgets_test.dart test/scanner_volume_03_structure_test.dart`
+- `test/cloud_portfolio_sync_foundation_test.dart`
 
-Sprint 02:
-
-- 519 passed
-- 19 failed
-
-The Sprint 02 failure count did not increase from the recorded Sprint 01 baseline. The ten additional passing tests correspond to the new Sprint 02 onboarding coverage. The existing 19 failures remain outside Sprint 02 onboarding changes.
-
-Sprint 03:
-
-- 530 passed
-- 19 failed
-
-The Sprint 03 failure count remained unchanged from the recorded Sprint 01 and Sprint 02 baseline. The eleven additional passing tests correspond to the new Sprint 03 app shell coverage. The existing 19 failures remain outside Sprint 03 app shell changes.
-
-Sprint 04 initial:
-
-- 525 passed
-- 25 failed
-
-Sprint 04 remediated:
-
-- 531 passed
-- 19 failed
-
-The Sprint 04 initial run exposed six new failures in broad Home-facing widget tests. Those tests still referenced stale Home copy, removed custom hero internals, or the removed Home-specific CTA key after the approved Home reconstruction. The expectations were reconciled to the approved Sprint 04 Home surface without weakening frozen Sprint 01, Sprint 02, or Sprint 03 contracts.
-
-The remediated Sprint 04 full-suite result returned to the documented 19-failure baseline. The extra passing test reflects Sprint 04 Home coverage and expectation reconciliation. The full suite must not be described as passing.
-
-Sprint 05 pre-remediation:
-
-- 526 passed
-- 24 failed
-
-Sprint 05 remediated:
-
-- 534 passed
-- 16 failed
-
-Sprint 05 is non-regressive against the Sprint 04 remediated baseline. The remediated Sprint 05 failure count improved by three compared with Sprint 04, from 19 failures to 16 failures. New Scanner coverage increased passing tests, obsolete Scanner structure failures were removed, eight stale broad widget expectations were reconciled against actual Sprint 05 scanner contracts, and one genuine duplicate lost-picker recovery defect was fixed.
-
-The Sprint 05 full suite must not be described as entirely passing.
-
-Sprint 06 initial:
-
-- 532 passed
-- 18 failed
-
-Sprint 06 remediated:
-
-- 534 passed
-- 16 failed
-
-The Sprint 06 initial run exposed two stale broad Portfolio assertions that still expected removed legacy Portfolio summary copy. Those expectations were reconciled to the approved Sprint 06 Portfolio presentation without changing production code.
-
-The remediated Sprint 06 full-suite result returned to the Sprint 05 ceiling of 16 failures. The full suite must not be described as entirely passing.
-
-Sprint 03 focused validation:
-
-- Sprint 01 bootstrap tests passed: 12
-- Sprint 02 onboarding tests passed: 10
-- Sprint 03 app shell tests passed: 11
-- shared shell S01 tests passed: 2
-- `flutter analyze`: passed
-- Android local debug build: passed
-
-Sprint 04 focused validation:
-
-- Sprint 01 bootstrap tests passed: 12
-- Sprint 02 onboarding tests passed: 10
-- Sprint 03 app shell tests passed: 11
-- Sprint 04 Home tests passed: 12
-- `flutter analyze`: passed
-- Android local debug build: passed
-- Android install/launch on Samsung SM E625F: passed
-- physical Home/App Shell stress sequence: passed
-
-Sprint 05 focused validation:
-
-- eight target tests individually passed
-- eight target tests together passed
-- focused Scanner suite: 51 passed
-- frozen Sprint 01-04 suite: 45 passed
-- `flutter analyze`: passed
-
-Sprint 06 focused validation:
-
-- Sprint 01 bootstrap tests passed: 12
-- Sprint 02 onboarding tests passed: 10
-- Sprint 03 App Shell tests passed: 11
-- Sprint 04 Home tests passed: 12
-- Sprint 05 focused Scanner suite passed: 51
-- Sprint 06 focused Portfolio targeted checks passed: 7
-- stale Portfolio expectation remediation targets passed individually: 2
-- `flutter analyze`: passed during runtime validation
-
-The full suite must not be described as passing. Do not fix unrelated failures as part of Sprint freeze governance.
-
-## Sprint 01 baseline context
-
-This baseline was captured after Sprint 01 implementation and before freeze. The failures are outside Sprint 01 changed files and are not fixed in the freeze task.
-
-Known failure groups reported:
-
-- analyzer provider/contract expectation, including `expected gemini, actual null`
-- scanner widget copy expectations, including missing expected scanner review/workspace text
-- portfolio metadata/widget expectations, including missing expected enhancement metadata labels
-
-Required later classification for each failure:
-
-- obsolete expectation
-- genuine regression
-- environment/configuration dependency
-- reconstruction mismatch
-- analyzer contract mismatch
-
-Do not treat this document as approval to skip focused tests for future sprints. Each reconstruction sprint must continue to run its own focused tests and then report the full-suite baseline honestly.
+Checklist correction: `test/local_portfolio_persistence_test.dart` does not exist in this repository. Local portfolio persistence is covered in `test/domain_unit_test.dart`, `test/widget_test.dart`, and focused Portfolio/Detail tests.
