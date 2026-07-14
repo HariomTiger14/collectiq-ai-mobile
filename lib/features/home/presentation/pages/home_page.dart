@@ -486,6 +486,9 @@ class _CollectionSnapshotSection extends StatelessWidget {
 class _EmptyCollectionCard extends StatelessWidget {
   const _EmptyCollectionCard({this.onScanPressed});
 
+  static const double iconCircleDiameter = 78;
+  static const double archiveIconSize = 36;
+
   final VoidCallback? onScanPressed;
 
   @override
@@ -499,7 +502,7 @@ class _EmptyCollectionCard extends StatelessWidget {
       child: Container(
         key: const ValueKey('home-empty-authority-card'),
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
         decoration: BoxDecoration(
           color: _packLoxRaisedSurfaceColor(colorScheme),
           borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -510,8 +513,9 @@ class _EmptyCollectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 96,
-              height: 96,
+              key: const ValueKey('home-empty-hero-icon-circle'),
+              width: iconCircleDiameter,
+              height: iconCircleDiameter,
               decoration: BoxDecoration(
                 color: PackLoxTokens.surface.withValues(alpha: 0.86),
                 shape: BoxShape.circle,
@@ -520,12 +524,13 @@ class _EmptyCollectionCard extends StatelessWidget {
                 ),
               ),
               child: Icon(
+                key: const ValueKey('home-empty-hero-archive-icon'),
                 Icons.inventory_2_outlined,
                 color: colorScheme.primary,
-                size: 44,
+                size: archiveIconSize,
               ),
             ),
-            const SizedBox(width: AppSpacing.lg),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -541,7 +546,7 @@ class _EmptyCollectionCard extends StatelessWidget {
                       height: 1.05,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: 4),
                   Text(
                     'Scan your first item to get started.',
                     maxLines: 1,
@@ -551,7 +556,7 @@ class _EmptyCollectionCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: 10),
                   PackLoxButton(
                     key: const ValueKey('home-primary-scan'),
                     label: 'Scan a Collectible',
@@ -741,59 +746,69 @@ class _EmptySnapshot extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatusMetric(
-                icon: Icons.layers_outlined,
-                value: '${data.itemCount}',
-                label: 'Items',
+    return Semantics(
+      container: true,
+      label:
+          'Collection dashboard summary. Zero items. Estimated value unavailable. Average condition unavailable. Zero scans.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StatusMetric(
+                  key: const ValueKey('home-status-metric-items'),
+                  icon: Icons.layers_outlined,
+                  value: '${data.itemCount}',
+                  label: 'Items',
+                ),
               ),
-            ),
-            const _MetricDivider(),
-            const Expanded(
-              child: _StatusMetric(
-                icon: Icons.attach_money_rounded,
-                value: '-',
-                label: 'Est. value',
+              const _MetricDivider(),
+              const Expanded(
+                child: _StatusMetric(
+                  key: ValueKey('home-status-metric-estimated-value'),
+                  icon: Icons.inventory_2_outlined,
+                  value: '-',
+                  label: 'Est. value',
+                ),
               ),
-            ),
-            const _MetricDivider(),
-            const Expanded(
-              child: _StatusMetric(
-                icon: Icons.verified_user_outlined,
-                value: '-',
-                label: 'Avg. condition',
+              const _MetricDivider(),
+              const Expanded(
+                child: _StatusMetric(
+                  key: ValueKey('home-status-metric-average-condition'),
+                  icon: Icons.verified_user_outlined,
+                  value: '-',
+                  label: 'Avg. condition',
+                ),
               ),
-            ),
-            const _MetricDivider(),
-            Expanded(
-              child: _StatusMetric(
-                icon: Icons.history_rounded,
-                value: '0',
-                label: 'Scans',
+              const _MetricDivider(),
+              Expanded(
+                child: _StatusMetric(
+                  key: const ValueKey('home-status-metric-scans'),
+                  icon: Icons.history_rounded,
+                  value: '0',
+                  label: 'Scans',
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          'Value, condition, and saved history will appear here.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Value and condition stay unavailable until items are saved.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _StatusMetric extends StatelessWidget {
   const _StatusMetric({
+    super.key,
     required this.icon,
     required this.value,
     required this.label,
@@ -808,15 +823,18 @@ class _StatusMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
+      key: ValueKey(
+        'home-status-metric-${label.toLowerCase().replaceAll(' ', '-').replaceAll('.', '')}',
+      ),
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: colorScheme.onSurfaceVariant, size: AppIconSizes.md),
-        const SizedBox(height: AppSpacing.sm),
+        Icon(icon, color: colorScheme.onSurfaceVariant, size: 18),
+        const SizedBox(height: 4),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: colorScheme.onSurface,
             fontWeight: FontWeight.w900,
             height: 1,
@@ -845,7 +863,7 @@ class _MetricDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 72,
+      height: 52,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       color: _packLoxSurfaceBorderColor(Theme.of(context).colorScheme),
     );
@@ -857,9 +875,9 @@ class _PopularCategoriesSection extends StatelessWidget {
 
   static const _categories = [
     (label: 'Cards', icon: Icons.style_outlined),
-    (label: 'Coins', icon: Icons.monetization_on_outlined),
-    (label: 'Figures', icon: Icons.toys_outlined),
-    (label: 'More', icon: Icons.more_horiz),
+    (label: 'Coins', icon: Icons.album_outlined),
+    (label: 'Figures', icon: Icons.smart_toy_outlined),
+    (label: 'More', icon: Icons.grid_view_outlined),
   ];
 
   @override
@@ -878,14 +896,15 @@ class _PopularCategoriesSection extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           LayoutBuilder(
             builder: (context, constraints) {
-              final tileWidth = (constraints.maxWidth - AppSpacing.sm * 3) / 4;
+              const gap = AppSpacing.xs;
+              final tileWidth = (constraints.maxWidth - gap * 3) / 4;
               return Row(
                 children: [
                   for (var i = 0; i < _categories.length; i++) ...[
-                    if (i > 0) const SizedBox(width: AppSpacing.sm),
+                    if (i > 0) const SizedBox(width: gap),
                     SizedBox(
                       width: tileWidth,
                       child: _CategoryChip(
@@ -907,6 +926,8 @@ class _PopularCategoriesSection extends StatelessWidget {
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({required this.label, required this.icon});
 
+  static const double iconSize = 30;
+
   final String label;
   final IconData icon;
 
@@ -915,14 +936,12 @@ class _CategoryChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Semantics(
+      button: true,
       label: 'Popular category $label',
       child: Container(
         key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-        constraints: const BoxConstraints(minHeight: 70),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs,
-          vertical: AppSpacing.sm,
-        ),
+        constraints: const BoxConstraints(minHeight: 60),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
           color: PackLoxTokens.surface.withValues(
             alpha: colorScheme.brightness == Brightness.dark ? 0.88 : 0.72,
@@ -933,8 +952,15 @@ class _CategoryChip extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: colorScheme.primary, size: AppIconSizes.lg),
-            const SizedBox(height: AppSpacing.sm),
+            Icon(
+              key: ValueKey(
+                'home-popular-category-${label.toLowerCase()}-icon',
+              ),
+              icon,
+              color: colorScheme.primary,
+              size: iconSize,
+            ),
+            const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
