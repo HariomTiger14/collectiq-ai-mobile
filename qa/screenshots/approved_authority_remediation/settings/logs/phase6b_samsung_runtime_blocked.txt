@@ -1,0 +1,11 @@
+Date: 2026-07-14
+Branch: rebuild/product-language-v1
+
+Superseded blocker note:
+
+- Earlier runtime evidence was blocked when `flutter build apk --debug --flavor local` appeared to hang with no useful output.
+- The final physical-runtime gate reran diagnostics, then completed `C:\Users\hario\Desktop\flutter\bin\flutter.bat build apk --debug --flavor local -v` successfully.
+- APK install, launch, screenshots, hierarchy XML, focused logcat, and comparison PNG were captured under `qa/screenshots/approved_authority_remediation/settings/`.
+- Final freeze status is recorded in `qa/reconstruction/settings_phase6b_freeze_record.md`.
+
+This file is retained only as history of the superseded blocker; it is not the final runtime status.

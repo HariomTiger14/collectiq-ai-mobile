@@ -1,0 +1,12 @@
+Strict Phase 6B logcat failure scan - 2026-07-14T21:23:21.4822722+10:00
+Log: qa/screenshots/approved_authority_remediation/settings/logs/phase6b_settings_runtime_logcat.txt
+Package under test: com.collectiq.ai.local
+Patterns: FATAL EXCEPTION, E/flutter, whole-word ANR, input dispatch timeout, uncaught exception, force-finish, process death
+
+Global fatal/input matches: none.
+
+Global process-death matches:
+07-14 21:18:29.104 I/ActivityManager( 3149): Process com.samsung.android.networkdiagnostic (pid 7658) has died: cch+25 CEM (128,1853)
+
+App-specific result: PASS - no PackLox FATAL EXCEPTION, E/flutter, ANR, input dispatch timeout, uncaught exception, force-finish, or PackLox process death found.
+Note: One global process-death line belongs to com.samsung.android.networkdiagnostic, outside the app under test. Broad AndroidRuntime entries in the raw log are adb/uiautomator command startup/shutdown.
