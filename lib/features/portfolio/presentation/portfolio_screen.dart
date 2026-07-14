@@ -1,7 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
@@ -141,11 +140,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   SliverToBoxAdapter(
                     child: _PortfolioFrame(
                       horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.md,
+                      topPadding: AppSpacing.sm,
                       child: const PackLoxHeader(
                         firstName: '',
-                        fallbackName: 'Portfolio',
-                        greetingText: 'Your collection',
+                        fallbackName: 'My Collection',
+                        greetingText: 'Portfolio',
                         onNotifications: null,
                       ),
                     ),
@@ -153,7 +152,32 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   SliverToBoxAdapter(
                     child: _PortfolioFrame(
                       horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.md,
+                      topPadding: AppSpacing.sm,
+                      child: _PortfolioControls(
+                        searchQuery: _searchQuery,
+                        categoryFilter: _categoryFilter,
+                        onSearchChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                        onSearchCleared: () {
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                        onCategoryFilterChanged: (value) {
+                          setState(() {
+                            _categoryFilter = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _PortfolioFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.sm,
                       child: _CollectionOverview(
                         totalValue: portfolioState.totalValue,
                         itemCount: portfolioState.itemCount,
@@ -163,27 +187,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       ),
                     ),
                   ),
-                  if (portfolioState.items.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _PortfolioFrame(
-                        horizontalPadding: horizontalPadding,
-                        topPadding: AppSpacing.md,
-                        child: _PortfolioControls(
-                          searchQuery: _searchQuery,
-                          categoryFilter: _categoryFilter,
-                          onSearchChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                          onCategoryFilterChanged: (value) {
-                            setState(() {
-                              _categoryFilter = value;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
                   SliverToBoxAdapter(
                     child: _PortfolioFrame(
                       horizontalPadding: horizontalPadding,
@@ -203,7 +206,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       horizontalPadding,
                       0,
                       horizontalPadding,
-                      AppSpacing.xl,
+                      176,
                     ),
                     sliver: SliverLayoutBuilder(
                       builder: (context, constraints) {
@@ -262,9 +265,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             ? 3
                             : 2;
                         final childAspectRatio = switch (crossAxisCount) {
-                          1 => 0.58,
-                          2 => 0.47,
-                          _ => 0.58,
+                          1 => 0.64,
+                          2 => 0.56,
+                          _ => 0.62,
                         };
 
                         return SliverMainAxisGroup(
@@ -317,7 +320,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: crossAxisCount,
                                     mainAxisSpacing: AppSpacing.xl,
-                                    crossAxisSpacing: AppSpacing.lg,
+                                    crossAxisSpacing: AppSpacing.md,
                                     childAspectRatio: childAspectRatio,
                                   ),
                               delegate: SliverChildBuilderDelegate((
@@ -788,7 +791,10 @@ class _PremiumFilterGroup<T> extends StatelessWidget {
         children: [
           Text(
             title,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            style: textTheme.titleSmall?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
@@ -840,10 +846,10 @@ class _PremiumConfidenceRangeFilter extends StatelessWidget {
       child: DecoratedBox(
         key: const ValueKey('portfolio-premium-range-slider'),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+          color: PackLoxTokens.surface.withValues(alpha: 0.78),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.58),
+            color: PackLoxTokens.border.withValues(alpha: 0.68),
           ),
         ),
         child: Padding(
@@ -857,6 +863,7 @@ class _PremiumConfidenceRangeFilter extends StatelessWidget {
                     child: Text(
                       'Confidence',
                       style: textTheme.titleSmall?.copyWith(
+                        color: PackLoxTokens.textPrimary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -864,7 +871,7 @@ class _PremiumConfidenceRangeFilter extends StatelessWidget {
                   Text(
                     _confidenceRangeLabel(selectedValue),
                     style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                      color: PackLoxTokens.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -952,7 +959,10 @@ class _PremiumTrendFilterGroup extends StatelessWidget {
         children: [
           Text(
             'Trend',
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            style: textTheme.titleSmall?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
@@ -1002,8 +1012,8 @@ class _PremiumFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerLow,
+              ? colorScheme.primary.withValues(alpha: 0.18)
+              : PackLoxTokens.surface.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: selected
@@ -1025,9 +1035,7 @@ class _PremiumFilterChip extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelMedium?.copyWith(
-                  color: selected
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface,
+                  color: PackLoxTokens.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1055,20 +1063,45 @@ class _PremiumBadgeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return MotionTapScale(
       onTap: onTap,
-      child: DecoratedBox(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: selected
                 ? colorScheme.primary
-                : colorScheme.outlineVariant.withValues(alpha: 0.62),
+                : PackLoxTokens.border.withValues(alpha: 0.68),
           ),
+          color: selected
+              ? colorScheme.primary.withValues(alpha: 0.18)
+              : PackLoxTokens.surface.withValues(alpha: 0.78),
           boxShadow: selected ? AppElevation.accentGlow : null,
         ),
-        child: PremiumBadge.trend(label: label, icon: icon, maxWidth: 116),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: colorScheme.primary),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium?.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1087,52 +1120,38 @@ class _PremiumSheetSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradientColors = PackLoxGradients.build(gradientStyle, context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return MotionElasticSheet(
       key: const ValueKey('portfolio-premium-elastic-sheet'),
       child: SafeArea(
         top: false,
-        child: MotionParallax(
-          scrollOffset: 0,
-          depth: PackLoxMotionTheme.cardParallaxDepth,
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppRadius.xxl),
-            ),
-            child: MotionAmbientGradient(
-              gradientBuilder: gradientStyle == GradientStyle.purpleDeepBlue
-                  ? PackLoxMotionTheme.ambientPurpleDeepBlue
-                  : PackLoxMotionTheme.ambientBlueIndigo,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppRadius.xxl),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradientColors.last.withValues(
-                        alpha: isDark ? 0.22 : 0.28,
-                      ),
-                      blurRadius: 36,
-                      offset: const Offset(0, -12),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    AppSpacing.xl,
-                    AppSpacing.xl,
-                    AppSpacing.xl,
-                    bottomInset + AppSpacing.xl,
-                  ),
-                  child: child,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _portfolioRaisedSurfaceColor(colorScheme),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.xl),
+              ),
+              border: Border(
+                top: BorderSide(
+                  color: _portfolioSurfaceBorderColor(colorScheme),
                 ),
               ),
+              boxShadow: AppElevation.level2,
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                bottomInset + AppSpacing.lg,
+              ),
+              child: child,
             ),
           ),
         ),
@@ -1183,7 +1202,6 @@ class _PremiumSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Column(
@@ -1194,7 +1212,10 @@ class _PremiumSheetHeader extends StatelessWidget {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          style: textTheme.titleLarge?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
@@ -1202,7 +1223,7 @@ class _PremiumSheetHeader extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurface.withValues(alpha: 0.68),
+            color: PackLoxTokens.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1213,7 +1234,7 @@ class _PremiumSheetHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.78),
+              color: PackLoxTokens.textSecondary.withValues(alpha: 0.78),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1305,7 +1326,7 @@ class _PremiumCTA extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           gradient: primary ? AppGradients.primary : null,
-          color: primary ? null : colorScheme.surfaceContainerHighest,
+          color: primary ? null : PackLoxTokens.surface.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: primary
               ? null
@@ -1323,7 +1344,7 @@ class _PremiumCTA extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: textTheme.labelLarge?.copyWith(
-              color: primary ? Colors.white : colorScheme.onSurface,
+              color: primary ? Colors.white : PackLoxTokens.textPrimary,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1423,7 +1444,7 @@ class _PremiumSortTile<T> extends StatelessWidget {
         child: DecoratedBox(
           key: ValueKey('portfolio-premium-sort-tile-${_sheetSlug(label)}'),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
+            color: PackLoxTokens.surface.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: selected
@@ -1452,6 +1473,7 @@ class _PremiumSortTile<T> extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodyLarge?.copyWith(
+                      color: PackLoxTokens.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1537,7 +1559,11 @@ class _CollectionOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final valueLabel = itemCount == 0
+        ? _formatPortfolioMoney(0)
+        : valuedItemCount == 0
+        ? '-'
+        : _formatPortfolioMoney(totalValue);
     final valuationLabel = unvaluedItemCount == 0
         ? 'All valued'
         : '$unvaluedItemCount unvalued';
@@ -1545,68 +1571,69 @@ class _CollectionOverview extends StatelessWidget {
     return Semantics(
       container: true,
       label:
-          'Portfolio summary. $itemCount items. ${_formatPortfolioMoney(totalValue)} total estimated value. $valuationLabel.',
-      child: DecoratedBox(
-        key: const ValueKey('portfolio-compact-snapshot'),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: colorScheme.outlineVariant),
-          boxShadow: AppElevation.level1,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Collection summary',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Estimated value uses saved item data only.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                key: const ValueKey('portfolio-compact-metrics-grid'),
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  _OverviewMetric(
-                    label: 'Total value',
-                    value: _formatPortfolioMoney(totalValue),
-                    icon: Icons.account_balance_wallet_outlined,
-                    emphasized: true,
-                  ),
-                  _OverviewMetric(
-                    label: 'Items',
-                    value: itemCount.toString(),
-                    icon: Icons.inventory_2_outlined,
-                  ),
-                  _OverviewMetric(
-                    label: 'Valued',
-                    value: valuedItemCount.toString(),
-                    icon: Icons.price_check_outlined,
-                  ),
-                  _OverviewMetric(
-                    label: 'Categories',
-                    value: categoryCount.toString(),
-                    icon: Icons.category_outlined,
-                  ),
-                ],
-              ),
-              if (unvaluedItemCount > 0) ...[
-                const SizedBox(height: AppSpacing.sm),
-                _PartialValuationNote(count: unvaluedItemCount),
-              ],
-            ],
+          'Portfolio summary. $itemCount items. $valueLabel total estimated value. $valuationLabel.',
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
+          key: const ValueKey('portfolio-compact-snapshot'),
+          decoration: BoxDecoration(
+            color: _portfolioRaisedSurfaceColor(colorScheme),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: _portfolioSurfaceBorderColor(colorScheme),
+            ),
+            boxShadow: AppElevation.level1,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = ((constraints.maxWidth - AppSpacing.sm) / 2)
+                    .clamp(126.0, 240.0);
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      key: const ValueKey('portfolio-compact-metrics-grid'),
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        _OverviewMetric(
+                          width: tileWidth,
+                          label: 'Total Items',
+                          value: itemCount.toString(),
+                          icon: Icons.inventory_2_outlined,
+                          emphasized: true,
+                        ),
+                        _OverviewMetric(
+                          width: tileWidth,
+                          label: 'Total Value (Est.)',
+                          value: valueLabel,
+                          icon: Icons.account_balance_wallet_outlined,
+                        ),
+                        _OverviewMetric(
+                          width: tileWidth,
+                          label: 'Valued',
+                          value: valuedItemCount.toString(),
+                          icon: Icons.price_check_outlined,
+                        ),
+                        _OverviewMetric(
+                          width: tileWidth,
+                          label: 'Categories',
+                          value: categoryCount.toString(),
+                          icon: Icons.category_outlined,
+                        ),
+                      ],
+                    ),
+                    if (unvaluedItemCount > 0) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _PartialValuationNote(count: unvaluedItemCount),
+                    ],
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -1616,12 +1643,14 @@ class _CollectionOverview extends StatelessWidget {
 
 class _OverviewMetric extends StatelessWidget {
   const _OverviewMetric({
+    required this.width,
     required this.label,
     required this.value,
     required this.icon,
     this.emphasized = false,
   });
 
+  final double width;
   final String label;
   final String value;
   final IconData icon;
@@ -1632,13 +1661,14 @@ class _OverviewMetric extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 132, maxWidth: 220),
+    return SizedBox(
+      width: width,
       child: DecoratedBox(
+        key: ValueKey('portfolio-summary-metric-${label.toLowerCase()}'),
         decoration: BoxDecoration(
           color: emphasized
               ? colorScheme.primary.withValues(alpha: 0.10)
-              : colorScheme.surface,
+              : PackLoxTokens.surface.withValues(alpha: 0.78),
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: emphasized
@@ -1647,7 +1677,10 @@ class _OverviewMetric extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
           child: Row(
             children: [
               Icon(icon, size: 18, color: colorScheme.primary),
@@ -1661,6 +1694,7 @@ class _OverviewMetric extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelLarge?.copyWith(
+                        color: PackLoxTokens.textPrimary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -1669,7 +1703,7 @@ class _OverviewMetric extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                        color: PackLoxTokens.textSecondary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1691,11 +1725,9 @@ class _PartialValuationNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Row(
       children: [
-        Icon(Icons.info_outline, size: 16, color: colorScheme.onSurfaceVariant),
+        Icon(Icons.info_outline, size: 16, color: PackLoxTokens.textSecondary),
         const SizedBox(width: AppSpacing.xs),
         Expanded(
           child: Text(
@@ -1703,7 +1735,7 @@ class _PartialValuationNote extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+              color: PackLoxTokens.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1732,7 +1764,7 @@ class _PortfolioCommandBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final stack = constraints.maxWidth < 430;
+        final stack = constraints.maxWidth < 360;
         final tools = Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
@@ -1755,14 +1787,14 @@ class _PortfolioCommandBar extends StatelessWidget {
             ),
           ],
         );
-        final addButton = PackLoxButton(
+        final addButton = SizedBox(
           key: const ValueKey('portfolio-action-add-item'),
-          label: 'Add item',
-          onPressed: onAddItem,
-          leadingIcon: Icons.add,
-          variant: PackLoxButtonVariant.primary,
-          size: stack ? PackLoxButtonSize.fullWidth : PackLoxButtonSize.compact,
-          semanticLabel: 'Add item. Start a new scan',
+          height: 44,
+          child: FilledButton.icon(
+            onPressed: onAddItem,
+            icon: const Icon(Icons.add),
+            label: const Text('Add item'),
+          ),
         );
 
         if (stack) {
@@ -1780,7 +1812,10 @@ class _PortfolioCommandBar extends StatelessWidget {
           children: [
             Expanded(child: tools),
             const SizedBox(width: AppSpacing.md),
-            addButton,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 148),
+              child: addButton,
+            ),
           ],
         );
       },
@@ -1808,19 +1843,20 @@ class _ToolButton extends StatelessWidget {
 
     return Tooltip(
       message: '$label: $value',
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text('$label: $value', overflow: TextOverflow.ellipsis),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colorScheme.onSurface,
-          side: BorderSide(color: colorScheme.outlineVariant),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.sm,
+      child: SizedBox(
+        height: 44,
+        child: OutlinedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          label: Text('$label: $value', overflow: TextOverflow.ellipsis),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: PackLoxTokens.textPrimary,
+            backgroundColor: _portfolioRaisedSurfaceColor(colorScheme),
+            side: BorderSide(color: _portfolioSurfaceBorderColor(colorScheme)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
           ),
         ),
       ),
@@ -1872,32 +1908,77 @@ String _formatPortfolioMoney(double value) {
   return '\$$withCommas';
 }
 
+Color _portfolioRaisedSurfaceColor(ColorScheme colorScheme) {
+  return PackLoxTokens.surfaceRaised.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.94 : 0.90,
+  );
+}
+
+Color _portfolioSurfaceBorderColor(ColorScheme colorScheme) {
+  return PackLoxTokens.border.withValues(
+    alpha: colorScheme.brightness == Brightness.dark ? 0.82 : 0.68,
+  );
+}
+
 class _PortfolioControls extends StatelessWidget {
   const _PortfolioControls({
     required this.searchQuery,
     required this.categoryFilter,
     required this.onSearchChanged,
+    required this.onSearchCleared,
     required this.onCategoryFilterChanged,
   });
 
   final String searchQuery;
   final _PortfolioCategoryFilter categoryFilter;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchCleared;
   final ValueChanged<_PortfolioCategoryFilter> onCategoryFilterChanged;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final colorScheme = Theme.of(context).colorScheme;
         final searchField = TextFormField(
-          key: const ValueKey('portfolio-search-field'),
+          key: ValueKey('portfolio-search-field-$searchQuery'),
           initialValue: searchQuery,
           onChanged: onSearchChanged,
           textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: searchQuery.trim().isEmpty
+                ? null
+                : IconButton(
+                    key: const ValueKey('portfolio-search-clear'),
+                    tooltip: 'Clear portfolio search',
+                    icon: const Icon(Icons.close),
+                    onPressed: onSearchCleared,
+                  ),
             hintText: 'Search items',
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
             isDense: true,
+            filled: true,
+            fillColor: _portfolioRaisedSurfaceColor(colorScheme),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: BorderSide(
+                color: _portfolioSurfaceBorderColor(colorScheme),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: BorderSide(
+                color: _portfolioSurfaceBorderColor(colorScheme),
+              ),
+            ),
           ),
         );
 
@@ -1928,6 +2009,7 @@ class _PortfolioCategoryFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     const visibleFilters = [
       _PortfolioCategoryFilter.all,
       _PortfolioCategoryFilter.cards,
@@ -1944,6 +2026,18 @@ class _PortfolioCategoryFilterChips extends StatelessWidget {
               label: Text(filter.label),
               selected: selectedFilter == filter,
               onSelected: (_) => onChanged(filter),
+              backgroundColor: _portfolioRaisedSurfaceColor(colorScheme),
+              selectedColor: colorScheme.primary.withValues(alpha: 0.18),
+              side: BorderSide(
+                color: selectedFilter == filter
+                    ? colorScheme.primary.withValues(alpha: 0.52)
+                    : _portfolioSurfaceBorderColor(colorScheme),
+              ),
+              labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: PackLoxTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+              checkmarkColor: PackLoxTokens.textPrimary,
             ),
             if (filter != visibleFilters.last) const SizedBox(width: 6),
           ],
