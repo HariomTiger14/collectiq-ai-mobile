@@ -106,7 +106,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Account & Profile'), findsWidgets);
     expectNoFlutterError(tester);
 
     await tester.tap(find.text('Home'));
@@ -712,8 +712,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Settings'), findsWidgets);
-    expect(find.text('Account'), findsOneWidget);
-    expect(find.text('Profile info'), findsOneWidget);
+    expect(find.text('Account & Profile'), findsWidgets);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
     expect(find.text('Sign Out'), findsOneWidget);
@@ -738,30 +737,30 @@ void main() {
       findsNothing,
     );
 
+    await tester.reveal(find.text('Preferences'));
+    expect(find.text('Default scan mode'), findsOneWidget);
+    expect(find.text('Auto Enhance'), findsOneWidget);
+
+    await tester.reveal(find.text('Notifications'));
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('Price alerts'), findsOneWidget);
+    expect(find.text('Notification permission'), findsOneWidget);
+
+    await tester.reveal(find.text('Privacy & Security'));
+    expect(find.text('Privacy & Security'), findsOneWidget);
+    expect(find.text('Biometric lock'), findsOneWidget);
+
     await tester.reveal(find.text('Backup & Sync'));
     expect(find.text('Backup & Sync'), findsWidgets);
     expect(find.text('Backup status'), findsOneWidget);
     expect(find.text('Sync Now'), findsOneWidget);
 
-    await tester.reveal(find.text('Scanning'));
-    expect(find.text('Scanning'), findsOneWidget);
-    expect(find.text('Scan quality'), findsOneWidget);
-    expect(find.text('Estimate guidance'), findsOneWidget);
-
-    await tester.reveal(find.text('Notifications'));
-    expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Price alerts'), findsOneWidget);
-    expect(find.text('Permissions'), findsOneWidget);
-
-    await tester.reveal(find.text('Appearance'));
-    expect(find.text('Appearance'), findsOneWidget);
-    expect(find.text('First-launch onboarding'), findsOneWidget);
-
-    await tester.reveal(find.text('Help & About'));
-    expect(find.text('Help & About'), findsOneWidget);
-    expect(find.text('About PackLox'), findsOneWidget);
-    expect(find.text('Export portfolio'), findsOneWidget);
-    expect(find.text('Contact'), findsOneWidget);
+    await tester.reveal(find.text('About PackLox'));
+    expect(find.text('About PackLox'), findsWidgets);
+    expect(find.text('Version 1.0.0 (1)'), findsOneWidget);
+    await tester.reveal(find.text('Danger Zone'));
+    expect(find.text('Danger Zone'), findsOneWidget);
+    expect(find.text('Delete Account'), findsOneWidget);
     expect(find.text('Developer Tools'), findsNothing);
     expect(find.text('Developer Diagnostics'), findsNothing);
     expect(find.text('Mock mode active'), findsNothing);
@@ -783,16 +782,19 @@ void main() {
     await tester.tap(find.text('Theme'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Theme follows the system setting for now.'),
+      find.text('Theme is owned by the app theme and follows the device.'),
       findsOneWidget,
     );
     await tester.pump(const Duration(seconds: 4));
 
-    await tester.reveal(find.text('Export portfolio'));
+    await tester.reveal(find.text('Help Center'));
     await tester.pump();
-    await tester.tap(find.text('Export portfolio'));
+    await tester.tap(find.text('Help Center'));
     await tester.pumpAndSettle();
-    expect(find.text('Portfolio export is coming soon.'), findsOneWidget);
+    expect(
+      find.text('Help Center links are not configured for this build.'),
+      findsOneWidget,
+    );
     await tester.pump(const Duration(seconds: 4));
   });
 
@@ -807,7 +809,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text('Sign in to prepare backup and restore for your collection.'),
+      find.text('Signed out. Your collection remains local on this device.'),
       findsOneWidget,
     );
     final syncButton = tester.widget<FilledButton>(
@@ -854,9 +856,9 @@ void main() {
     await tester.pumpCollectIqApp();
 
     await tester.openSettings();
-    await tester.reveal(find.text('About PackLox'));
+    await tester.reveal(find.text('Version 1.0.0 (1)'));
     await tester.pump();
-    await tester.tap(find.text('About PackLox'));
+    await tester.tap(find.text('Version 1.0.0 (1)'));
     await tester.pumpAndSettle();
 
     expect(find.text('About PackLox'), findsOneWidget);
@@ -880,13 +882,11 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.reveal(
-      find.byKey(const ValueKey('settings-reset-onboarding-button')),
-    );
+    await tester.reveal(find.text('Reset Onboarding'));
     await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('settings-reset-onboarding-button')),
-    );
+    await tester.tap(find.text('Reset Onboarding'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reset'));
     await tester.pumpAndSettle();
 
     expect(repository.completed, isFalse);
@@ -924,14 +924,13 @@ void main() {
     );
 
     await tester.openSettings();
-    await tester.reveal(find.text('Scanning'));
+    await tester.reveal(find.text('Default scan mode'));
     await tester.pump();
 
-    expect(find.text('Scanning'), findsOneWidget);
-    expect(find.text('Estimate guidance'), findsOneWidget);
+    expect(find.text('Default scan mode'), findsOneWidget);
+    expect(find.text('Auto Enhance'), findsOneWidget);
     expect(find.text('Current AI provider'), findsNothing);
     expect(find.text('OpenAI Vision'), findsNothing);
-    expect(find.text('Unavailable'), findsNothing);
   });
 
   testWidgets('switches between feature placeholders', (
@@ -5233,7 +5232,7 @@ void main() {
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
       expectNoFlutterError(tester);
-      expect(find.text('Account'), findsOneWidget);
+      expect(find.text('Account & Profile'), findsWidgets);
       await tester.reveal(find.text('Backup & Sync'));
       expectNoFlutterError(tester);
       expect(find.text('Backup & Sync'), findsWidgets);
