@@ -69,9 +69,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final horizontalPadding = constraints.maxWidth <= 360
-                  ? AppSpacing.md
-                  : AppSpacing.lg;
+              final horizontalPadding = AppSpacing.md;
 
               return CustomScrollView(
                 key: const PageStorageKey<String>('home-scroll-position'),
@@ -192,6 +190,7 @@ class _CompactQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final actions = [
       _HomeActionData(
         key: 'scan',
@@ -216,26 +215,42 @@ class _CompactQuickActions extends StatelessWidget {
       ),
     ];
 
-    return Semantics(
-      container: true,
-      label: 'Collection actions',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 300;
-          return Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final action in actions)
-                SizedBox(
-                  width: compact
-                      ? (constraints.maxWidth - AppSpacing.sm) / 2
-                      : (constraints.maxWidth - AppSpacing.sm * 2) / 3,
-                  child: _CompactHomeAction(action: action),
-                ),
-            ],
-          );
-        },
+    return _SectionSurface(
+      title: 'Quick actions',
+      child: Semantics(
+        container: true,
+        label: 'Collection actions',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Start adding to your collection',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 300;
+                return Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final action in actions)
+                      SizedBox(
+                        width: compact
+                            ? (constraints.maxWidth - AppSpacing.sm) / 2
+                            : (constraints.maxWidth - AppSpacing.sm * 2) / 3,
+                        child: _CompactHomeAction(action: action),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -275,37 +290,43 @@ class _CompactHomeAction extends StatelessWidget {
         onTap: action.onTap,
         child: Container(
           key: ValueKey('home-quick-action-${action.key}'),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: const BoxConstraints(minHeight: 58),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xs,
-            vertical: AppSpacing.sm,
+            vertical: AppSpacing.xs,
           ),
           decoration: BoxDecoration(
             color: _packLoxRaisedSurfaceColor(colorScheme),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
             children: [
               Icon(
                 action.icon,
                 color: enabled
                     ? colorScheme.primary
                     : colorScheme.onSurfaceVariant,
+                size: AppIconSizes.md,
               ),
-              const SizedBox(height: 4),
-              Text(
-                action.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: enabled
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w900,
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  action.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: enabled
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+                size: AppIconSizes.md,
               ),
             ],
           ),
@@ -456,7 +477,7 @@ class _CollectionSnapshotSection extends StatelessWidget {
     return _SectionSurface(
       title: data.isEmpty ? 'Collection status' : 'Collection snapshot',
       child: data.isEmpty
-          ? const _EmptySnapshot()
+          ? _EmptySnapshot(data: data)
           : _SnapshotContent(data: data),
     );
   }
@@ -478,27 +499,22 @@ class _EmptyCollectionCard extends StatelessWidget {
       child: Container(
         key: const ValueKey('home-empty-authority-card'),
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.md,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
+        padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
         decoration: BoxDecoration(
           color: _packLoxRaisedSurfaceColor(colorScheme),
           borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
           boxShadow: AppElevation.level1,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
                 color: PackLoxTokens.surface.withValues(alpha: 0.86),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
+                shape: BoxShape.circle,
                 border: Border.all(
                   color: PackLoxTokens.blue.withValues(alpha: 0.34),
                 ),
@@ -506,37 +522,44 @@ class _EmptyCollectionCard extends StatelessWidget {
               child: Icon(
                 Icons.inventory_2_outlined,
                 color: colorScheme.primary,
-                size: AppIconSizes.lg,
+                size: 44,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Your collection is waiting',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
-                height: 1.04,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Scan your first item to get started.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            FractionallySizedBox(
-              widthFactor: 0.76,
-              child: PackLoxButton(
-                key: const ValueKey('home-primary-scan'),
-                label: 'Scan a Collectible',
-                leadingIcon: Icons.photo_camera_outlined,
-                onPressed: onScanPressed,
-                size: PackLoxButtonSize.compact,
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your collection is waiting',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Scan your first item to get started.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  PackLoxButton(
+                    key: const ValueKey('home-primary-scan'),
+                    label: 'Scan a Collectible',
+                    leadingIcon: Icons.photo_camera_outlined,
+                    onPressed: onScanPressed,
+                    size: PackLoxButtonSize.compact,
+                  ),
+                ],
               ),
             ),
           ],
@@ -710,7 +733,9 @@ class _TopCollectiblePreview extends StatelessWidget {
 }
 
 class _EmptySnapshot extends StatelessWidget {
-  const _EmptySnapshot();
+  const _EmptySnapshot({required this.data});
+
+  final _HomeViewData data;
 
   @override
   Widget build(BuildContext context) {
@@ -719,22 +744,110 @@ class _EmptySnapshot extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'No saved items yet',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: colorScheme.onSurface,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _StatusMetric(
+                icon: Icons.layers_outlined,
+                value: '${data.itemCount}',
+                label: 'Items',
+              ),
+            ),
+            const _MetricDivider(),
+            const Expanded(
+              child: _StatusMetric(
+                icon: Icons.attach_money_rounded,
+                value: '-',
+                label: 'Est. value',
+              ),
+            ),
+            const _MetricDivider(),
+            const Expanded(
+              child: _StatusMetric(
+                icon: Icons.verified_user_outlined,
+                value: '-',
+                label: 'Avg. condition',
+              ),
+            ),
+            const _MetricDivider(),
+            Expanded(
+              child: _StatusMetric(
+                icon: Icons.history_rounded,
+                value: '0',
+                label: 'Scans',
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.lg),
         Text(
           'Value, condition, and saved history will appear here.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StatusMetric extends StatelessWidget {
+  const _StatusMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: colorScheme.onSurfaceVariant, size: AppIconSizes.md),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 72,
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      color: _packLoxSurfaceBorderColor(Theme.of(context).colorScheme),
     );
   }
 }
@@ -765,14 +878,25 @@ class _PopularCategoriesSection extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              for (final category in _categories)
-                _CategoryChip(label: category.label, icon: category.icon),
-            ],
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final tileWidth = (constraints.maxWidth - AppSpacing.sm * 3) / 4;
+              return Row(
+                children: [
+                  for (var i = 0; i < _categories.length; i++) ...[
+                    if (i > 0) const SizedBox(width: AppSpacing.sm),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _CategoryChip(
+                        label: _categories[i].label,
+                        icon: _categories[i].icon,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -794,10 +918,10 @@ class _CategoryChip extends StatelessWidget {
       label: 'Popular category $label',
       child: Container(
         key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-        constraints: const BoxConstraints(minWidth: 64, minHeight: 54),
+        constraints: const BoxConstraints(minHeight: 70),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.xs,
-          vertical: AppSpacing.xs,
+          vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
           color: PackLoxTokens.surface.withValues(
@@ -809,15 +933,15 @@ class _CategoryChip extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: colorScheme.primary, size: AppIconSizes.sm),
-            const SizedBox(height: 2),
+            Icon(icon, color: colorScheme.primary, size: AppIconSizes.lg),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: colorScheme.onSurface,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ],
