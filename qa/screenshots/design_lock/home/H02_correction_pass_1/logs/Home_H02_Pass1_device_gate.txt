@@ -1,0 +1,7 @@
+Home H02 Correction Pass 1 Device Gate
+
+Build: android/gradlew.bat assembleLocalDebug from android/ with JAVA_HOME=C:\Program Files\Android\Android Studio\jbr succeeded.
+Install: adb -s RZ8R213M8ZL install -r build\app\outputs\apk\local\debug\app-local-debug.apk succeeded.
+Launch: adb shell am start -n com.collectiq.ai.local/com.collectiq.ai.MainActivity succeeded and focused app was com.collectiq.ai.local/com.collectiq.ai.MainActivity.
+Capture blocker: Samsung OS remained on keyguard/notification shade. Observed mCurrentFocus values included DreamActivity, Bouncer, NotificationShade, and lock-screen screenshots. A valid H02 runtime screenshot could not be captured without manual device unlock.
+No fabricated comparison image was created.
