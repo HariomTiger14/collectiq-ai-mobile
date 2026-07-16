@@ -1,12 +1,12 @@
 import 'dart:convert';
 
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
-import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -14,6 +14,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_w
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -453,7 +454,7 @@ void main() {
     final circleRect = tester.getRect(
       find.byKey(const ValueKey('home-empty-hero-icon-circle')),
     );
-    final icon = tester.widget<Icon>(
+    final icon = tester.widget<SvgPicture>(
       find.byKey(const ValueKey('home-empty-hero-archive-icon')),
     );
     final heading = tester.widget<Text>(
@@ -464,8 +465,13 @@ void main() {
     expect(heroRect.height / 1000, inInclusiveRange(0.21, 0.26));
     expect(circleRect.width, inInclusiveRange(54, 58));
     expect(circleRect.height, inInclusiveRange(54, 58));
-    expect(icon.icon, Icons.inventory_2_outlined);
-    expect(icon.size, inInclusiveRange(28, 32));
+    expect(icon.bytesLoader, isA<SvgAssetLoader>());
+    expect(
+      (icon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.emblem,
+    );
+    expect(icon.width, inInclusiveRange(28, 32));
+    expect(icon.height, inInclusiveRange(28, 32));
     expect(circleRect.height / heroRect.height, lessThan(0.34));
     expect(headingRect.height, greaterThan(45));
     expect(heading.textAlign, TextAlign.center);
@@ -507,34 +513,39 @@ void main() {
       await tester.pumpWidget(_homeApp());
       await tester.pumpAndSettle();
 
-      final cardsIcon = tester.widget<Icon>(
+      final cardsIcon = tester.widget<SvgPicture>(
         find.byKey(const ValueKey('home-popular-category-cards-icon')),
       );
-      final coinsIcon = tester.widget<Icon>(
+      final coinsIcon = tester.widget<SvgPicture>(
         find.byKey(const ValueKey('home-popular-category-coins-icon')),
       );
-      final figuresIcon = tester.widget<Icon>(
+      final figuresIcon = tester.widget<SvgPicture>(
         find.byKey(const ValueKey('home-popular-category-figures-icon')),
       );
-      final moreIcon = tester.widget<Icon>(
+      final moreIcon = tester.widget<SvgPicture>(
         find.byKey(const ValueKey('home-popular-category-more-icon')),
       );
 
-      expect(cardsIcon.icon, Icons.style_outlined);
-      expect(coinsIcon.icon, Icons.album_outlined);
-      expect(coinsIcon.icon, isNot(Icons.attach_money_rounded));
-      expect(coinsIcon.icon, isNot(Icons.monetization_on_outlined));
-      expect(figuresIcon.icon, Icons.smart_toy_outlined);
-      expect(figuresIcon.icon, isNot(Icons.directions_car_outlined));
-      expect(figuresIcon.icon, isNot(Icons.toys_outlined));
-      expect(moreIcon.icon, Icons.grid_view_outlined);
-      expect(cardsIcon.color, HomeTokens.categoryCards);
-      expect(coinsIcon.color, HomeTokens.categoryCoins);
-      expect(figuresIcon.color, HomeTokens.categoryFigures);
-      expect(moreIcon.color, HomeTokens.categoryMore);
+      expect(
+        (cardsIcon.bytesLoader as SvgAssetLoader).assetName,
+        PackLoxAssets.categoryCards,
+      );
+      expect(
+        (coinsIcon.bytesLoader as SvgAssetLoader).assetName,
+        PackLoxAssets.categoryCoins,
+      );
+      expect(
+        (figuresIcon.bytesLoader as SvgAssetLoader).assetName,
+        PackLoxAssets.categoryFigures,
+      );
+      expect(
+        (moreIcon.bytesLoader as SvgAssetLoader).assetName,
+        PackLoxAssets.categoryMore,
+      );
 
       for (final icon in [cardsIcon, coinsIcon, figuresIcon, moreIcon]) {
-        expect(icon.size, inInclusiveRange(28, 32));
+        expect(icon.width, inInclusiveRange(28, 32));
+        expect(icon.height, inInclusiveRange(28, 32));
       }
 
       for (final key in const [

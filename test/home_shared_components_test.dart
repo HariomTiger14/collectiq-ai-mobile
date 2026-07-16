@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
   testWidgets('HomeSurface uses dark Home tokens', (tester) async {
@@ -142,7 +144,13 @@ void main() {
       find.bySemanticsLabel('Popular category More, more categories grid'),
       findsOneWidget,
     );
-    expect(find.byIcon(Icons.grid_view_outlined), findsOneWidget);
+    final moreIcon = tester.widget<SvgPicture>(
+      find.byKey(const ValueKey('home-popular-category-more-icon')),
+    );
+    expect(
+      (moreIcon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.categoryMore,
+    );
   });
 
   testWidgets('Popular category icons use authority color separation', (
@@ -150,23 +158,35 @@ void main() {
   ) async {
     await tester.pumpHomeComponent(HomeCategoryGrid.popular());
 
-    final cardsIcon = tester.widget<Icon>(
+    final cardsIcon = tester.widget<SvgPicture>(
       find.byKey(const ValueKey('home-popular-category-cards-icon')),
     );
-    final coinsIcon = tester.widget<Icon>(
+    final coinsIcon = tester.widget<SvgPicture>(
       find.byKey(const ValueKey('home-popular-category-coins-icon')),
     );
-    final figuresIcon = tester.widget<Icon>(
+    final figuresIcon = tester.widget<SvgPicture>(
       find.byKey(const ValueKey('home-popular-category-figures-icon')),
     );
-    final moreIcon = tester.widget<Icon>(
+    final moreIcon = tester.widget<SvgPicture>(
       find.byKey(const ValueKey('home-popular-category-more-icon')),
     );
 
-    expect(cardsIcon.color, HomeTokens.categoryCards);
-    expect(coinsIcon.color, HomeTokens.categoryCoins);
-    expect(figuresIcon.color, HomeTokens.categoryFigures);
-    expect(moreIcon.color, HomeTokens.categoryMore);
+    expect(
+      (cardsIcon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.categoryCards,
+    );
+    expect(
+      (coinsIcon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.categoryCoins,
+    );
+    expect(
+      (figuresIcon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.categoryFigures,
+    );
+    expect(
+      (moreIcon.bytesLoader as SvgAssetLoader).assetName,
+      PackLoxAssets.categoryMore,
+    );
   });
 
   testWidgets('Category grid wraps responsively', (tester) async {
