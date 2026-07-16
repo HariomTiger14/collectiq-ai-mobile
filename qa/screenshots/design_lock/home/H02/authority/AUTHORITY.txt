@@ -1,0 +1,13 @@
+Authority source:
+C:\Users\hario\Desktop\projects\packlox-design-platform\releases\v1.0\design_lock\Home\H02_Empty_Collection\Home_H02_Final.png
+
+Design Platform commit:
+1c8199a6b07b84c7e2667ec4fc8b01b5bf0686d5
+
+Dimensions:
+853x1844
+
+SHA256:
+117F5E10BAA05EB1AAB71006BBDACC3AE989F1BD88A3225556D0BE52FD0628E3
+
+Authority file was inspected read-only from the Design Platform repository.
