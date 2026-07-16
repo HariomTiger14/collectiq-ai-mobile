@@ -1,0 +1,936 @@
+import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:flutter/material.dart';
+
+class HomeTokens {
+  const HomeTokens._();
+
+  static const background = Color(0xFF030B14);
+  static const surface = Color(0xFF071827);
+  static const surfaceRaised = Color(0xFF0A2033);
+  static const surfaceInteractive = Color(0xFF0C2740);
+  static const border = Color(0xFF17324A);
+  static const accent = Color(0xFF0087FF);
+  static const accentStrong = Color(0xFF0067E8);
+  static const textPrimary = Color(0xFFF4F8FC);
+  static const textSecondary = Color(0xFFA7B5C5);
+  static const textMuted = Color(0xFF6F8295);
+  static const positive = Color(0xFF00D88A);
+  static const warning = Color(0xFFF4B740);
+
+  static const pageGutter = 16.0;
+  static const cardPadding = 14.0;
+  static const sectionGap = 16.0;
+  static const cardGap = 10.0;
+  static const maxContentWidth = 600.0;
+  static const bottomContentClearance = 80.0;
+  static const cardRadius = 14.0;
+  static const controlRadius = 10.0;
+}
+
+class HomeAppBar extends StatelessWidget {
+  const HomeAppBar({
+    required this.firstName,
+    required this.onNotifications,
+    this.greetingText,
+    this.fallbackName = 'Collector',
+    this.notificationUnreadCount = 0,
+    this.profileLoading = false,
+    super.key,
+  });
+
+  final String firstName;
+  final String? greetingText;
+  final String fallbackName;
+  final int notificationUnreadCount;
+  final VoidCallback? onNotifications;
+  final bool profileLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return PackLoxHeader(
+      firstName: firstName,
+      greetingText: greetingText,
+      fallbackName: fallbackName,
+      notificationUnreadCount: notificationUnreadCount,
+      profileLoading: profileLoading,
+      onNotifications: onNotifications,
+    );
+  }
+}
+
+class HomeStateContainer extends StatelessWidget {
+  const HomeStateContainer({
+    required this.sections,
+    this.controller,
+    this.topPadding = AppSpacing.xs,
+    this.bottomClearance = HomeTokens.bottomContentClearance,
+    super.key,
+  });
+
+  final List<Widget> sections;
+  final ScrollController? controller;
+  final double topPadding;
+  final double bottomClearance;
+
+  static double gutterForWidth(double width) {
+    if (width < 360) {
+      return 14;
+    }
+    if (width <= 430) {
+      return HomeTokens.pageGutter;
+    }
+    if (width < 600) {
+      return 20;
+    }
+    return 20;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gutter = gutterForWidth(constraints.maxWidth);
+        return CustomScrollView(
+          key: const PageStorageKey<String>('home-scroll-position'),
+          controller: controller,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.only(top: topPadding),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate.fixed([
+                  for (final section in sections)
+                    _HomeConstrainedSection(gutter: gutter, child: section),
+                  SizedBox(height: bottomClearance),
+                ]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class HomeSection extends StatelessWidget {
+  const HomeSection({
+    required this.child,
+    this.topPadding = AppSpacing.sm,
+    this.bottomPadding = 0,
+    super.key,
+  });
+
+  final Widget child;
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
+      child: child,
+    );
+  }
+}
+
+class _HomeConstrainedSection extends StatelessWidget {
+  const _HomeConstrainedSection({required this.gutter, required this.child});
+
+  final double gutter;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: gutter),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: HomeTokens.maxContentWidth,
+          ),
+          child: SizedBox(width: double.infinity, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeSurface extends StatelessWidget {
+  const HomeSurface({
+    required this.child,
+    this.semanticLabel,
+    this.padding = const EdgeInsets.all(HomeTokens.cardPadding),
+    this.radius = HomeTokens.cardRadius,
+    this.backgroundColor = HomeTokens.surfaceRaised,
+    this.borderColor = HomeTokens.border,
+    this.keySeed,
+    this.keyPrefix = 'home-surface',
+    super.key,
+  });
+
+  final Widget child;
+  final String? semanticLabel;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final Color backgroundColor;
+  final Color borderColor;
+  final String? keySeed;
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Container(
+      key: keySeed == null ? null : ValueKey('$keyPrefix-$keySeed'),
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: borderColor),
+        boxShadow: AppElevation.level1,
+      ),
+      child: child,
+    );
+
+    if (semanticLabel == null) {
+      return content;
+    }
+
+    return Semantics(container: true, label: semanticLabel, child: content);
+  }
+}
+
+class HomeSectionHeader extends StatelessWidget {
+  const HomeSectionHeader({
+    required this.title,
+    this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        if (actionLabel != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: onAction == null
+                  ? HomeTokens.textMuted
+                  : HomeTokens.accent,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(48, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionLabel!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class HomeSectionSurface extends StatelessWidget {
+  const HomeSectionSurface({
+    required this.title,
+    required this.child,
+    this.actionLabel,
+    this.onAction,
+    this.keySeed,
+    this.backgroundColor = HomeTokens.surfaceRaised,
+    this.borderColor = HomeTokens.border,
+    super.key,
+  });
+
+  final String title;
+  final Widget child;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? keySeed;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeSurface(
+      keySeed: keySeed ?? title.toLowerCase().replaceAll(' ', '-'),
+      keyPrefix: 'home-section',
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(
+            title: title,
+            actionLabel: actionLabel,
+            onAction: onAction,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class HomeCollectionStripItem {
+  const HomeCollectionStripItem({
+    required this.id,
+    required this.title,
+    required this.imagePath,
+    this.subtitle,
+    this.onTap,
+  });
+
+  final String id;
+  final String title;
+  final String imagePath;
+  final String? subtitle;
+  final VoidCallback? onTap;
+}
+
+class HomeCollectionStrip extends StatelessWidget {
+  const HomeCollectionStrip({
+    required this.title,
+    required this.itemCount,
+    required this.items,
+    this.onViewAll,
+    this.maxVisibleItems = 4,
+    super.key,
+  });
+
+  final String title;
+  final int itemCount;
+  final List<HomeCollectionStripItem> items;
+  final VoidCallback? onViewAll;
+  final int maxVisibleItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = items.take(maxVisibleItems).toList(growable: false);
+    final overflow = itemCount - visible.length;
+
+    return HomeSectionSurface(
+      title: title,
+      actionLabel: onViewAll == null ? null : 'View all',
+      onAction: onViewAll,
+      keySeed: 'collection-strip',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 104,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: visible.length + (overflow > 0 ? 1 : 0),
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, index) {
+                if (index >= visible.length) {
+                  return _HomeOverflowTile(count: overflow);
+                }
+                return _HomeStripTile(item: visible[index]);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeStripTile extends StatelessWidget {
+  const _HomeStripTile({required this.item});
+
+  final HomeCollectionStripItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return MotionTapScale(
+      onTap: item.onTap,
+      child: Semantics(
+        button: item.onTap != null,
+        label: item.subtitle == null
+            ? item.title
+            : '${item.title}, ${item.subtitle}',
+        excludeSemantics: true,
+        child: SizedBox(
+          width: 82,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: PortfolioThumbnail(imagePath: item.imagePath, size: 72),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeOverflowTile extends StatelessWidget {
+  const _HomeOverflowTile({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$count more items',
+      child: Container(
+        key: const ValueKey('home-collection-strip-overflow'),
+        width: 72,
+        height: 72,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceInteractive,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: Text(
+          '+$count',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: HomeTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeValueMetricCard extends StatelessWidget {
+  const HomeValueMetricCard({
+    required this.label,
+    required this.value,
+    this.isUnavailable = false,
+    this.changeLabel,
+    this.trendValues = const [],
+    super.key,
+  });
+
+  final String label;
+  final String value;
+  final bool isUnavailable;
+  final String? changeLabel;
+  final List<double> trendValues;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTrend = trendValues.length >= 2;
+    return HomeSurface(
+      keySeed: 'value-metric',
+      semanticLabel: isUnavailable ? '$label unavailable' : '$label $value',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            isUnavailable ? 'Unavailable' : value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: isUnavailable
+                  ? HomeTokens.textSecondary
+                  : HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (changeLabel != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              changeLabel!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: HomeTokens.positive,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (hasTrend) ...[
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              key: const ValueKey('home-value-metric-trend'),
+              height: 42,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _HomeSparklinePainter(
+                  values: trendValues,
+                  color: HomeTokens.accent,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSparklinePainter extends CustomPainter {
+  const _HomeSparklinePainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) {
+      return;
+    }
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final span = maxValue - minValue;
+    final points = <Offset>[];
+    for (var i = 0; i < values.length; i++) {
+      final x = size.width * i / (values.length - 1);
+      final normalized = span == 0 ? 0.5 : (values[i] - minValue) / span;
+      points.add(Offset(x, size.height - size.height * normalized));
+    }
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HomeSparklinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
+  }
+}
+
+enum HomeCategoryKind { cards, coins, figures, more }
+
+class HomeCategoryTile extends StatelessWidget {
+  const HomeCategoryTile({
+    required this.label,
+    required this.icon,
+    required this.semanticMeaning,
+    this.onTap,
+    super.key,
+  });
+
+  factory HomeCategoryTile.cards({VoidCallback? onTap}) {
+    return HomeCategoryTile(
+      label: 'Cards',
+      icon: Icons.style_outlined,
+      semanticMeaning: 'trading cards',
+      onTap: onTap,
+    );
+  }
+
+  factory HomeCategoryTile.coins({VoidCallback? onTap}) {
+    return HomeCategoryTile(
+      label: 'Coins',
+      icon: Icons.album_outlined,
+      semanticMeaning: 'collectible coins and medallions',
+      onTap: onTap,
+    );
+  }
+
+  factory HomeCategoryTile.figures({VoidCallback? onTap}) {
+    return HomeCategoryTile(
+      label: 'Figures',
+      icon: Icons.smart_toy_outlined,
+      semanticMeaning: 'figurines and action figures',
+      onTap: onTap,
+    );
+  }
+
+  factory HomeCategoryTile.more({VoidCallback? onTap}) {
+    return HomeCategoryTile(
+      label: 'More',
+      icon: Icons.grid_view_outlined,
+      semanticMeaning: 'more categories grid',
+      onTap: onTap,
+    );
+  }
+
+  final String label;
+  final IconData icon;
+  final String semanticMeaning;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: 'Popular category $label, $semanticMeaning',
+      excludeSemantics: true,
+      child: MotionTapScale(
+        onTap: onTap,
+        child: Container(
+          key: ValueKey('home-popular-category-${label.toLowerCase()}'),
+          constraints: const BoxConstraints(minHeight: 74, minWidth: 48),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: HomeTokens.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                key: ValueKey(
+                  'home-popular-category-${label.toLowerCase()}-icon',
+                ),
+                icon,
+                color: HomeTokens.accent,
+                size: 30,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeCategoryGrid extends StatelessWidget {
+  const HomeCategoryGrid({
+    required this.categories,
+    this.spacing = 12,
+    super.key,
+  });
+
+  final List<HomeCategoryTile> categories;
+  final double spacing;
+
+  factory HomeCategoryGrid.popular() {
+    return HomeCategoryGrid(
+      categories: [
+        HomeCategoryTile.cards(),
+        HomeCategoryTile.coins(),
+        HomeCategoryTile.figures(),
+        HomeCategoryTile.more(),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final fourColumnTileWidth = (constraints.maxWidth - spacing * 3) / 4;
+        final columns =
+            screenWidth >= 360 && fourColumnTileWidth >= 68 && textScale <= 1.35
+            ? 4
+            : 2;
+        final tileWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final category in categories)
+              SizedBox(width: tileWidth, child: category),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class HomeQuickAction {
+  const HomeQuickAction({
+    required this.key,
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    this.onTap,
+  });
+
+  final String key;
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback? onTap;
+}
+
+class HomeQuickActionTile extends StatelessWidget {
+  const HomeQuickActionTile({required this.action, super.key});
+
+  final HomeQuickAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = action.onTap != null;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: action.semanticLabel,
+      excludeSemantics: true,
+      child: MotionTapScale(
+        onTap: action.onTap,
+        child: Container(
+          key: ValueKey('home-quick-action-${action.key}'),
+          constraints: const BoxConstraints(minHeight: 58, minWidth: 48),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: HomeTokens.surfaceRaised,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                action.icon,
+                color: enabled ? HomeTokens.accent : HomeTokens.textMuted,
+                size: AppIconSizes.md,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  action.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: enabled
+                        ? HomeTokens.textPrimary
+                        : HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: HomeTokens.textSecondary,
+                size: AppIconSizes.md,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeQuickActionGrid extends StatelessWidget {
+  const HomeQuickActionGrid({required this.actions, super.key});
+
+  final List<HomeQuickAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact =
+            constraints.maxWidth < 300 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.35;
+        final columns = compact ? 2 : 3;
+        final tileWidth =
+            (constraints.maxWidth - AppSpacing.sm * (columns - 1)) / columns;
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final action in actions)
+              SizedBox(
+                width: tileWidth,
+                child: HomeQuickActionTile(action: action),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class HomeRecentItemCard extends StatelessWidget {
+  const HomeRecentItemCard({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.imagePath,
+    required this.valueLabel,
+    this.condition,
+    this.addedLabel,
+    this.valueUnavailable = false,
+    this.onTap,
+    this.backgroundColor = HomeTokens.surfaceRaised,
+    this.borderColor = HomeTokens.border,
+    super.key,
+  });
+
+  final String id;
+  final String title;
+  final String category;
+  final String imagePath;
+  final String valueLabel;
+  final String? condition;
+  final String? addedLabel;
+  final bool valueUnavailable;
+  final VoidCallback? onTap;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = [
+      category,
+      if (condition != null && condition!.trim().isNotEmpty) condition!,
+    ].join(' / ');
+
+    return MotionTapScale(
+      onTap: onTap,
+      child: Semantics(
+        button: onTap != null,
+        label: '$title, $detail, $valueLabel',
+        excludeSemantics: true,
+        child: Container(
+          key: ValueKey('home-recent-$id'),
+          constraints: const BoxConstraints(minHeight: 86),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: PortfolioThumbnail(imagePath: imagePath, size: 64),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        height: 1.12,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (addedLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        addedLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              SizedBox(
+                width: 74,
+                child: Text(
+                  valueLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: valueUnavailable
+                        ? HomeTokens.textSecondary
+                        : HomeTokens.accent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

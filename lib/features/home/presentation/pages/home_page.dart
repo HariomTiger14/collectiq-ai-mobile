@@ -1,10 +1,10 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -64,114 +64,75 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
-        backgroundColor: PackLoxTokens.background,
+        backgroundColor: HomeTokens.background,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final horizontalPadding = width < 360
-                  ? AppSpacing.lg
-                  : width <= 430
-                  ? 20.0
-                  : AppSpacing.xl;
-
-              return CustomScrollView(
-                key: const PageStorageKey<String>('home-scroll-position'),
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
+          child: HomeStateContainer(
+            controller: _scrollController,
+            bottomClearance: 104,
+            sections: [
+              const HomeSection(
+                topPadding: AppSpacing.xs,
+                child: HomeAppBar(
+                  firstName: '',
+                  fallbackName: 'Collector',
+                  greetingText: 'Your collection',
+                  onNotifications: null,
                 ),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _HomeFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.xs,
-                      child: const PackLoxHeader(
-                        firstName: '',
-                        fallbackName: 'Collector',
-                        greetingText: 'Your collection',
-                        onNotifications: null,
-                      ),
-                    ),
+              ),
+              if (homeData.isEmpty)
+                HomeSection(
+                  topPadding: AppSpacing.xs,
+                  child: _EmptyCollectionCard(
+                    onScanPressed: widget.onScanPressed == null
+                        ? null
+                        : _handleScanPressed,
                   ),
-                  if (homeData.isEmpty)
-                    SliverToBoxAdapter(
-                      child: _HomeFrame(
-                        horizontalPadding: horizontalPadding,
-                        topPadding: AppSpacing.xs,
-                        child: _EmptyCollectionCard(
-                          onScanPressed: widget.onScanPressed == null
-                              ? null
-                              : _handleScanPressed,
-                        ),
+                ),
+              HomeSection(
+                topPadding: AppSpacing.sm,
+                child: _CollectionSnapshotSection(data: homeData),
+              ),
+              HomeSection(
+                topPadding: AppSpacing.sm,
+                child: homeData.isEmpty
+                    ? const _PopularCategoriesSection()
+                    : _CompactQuickActions(
+                        onScanPressed: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                        onImportPhotoPressed:
+                            widget.onImportPhotoPressed ?? widget.onScanPressed,
+                        onPortfolioPressed: widget.onPortfolioPressed,
                       ),
-                    ),
-                  SliverToBoxAdapter(
-                    child: _HomeFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      child: _CollectionSnapshotSection(data: homeData),
-                    ),
+              ),
+              if (homeData.isEmpty)
+                HomeSection(
+                  topPadding: AppSpacing.sm,
+                  child: _CompactQuickActions(
+                    onScanPressed: widget.onScanPressed == null
+                        ? null
+                        : _handleScanPressed,
+                    onImportPhotoPressed:
+                        widget.onImportPhotoPressed ?? widget.onScanPressed,
+                    onPortfolioPressed: widget.onPortfolioPressed,
                   ),
-                  SliverToBoxAdapter(
-                    child: _HomeFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      child: homeData.isEmpty
-                          ? const _PopularCategoriesSection()
-                          : _CompactQuickActions(
-                              onScanPressed: widget.onScanPressed == null
-                                  ? null
-                                  : _handleScanPressed,
-                              onImportPhotoPressed:
-                                  widget.onImportPhotoPressed ??
-                                  widget.onScanPressed,
-                              onPortfolioPressed: widget.onPortfolioPressed,
-                            ),
-                    ),
+                ),
+              if (recentItems.isNotEmpty)
+                HomeSection(
+                  topPadding: AppSpacing.lg,
+                  child: _RecentCollectiblesSection(
+                    items: recentItems,
+                    hasMore: homeData.itemCount > recentItems.length,
+                    onViewAll: widget.onPortfolioPressed,
                   ),
-                  if (homeData.isEmpty)
-                    SliverToBoxAdapter(
-                      child: _HomeFrame(
-                        horizontalPadding: horizontalPadding,
-                        topPadding: AppSpacing.sm,
-                        child: _CompactQuickActions(
-                          onScanPressed: widget.onScanPressed == null
-                              ? null
-                              : _handleScanPressed,
-                          onImportPhotoPressed:
-                              widget.onImportPhotoPressed ??
-                              widget.onScanPressed,
-                          onPortfolioPressed: widget.onPortfolioPressed,
-                        ),
-                      ),
-                    ),
-                  if (recentItems.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _HomeFrame(
-                        horizontalPadding: horizontalPadding,
-                        topPadding: AppSpacing.lg,
-                        child: _RecentCollectiblesSection(
-                          items: recentItems,
-                          hasMore: homeData.itemCount > recentItems.length,
-                          onViewAll: widget.onPortfolioPressed,
-                        ),
-                      ),
-                    ),
-                  if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
-                    SliverToBoxAdapter(
-                      child: _HomeFrame(
-                        horizontalPadding: horizontalPadding,
-                        topPadding: AppSpacing.lg,
-                        bottomPadding: AppSpacing.xxl,
-                        child: _GroundedInsightCard(data: homeData),
-                      ),
-                    )
-                  else
-                    const SliverToBoxAdapter(child: SizedBox(height: 104)),
-                ],
-              );
-            },
+                ),
+              if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
+                HomeSection(
+                  topPadding: AppSpacing.lg,
+                  bottomPadding: AppSpacing.xxl,
+                  child: _GroundedInsightCard(data: homeData),
+                ),
+            ],
           ),
         ),
       ),
@@ -194,21 +155,21 @@ class _CompactQuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final actions = [
-      _HomeActionData(
+      HomeQuickAction(
         key: 'scan',
         icon: Icons.photo_camera_outlined,
         label: 'Scan',
         semanticLabel: 'Scan a collectible',
         onTap: onScanPressed,
       ),
-      _HomeActionData(
+      HomeQuickAction(
         key: 'import',
         icon: Icons.image_outlined,
         label: 'Import',
         semanticLabel: 'Import photo',
         onTap: onImportPhotoPressed,
       ),
-      _HomeActionData(
+      HomeQuickAction(
         key: 'portfolio',
         icon: Icons.inventory_2_outlined,
         label: 'Portfolio',
@@ -217,8 +178,10 @@ class _CompactQuickActions extends StatelessWidget {
       ),
     ];
 
-    return _SectionSurface(
+    return HomeSectionSurface(
       title: 'Quick actions',
+      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
+      borderColor: _packLoxSurfaceBorderColor(colorScheme),
       child: Semantics(
         container: true,
         label: 'Collection actions',
@@ -228,110 +191,13 @@ class _CompactQuickActions extends StatelessWidget {
             Text(
               'Start adding to your collection',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: HomeTokens.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 300;
-                return Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final action in actions)
-                      SizedBox(
-                        width: compact
-                            ? (constraints.maxWidth - AppSpacing.sm) / 2
-                            : (constraints.maxWidth - AppSpacing.sm * 2) / 3,
-                        child: _CompactHomeAction(action: action),
-                      ),
-                  ],
-                );
-              },
-            ),
+            HomeQuickActionGrid(actions: actions),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeActionData {
-  const _HomeActionData({
-    required this.key,
-    required this.icon,
-    required this.label,
-    required this.semanticLabel,
-    this.onTap,
-  });
-
-  final String key;
-  final IconData icon;
-  final String label;
-  final String semanticLabel;
-  final VoidCallback? onTap;
-}
-
-class _CompactHomeAction extends StatelessWidget {
-  const _CompactHomeAction({required this.action});
-
-  final _HomeActionData action;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final enabled = action.onTap != null;
-
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: action.semanticLabel,
-      child: MotionTapScale(
-        onTap: action.onTap,
-        child: Container(
-          key: ValueKey('home-quick-action-${action.key}'),
-          constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
-            vertical: AppSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            color: _packLoxRaisedSurfaceColor(colorScheme),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                action.icon,
-                color: enabled
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-                size: AppIconSizes.md,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  action.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: enabled
-                        ? colorScheme.onSurface
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.onSurfaceVariant,
-                size: AppIconSizes.md,
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -437,38 +303,6 @@ class _HomeViewData {
   }
 }
 
-class _HomeFrame extends StatelessWidget {
-  const _HomeFrame({
-    required this.child,
-    required this.horizontalPadding,
-    this.topPadding = AppSpacing.lg,
-    this.bottomPadding = 0,
-  });
-
-  final Widget child;
-  final double horizontalPadding;
-  final double topPadding;
-  final double bottomPadding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        topPadding,
-        horizontalPadding,
-        bottomPadding,
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: SizedBox(width: double.infinity, child: child),
-        ),
-      ),
-    );
-  }
-}
-
 class _CollectionSnapshotSection extends StatelessWidget {
   const _CollectionSnapshotSection({required this.data});
 
@@ -476,8 +310,11 @@ class _CollectionSnapshotSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SectionSurface(
+    final colorScheme = Theme.of(context).colorScheme;
+    return HomeSectionSurface(
       title: data.isEmpty ? 'Collection status' : 'Collection snapshot',
+      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
+      borderColor: _packLoxSurfaceBorderColor(colorScheme),
       child: data.isEmpty
           ? _EmptySnapshot(data: data)
           : _SnapshotContent(data: data),
@@ -1032,105 +869,32 @@ class _PopularCategoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    return _SectionSurface(
+    return HomeSectionSurface(
       title: 'Popular Categories',
+      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
+      borderColor: _packLoxSurfaceBorderColor(colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'See what collectors love',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+              color: HomeTokens.textSecondary,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const gap = 12.0;
-              final fourColumnTileWidth = (constraints.maxWidth - gap * 3) / 4;
-              final columns = fourColumnTileWidth >= 68 ? 4 : 2;
-              final tileWidth =
-                  (constraints.maxWidth - gap * (columns - 1)) / columns;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final category in _categories)
-                    SizedBox(
-                      width: tileWidth,
-                      child: _CategoryChip(
-                        label: category.label,
-                        icon: category.icon,
-                        semanticMeaning: category.semanticMeaning,
-                      ),
-                    ),
-                ],
-              );
-            },
+          HomeCategoryGrid(
+            categories: [
+              for (final category in _categories)
+                HomeCategoryTile(
+                  label: category.label,
+                  icon: category.icon,
+                  semanticMeaning: category.semanticMeaning,
+                ),
+            ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
-    required this.label,
-    required this.icon,
-    required this.semanticMeaning,
-  });
-
-  static const double iconSize = 30;
-
-  final String label;
-  final IconData icon;
-  final String semanticMeaning;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      button: true,
-      label: 'Popular category $label, $semanticMeaning',
-      child: Container(
-        key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-        constraints: const BoxConstraints(minHeight: 74),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: PackLoxTokens.surface.withValues(
-            alpha: colorScheme.brightness == Brightness.dark ? 0.88 : 0.72,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              key: ValueKey(
-                'home-popular-category-${label.toLowerCase()}-icon',
-              ),
-              icon,
-              color: colorScheme.primary,
-              size: iconSize,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1149,16 +913,30 @@ class _RecentCollectiblesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SectionSurface(
+    final colorScheme = Theme.of(context).colorScheme;
+    return HomeSectionSurface(
       title: 'Recent collectibles',
-      trailing: hasMore
-          ? TextButton(onPressed: onViewAll, child: const Text('View all'))
-          : null,
+      actionLabel: hasMore ? 'View all' : null,
+      onAction: hasMore ? onViewAll : null,
+      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
+      borderColor: _packLoxSurfaceBorderColor(colorScheme),
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(height: AppSpacing.sm),
-            _RecentCollectibleTile(item: items[i]),
+            HomeRecentItemCard(
+              id: items[i].id,
+              title: items[i].title,
+              category: items[i].category,
+              condition: items[i].condition,
+              imagePath: items[i].imagePath,
+              valueLabel: _formatItemValue(items[i]),
+              valueUnavailable: !_hasDisplayValue(items[i]),
+              addedLabel: 'Added ${_formatRelativeTime(items[i].createdAt)}',
+              onTap: () => _openCollectibleDetail(context, items[i]),
+              backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
+              borderColor: _packLoxSurfaceBorderColor(colorScheme),
+            ),
           ],
         ],
       ),
@@ -1166,6 +944,7 @@ class _RecentCollectiblesSection extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _RecentCollectibleTile extends StatelessWidget {
   const _RecentCollectibleTile({required this.item});
 
@@ -1290,58 +1069,6 @@ class _GroundedInsightCard extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionSurface extends StatelessWidget {
-  const _SectionSurface({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
-
-  final String title;
-  final Widget child;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      key: ValueKey('home-section-${title.toLowerCase().replaceAll(' ', '-')}'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: _packLoxRaisedSurfaceColor(colorScheme),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-        boxShadow: AppElevation.level1,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              ?trailing,
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          child,
         ],
       ),
     );
