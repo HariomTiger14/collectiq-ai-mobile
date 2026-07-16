@@ -1,0 +1,47 @@
+PackLox Home H02 Samsung Runtime Gate Diagnostics
+Date: 2026-07-16
+Repo: C:\Users\hario\Desktop\projects\collectiq_ai_reconstruction
+
+Baseline:
+- git status --short: clean at start.
+- git branch --show-current: rebuild/product-language-v1
+- git rev-parse HEAD: 930d9a51d52036f706fc2908d19e3a43fe84e00a
+- git diff --check: passed.
+- flutter analyze: passed, no issues found.
+
+Device:
+- adb devices -l:
+  RZ8R213M8ZL device product:f62ins model:SM_E625F device:f62 transport_id:10
+- Device model: SM-E625F
+- Android release: 13
+- Android SDK: 33
+
+Flutter startup diagnostics:
+- C:\Users\hario\Desktop\flutter\bin\flutter.bat devices --device-timeout 30
+  Result: no stdout after bounded wait; process inspection showed only the PowerShell wrapper and no active Flutter tool child. Wrapper stopped.
+- C:\Users\hario\Desktop\flutter\bin\flutter.bat doctor -v
+  Result: no stdout after bounded wait; process inspection showed only the PowerShell wrapper and no active Flutter tool child. Wrapper stopped.
+- C:\Users\hario\Desktop\flutter\bin\flutter.bat build apk --debug --flavor local -v
+  Result: no stdout after bounded wait; process inspection showed only the PowerShell wrapper and no Dart or Gradle child. Wrapper stopped.
+
+Locks and environment:
+- Flutter cache lock files existed:
+  C:\Users\hario\Desktop\flutter\bin\cache\flutter.bat.lock
+  C:\Users\hario\Desktop\flutter\bin\cache\lockfile
+- Project Gradle lock files existed under android\.gradle and were normal Gradle state files.
+- Gradle wrapper distribution: Gradle 9.1.0, cached under C:\Users\hario\.gradle\wrapper\dists\gradle-9.1.0-all.
+- Default java -version: Java 1.8.0_431.
+- Compatible build JDK used: C:\Program Files\Android\Android Studio\jbr
+  openjdk version "21.0.10" 2026-01-20
+
+Gradle fallback:
+- First sandboxed .\gradlew.bat --version attempt failed with Permission denied: connect while attempting Gradle distribution access.
+- Escalated .\gradlew.bat --version passed and reported Gradle 9.1.0.
+- .\gradlew.bat assembleLocalDebug without JAVA_HOME failed because Gradle requires JVM 17 or later and Java 8 was selected.
+- Successful command:
+  & { $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat assembleLocalDebug }
+- Result: BUILD SUCCESSFUL in 1m 4s.
+- APK:
+  C:\Users\hario\Desktop\projects\collectiq_ai_reconstruction\build\app\outputs\flutter-apk\app-local-debug.apk
+  Size: 191,822,483 bytes
+  Timestamp: 2026-07-16 16:11:09 +10:00

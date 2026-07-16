@@ -1,0 +1,441 @@
+﻿
+07-16 16:12:00.389 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:12:00.400 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:12:04.445 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:05.979 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:12:06.956 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:08.467 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:12:09.983 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:12:11.230 D/AndroidRuntime(20998): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:12:11.285 I/AndroidRuntime(20998): Using default boot image
+07-16 16:12:11.285 I/AndroidRuntime(20998): Leaving lock profiling enabled
+07-16 16:12:11.289 D/AndroidRuntime(20998): addProductProperty: pBrand1 is not null
+07-16 16:12:11.289 D/AndroidRuntime(20998): addProductProperty: not brand or 7
+07-16 16:12:11.665 D/AndroidRuntime(20998): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:12:12.510 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:12.968 D/AndroidRuntime(20998): Shutting down VM
+07-16 16:12:14.022 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:12:14.027 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:12:16.540 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-71, periodicAdvInt=0x0
+07-16 16:12:16.547 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-71, periodicAdvInt=0x0
+07-16 16:12:18.057 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-67, periodicAdvInt=0x0
+07-16 16:12:18.065 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-67, periodicAdvInt=0x0
+07-16 16:12:22.081 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-67, periodicAdvInt=0x0
+07-16 16:12:22.091 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:12:23.597 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:12:23.609 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:12:26.111 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:12:26.122 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:12:27.623 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-68, periodicAdvInt=0x0
+07-16 16:12:27.629 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-68, periodicAdvInt=0x0
+07-16 16:12:30.134 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-68, periodicAdvInt=0x0
+07-16 16:12:30.138 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-68, periodicAdvInt=0x0
+07-16 16:12:31.632 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-62, periodicAdvInt=0x0
+07-16 16:12:31.645 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:12:35.662 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+07-16 16:12:35.673 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+07-16 16:12:39.691 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:12:43.743 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:12:45.241 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:45.245 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:49.290 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-62, periodicAdvInt=0x0
+07-16 16:12:49.298 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-62, periodicAdvInt=0x0
+07-16 16:12:50.798 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:12:50.804 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:12:53.823 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:12:55.302 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:12:55.313 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:12:57.822 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:12:59.344 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-61, periodicAdvInt=0x0
+07-16 16:13:00.861 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:13:04.890 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:04.898 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:07.411 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:07.419 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:08.929 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-62, periodicAdvInt=0x0
+07-16 16:13:12.965 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:13:14.482 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:14.493 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:17.012 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:17.019 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:18.534 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:18.542 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:21.043 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:24.059 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:24.065 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:26.573 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:26.588 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:28.085 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:30.600 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:13:30.602 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:13:36.158 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:37.672 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:37.676 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:13:41.705 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:13:44.218 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:45.747 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:49.744 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:13:49.754 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:13:53.787 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:13:55.284 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:13:55.288 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:13:57.803 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:13:57.816 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:14:01.066 D/AndroidRuntime(21261): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:14:01.096 I/AndroidRuntime(21261): Using default boot image
+07-16 16:14:01.096 I/AndroidRuntime(21261): Leaving lock profiling enabled
+07-16 16:14:01.098 D/AndroidRuntime(21261): addProductProperty: pBrand1 is not null
+07-16 16:14:01.098 D/AndroidRuntime(21261): addProductProperty: not brand or 7
+07-16 16:14:01.280 D/AndroidRuntime(21261): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:14:02.541 D/AndroidRuntime(21261): Shutting down VM
+07-16 16:14:03.347 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:14:04.862 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:04.873 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:07.374 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:07.382 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:08.886 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:14:11.396 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:14:12.890 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:14:16.934 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:20.948 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:14:20.953 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:14:24.978 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:14:26.473 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:26.485 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:28.992 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:29.001 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:30.505 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:14:30.512 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:14:34.547 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:14:34.556 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:14:36.080 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:14:36.083 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:14:38.591 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:38.600 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:40.113 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:14:40.118 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:14:44.140 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:14:44.148 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:14:44.609 D/AndroidRuntime(21323): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:14:44.614 I/AndroidRuntime(21323): Using default boot image
+07-16 16:14:44.614 I/AndroidRuntime(21323): Leaving lock profiling enabled
+07-16 16:14:44.615 D/AndroidRuntime(21323): addProductProperty: pBrand1 is not null
+07-16 16:14:44.615 D/AndroidRuntime(21323): addProductProperty: not brand or 7
+07-16 16:14:44.791 D/AndroidRuntime(21323): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:14:45.654 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:46.036 D/AndroidRuntime(21323): Shutting down VM
+07-16 16:14:48.185 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:14:49.681 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:14:49.682 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:14:52.166 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:14:53.688 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:14:56.186 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:14:57.673 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:00.177 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:01.693 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:01.708 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:04.208 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:15:05.726 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:15:05.733 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:15:07.258 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:09.771 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:11.271 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:15:11.280 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:13.796 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:13.808 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:15.305 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:15:15.313 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:19.339 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:19.348 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:23.344 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:15:23.353 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-67, periodicAdvInt=0x0
+07-16 16:15:24.862 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:27.367 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:27.480 W/lacrima (21404): Start AnrAppDeathDetector... X.0rc
+07-16 16:15:27.714 W/lacrima (21404): Start AnrDetector... com.facebook.acra.anr.multisignal.MultiSignalANRDetector
+07-16 16:15:27.714 W/MultiSignalANRDetectorLacrima(21404): Starting
+07-16 16:15:27.714 W/ProcessAnrErrorMonitor(21404): startMonitoring with delay: 0
+07-16 16:15:27.734 W/ProcessAnrErrorMonitor(21404): Starting process monitor checks for process 'com.instagram.android'
+07-16 16:15:27.735 W/MultiSignalANRDetectorLacrima(21404): Started monitoring
+07-16 16:15:28.881 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:15:29.750 W/MultiSignalANRDetectorLacrima(21404): Pausing error state checks
+07-16 16:15:30.460 D/AndroidRuntime(21691): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:15:30.466 I/AndroidRuntime(21691): Using default boot image
+07-16 16:15:30.466 I/AndroidRuntime(21691): Leaving lock profiling enabled
+07-16 16:15:30.467 D/AndroidRuntime(21691): addProductProperty: pBrand1 is not null
+07-16 16:15:30.467 D/AndroidRuntime(21691): addProductProperty: not brand or 7
+07-16 16:15:30.647 D/AndroidRuntime(21691): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:15:31.399 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:31.861 D/AndroidRuntime(21691): Shutting down VM
+07-16 16:15:32.927 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:15:32.935 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:35.637 D/AndroidRuntime(21815): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:15:35.643 I/AndroidRuntime(21815): Using default boot image
+07-16 16:15:35.643 I/AndroidRuntime(21815): Leaving lock profiling enabled
+07-16 16:15:35.644 D/AndroidRuntime(21815): addProductProperty: pBrand1 is not null
+07-16 16:15:35.644 D/AndroidRuntime(21815): addProductProperty: not brand or 7
+07-16 16:15:35.823 D/AndroidRuntime(21815): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:15:37.081 D/AndroidRuntime(21815): Shutting down VM
+07-16 16:15:38.483 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:38.489 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:15:42.532 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:42.542 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:44.047 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:44.052 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:15:48.081 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:15:50.603 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:15:52.115 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:52.121 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:15:57.665 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:15:57.668 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:00.180 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:00.193 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:01.698 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:16:01.708 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:05.734 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:16:09.750 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:09.755 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:11.266 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:16:11.276 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:16:15.315 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:16:18.368 V/SemWifiScanPool(32216): updateScanResult, full scan:6 configKeys: 8 pool_bssid:6 pool_configKeys:8
+07-16 16:16:18.368 D/WifiConnectivityMonitor(32216): onScanResultUpdated
+07-16 16:16:19.336 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:19.364 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:20.854 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-66, periodicAdvInt=0x0
+07-16 16:16:20.863 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:23.370 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:23.379 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:24.097 V/SemWifiScanPool(32216): updateScanResult, partial scan:2 configKeys: 8 pool_bssid:6 
+pool_configKeys:8
+07-16 16:16:27.152 D/AndroidRuntime(22080): >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-16 16:16:27.157 I/AndroidRuntime(22080): Using default boot image
+07-16 16:16:27.157 I/AndroidRuntime(22080): Leaving lock profiling enabled
+07-16 16:16:27.158 D/AndroidRuntime(22080): addProductProperty: pBrand1 is not null
+07-16 16:16:27.158 D/AndroidRuntime(22080): addProductProperty: not brand or 7
+07-16 16:16:27.335 D/AndroidRuntime(22080): Calling main entry com.android.commands.uiautomator.Launcher
+07-16 16:16:27.391 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-55, periodicAdvInt=0x0
+07-16 16:16:28.592 D/AndroidRuntime(22080): Shutting down VM
+07-16 16:16:28.904 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+07-16 16:16:28.906 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+07-16 16:16:31.666 I/DMASA[D][795-395-509999]( 1996): [DiagmonProvider]Received msg based on provider : true / 
+anr_logging
+07-16 16:16:32.934 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:32.941 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:34.435 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:16:36.953 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:16:38.470 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:38.483 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:40.982 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-59, periodicAdvInt=0x0
+07-16 16:16:40.998 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-60, periodicAdvInt=0x0
+07-16 16:16:42.509 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:16:44.998 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-68, periodicAdvInt=0x0
+07-16 16:16:46.252 I/AndroidRuntime(22256): VM exiting with result code 0, cleanup skipped.
+07-16 16:16:50.536 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:16:52.049 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:52.058 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-64, periodicAdvInt=0x0
+07-16 16:16:54.571 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:16:56.074 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+07-16 16:17:00.125 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:17:00.132 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:17:01.635 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:17:01.641 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:17:04.164 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-63, periodicAdvInt=0x0
+07-16 16:17:04.176 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-65, periodicAdvInt=0x0
+07-16 16:17:09.721 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-58, periodicAdvInt=0x0
+07-16 16:17:13.760 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-62, periodicAdvInt=0x0
+07-16 16:17:15.258 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-56, periodicAdvInt=0x0
+07-16 16:17:15.262 D/BtGatt.GattService(  704): onScanResult to scannerId: 4- eventType=0x1b, addressType=0, 
+address=28AF42_D, primaryPhy=1, secondaryPhy=0, advertisingSid=0xff, txPower=127, rssi=-57, periodicAdvInt=0x0
+
+

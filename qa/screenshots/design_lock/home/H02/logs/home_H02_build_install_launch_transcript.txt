@@ -1,0 +1,29 @@
+PackLox Home H02 Build / Install / Launch Transcript
+Date: 2026-07-16
+
+Build:
+Command:
+& { $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat assembleLocalDebug }
+
+Result:
+BUILD SUCCESSFUL in 1m 4s
+271 actionable tasks: 22 executed, 249 up-to-date
+
+Install:
+Command:
+adb -s RZ8R213M8ZL install -r build\app\outputs\flutter-apk\app-local-debug.apk
+
+Result:
+Performing Streamed Install
+Success
+
+Launch:
+Command:
+adb -s RZ8R213M8ZL shell am start -n com.collectiq.ai.local/com.collectiq.ai.MainActivity
+
+Result:
+Starting: Intent { cmp=com.collectiq.ai.local/com.collectiq.ai.MainActivity }
+
+Foreground activity:
+mCurrentFocus=Window{49ae8a0 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+mFocusedApp=ActivityRecord{75d40d6 u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1315}

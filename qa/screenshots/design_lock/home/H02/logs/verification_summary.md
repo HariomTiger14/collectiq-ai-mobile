@@ -29,4 +29,4 @@ Results:
 - Focused Home suite: passed, 19 tests.
 - Focused guard suites: passed.
 - Full suite: accepted baseline `+589 -9`.
-- Android build/install/screenshot: blocked before build startup; see `runtime/BUILD_BLOCKED.md`.
+- Android build/install/screenshot: completed on Samsung SM-E625F using the documented Gradle fallback; see `runtime/BUILD_RESOLVED.md`, `logs/home_H02_build_install_launch_transcript.txt`, and the runtime screenshots.

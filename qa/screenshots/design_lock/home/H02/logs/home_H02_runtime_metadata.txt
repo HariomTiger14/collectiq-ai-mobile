@@ -1,0 +1,47 @@
+PackLox Home H02 Runtime Metadata
+Date: 2026-07-16
+
+Repo:
+C:\Users\hario\Desktop\projects\collectiq_ai_reconstruction
+
+Branch:
+rebuild/product-language-v1
+
+Commit under test:
+930d9a51d52036f706fc2908d19e3a43fe84e00a
+
+Package:
+com.collectiq.ai.local
+
+Activity:
+com.collectiq.ai.local/com.collectiq.ai.MainActivity
+
+Device:
+RZ8R213M8ZL
+Samsung SM-E625F
+Android 13 / API 33
+
+Build method:
+Gradle fallback from android\ with Android Studio JBR.
+
+JDK:
+C:\Program Files\Android\Android Studio\jbr
+openjdk version "21.0.10" 2026-01-20
+
+APK:
+C:\Users\hario\Desktop\projects\collectiq_ai_reconstruction\build\app\outputs\flutter-apk\app-local-debug.apk
+Size: 191,822,483 bytes
+Timestamp: 2026-07-16 16:11:09 +10:00
+
+H02 reproduction:
+The app launched into first-run onboarding because no shared_prefs files existed. Onboarding was completed through normal visible UI. It landed on the existing Scan tab; Home was opened through the existing App Shell. With no local portfolio seed, Home rendered the actual empty state from portfolio.orderedItems.isEmpty. No data clear was required.
+
+Stress path:
+Home first entry, Home scroll, Home -> Scan -> Home, Home -> Portfolio -> Home, repeated Home tab return, and Android background/foreground were exercised.
+
+Logcat:
+Full logcat: qa/screenshots/design_lock/home/H02/logs/home_H02_focused_logcat.txt
+Critical scan: qa/screenshots/design_lock/home/H02/logs/home_H02_critical_log_scan.txt
+
+Critical scan interpretation:
+No app-attributable FATAL EXCEPTION, E/flutter, ANR, input dispatch timeout, overflow, route assertion, input lock, or process death was observed. AndroidRuntime entries in the scan came from the adb/uiautomator command process, not com.collectiq.ai.local crashing.
