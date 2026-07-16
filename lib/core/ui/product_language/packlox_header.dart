@@ -1,5 +1,7 @@
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// PackLox Header 1.0.1 (PLX-CMP-HEADER@1.0.1).
 class PackLoxHeader extends StatelessWidget {
@@ -101,9 +103,14 @@ class PackLoxHeader extends StatelessWidget {
                     child: IconButton(
                       key: const ValueKey('scan-hub-notifications-button'),
                       onPressed: onNotifications,
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 22,
+                      icon: SvgPicture.asset(
+                        PackLoxAssets.notificationBell,
+                        width: 22,
+                        height: 22,
+                        colorFilter: const ColorFilter.mode(
+                          PackLoxTokens.textPrimary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       color: PackLoxTokens.textPrimary,
                       style: IconButton.styleFrom(

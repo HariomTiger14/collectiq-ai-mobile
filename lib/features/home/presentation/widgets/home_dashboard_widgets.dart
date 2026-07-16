@@ -1,5 +1,7 @@
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class DashboardAction {
   const DashboardAction({
@@ -82,7 +84,15 @@ class HomeDashboardAppBar extends StatelessWidget {
         ),
         IconButton.filledTonal(
           onPressed: () {},
-          icon: const Icon(Icons.notifications_none_outlined),
+          icon: SvgPicture.asset(
+            PackLoxAssets.notificationBell,
+            width: 24,
+            height: 24,
+            colorFilter: ColorFilter.mode(
+              colorScheme.onSecondaryContainer,
+              BlendMode.srcIn,
+            ),
+          ),
           tooltip: 'Notifications',
         ),
         const SizedBox(width: 8),

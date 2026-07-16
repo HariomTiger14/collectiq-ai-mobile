@@ -1,8 +1,10 @@
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeTokens {
   const HomeTokens._();
@@ -249,11 +251,15 @@ class HomeEmptyCollectionHero extends StatelessWidget {
                 color: HomeTokens.accent.withValues(alpha: .4),
               ),
             ),
-            child: const Icon(
+            child: SvgPicture.asset(
               key: ValueKey('home-empty-hero-archive-icon'),
-              Icons.inventory_2_outlined,
-              color: HomeTokens.accent,
-              size: 30,
+              PackLoxAssets.emblem,
+              width: 30,
+              height: 30,
+              colorFilter: const ColorFilter.mode(
+                HomeTokens.accent,
+                BlendMode.srcIn,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -735,6 +741,7 @@ class HomeCategoryTile extends StatelessWidget {
     required this.icon,
     required this.semanticMeaning,
     required this.iconColor,
+    required this.assetPath,
     this.onTap,
     super.key,
   });
@@ -743,6 +750,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Cards',
       icon: Icons.style_outlined,
+      assetPath: PackLoxAssets.categoryCards,
       semanticMeaning: 'trading cards',
       iconColor: HomeTokens.categoryCards,
       onTap: onTap,
@@ -753,6 +761,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Coins',
       icon: Icons.album_outlined,
+      assetPath: PackLoxAssets.categoryCoins,
       semanticMeaning: 'collectible coins and medallions',
       iconColor: HomeTokens.categoryCoins,
       onTap: onTap,
@@ -763,6 +772,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Figures',
       icon: Icons.smart_toy_outlined,
+      assetPath: PackLoxAssets.categoryFigures,
       semanticMeaning: 'figurines and action figures',
       iconColor: HomeTokens.categoryFigures,
       onTap: onTap,
@@ -773,6 +783,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'More',
       icon: Icons.grid_view_outlined,
+      assetPath: PackLoxAssets.categoryMore,
       semanticMeaning: 'more categories grid',
       iconColor: HomeTokens.categoryMore,
       onTap: onTap,
@@ -781,6 +792,7 @@ class HomeCategoryTile extends StatelessWidget {
 
   final String label;
   final IconData icon;
+  final String assetPath;
   final String semanticMeaning;
   final Color iconColor;
   final VoidCallback? onTap;
@@ -807,13 +819,14 @@ class HomeCategoryTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              SvgPicture.asset(
                 key: ValueKey(
                   'home-popular-category-${label.toLowerCase()}-icon',
                 ),
-                icon,
-                color: iconColor,
-                size: 30,
+                assetPath,
+                width: 30,
+                height: 30,
+                colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
               ),
               const SizedBox(height: 4),
               Text(

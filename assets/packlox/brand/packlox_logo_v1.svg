@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 24" fill="none"><title>PackLox logo</title>
+<defs><linearGradient id="g" x1="6" y1="2" x2="18" y2="22">
+<stop stop-color="#00D4FF"/><stop offset=".55" stop-color="#1EA7FF"/><stop offset="1" stop-color="#0066CC"/></linearGradient></defs>
+<path d="M12 2.25 18.5 6 12 9.75 5.5 6 12 2.25Z" stroke="url(#g)" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M5.5 6v5L12 14.75 18.5 11V6" stroke="url(#g)" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M5.5 11v5L12 19.75 18.5 16v-5" stroke="url(#g)" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M5.5 16v2L12 21.75 18.5 18v-2" stroke="url(#g)" stroke-width="1.8" stroke-linejoin="round"/>
+
+<text x="25" y="16.2" fill="#F2F5FA" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700">Pack</text>
+<text x="52" y="16.2" fill="#1EA7FF" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700">Lox</text>
+</svg>

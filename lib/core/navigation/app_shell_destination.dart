@@ -8,6 +8,7 @@ class AppShellDestination {
     required this.label,
     required this.icon,
     required this.builder,
+    this.iconAsset,
     IconData? selectedIcon,
   }) : selectedIcon = selectedIcon ?? icon;
 
@@ -15,5 +16,6 @@ class AppShellDestination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+  final String? iconAsset;
   final AppShellDestinationBuilder builder;
 }

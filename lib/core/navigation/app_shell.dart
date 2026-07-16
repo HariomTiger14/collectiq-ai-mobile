@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
@@ -115,6 +116,7 @@ class _AppShellState extends ConsumerState<AppShell>
       label: 'Home',
       icon: Icons.home_outlined,
       selectedIcon: Icons.home_rounded,
+      iconAsset: PackLoxAssets.navHome,
       builder: (_) => HomeScreen(
         onScanPressed: _startNewScan,
         onImportPhotoPressed: _startGalleryImport,
@@ -126,6 +128,7 @@ class _AppShellState extends ConsumerState<AppShell>
       label: 'Portfolio',
       icon: Icons.inventory_2_outlined,
       selectedIcon: Icons.inventory_2_rounded,
+      iconAsset: PackLoxAssets.navPortfolio,
       builder: (_) => PortfolioScreen(onScanPressed: _startNewScan),
     ),
     AppShellDestination(
@@ -133,6 +136,7 @@ class _AppShellState extends ConsumerState<AppShell>
       label: 'Scan',
       icon: Icons.camera_alt_outlined,
       selectedIcon: Icons.camera_alt_rounded,
+      iconAsset: PackLoxAssets.navScan,
       builder: (_) => ScanHubPage(
         onViewPortfolio: () => _selectTab(
           AppShellTabController.portfolioTab,
@@ -145,6 +149,7 @@ class _AppShellState extends ConsumerState<AppShell>
       label: 'Settings',
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings_rounded,
+      iconAsset: PackLoxAssets.navSettings,
       builder: _buildSettingsDestination,
     ),
   ];
@@ -181,6 +186,7 @@ class _AppShellState extends ConsumerState<AppShell>
             key: ValueKey('nav-${destination.label.toLowerCase()}'),
             icon: destination.icon,
             selectedIcon: destination.selectedIcon,
+            iconAsset: destination.iconAsset,
             label: destination.label,
             isActive: false,
           ),

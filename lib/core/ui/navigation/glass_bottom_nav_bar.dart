@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class GlassBottomNavBar extends StatelessWidget {
   const GlassBottomNavBar({
@@ -65,6 +66,7 @@ class GlassBottomNavBar extends StatelessWidget {
                           ),
                       icon: items[index].icon,
                       selectedIcon: items[index].selectedIcon,
+                      iconAsset: items[index].iconAsset,
                       label: items[index].label,
                       isActive: currentIndex == index,
                       gradientStyle: items[index].gradientStyle,
@@ -86,6 +88,7 @@ class NavBarItem extends StatelessWidget {
     required this.label,
     required this.isActive,
     this.selectedIcon,
+    this.iconAsset,
     this.gradientStyle = GradientStyle.blueIndigo,
     this.onTap,
     super.key,
@@ -93,6 +96,7 @@ class NavBarItem extends StatelessWidget {
 
   final IconData icon;
   final IconData? selectedIcon;
+  final String? iconAsset;
   final String label;
   final bool isActive;
   final GradientStyle gradientStyle;
@@ -133,7 +137,14 @@ class NavBarItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ExcludeSemantics(
-            child: Icon(effectiveIcon, color: foreground, size: 23),
+            child: iconAsset == null
+                ? Icon(effectiveIcon, color: foreground, size: 23)
+                : SvgPicture.asset(
+                    iconAsset!,
+                    width: 23,
+                    height: 23,
+                    colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
+                  ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Flexible(

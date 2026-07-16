@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -655,24 +656,28 @@ class _PopularCategoriesSection extends StatelessWidget {
     (
       label: 'Cards',
       icon: Icons.style_outlined,
+      assetPath: PackLoxAssets.categoryCards,
       semanticMeaning: 'trading cards',
       iconColor: HomeTokens.categoryCards,
     ),
     (
       label: 'Coins',
       icon: Icons.album_outlined,
+      assetPath: PackLoxAssets.categoryCoins,
       semanticMeaning: 'collectible coins and medallions',
       iconColor: HomeTokens.categoryCoins,
     ),
     (
       label: 'Figures',
       icon: Icons.smart_toy_outlined,
+      assetPath: PackLoxAssets.categoryFigures,
       semanticMeaning: 'figurines and action figures',
       iconColor: HomeTokens.categoryFigures,
     ),
     (
       label: 'More',
       icon: Icons.grid_view_outlined,
+      assetPath: PackLoxAssets.categoryMore,
       semanticMeaning: 'more categories grid',
       iconColor: HomeTokens.categoryMore,
     ),
@@ -715,6 +720,7 @@ class _PopularCategoriesSection extends StatelessWidget {
                 HomeCategoryTile(
                   label: category.label,
                   icon: category.icon,
+                  assetPath: category.assetPath,
                   semanticMeaning: category.semanticMeaning,
                   iconColor: category.iconColor,
                 ),
