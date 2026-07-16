@@ -6,6 +6,7 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -420,8 +421,8 @@ void main() {
 
     expect(headerTop, lessThan(emptyRect.top));
     expect(emptyRect.bottom, lessThan(categoriesTop));
-    expect(emptyRect.height, inInclusiveRange(218, 252));
-    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.60, 0.72));
+    expect(emptyRect.height, inInclusiveRange(226, 260));
+    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.62, 0.73));
     expect(primaryScanRect.height, inInclusiveRange(42, 46));
     expect(primaryScanRect.width / emptyRect.width, greaterThan(0.82));
     expect(
@@ -458,6 +459,7 @@ void main() {
     final heading = tester.widget<Text>(
       find.text('Your collection is waiting'),
     );
+    final headingRect = tester.getRect(find.text('Your collection is waiting'));
 
     expect(heroRect.height / 1000, inInclusiveRange(0.21, 0.26));
     expect(circleRect.width, inInclusiveRange(54, 58));
@@ -465,8 +467,10 @@ void main() {
     expect(icon.icon, Icons.inventory_2_outlined);
     expect(icon.size, inInclusiveRange(28, 32));
     expect(circleRect.height / heroRect.height, lessThan(0.34));
+    expect(headingRect.height, greaterThan(45));
     expect(heading.textAlign, TextAlign.center);
     expect(heading.style?.fontWeight, FontWeight.w800);
+    expect(heading.style?.fontSize, 24);
   });
 
   testWidgets('H02 does not render Collection Status or Quick Actions', (
@@ -524,6 +528,10 @@ void main() {
       expect(figuresIcon.icon, isNot(Icons.directions_car_outlined));
       expect(figuresIcon.icon, isNot(Icons.toys_outlined));
       expect(moreIcon.icon, Icons.grid_view_outlined);
+      expect(cardsIcon.color, HomeTokens.categoryCards);
+      expect(coinsIcon.color, HomeTokens.categoryCoins);
+      expect(figuresIcon.color, HomeTokens.categoryFigures);
+      expect(moreIcon.color, HomeTokens.categoryMore);
 
       for (final icon in [cardsIcon, coinsIcon, figuresIcon, moreIcon]) {
         expect(icon.size, inInclusiveRange(28, 32));

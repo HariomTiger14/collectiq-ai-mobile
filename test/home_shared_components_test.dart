@@ -145,6 +145,30 @@ void main() {
     expect(find.byIcon(Icons.grid_view_outlined), findsOneWidget);
   });
 
+  testWidgets('Popular category icons use authority color separation', (
+    tester,
+  ) async {
+    await tester.pumpHomeComponent(HomeCategoryGrid.popular());
+
+    final cardsIcon = tester.widget<Icon>(
+      find.byKey(const ValueKey('home-popular-category-cards-icon')),
+    );
+    final coinsIcon = tester.widget<Icon>(
+      find.byKey(const ValueKey('home-popular-category-coins-icon')),
+    );
+    final figuresIcon = tester.widget<Icon>(
+      find.byKey(const ValueKey('home-popular-category-figures-icon')),
+    );
+    final moreIcon = tester.widget<Icon>(
+      find.byKey(const ValueKey('home-popular-category-more-icon')),
+    );
+
+    expect(cardsIcon.color, HomeTokens.categoryCards);
+    expect(coinsIcon.color, HomeTokens.categoryCoins);
+    expect(figuresIcon.color, HomeTokens.categoryFigures);
+    expect(moreIcon.color, HomeTokens.categoryMore);
+  });
+
   testWidgets('Category grid wraps responsively', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
