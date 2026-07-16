@@ -218,7 +218,7 @@ void main() {
       const Offset(0, -520),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Scan a Collectible'), findsOneWidget);
+    expect(find.text('Popular Categories'), findsOneWidget);
     expect(find.text('Welcome to PackLox'), findsNothing);
   });
 

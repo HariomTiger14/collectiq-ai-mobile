@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
@@ -41,10 +40,7 @@ void main() {
       );
       expect(find.text('Your collection is waiting'), findsOneWidget);
       expect(find.text('Scan your first item to get started.'), findsOneWidget);
-      expect(
-        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('home-primary-scan')), findsOneWidget);
       expect(find.text('Your collection starts here'), findsNothing);
       expect(find.text('Start your collection'), findsNothing);
       expect(find.text('Try a Sample Scan'), findsNothing);
@@ -57,9 +53,7 @@ void main() {
       expect(find.byType(MotionParallax), findsNothing);
       expect(find.byType(MotionReveal), findsNothing);
 
-      await tester.tap(
-        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
-      );
+      await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
       await tester.pump();
 
       expect(scanTaps, 1);
@@ -156,7 +150,7 @@ void main() {
       expect(find.text('Items'), findsOneWidget);
       expect(find.text('Est. value'), findsOneWidget);
       expect(find.text('Avg. condition'), findsOneWidget);
-      expect(find.text('Scans'), findsOneWidget);
+      expect(find.text('Scans'), findsNothing);
       expect(
         find.text(
           'Value and condition stay unavailable until items are saved.',
@@ -178,12 +172,22 @@ void main() {
         findsNothing,
       );
       expect(find.text('Scan first collectible'), findsNothing);
+      expect(find.text('Search'), findsNothing);
+      expect(find.text('Alerts'), findsNothing);
+      expect(
+        find.textContaining('confidence', findRichText: true),
+        findsNothing,
+      );
+      expect(find.textContaining('trend', findRichText: true), findsNothing);
+      expect(find.textContaining('sync', findRichText: true), findsNothing);
+      expect(
+        find.textContaining('readiness', findRichText: true),
+        findsNothing,
+      );
       expect(find.text('Recent collectibles'), findsNothing);
       expect(find.byKey(const ValueKey('home-grounded-insight')), findsNothing);
 
-      await tester.tap(
-        find.widgetWithText(PackLoxButton, 'Scan a Collectible'),
-      );
+      await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
       await tester.pump();
 
       expect(scanTaps, 1);
@@ -411,13 +415,13 @@ void main() {
     expect(emptyRect.top, lessThan(statusTop));
     expect(statusTop, lessThan(categoriesTop));
     expect(categoriesTop, lessThan(actionsTop));
-    expect(emptyRect.height / viewportHeight, inInclusiveRange(0.12, 0.19));
-    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.29, 0.43));
+    expect(emptyRect.height, inInclusiveRange(156, 172));
+    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.42, 0.50));
     expect(
       primaryScanRect.left,
       greaterThan(emptyRect.left + emptyRect.width * 0.27),
     );
-    expect(primaryScanRect.height, inInclusiveRange(40, 52));
+    expect(primaryScanRect.height, inInclusiveRange(48, 54));
     expect(
       primaryScanRect.width / emptyRect.width,
       inInclusiveRange(0.44, 0.72),
@@ -431,7 +435,8 @@ void main() {
       quickActionsRect.height / viewportHeight,
       inInclusiveRange(0.13, 0.20),
     );
-    expect(cardsRect.height, inInclusiveRange(60, 78));
+    expect(cardsRect.height, inInclusiveRange(72, 80));
+    expect(cardsRect.width, greaterThanOrEqualTo(68));
     expect(moreRect.left, greaterThan(cardsRect.left));
     expect(scanActionRect.height, inInclusiveRange(58, 74));
     expect(importActionRect.height, inInclusiveRange(58, 74));
@@ -464,11 +469,11 @@ void main() {
     );
 
     expect(heroRect.height / 1000, inInclusiveRange(0.11, 0.17));
-    expect(circleRect.width, inInclusiveRange(76, 80));
-    expect(circleRect.height, inInclusiveRange(76, 80));
+    expect(circleRect.width, inInclusiveRange(58, 64));
+    expect(circleRect.height, inInclusiveRange(58, 64));
     expect(icon.icon, Icons.inventory_2_outlined);
-    expect(icon.size, inInclusiveRange(35, 37));
-    expect(circleRect.height / heroRect.height, lessThan(0.70));
+    expect(icon.size, inInclusiveRange(28, 30));
+    expect(circleRect.height / heroRect.height, lessThan(0.42));
     expect(heading.style?.fontWeight, FontWeight.w900);
   });
 
@@ -476,6 +481,7 @@ void main() {
     tester,
   ) async {
     _seedPortfolio(const []);
+    final semantics = tester.ensureSemantics();
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
@@ -495,13 +501,15 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: status, matching: find.text('-')),
-      findsNWidgets(2),
+      find.descendant(of: status, matching: find.text('Scans')),
+      findsNothing,
     );
     expect(
-      find.descendant(of: status, matching: find.text('Scans')),
-      findsOneWidget,
+      find.descendant(of: status, matching: find.text('\u2014')),
+      findsNWidgets(2),
     );
+    expect(find.bySemanticsLabel('Est. value unavailable'), findsOneWidget);
+    expect(find.bySemanticsLabel('Avg. condition unavailable'), findsOneWidget);
     expect(
       find.descendant(
         of: status,
@@ -516,6 +524,7 @@ void main() {
       ),
       findsNothing,
     );
+    semantics.dispose();
   });
 
   testWidgets(
@@ -558,8 +567,8 @@ void main() {
         ValueKey('home-popular-category-more'),
       ]) {
         final rect = tester.getRect(find.byKey(key));
-        expect(rect.height, inInclusiveRange(60, 78));
-        expect(rect.width, greaterThanOrEqualTo(44));
+        expect(rect.height, inInclusiveRange(72, 80));
+        expect(rect.width, greaterThanOrEqualTo(68));
       }
     },
   );
@@ -571,7 +580,7 @@ void main() {
     await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
     await tester.pumpAndSettle();
 
-    final scan = find.widgetWithText(PackLoxButton, 'Scan a Collectible');
+    final scan = find.byKey(const ValueKey('home-primary-scan'));
     await tester.tap(scan);
     await tester.tap(scan);
     await tester.pump();
