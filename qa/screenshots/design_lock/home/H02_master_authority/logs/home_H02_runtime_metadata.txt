@@ -1,0 +1,10 @@
+device=RZ8R213M8ZL
+SM-E625F
+Physical size: 1080x2400
+Physical density: 450
+Override density: 420
+    versionCode=1 minSdk=24 targetSdk=36
+    versionName=1.0.0
+    lastUpdateTime=2026-07-16 19:23:44
+      firstInstallTime=2026-07-16 16:11:51
+      firstInstallTime=2026-07-16 16:11:51
