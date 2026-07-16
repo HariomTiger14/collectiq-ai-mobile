@@ -323,25 +323,29 @@ void main() {
     expect(find.text('Your collection is waiting'), findsOneWidget);
     expect(find.text('Scan your first item to get started.'), findsOneWidget);
     expect(find.byType(MotionElasticHero), findsNothing);
-    expect(find.text('Your collection'), findsOneWidget);
+    expect(find.text('Your collection'), findsNothing);
     expect(find.text('Collector'), findsOneWidget);
     expect(find.text('Scan a Collectible'), findsOneWidget);
-    await tester.reveal(find.byKey(const ValueKey('home-quick-action-import')));
-    expect(find.text('Import'), findsOneWidget);
+    expect(find.text('Sample Scan unavailable'), findsOneWidget);
+    await tester.reveal(
+      find.byKey(const ValueKey('home-popular-category-cards')),
+    );
+    expect(find.text('Popular Categories'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('home-quick-action-import')),
+      find.byKey(const ValueKey('home-popular-category-cards')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('home-quick-action-portfolio')),
+      find.byKey(const ValueKey('home-popular-category-more')),
       findsOneWidget,
     );
+    expect(find.text('Import'), findsNothing);
+    expect(find.text('Quick actions'), findsNothing);
     expect(find.text('PI (Soon)'), findsNothing);
     expect(find.textContaining('Soon'), findsNothing);
-    await tester.reveal(find.text('Collection status'));
-    expect(find.text('Collection status'), findsWidgets);
-    expect(find.text('Items'), findsOneWidget);
-    expect(find.text('Est. value'), findsOneWidget);
+    expect(find.text('Collection status'), findsNothing);
+    expect(find.text('Items'), findsNothing);
+    expect(find.text('Est. value'), findsNothing);
     expect(find.text('Recent collectibles'), findsNothing);
     expect(find.text('AI Insights'), findsNothing);
     expect(find.text('Starter Categories'), findsNothing);
@@ -474,9 +478,11 @@ void main() {
       findsNothing,
     );
     expect(find.text('Your collection is waiting'), findsOneWidget);
-    await tester.reveal(find.text('Collection status'));
-    expect(find.text('Items'), findsOneWidget);
-    expect(find.text('Est. value'), findsOneWidget);
+    await tester.reveal(find.text('Popular Categories'));
+    expect(find.text('Collection status'), findsNothing);
+    expect(find.text('Quick actions'), findsNothing);
+    expect(find.text('Items'), findsNothing);
+    expect(find.text('Est. value'), findsNothing);
     expect(find.text('Scan first collectible'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -604,29 +610,23 @@ void main() {
     );
   });
 
-  testWidgets('home import photo quick action opens gallery flow', (
+  testWidgets('home empty H02 omits legacy import quick action', (
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('home-quick-action-import')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-quick-action-import')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.acceptEnhancementPreview();
+    expect(find.text('Import Photo'), findsNothing);
+    expect(find.byKey(const ValueKey('home-quick-action-import')), findsNothing);
+    expect(find.text('Quick Actions'), findsNothing);
 
-    await tester.pumpUntilFound(
-      find.byKey(const ValueKey('scan-primary-Analyze Image')),
-    );
+    await tester.tap(find.text('Scan a Collectible'));
+    await tester.pumpAndSettle();
+
     expect(find.text('AI Scanner'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('scan-primary-Scan with Camera')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shell recreation returns to Home and Scan still works', (

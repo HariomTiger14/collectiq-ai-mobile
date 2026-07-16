@@ -22,43 +22,79 @@ void main() {
     _seedPortfolio(_portfolioItems());
   });
 
-  testWidgets(
-    'renders approved empty Home structure without legacy blue Hero',
-    (tester) async {
-      _seedPortfolio(const []);
-      var scanTaps = 0;
+  testWidgets('empty state uses approved H02 composition', (tester) async {
+    _seedPortfolio(const []);
+    var scanTaps = 0;
 
-      await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_homeApp(onScanPressed: () => scanTaps++));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(PackLoxHeader), findsOneWidget);
-      expect(find.text('Your collection'), findsOneWidget);
-      expect(find.text('Collector'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('home-empty-authority-card')),
-        findsOneWidget,
-      );
-      expect(find.text('Your collection is waiting'), findsOneWidget);
-      expect(find.text('Scan your first item to get started.'), findsOneWidget);
-      expect(find.byKey(const ValueKey('home-primary-scan')), findsOneWidget);
-      expect(find.text('Your collection starts here'), findsNothing);
-      expect(find.text('Start your collection'), findsNothing);
-      expect(find.text('Try a Sample Scan'), findsNothing);
-      expect(find.text('Popular Categories'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('home-popular-category-cards')),
-        findsOneWidget,
-      );
-      expect(find.byType(MotionElasticHero), findsNothing);
-      expect(find.byType(MotionParallax), findsNothing);
-      expect(find.byType(MotionReveal), findsNothing);
+    expect(find.byType(PackLoxHeader), findsOneWidget);
+    expect(find.text('Collector'), findsOneWidget);
+    expect(find.text('Your collection'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.data == 'Good morning,' ||
+                widget.data == 'Good afternoon,' ||
+                widget.data == 'Good evening,'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-empty-authority-card')),
+      findsOneWidget,
+    );
+    expect(find.text('Your collection is waiting'), findsOneWidget);
+    expect(find.text('Scan your first item to get started.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-primary-scan')), findsOneWidget);
+    expect(find.text('Scan a Collectible'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-sample-scan')), findsOneWidget);
+    expect(find.text('Sample Scan unavailable'), findsOneWidget);
+    expect(find.text('Try a Sample Scan'), findsNothing);
+    expect(find.text('Collection status'), findsNothing);
+    expect(find.text('Quick actions'), findsNothing);
+    expect(find.text('Popular Categories'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-popular-category-cards')),
+      findsOneWidget,
+    );
+    expect(find.byType(MotionElasticHero), findsNothing);
+    expect(find.byType(MotionParallax), findsNothing);
+    expect(find.byType(MotionReveal), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
-      await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
+    await tester.pump();
 
-      expect(scanTaps, 1);
-    },
-  );
+    expect(scanTaps, 1);
+  });
+
+  testWidgets('Sample Scan tertiary action is enabled only when supported', (
+    tester,
+  ) async {
+    _seedPortfolio(const []);
+    var sampleTaps = 0;
+
+    await tester.pumpWidget(_homeApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home-sample-scan')), findsOneWidget);
+    expect(find.text('Sample Scan unavailable'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home-sample-scan')));
+    await tester.pump();
+    expect(sampleTaps, 0);
+
+    await tester.pumpWidget(_homeApp(onSampleScanPressed: () => sampleTaps++));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Try a Sample Scan'), findsOneWidget);
+    expect(find.text('Sample Scan unavailable'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('home-sample-scan')));
+    await tester.pump();
+
+    expect(sampleTaps, 1);
+  });
 
   testWidgets(
     'loaded data displays real collection values and recent content',
@@ -93,7 +129,7 @@ void main() {
 
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
-    await _scrollUntilVisible(tester, find.text('Collection status'));
+    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
 
     expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('\$0'), findsNothing);
@@ -147,27 +183,15 @@ void main() {
       expect(find.text('Cards'), findsOneWidget);
       expect(find.text('Coins'), findsOneWidget);
       expect(find.text('Figures'), findsOneWidget);
-      expect(find.text('Items'), findsOneWidget);
-      expect(find.text('Est. value'), findsOneWidget);
-      expect(find.text('Avg. condition'), findsOneWidget);
+      expect(find.text('Collection status'), findsNothing);
+      expect(find.text('Quick actions'), findsNothing);
+      expect(find.text('Items'), findsNothing);
+      expect(find.text('Est. value'), findsNothing);
+      expect(find.text('Avg. condition'), findsNothing);
       expect(find.text('Scans'), findsNothing);
       expect(
         find.text(
           'Value and condition stay unavailable until items are saved.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('home-section-collection-status')),
-          matching: find.text('Scan your first item to get started.'),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('home-section-collection-status')),
-          matching: find.text('Your collection is waiting'),
         ),
         findsNothing,
       );
@@ -365,7 +389,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first viewport density follows owner v1 Home authority ratios', (
+  testWidgets('first viewport density follows H02 master authority', (
     tester,
   ) async {
     _seedPortfolio(const []);
@@ -383,14 +407,8 @@ void main() {
     final primaryScanRect = tester.getRect(
       find.byKey(const ValueKey('home-primary-scan')),
     );
-    final statusRect = tester.getRect(
-      find.byKey(const ValueKey('home-section-collection-status')),
-    );
     final categoriesRect = tester.getRect(
       find.byKey(const ValueKey('home-section-popular-categories')),
-    );
-    final quickActionsRect = tester.getRect(
-      find.byKey(const ValueKey('home-section-quick-actions')),
     );
     final cardsRect = tester.getRect(
       find.byKey(const ValueKey('home-popular-category-cards')),
@@ -398,51 +416,24 @@ void main() {
     final moreRect = tester.getRect(
       find.byKey(const ValueKey('home-popular-category-more')),
     );
-    final scanActionRect = tester.getRect(
-      find.byKey(const ValueKey('home-quick-action-scan')),
-    );
-    final importActionRect = tester.getRect(
-      find.byKey(const ValueKey('home-quick-action-import')),
-    );
-    final portfolioActionRect = tester.getRect(
-      find.byKey(const ValueKey('home-quick-action-portfolio')),
-    );
-    final statusTop = tester.getTopLeft(find.text('Collection status')).dy;
     final categoriesTop = tester.getTopLeft(find.text('Popular Categories')).dy;
-    final actionsTop = tester.getTopLeft(find.text('Quick actions')).dy;
 
     expect(headerTop, lessThan(emptyRect.top));
-    expect(emptyRect.top, lessThan(statusTop));
-    expect(statusTop, lessThan(categoriesTop));
-    expect(categoriesTop, lessThan(actionsTop));
-    expect(emptyRect.height, inInclusiveRange(156, 172));
-    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.42, 0.50));
-    expect(
-      primaryScanRect.left,
-      greaterThan(emptyRect.left + emptyRect.width * 0.27),
-    );
-    expect(primaryScanRect.height, inInclusiveRange(48, 54));
-    expect(
-      primaryScanRect.width / emptyRect.width,
-      inInclusiveRange(0.44, 0.72),
-    );
-    expect(statusRect.height / viewportHeight, inInclusiveRange(0.11, 0.18));
+    expect(emptyRect.bottom, lessThan(categoriesTop));
+    expect(emptyRect.height, inInclusiveRange(218, 252));
+    expect(emptyRect.height / emptyRect.width, inInclusiveRange(0.60, 0.72));
+    expect(primaryScanRect.height, inInclusiveRange(42, 46));
+    expect(primaryScanRect.width / emptyRect.width, greaterThan(0.82));
     expect(
       categoriesRect.height / viewportHeight,
-      inInclusiveRange(0.10, 0.17),
-    );
-    expect(
-      quickActionsRect.height / viewportHeight,
-      inInclusiveRange(0.13, 0.20),
+      inInclusiveRange(0.11, 0.18),
     );
     expect(cardsRect.height, inInclusiveRange(72, 80));
     expect(cardsRect.width, greaterThanOrEqualTo(68));
     expect(moreRect.left, greaterThan(cardsRect.left));
-    expect(scanActionRect.height, inInclusiveRange(58, 74));
-    expect(importActionRect.height, inInclusiveRange(58, 74));
-    expect(portfolioActionRect.height, inInclusiveRange(58, 74));
-    expect(scanActionRect.top, greaterThan(actionsTop));
-    expect(quickActionsRect.bottom, lessThan(viewportHeight));
+    expect(categoriesRect.bottom, lessThan(viewportHeight));
+    expect(find.text('Collection status'), findsNothing);
+    expect(find.text('Quick actions'), findsNothing);
   });
 
   testWidgets('visual weight correction keeps hero icon secondary', (
@@ -468,16 +459,17 @@ void main() {
       find.text('Your collection is waiting'),
     );
 
-    expect(heroRect.height / 1000, inInclusiveRange(0.11, 0.17));
-    expect(circleRect.width, inInclusiveRange(58, 64));
-    expect(circleRect.height, inInclusiveRange(58, 64));
+    expect(heroRect.height / 1000, inInclusiveRange(0.21, 0.26));
+    expect(circleRect.width, inInclusiveRange(54, 58));
+    expect(circleRect.height, inInclusiveRange(54, 58));
     expect(icon.icon, Icons.inventory_2_outlined);
-    expect(icon.size, inInclusiveRange(28, 30));
-    expect(circleRect.height / heroRect.height, lessThan(0.42));
-    expect(heading.style?.fontWeight, FontWeight.w900);
+    expect(icon.size, inInclusiveRange(28, 32));
+    expect(circleRect.height / heroRect.height, lessThan(0.34));
+    expect(heading.textAlign, TextAlign.center);
+    expect(heading.style?.fontWeight, FontWeight.w800);
   });
 
-  testWidgets('Collection Status uses compact real dashboard metrics', (
+  testWidgets('H02 does not render Collection Status or Quick Actions', (
     tester,
   ) async {
     _seedPortfolio(const []);
@@ -485,45 +477,22 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
-    final status = find.byKey(const ValueKey('home-section-collection-status'));
-
     expect(
-      find.descendant(of: status, matching: find.text('Items')),
-      findsOneWidget,
-    );
-    expect(find.descendant(of: status, matching: find.text('0')), findsWidgets);
-    expect(
-      find.descendant(of: status, matching: find.text('Est. value')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: status, matching: find.text('Avg. condition')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: status, matching: find.text('Scans')),
+      find.byKey(const ValueKey('home-section-collection-status')),
       findsNothing,
     );
     expect(
-      find.descendant(of: status, matching: find.text('\u2014')),
-      findsNWidgets(2),
-    );
-    expect(find.bySemanticsLabel('Est. value unavailable'), findsOneWidget);
-    expect(find.bySemanticsLabel('Avg. condition unavailable'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: status,
-        matching: find.text('Scan your first item to get started.'),
-      ),
+      find.byKey(const ValueKey('home-section-quick-actions')),
       findsNothing,
     );
-    expect(
-      find.descendant(
-        of: status,
-        matching: find.text('Your collection is waiting'),
-      ),
-      findsNothing,
-    );
+    expect(find.text('Collection status'), findsNothing);
+    expect(find.text('Quick actions'), findsNothing);
+    expect(find.text('Items'), findsNothing);
+    expect(find.text('Est. value'), findsNothing);
+    expect(find.text('Avg. condition'), findsNothing);
+    expect(find.text('\u2014'), findsNothing);
+    expect(find.bySemanticsLabel('Est. value unavailable'), findsNothing);
+    expect(find.bySemanticsLabel('Avg. condition unavailable'), findsNothing);
     semantics.dispose();
   });
 
@@ -690,6 +659,7 @@ void main() {
 
 Widget _homeApp({
   VoidCallback? onScanPressed,
+  VoidCallback? onSampleScanPressed,
   VoidCallback? onImportPhotoPressed,
   VoidCallback? onPortfolioPressed,
   ThemeMode themeMode = ThemeMode.light,
@@ -711,6 +681,7 @@ Widget _homeApp({
             data: mediaQuery,
             child: HomePage(
               onScanPressed: onScanPressed,
+              onSampleScanPressed: onSampleScanPressed,
               onImportPhotoPressed: onImportPhotoPressed,
               onPortfolioPressed: onPortfolioPressed,
             ),
