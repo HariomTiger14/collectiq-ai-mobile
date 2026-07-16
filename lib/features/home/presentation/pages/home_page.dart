@@ -656,21 +656,25 @@ class _PopularCategoriesSection extends StatelessWidget {
       label: 'Cards',
       icon: Icons.style_outlined,
       semanticMeaning: 'trading cards',
+      iconColor: HomeTokens.categoryCards,
     ),
     (
       label: 'Coins',
       icon: Icons.album_outlined,
       semanticMeaning: 'collectible coins and medallions',
+      iconColor: HomeTokens.categoryCoins,
     ),
     (
       label: 'Figures',
       icon: Icons.smart_toy_outlined,
       semanticMeaning: 'figurines and action figures',
+      iconColor: HomeTokens.categoryFigures,
     ),
     (
       label: 'More',
       icon: Icons.grid_view_outlined,
       semanticMeaning: 'more categories grid',
+      iconColor: HomeTokens.categoryMore,
     ),
   ];
 
@@ -712,6 +716,7 @@ class _PopularCategoriesSection extends StatelessWidget {
                   label: category.label,
                   icon: category.icon,
                   semanticMeaning: category.semanticMeaning,
+                  iconColor: category.iconColor,
                 ),
             ],
           ),

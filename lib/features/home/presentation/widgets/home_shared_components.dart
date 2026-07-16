@@ -14,6 +14,10 @@ class HomeTokens {
   static const border = Color(0xFF17324A);
   static const accent = Color(0xFF0087FF);
   static const accentStrong = Color(0xFF0067E8);
+  static const categoryCards = Color(0xFF22D3EE);
+  static const categoryCoins = Color(0xFFF4B740);
+  static const categoryFigures = Color(0xFF9B7CFF);
+  static const categoryMore = Color(0xFF00D88A);
   static const textPrimary = Color(0xFFF4F8FC);
   static const textSecondary = Color(0xFFA7B5C5);
   static const textMuted = Color(0xFF6F8295);
@@ -225,7 +229,7 @@ class HomeEmptyCollectionHero extends StatelessWidget {
       keySeed: 'empty-authority-card',
       semanticLabel:
           'Empty collection. Your collection is waiting. Scan your first item to get started.',
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       radius: HomeTokens.cardRadius,
       backgroundColor: HomeTokens.surfaceRaised,
       borderColor: HomeTokens.border,
@@ -252,16 +256,19 @@ class HomeEmptyCollectionHero extends StatelessWidget {
               size: 30,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Your collection is waiting',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: textTheme.titleMedium?.copyWith(
-              color: HomeTokens.textPrimary,
-              fontWeight: FontWeight.w800,
-              height: 1.16,
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 190,
+            child: Text(
+              'Your collection is waiting',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: textTheme.titleLarge?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+                height: 1.10,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -276,9 +283,9 @@ class HomeEmptyCollectionHero extends StatelessWidget {
               height: 1.24,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _HomeHeroPrimaryButton(onPressed: onScanPressed),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Semantics(
             button: true,
             enabled: sampleSupported,
@@ -727,6 +734,7 @@ class HomeCategoryTile extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.semanticMeaning,
+    required this.iconColor,
     this.onTap,
     super.key,
   });
@@ -736,6 +744,7 @@ class HomeCategoryTile extends StatelessWidget {
       label: 'Cards',
       icon: Icons.style_outlined,
       semanticMeaning: 'trading cards',
+      iconColor: HomeTokens.categoryCards,
       onTap: onTap,
     );
   }
@@ -745,6 +754,7 @@ class HomeCategoryTile extends StatelessWidget {
       label: 'Coins',
       icon: Icons.album_outlined,
       semanticMeaning: 'collectible coins and medallions',
+      iconColor: HomeTokens.categoryCoins,
       onTap: onTap,
     );
   }
@@ -754,6 +764,7 @@ class HomeCategoryTile extends StatelessWidget {
       label: 'Figures',
       icon: Icons.smart_toy_outlined,
       semanticMeaning: 'figurines and action figures',
+      iconColor: HomeTokens.categoryFigures,
       onTap: onTap,
     );
   }
@@ -763,6 +774,7 @@ class HomeCategoryTile extends StatelessWidget {
       label: 'More',
       icon: Icons.grid_view_outlined,
       semanticMeaning: 'more categories grid',
+      iconColor: HomeTokens.categoryMore,
       onTap: onTap,
     );
   }
@@ -770,6 +782,7 @@ class HomeCategoryTile extends StatelessWidget {
   final String label;
   final IconData icon;
   final String semanticMeaning;
+  final Color iconColor;
   final VoidCallback? onTap;
 
   @override
@@ -799,7 +812,7 @@ class HomeCategoryTile extends StatelessWidget {
                   'home-popular-category-${label.toLowerCase()}-icon',
                 ),
                 icon,
-                color: HomeTokens.accent,
+                color: iconColor,
                 size: 30,
               ),
               const SizedBox(height: 4),
