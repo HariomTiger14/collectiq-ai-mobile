@@ -1,0 +1,62 @@
+PackLox Home H02 Correction Pass 1 runtime metadata
+Captured: 2026-07-16 Australia/Sydney
+Device command: adb devices -l
+List of devices attached
+RZ8R213M8ZL            device product:f62ins model:SM_E625F device:f62 transport_id:13
+
+
+Package: com.collectiq.ai.local
+Activity: com.collectiq.ai.MainActivity
+
+Window focus summary:
+    mKeyguardOccluded=false mKeyguardOccludedChanged=false mPendingKeyguardOccluded=false
+        mInputRestricted=false
+      Window #11: WindowStateAnimator{663c26a NotificationShade}
+      Window #13: WindowStateAnimator{ce97f8 Bouncer}
+  mCurrentFocus=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  mFocusedApp=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+    mKeyguardDrawComplete=true mWindowManagerDrawComplete=true
+    mExpandedPanel=Window{f5025e6 u0 NotificationShade}
+  Window #5 Window{c1c8b1b u0 Bouncer}:
+    WindowStateAnimator{ce97f8 Bouncer}:
+  Window #7 Window{f5025e6 u0 NotificationShade}:
+    WindowStateAnimator{663c26a NotificationShade}:
+
+Activity summary:
+  * Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+    * Hist  #0: ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+      packageName=com.collectiq.ai.local processName=com.collectiq.ai.local
+      app=ProcessRecord{826783f 29144:com.collectiq.ai.local/u0a0}
+      Intent { flg=0x10000000 cmp=com.collectiq.ai.local/com.collectiq.ai.MainActivity }
+      rootOfTask=true task=Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      mActivityComponent=com.collectiq.ai.local/com.collectiq.ai.MainActivity
+      baseDir=/data/app/~~6CvRT4LAVFWA-eYVJMJlyA==/com.collectiq.ai.local-OiJMpJAS43iU_X7ixaeAEw==/base.apk
+      dataDir=/data/user/0/com.collectiq.ai.local
+      taskDescription: label="PackLox" icon=null iconResource=com.collectiq.ai.local/0 iconFilename=null primaryColor=ff0a84ff
+      windows=[Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}]
+    Resumed: ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+  ResumedActivity: ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+  topDisplayFocusedRootTask=Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+  deepestLastOrientationSource=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+  mCurrentFocus=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  mFocusedApp=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+      mPreferredTopFocusableRootTask=Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      mLastFocusedRootTask=Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+      * Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        * ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
+    mFocusedWindow=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mTopFullscreenOpaqueWindowState=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mNavBarColorWindowCandidate=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+    mNavBarBackgroundWindow=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        source=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333} SCREEN_ORIENTATION_UNSPECIFIED
+        source=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333} SCREEN_ORIENTATION_UNSPECIFIED
+      ITYPE_IME -> Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      ITYPE_NAVIGATION_BAR -> Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+      ITYPE_STATUS_BAR -> Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        mControlTarget=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        mControlTarget=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        mControlTarget=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+        (fullscreen) Task{987d112 #1333 type=standard I=com.collectiq.ai.local/com.collectiq.ai.MainActivity U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+  VisibleActivityProcess:[ ProcessRecord{826783f 29144:com.collectiq.ai.local/u0a0}]

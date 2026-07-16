@@ -1,0 +1,11 @@
+PackLox Home H02 Correction Pass 1 launch transcript
+Command: adb shell input keyevent KEYCODE_WAKEUP
+Command: adb shell wm dismiss-keyguard
+Command: adb shell input keyevent 82
+Command: adb shell am start -n com.collectiq.ai.local/com.collectiq.ai.MainActivity
+Starting: Intent { cmp=com.collectiq.ai.local/com.collectiq.ai.MainActivity }
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+
+Focused app after launch:
+  mCurrentFocus=Window{eb297db u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity}
+  mFocusedApp=ActivityRecord{dfaa89d u0 com.collectiq.ai.local/com.collectiq.ai.MainActivity} t1333}
