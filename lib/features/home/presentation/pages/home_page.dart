@@ -16,12 +16,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     this.onScanPressed,
+    this.onSampleScanPressed,
     this.onImportPhotoPressed,
     this.onPortfolioPressed,
     super.key,
   });
 
   final VoidCallback? onScanPressed;
+  final VoidCallback? onSampleScanPressed;
   final VoidCallback? onImportPhotoPressed;
   final VoidCallback? onPortfolioPressed;
 
@@ -59,6 +61,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final insights = const CollectorDashboardAnalyticsService().build(items);
     final homeData = _HomeViewData.fromInsights(insights);
     final recentItems = homeData.recentItems.take(3).toList(growable: false);
+    final greetingText = _homeGreetingFor(DateTime.now());
 
     // Home follows the approved dark authority independent of system brightness.
     return Theme(
@@ -70,42 +73,30 @@ class _HomePageState extends ConsumerState<HomePage> {
             controller: _scrollController,
             bottomClearance: 104,
             sections: [
-              const HomeSection(
+              HomeSection(
                 topPadding: AppSpacing.xs,
                 child: HomeAppBar(
                   firstName: '',
                   fallbackName: 'Collector',
-                  greetingText: 'Your collection',
+                  greetingText: greetingText,
                   onNotifications: null,
                 ),
               ),
               if (homeData.isEmpty)
                 HomeSection(
                   topPadding: AppSpacing.xs,
-                  child: _EmptyCollectionCard(
+                  child: HomeEmptyCollectionHero(
                     onScanPressed: widget.onScanPressed == null
                         ? null
                         : _handleScanPressed,
+                    onSampleScanPressed: widget.onSampleScanPressed,
                   ),
+                )
+              else ...[
+                HomeSection(
+                  topPadding: AppSpacing.sm,
+                  child: _CollectionSnapshotSection(data: homeData),
                 ),
-              HomeSection(
-                topPadding: AppSpacing.sm,
-                child: _CollectionSnapshotSection(data: homeData),
-              ),
-              HomeSection(
-                topPadding: AppSpacing.sm,
-                child: homeData.isEmpty
-                    ? const _PopularCategoriesSection()
-                    : _CompactQuickActions(
-                        onScanPressed: widget.onScanPressed == null
-                            ? null
-                            : _handleScanPressed,
-                        onImportPhotoPressed:
-                            widget.onImportPhotoPressed ?? widget.onScanPressed,
-                        onPortfolioPressed: widget.onPortfolioPressed,
-                      ),
-              ),
-              if (homeData.isEmpty)
                 HomeSection(
                   topPadding: AppSpacing.sm,
                   child: _CompactQuickActions(
@@ -116,6 +107,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                         widget.onImportPhotoPressed ?? widget.onScanPressed,
                     onPortfolioPressed: widget.onPortfolioPressed,
                   ),
+                ),
+              ],
+              if (homeData.isEmpty)
+                const HomeSection(
+                  topPadding: AppSpacing.sm,
+                  child: _PopularCategoriesSection(),
                 ),
               if (recentItems.isNotEmpty)
                 HomeSection(
@@ -138,6 +135,17 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
     );
   }
+}
+
+String _homeGreetingFor(DateTime now) {
+  final hour = now.hour;
+  if (hour < 12) {
+    return 'Good morning,';
+  }
+  if (hour < 17) {
+    return 'Good afternoon,';
+  }
+  return 'Good evening,';
 }
 
 class _CompactQuickActions extends StatelessWidget {
@@ -318,206 +326,6 @@ class _CollectionSnapshotSection extends StatelessWidget {
       child: data.isEmpty
           ? _EmptySnapshot(data: data)
           : _SnapshotContent(data: data),
-    );
-  }
-}
-
-class _EmptyCollectionCard extends StatelessWidget {
-  const _EmptyCollectionCard({this.onScanPressed});
-
-  static const double iconCircleDiameter = 62;
-  static const double archiveIconSize = 30;
-
-  final VoidCallback? onScanPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      container: true,
-      label:
-          'Empty collection. Your collection is waiting. Scan your first item to get started.',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final textScale = MediaQuery.textScalerOf(context).scale(1);
-          final stackHero = constraints.maxWidth < 328 || textScale > 1.25;
-          final fixedPhoneHero = !stackHero && constraints.maxWidth <= 430;
-
-          return Container(
-            key: const ValueKey('home-empty-authority-card'),
-            width: double.infinity,
-            height: fixedPhoneHero ? 164 : null,
-            constraints: BoxConstraints(minHeight: fixedPhoneHero ? 156 : 0),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _packLoxRaisedSurfaceColor(colorScheme),
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(
-                color: _packLoxSurfaceBorderColor(colorScheme),
-              ),
-              boxShadow: AppElevation.level1,
-            ),
-            child: stackHero
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _EmptyHeroIcon(colorScheme: colorScheme),
-                      const SizedBox(height: AppSpacing.md),
-                      _EmptyHeroCopy(onScanPressed: onScanPressed),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _EmptyHeroIcon(colorScheme: colorScheme),
-                      const SizedBox(width: AppSpacing.lg),
-                      Expanded(
-                        child: _EmptyHeroCopy(
-                          onScanPressed: onScanPressed,
-                          compact: fixedPhoneHero,
-                        ),
-                      ),
-                    ],
-                  ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _EmptyHeroIcon extends StatelessWidget {
-  const _EmptyHeroIcon({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('home-empty-hero-icon-circle'),
-      width: _EmptyCollectionCard.iconCircleDiameter,
-      height: _EmptyCollectionCard.iconCircleDiameter,
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surface.withValues(alpha: 0.86),
-        shape: BoxShape.circle,
-        border: Border.all(color: PackLoxTokens.blue.withValues(alpha: 0.34)),
-      ),
-      child: Icon(
-        key: const ValueKey('home-empty-hero-archive-icon'),
-        Icons.inventory_2_outlined,
-        color: colorScheme.primary,
-        size: _EmptyCollectionCard.archiveIconSize,
-      ),
-    );
-  }
-}
-
-class _EmptyHeroCopy extends StatelessWidget {
-  const _EmptyHeroCopy({this.onScanPressed, this.compact = false});
-
-  final VoidCallback? onScanPressed;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Your collection is waiting',
-          maxLines: compact ? 1 : 2,
-          overflow: TextOverflow.ellipsis,
-          style:
-              (compact
-                      ? Theme.of(context).textTheme.titleMedium
-                      : Theme.of(context).textTheme.titleLarge)
-                  ?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w900,
-                    height: 1.08,
-                  ),
-        ),
-        SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
-        Text(
-          'Scan your first item to get started.',
-          maxLines: compact ? 1 : 2,
-          overflow: TextOverflow.ellipsis,
-          style:
-              (compact
-                      ? Theme.of(context).textTheme.bodySmall
-                      : Theme.of(context).textTheme.bodyMedium)
-                  ?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-        ),
-        SizedBox(height: compact ? 10 : AppSpacing.md),
-        _HeroScanButton(
-          key: const ValueKey('home-primary-scan'),
-          onPressed: onScanPressed,
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroScanButton extends StatelessWidget {
-  const _HeroScanButton({required this.onPressed, super.key});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: 'Scan a Collectible',
-      excludeSemantics: true,
-      child: SizedBox(
-        height: 52,
-        width: double.infinity,
-        child: TextButton.icon(
-          onPressed: onPressed,
-          icon: const Icon(Icons.photo_camera_outlined, size: 22),
-          label: const Text(
-            'Scan a Collectible',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          style: ButtonStyle(
-            backgroundColor: WidgetStatePropertyAll(
-              enabled
-                  ? PackLoxTokens.blue
-                  : PackLoxTokens.blue.withValues(alpha: .45),
-            ),
-            foregroundColor: const WidgetStatePropertyAll(
-              PackLoxTokens.textPrimary,
-            ),
-            overlayColor: WidgetStatePropertyAll(
-              Colors.white.withValues(alpha: .08),
-            ),
-            padding: const WidgetStatePropertyAll(
-              EdgeInsets.symmetric(horizontal: 18),
-            ),
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                side: const BorderSide(color: Color(0xFF60A5FA)),
-              ),
-            ),
-            textStyle: const WidgetStatePropertyAll(
-              TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -868,19 +676,32 @@ class _PopularCategoriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return HomeSectionSurface(
-      title: 'Popular Categories',
-      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
-      borderColor: _packLoxSurfaceBorderColor(colorScheme),
+    return Semantics(
+      container: true,
+      label: 'Popular Categories. See what collectors love.',
       child: Column(
+        key: const ValueKey('home-section-popular-categories'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            'Popular Categories',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+              height: 1.18,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
             'See what collectors love',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: HomeTokens.textSecondary,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

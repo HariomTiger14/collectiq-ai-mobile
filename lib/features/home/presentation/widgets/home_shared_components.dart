@@ -205,6 +205,168 @@ class HomeSurface extends StatelessWidget {
   }
 }
 
+class HomeEmptyCollectionHero extends StatelessWidget {
+  const HomeEmptyCollectionHero({
+    this.onScanPressed,
+    this.onSampleScanPressed,
+    super.key,
+  });
+
+  final VoidCallback? onScanPressed;
+  final VoidCallback? onSampleScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final sampleSupported = onSampleScanPressed != null;
+
+    return HomeSurface(
+      keyPrefix: 'home',
+      keySeed: 'empty-authority-card',
+      semanticLabel:
+          'Empty collection. Your collection is waiting. Scan your first item to get started.',
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      radius: HomeTokens.cardRadius,
+      backgroundColor: HomeTokens.surfaceRaised,
+      borderColor: HomeTokens.border,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            key: const ValueKey('home-empty-hero-icon-circle'),
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: HomeTokens.surface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: HomeTokens.accent.withValues(alpha: .4),
+              ),
+            ),
+            child: const Icon(
+              key: ValueKey('home-empty-hero-archive-icon'),
+              Icons.inventory_2_outlined,
+              color: HomeTokens.accent,
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Your collection is waiting',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: textTheme.titleMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+              height: 1.16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Scan your first item to get started.',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w500,
+              height: 1.24,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _HomeHeroPrimaryButton(onPressed: onScanPressed),
+          const SizedBox(height: 4),
+          Semantics(
+            button: true,
+            enabled: sampleSupported,
+            label: sampleSupported
+                ? 'Try a Sample Scan'
+                : 'Sample Scan unavailable',
+            excludeSemantics: true,
+            child: TextButton(
+              key: const ValueKey('home-sample-scan'),
+              onPressed: onSampleScanPressed,
+              style: TextButton.styleFrom(
+                foregroundColor: sampleSupported
+                    ? HomeTokens.accent
+                    : HomeTokens.textMuted,
+                minimumSize: const Size.fromHeight(28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                visualDensity: VisualDensity.compact,
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(
+                sampleSupported
+                    ? 'Try a Sample Scan'
+                    : 'Sample Scan unavailable',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeHeroPrimaryButton extends StatelessWidget {
+  const _HomeHeroPrimaryButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Scan a Collectible',
+      excludeSemantics: true,
+      child: SizedBox(
+        key: const ValueKey('home-primary-scan'),
+        height: 42,
+        width: double.infinity,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.photo_camera_outlined, size: 19),
+          label: const Text(
+            'Scan a Collectible',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: TextButton.styleFrom(
+            backgroundColor: enabled
+                ? HomeTokens.accentStrong
+                : HomeTokens.accentStrong.withValues(alpha: .45),
+            foregroundColor: HomeTokens.textPrimary,
+            disabledForegroundColor: HomeTokens.textPrimary.withValues(
+              alpha: .74,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: HomeTokens.accent.withValues(alpha: .68)),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class HomeSectionHeader extends StatelessWidget {
   const HomeSectionHeader({
     required this.title,
