@@ -1,7 +1,6 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
@@ -69,7 +68,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final horizontalPadding = AppSpacing.md;
+              final width = constraints.maxWidth;
+              final horizontalPadding = width < 360
+                  ? AppSpacing.lg
+                  : width <= 430
+                  ? 20.0
+                  : AppSpacing.xl;
 
               return CustomScrollView(
                 key: const PageStorageKey<String>('home-scroll-position'),
@@ -164,9 +168,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     )
                   else
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: AppSpacing.xxl),
-                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 104)),
                 ],
               );
             },
@@ -459,7 +461,7 @@ class _HomeFrame extends StatelessWidget {
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: const BoxConstraints(maxWidth: 640),
           child: SizedBox(width: double.infinity, child: child),
         ),
       ),
@@ -486,8 +488,8 @@ class _CollectionSnapshotSection extends StatelessWidget {
 class _EmptyCollectionCard extends StatelessWidget {
   const _EmptyCollectionCard({this.onScanPressed});
 
-  static const double iconCircleDiameter = 78;
-  static const double archiveIconSize = 36;
+  static const double iconCircleDiameter = 62;
+  static const double archiveIconSize = 30;
 
   final VoidCallback? onScanPressed;
 
@@ -499,75 +501,184 @@ class _EmptyCollectionCard extends StatelessWidget {
       container: true,
       label:
           'Empty collection. Your collection is waiting. Scan your first item to get started.',
-      child: Container(
-        key: const ValueKey('home-empty-authority-card'),
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-        decoration: BoxDecoration(
-          color: _packLoxRaisedSurfaceColor(colorScheme),
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-          boxShadow: AppElevation.level1,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScale = MediaQuery.textScalerOf(context).scale(1);
+          final stackHero = constraints.maxWidth < 328 || textScale > 1.25;
+          final fixedPhoneHero = !stackHero && constraints.maxWidth <= 430;
+
+          return Container(
+            key: const ValueKey('home-empty-authority-card'),
+            width: double.infinity,
+            height: fixedPhoneHero ? 164 : null,
+            constraints: BoxConstraints(minHeight: fixedPhoneHero ? 156 : 0),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _packLoxRaisedSurfaceColor(colorScheme),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: _packLoxSurfaceBorderColor(colorScheme),
+              ),
+              boxShadow: AppElevation.level1,
+            ),
+            child: stackHero
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EmptyHeroIcon(colorScheme: colorScheme),
+                      const SizedBox(height: AppSpacing.md),
+                      _EmptyHeroCopy(onScanPressed: onScanPressed),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _EmptyHeroIcon(colorScheme: colorScheme),
+                      const SizedBox(width: AppSpacing.lg),
+                      Expanded(
+                        child: _EmptyHeroCopy(
+                          onScanPressed: onScanPressed,
+                          compact: fixedPhoneHero,
+                        ),
+                      ),
+                    ],
+                  ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EmptyHeroIcon extends StatelessWidget {
+  const _EmptyHeroIcon({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('home-empty-hero-icon-circle'),
+      width: _EmptyCollectionCard.iconCircleDiameter,
+      height: _EmptyCollectionCard.iconCircleDiameter,
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surface.withValues(alpha: 0.86),
+        shape: BoxShape.circle,
+        border: Border.all(color: PackLoxTokens.blue.withValues(alpha: 0.34)),
+      ),
+      child: Icon(
+        key: const ValueKey('home-empty-hero-archive-icon'),
+        Icons.inventory_2_outlined,
+        color: colorScheme.primary,
+        size: _EmptyCollectionCard.archiveIconSize,
+      ),
+    );
+  }
+}
+
+class _EmptyHeroCopy extends StatelessWidget {
+  const _EmptyHeroCopy({this.onScanPressed, this.compact = false});
+
+  final VoidCallback? onScanPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your collection is waiting',
+          maxLines: compact ? 1 : 2,
+          overflow: TextOverflow.ellipsis,
+          style:
+              (compact
+                      ? Theme.of(context).textTheme.titleMedium
+                      : Theme.of(context).textTheme.titleLarge)
+                  ?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                    height: 1.08,
+                  ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              key: const ValueKey('home-empty-hero-icon-circle'),
-              width: iconCircleDiameter,
-              height: iconCircleDiameter,
-              decoration: BoxDecoration(
-                color: PackLoxTokens.surface.withValues(alpha: 0.86),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: PackLoxTokens.blue.withValues(alpha: 0.34),
-                ),
-              ),
-              child: Icon(
-                key: const ValueKey('home-empty-hero-archive-icon'),
-                Icons.inventory_2_outlined,
-                color: colorScheme.primary,
-                size: archiveIconSize,
+        SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
+        Text(
+          'Scan your first item to get started.',
+          maxLines: compact ? 1 : 2,
+          overflow: TextOverflow.ellipsis,
+          style:
+              (compact
+                      ? Theme.of(context).textTheme.bodySmall
+                      : Theme.of(context).textTheme.bodyMedium)
+                  ?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+        ),
+        SizedBox(height: compact ? 10 : AppSpacing.md),
+        _HeroScanButton(
+          key: const ValueKey('home-primary-scan'),
+          onPressed: onScanPressed,
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroScanButton extends StatelessWidget {
+  const _HeroScanButton({required this.onPressed, super.key});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Scan a Collectible',
+      excludeSemantics: true,
+      child: SizedBox(
+        height: 52,
+        width: double.infinity,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.photo_camera_outlined, size: 22),
+          label: const Text(
+            'Scan a Collectible',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: ButtonStyle(
+            backgroundColor: WidgetStatePropertyAll(
+              enabled
+                  ? PackLoxTokens.blue
+                  : PackLoxTokens.blue.withValues(alpha: .45),
+            ),
+            foregroundColor: const WidgetStatePropertyAll(
+              PackLoxTokens.textPrimary,
+            ),
+            overlayColor: WidgetStatePropertyAll(
+              Colors.white.withValues(alpha: .08),
+            ),
+            padding: const WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: 18),
+            ),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                side: const BorderSide(color: Color(0xFF60A5FA)),
               ),
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your collection is waiting',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                      height: 1.05,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Scan your first item to get started.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  PackLoxButton(
-                    key: const ValueKey('home-primary-scan'),
-                    label: 'Scan a Collectible',
-                    leadingIcon: Icons.photo_camera_outlined,
-                    onPressed: onScanPressed,
-                    size: PackLoxButtonSize.compact,
-                  ),
-                ],
-              ),
+            textStyle: const WidgetStatePropertyAll(
+              TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -749,48 +860,59 @@ class _EmptySnapshot extends StatelessWidget {
     return Semantics(
       container: true,
       label:
-          'Collection dashboard summary. Zero items. Estimated value unavailable. Average condition unavailable. Zero scans.',
+          'Collection dashboard summary. Zero items. Estimated value unavailable. Average condition unavailable.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _StatusMetric(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 300;
+              final metrics = <Widget>[
+                _StatusMetric(
                   key: const ValueKey('home-status-metric-items'),
                   icon: Icons.layers_outlined,
                   value: '${data.itemCount}',
                   label: 'Items',
                 ),
-              ),
-              const _MetricDivider(),
-              const Expanded(
-                child: _StatusMetric(
+                const _StatusMetric(
                   key: ValueKey('home-status-metric-estimated-value'),
                   icon: Icons.inventory_2_outlined,
-                  value: '-',
+                  value: '\u2014',
                   label: 'Est. value',
+                  semanticValue: 'unavailable',
                 ),
-              ),
-              const _MetricDivider(),
-              const Expanded(
-                child: _StatusMetric(
+                const _StatusMetric(
                   key: ValueKey('home-status-metric-average-condition'),
                   icon: Icons.verified_user_outlined,
-                  value: '-',
+                  value: '\u2014',
                   label: 'Avg. condition',
+                  semanticValue: 'unavailable',
                 ),
-              ),
-              const _MetricDivider(),
-              Expanded(
-                child: _StatusMetric(
-                  key: const ValueKey('home-status-metric-scans'),
-                  icon: Icons.history_rounded,
-                  value: '0',
-                  label: 'Scans',
-                ),
-              ),
-            ],
+              ];
+
+              if (compact) {
+                return Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.md,
+                  children: [
+                    for (final metric in metrics)
+                      SizedBox(
+                        width: (constraints.maxWidth - AppSpacing.sm) / 2,
+                        child: metric,
+                      ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  for (var i = 0; i < metrics.length; i++) ...[
+                    if (i > 0) const _MetricDivider(),
+                    Expanded(child: metrics[i]),
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -812,46 +934,57 @@ class _StatusMetric extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.label,
+    this.semanticValue,
   });
 
   final IconData icon;
   final String value;
   final String label;
+  final String? semanticValue;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      key: ValueKey(
-        'home-status-metric-${label.toLowerCase().replaceAll(' ', '-').replaceAll('.', '')}',
-      ),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: colorScheme.onSurfaceVariant, size: 18),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w900,
-            height: 1,
-          ),
+    return Semantics(
+      container: true,
+      label: '$label ${semanticValue ?? value}',
+      excludeSemantics: true,
+      child: Column(
+        key: ValueKey(
+          'home-status-metric-${label.toLowerCase().replaceAll(' ', '-').replaceAll('.', '')}',
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
             color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
+            size: AppIconSizes.sm,
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -874,10 +1007,26 @@ class _PopularCategoriesSection extends StatelessWidget {
   const _PopularCategoriesSection();
 
   static const _categories = [
-    (label: 'Cards', icon: Icons.style_outlined),
-    (label: 'Coins', icon: Icons.album_outlined),
-    (label: 'Figures', icon: Icons.smart_toy_outlined),
-    (label: 'More', icon: Icons.grid_view_outlined),
+    (
+      label: 'Cards',
+      icon: Icons.style_outlined,
+      semanticMeaning: 'trading cards',
+    ),
+    (
+      label: 'Coins',
+      icon: Icons.album_outlined,
+      semanticMeaning: 'collectible coins and medallions',
+    ),
+    (
+      label: 'Figures',
+      icon: Icons.smart_toy_outlined,
+      semanticMeaning: 'figurines and action figures',
+    ),
+    (
+      label: 'More',
+      icon: Icons.grid_view_outlined,
+      semanticMeaning: 'more categories grid',
+    ),
   ];
 
   @override
@@ -899,20 +1048,24 @@ class _PopularCategoriesSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           LayoutBuilder(
             builder: (context, constraints) {
-              const gap = AppSpacing.xs;
-              final tileWidth = (constraints.maxWidth - gap * 3) / 4;
-              return Row(
+              const gap = 12.0;
+              final fourColumnTileWidth = (constraints.maxWidth - gap * 3) / 4;
+              final columns = fourColumnTileWidth >= 68 ? 4 : 2;
+              final tileWidth =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
                 children: [
-                  for (var i = 0; i < _categories.length; i++) ...[
-                    if (i > 0) const SizedBox(width: gap),
+                  for (final category in _categories)
                     SizedBox(
                       width: tileWidth,
                       child: _CategoryChip(
-                        label: _categories[i].label,
-                        icon: _categories[i].icon,
+                        label: category.label,
+                        icon: category.icon,
+                        semanticMeaning: category.semanticMeaning,
                       ),
                     ),
-                  ],
                 ],
               );
             },
@@ -924,12 +1077,17 @@ class _PopularCategoriesSection extends StatelessWidget {
 }
 
 class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({required this.label, required this.icon});
+  const _CategoryChip({
+    required this.label,
+    required this.icon,
+    required this.semanticMeaning,
+  });
 
   static const double iconSize = 30;
 
   final String label;
   final IconData icon;
+  final String semanticMeaning;
 
   @override
   Widget build(BuildContext context) {
@@ -937,11 +1095,12 @@ class _CategoryChip extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: 'Popular category $label',
+      label: 'Popular category $label, $semanticMeaning',
       child: Container(
         key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-        constraints: const BoxConstraints(minHeight: 60),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        constraints: const BoxConstraints(minHeight: 74),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: PackLoxTokens.surface.withValues(
             alpha: colorScheme.brightness == Brightness.dark ? 0.88 : 0.72,
