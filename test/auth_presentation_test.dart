@@ -340,15 +340,220 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('auth-create-account-continue')),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        'Email verification continues in the next authentication sprint.',
-      ),
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Enter the code we sent to c***@example.com.'),
       findsOneWidget,
     );
     expect(repository.signUpCalls, 0);
+  });
+
+  testWidgets('S02 Continue with valid email navigates to S03', (tester) async {
+    await tester.pumpAuthScreen(const AuthSignUpScreen());
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'hari@example.com',
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Verify your email'), findsOneWidget);
+    expect(
+      find.text('Enter the code we sent to h***@example.com.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('S03 hierarchy renders frozen OTP contract', (tester) async {
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+    );
+
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-brand-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Verify your email'), findsOneWidget);
+    expect(
+      find.text('Enter the code we sent to c***@example.com.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-otp-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Verification code'), findsOneWidget);
+    expect(find.text('6-digit code'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-verify')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-resend')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-change-email')),
+      findsOneWidget,
+    );
+    expect(find.text('This code expires in 10:00.'), findsOneWidget);
+    expect(find.text('5 attempts remaining.'), findsOneWidget);
+    expect(find.text('Create your password'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('S03 Verify enables only for 6 digits without auto-submit', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+    );
+
+    TextButton verifyButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNull);
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '12345',
+    );
+    await tester.pump();
+
+    verifyButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNull);
+    expect(find.textContaining('not correct'), findsNothing);
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '123456',
+    );
+    await tester.pump();
+
+    verifyButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNotNull);
+    expect(find.textContaining('not correct'), findsNothing);
+  });
+
+  testWidgets('S03 Resend code uses 30 second cooldown', (tester) async {
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+    );
+
+    expect(find.text('Resend code in 30s'), findsOneWidget);
+    TextButton resendButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-resend')),
+    );
+    expect(resendButton.onPressed, isNull);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+
+    expect(find.text('Resend code'), findsOneWidget);
+    resendButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-resend')),
+    );
+    expect(resendButton.onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
+    await tester.pump();
+
+    expect(find.text('Resend code in 30s'), findsOneWidget);
+    expect(find.text('5 attempts remaining.'), findsOneWidget);
+  });
+
+  testWidgets('S03 five attempt lockout requires resend', (tester) async {
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '123456',
+    );
+    await tester.pump();
+
+    for (var attempt = 0; attempt < 5; attempt += 1) {
+      await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+      await tester.pump();
+    }
+
+    expect(find.text('Too many attempts. Request a new code.'), findsOneWidget);
+    expect(find.text('Request a new code to try again.'), findsOneWidget);
+
+    TextButton verifyButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNull);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
+    await tester.pump();
+
+    expect(find.text('Too many attempts. Request a new code.'), findsNothing);
+    expect(find.text('5 attempts remaining.'), findsOneWidget);
+    verifyButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNull);
+  });
+
+  testWidgets('S03 Change email returns to S02', (tester) async {
+    await tester.pumpAuthScreen(const AuthSignUpScreen());
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'collector@example.com',
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('auth-verify-email-change-email')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsNothing,
+    );
   });
 
   testWidgets('S02 Sign In bridge opens the sign-in route shell', (

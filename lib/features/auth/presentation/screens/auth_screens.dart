@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
@@ -11,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 abstract final class AuthRouteNames {
   static const welcome = 'auth/welcome';
   static const createAccountEmail = 'auth/create-account/email';
+  static const verifyEmail = 'auth/create-account/verify-email';
   static const signIn = 'auth/sign-in';
   static const forgotPasswordEmail = 'auth/forgot-password/email';
   static const guestHome = 'app/guest-home';
@@ -1241,15 +1244,9 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
     if (_emailError != null) {
       return;
     }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Email verification continues in the next authentication sprint.',
-          ),
-        ),
-      );
+    Navigator.of(
+      context,
+    ).push(AuthVerifyEmailScreen.route(email: _emailController.text.trim()));
   }
 
   void _openSignIn() {
@@ -1442,13 +1439,399 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   }
 }
 
+class AuthVerifyEmailScreen extends StatefulWidget {
+  const AuthVerifyEmailScreen({super.key, this.email});
+
+  final String? email;
+
+  static Route<void> route({String? email}) {
+    return MaterialPageRoute<void>(
+      settings: RouteSettings(
+        name: AuthRouteNames.verifyEmail,
+        arguments: {'email': email},
+      ),
+      builder: (_) => AuthVerifyEmailScreen(email: email),
+    );
+  }
+
+  @override
+  State<AuthVerifyEmailScreen> createState() => _AuthVerifyEmailScreenState();
+}
+
+class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
+  static const _otpLength = 6;
+  static const _maxAttempts = 5;
+  static const _resendCooldownSeconds = 30;
+
+  final _codeController = TextEditingController();
+  Timer? _cooldownTimer;
+  var _cooldownRemaining = _resendCooldownSeconds;
+  var _attemptsRemaining = _maxAttempts;
+  var _requiresResend = false;
+  String? _fieldError;
+
+  String get _maskedEmail => _maskEmailForVerification(widget.email);
+
+  bool get _hasCompleteCode => _codeController.text.length == _otpLength;
+
+  bool get _canVerify => _hasCompleteCode && !_requiresResend;
+
+  bool get _canResend => _cooldownRemaining == 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController.addListener(_handleCodeChanged);
+    _startCooldownTimer();
+  }
+
+  @override
+  void dispose() {
+    _cooldownTimer?.cancel();
+    _codeController.removeListener(_handleCodeChanged);
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  void _handleCodeChanged() {
+    if (_fieldError != null && !_requiresResend) {
+      _fieldError = null;
+    }
+    setState(() {});
+  }
+
+  void _startCooldownTimer() {
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_cooldownRemaining <= 1) {
+        timer.cancel();
+        setState(() => _cooldownRemaining = 0);
+        return;
+      }
+      setState(() => _cooldownRemaining -= 1);
+    });
+  }
+
+  void _verify() {
+    if (!_canVerify) {
+      return;
+    }
+    setState(() {
+      if (_attemptsRemaining <= 1) {
+        _attemptsRemaining = 0;
+        _requiresResend = true;
+        _fieldError = 'Too many attempts. Request a new code.';
+      } else {
+        _attemptsRemaining -= 1;
+        _fieldError = 'That code is not correct. Try again.';
+      }
+    });
+  }
+
+  void _resendCode() {
+    if (!_canResend) {
+      return;
+    }
+    _codeController.clear();
+    setState(() {
+      _cooldownRemaining = _resendCooldownSeconds;
+      _attemptsRemaining = _maxAttempts;
+      _requiresResend = false;
+      _fieldError = null;
+    });
+    _startCooldownTimer();
+  }
+
+  void _changeEmail() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    navigator.pushReplacement(AuthSignUpScreen.route());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-verify-email-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
+            ),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final compactHeight =
+                    constraints.maxHeight < 760 || viewInsets.bottom > 0;
+                final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
+                final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-verify-email-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg + viewInsets.bottom,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: AutofillGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AuthCompactBrandLockup(
+                                keyPrefix: 'auth-verify-email',
+                                emblemSize: compactHeight ? 54 : 62,
+                              ),
+                              SizedBox(height: titleGap),
+                              const Text(
+                                'Verify your email',
+                                key: ValueKey('auth-verify-email-title'),
+                                textAlign: TextAlign.left,
+                                style: TextStyle(
+                                  color: PackLoxTokens.textPrimary,
+                                  fontSize: 30,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                'Enter the code we sent to $_maskedEmail.',
+                                key: const ValueKey(
+                                  'auth-verify-email-supporting-copy',
+                                ),
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .94,
+                                  ),
+                                  fontSize: 15,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxl),
+                              _OtpCodeField(
+                                key: const ValueKey(
+                                  'auth-verify-email-otp-field',
+                                ),
+                                controller: _codeController,
+                                errorText: _fieldError,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _GradientAuthButton(
+                                key: const ValueKey('auth-verify-email-verify'),
+                                label: 'Verify',
+                                semanticLabel: 'Verify',
+                                onPressed: _canVerify ? _verify : null,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _CooldownAuthAction(
+                                key: const ValueKey('auth-verify-email-resend'),
+                                label: _canResend
+                                    ? 'Resend code'
+                                    : 'Resend code in ${_cooldownRemaining}s',
+                                semanticLabel: _canResend
+                                    ? 'Resend code'
+                                    : 'Resend code available in $_cooldownRemaining seconds',
+                                enabled: _canResend,
+                                onPressed: _resendCode,
+                              ),
+                              _QuietAuthAction(
+                                key: const ValueKey(
+                                  'auth-verify-email-change-email',
+                                ),
+                                label: 'Change email',
+                                semanticLabel: 'Change email',
+                                onPressed: _changeEmail,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                'This code expires in 10:00.',
+                                key: const ValueKey('auth-verify-email-expiry'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .82,
+                                  ),
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                _requiresResend
+                                    ? 'Request a new code to try again.'
+                                    : '$_attemptsRemaining attempts remaining.',
+                                key: const ValueKey(
+                                  'auth-verify-email-attempts',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .72,
+                                  ),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const Spacer(),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OtpCodeField extends StatelessWidget {
+  const _OtpCodeField({
+    required this.controller,
+    required this.errorText,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String? errorText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Verification code, 6-digit code',
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        autofillHints: const [AutofillHints.oneTimeCode],
+        maxLength: 6,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(6),
+        ],
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: PackLoxTokens.textPrimary,
+          fontSize: 26,
+          height: 1.2,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 8,
+        ),
+        decoration: InputDecoration(
+          labelText: 'Verification code',
+          hintText: '6-digit code',
+          counterText: '',
+          errorText: errorText,
+        ),
+      ),
+    );
+  }
+}
+
+class _CooldownAuthAction extends StatelessWidget {
+  const _CooldownAuthAction({
+    required this.label,
+    required this.semanticLabel,
+    required this.enabled,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: TextButton(
+        onPressed: enabled ? onPressed : null,
+        style: TextButton.styleFrom(
+          foregroundColor: enabled
+              ? const Color(0xFF9CCBFF)
+              : PackLoxTokens.textSecondary.withValues(alpha: .70),
+          disabledForegroundColor: PackLoxTokens.textSecondary.withValues(
+            alpha: .70,
+          ),
+          minimumSize: const Size.fromHeight(48),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            height: 1.2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
 class _AuthCompactBrandLockup extends StatelessWidget {
-  const _AuthCompactBrandLockup({required this.emblemSize});
+  const _AuthCompactBrandLockup({
+    required this.emblemSize,
+    this.keyPrefix = 'auth-create-account',
+  });
 
   static const _brandV2EmblemPath =
       'assets/packlox/brand/packlox_brand_v2_emblem_authority_v0_7.png';
 
   final double emblemSize;
+  final String keyPrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -1456,11 +1839,11 @@ class _AuthCompactBrandLockup extends StatelessWidget {
       container: true,
       label: 'PackLox Brand v2 identity',
       child: Row(
-        key: const ValueKey('auth-create-account-brand-identity'),
+        key: ValueKey('$keyPrefix-brand-identity'),
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox.square(
-            key: const ValueKey('auth-create-account-brand-emblem'),
+            key: ValueKey('$keyPrefix-brand-emblem'),
             dimension: emblemSize,
             child: Padding(
               padding: const EdgeInsets.all(3),
@@ -1488,7 +1871,7 @@ class _AuthCompactBrandLockup extends StatelessWidget {
                 ),
               ],
             ),
-            key: const ValueKey('auth-create-account-wordmark'),
+            key: ValueKey('$keyPrefix-wordmark'),
             textAlign: TextAlign.left,
             style: const TextStyle(
               fontSize: 26,
@@ -2026,6 +2409,18 @@ String? _validateCreateAccountEmail(String email) {
     return 'Enter a valid email address.';
   }
   return null;
+}
+
+String _maskEmailForVerification(String? email) {
+  final trimmed = email?.trim() ?? '';
+  final atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0 || atIndex == trimmed.length - 1) {
+    return 'h***@example.com';
+  }
+
+  final localPart = trimmed.substring(0, atIndex);
+  final domain = trimmed.substring(atIndex + 1);
+  return '${localPart[0]}***@$domain';
 }
 
 String? _validatePassword(String password) {
