@@ -2616,7 +2616,7 @@ class _AuthSocialProviderBlock extends StatelessWidget {
   }
 }
 
-class AuthForgotPasswordScreen extends StatefulWidget {
+class AuthForgotPasswordScreen extends ConsumerStatefulWidget {
   const AuthForgotPasswordScreen({super.key, this.initialEmail});
 
   final String? initialEmail;
@@ -2632,11 +2632,12 @@ class AuthForgotPasswordScreen extends StatefulWidget {
   }
 
   @override
-  State<AuthForgotPasswordScreen> createState() =>
+  ConsumerState<AuthForgotPasswordScreen> createState() =>
       _AuthForgotPasswordScreenState();
 }
 
-class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
+class _AuthForgotPasswordScreenState
+    extends ConsumerState<AuthForgotPasswordScreen> {
   static const _resendCooldownSeconds = 30;
   static const _maxRequestCount = 5;
 
@@ -2647,6 +2648,8 @@ class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
   var _requestCount = 0;
   var _cooldownRemaining = 0;
   var _rateLimited = false;
+  var _isRequesting = false;
+  String? _requestError;
 
   @override
   void initState() {
@@ -2675,10 +2678,12 @@ class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
     setState(() {
       _submitted = false;
       _rateLimited = false;
+      _requestError = null;
     });
   }
 
   bool get _canSend =>
+      !_isRequesting &&
       _validateForgotPasswordEmail(_emailController.text) == null;
 
   String? get _emailError {
@@ -2687,35 +2692,84 @@ class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
   }
 
   void _submit() {
-    setState(() => _submitted = true);
+    setState(() {
+      _submitted = true;
+      _requestError = null;
+    });
     if (!_canSend) {
       return;
     }
-    _acceptRequest();
+    unawaited(_sendResetRequest());
   }
 
   void _resend() {
-    if (_cooldownRemaining > 0 || _rateLimited) {
+    if (_cooldownRemaining > 0 || _rateLimited || _isRequesting) {
       return;
     }
-    _acceptRequest();
+    unawaited(_sendResetRequest());
   }
 
-  void _acceptRequest() {
+  Future<void> _sendResetRequest() async {
+    if (_requestCount >= _maxRequestCount) {
+      setState(() {
+        _confirmed = true;
+        _rateLimited = true;
+        _requestError = null;
+      });
+      return;
+    }
+
     _cooldownTimer?.cancel();
+    setState(() {
+      _isRequesting = true;
+      _requestError = null;
+    });
+
+    final backendController = ref.read(
+      authBackendContractControllerProvider.notifier,
+    );
+    await backendController.requestPasswordReset(
+      email: _emailController.text.trim(),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final backendState = ref.read(authBackendContractControllerProvider);
+    if (backendState.status ==
+        AuthBackendContractStatus.passwordResetConfirmation) {
+      _acceptRequest(cooldown: backendState.cooldownRemaining);
+      return;
+    }
+
+    setState(() {
+      _isRequesting = false;
+      _requestError =
+          backendState.failure?.safeMessage ??
+          backendState.infoMessage ??
+          'We could not send reset instructions. Check your connection and try again.';
+    });
+  }
+
+  void _acceptRequest({Duration? cooldown}) {
+    final cooldownSeconds = cooldown?.inSeconds ?? _resendCooldownSeconds;
     setState(() {
       _submitted = false;
       _confirmed = true;
+      _isRequesting = false;
+      _requestError = null;
       _requestCount += 1;
       _rateLimited = _requestCount >= _maxRequestCount;
     });
     if (!_rateLimited) {
-      _startCooldown();
+      _startCooldown(
+        cooldownSeconds > 0 ? cooldownSeconds : _resendCooldownSeconds,
+      );
     }
   }
 
-  void _startCooldown() {
-    setState(() => _cooldownRemaining = _resendCooldownSeconds);
+  void _startCooldown(int seconds) {
+    setState(() => _cooldownRemaining = seconds);
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -2800,6 +2854,8 @@ class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
                                 _ForgotPasswordConfirmationContent(
                                   cooldownRemaining: _cooldownRemaining,
                                   rateLimited: _rateLimited,
+                                  isLoading: _isRequesting,
+                                  requestError: _requestError,
                                   onBackToSignIn: _backToSignIn,
                                   onResend: _resend,
                                 )
@@ -2808,6 +2864,8 @@ class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
                                   emailController: _emailController,
                                   emailError: _emailError,
                                   canSend: _canSend,
+                                  isLoading: _isRequesting,
+                                  requestError: _requestError,
                                   onSubmit: _submit,
                                   onBackToSignIn: _backToSignIn,
                                 ),
@@ -2834,6 +2892,8 @@ class _ForgotPasswordRequestContent extends StatelessWidget {
     required this.emailController,
     required this.emailError,
     required this.canSend,
+    required this.isLoading,
+    required this.requestError,
     required this.onSubmit,
     required this.onBackToSignIn,
   });
@@ -2841,6 +2901,8 @@ class _ForgotPasswordRequestContent extends StatelessWidget {
   final TextEditingController emailController;
   final String? emailError;
   final bool canSend;
+  final bool isLoading;
+  final String? requestError;
   final VoidCallback onSubmit;
   final VoidCallback onBackToSignIn;
 
@@ -2882,14 +2944,22 @@ class _ForgotPasswordRequestContent extends StatelessWidget {
           keyboardType: TextInputType.emailAddress,
           autofillHints: const [AutofillHints.email],
           errorText: emailError,
+          enabled: !isLoading,
           onSubmitted: (_) => onSubmit(),
         ),
+        if (requestError != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _ForgotPasswordNotice(
+            key: const ValueKey('auth-forgot-request-error'),
+            text: requestError!,
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         _GradientAuthButton(
           key: const ValueKey('auth-forgot-submit'),
-          label: 'Send reset instructions',
+          label: isLoading ? 'Sending...' : 'Send reset instructions',
           semanticLabel: 'Send reset instructions',
-          onPressed: canSend ? onSubmit : null,
+          onPressed: canSend && !isLoading ? onSubmit : null,
         ),
         const SizedBox(height: AppSpacing.md),
         _OutlineAuthButton(
@@ -2907,12 +2977,16 @@ class _ForgotPasswordConfirmationContent extends StatelessWidget {
   const _ForgotPasswordConfirmationContent({
     required this.cooldownRemaining,
     required this.rateLimited,
+    required this.isLoading,
+    required this.requestError,
     required this.onBackToSignIn,
     required this.onResend,
   });
 
   final int cooldownRemaining;
   final bool rateLimited;
+  final bool isLoading;
+  final String? requestError;
   final VoidCallback onBackToSignIn;
   final VoidCallback onResend;
 
@@ -2953,12 +3027,24 @@ class _ForgotPasswordConfirmationContent extends StatelessWidget {
           semanticLabel: 'Back to Sign In',
           onPressed: onBackToSignIn,
         ),
+        if (requestError != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _ForgotPasswordNotice(
+            key: const ValueKey('auth-forgot-request-error'),
+            text: requestError!,
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         if (rateLimited)
           const _ForgotPasswordNotice(
             key: ValueKey('auth-forgot-rate-limit'),
             text:
                 "We couldn't send more instructions right now. Please wait and try again.",
+          )
+        else if (isLoading)
+          const _ForgotPasswordNotice(
+            key: ValueKey('auth-forgot-resend-loading'),
+            text: 'Sending reset instructions...',
           )
         else if (cooldownRemaining > 0)
           _ForgotPasswordNotice(

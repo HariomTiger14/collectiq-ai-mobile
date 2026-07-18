@@ -989,10 +989,10 @@ void main() {
   });
 
   testWidgets('S06 Send disabled for empty or invalid email', (tester) async {
-    final repository = _InteractiveAuthRepository();
+    final backendRepository = InMemoryAuthBackendRepository();
     await tester.pumpAuthScreen(
       const AuthForgotPasswordScreen(),
-      repository: repository,
+      backendRepository: backendRepository,
     );
 
     TextButton sendButton = tester.widget(
@@ -1010,21 +1010,21 @@ void main() {
       _textButtonIn(const ValueKey('auth-forgot-submit')),
     );
     expect(sendButton.onPressed, isNull);
-    expect(repository.passwordResetCalls, 0);
+    expect(backendRepository.resetCalls, 0);
   });
 
-  testWidgets('S06 submit shows generic confirmation and stays on S06', (
+  testWidgets('S06 send reset calls backend and shows generic confirmation', (
     tester,
   ) async {
-    final repository = _InteractiveAuthRepository();
+    final backendRepository = InMemoryAuthBackendRepository();
     await tester.pumpAuthScreen(
       const AuthForgotPasswordScreen(),
-      repository: repository,
+      backendRepository: backendRepository,
     );
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-forgot-email-field')),
-      'reset@example.com',
+      'Reset@Example.com ',
     );
     await tester.pump();
 
@@ -1035,8 +1035,10 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
     await tester.pump();
+    await tester.pump();
 
-    expect(repository.passwordResetCalls, 0);
+    expect(backendRepository.resetCalls, 1);
+    expect(backendRepository.lastResetEmail, 'reset@example.com');
     expect(
       find.byKey(const ValueKey('auth-forgot-password-screen')),
       findsOneWidget,
@@ -1057,14 +1059,89 @@ void main() {
       find.textContaining('account exists for this email'),
       findsOneWidget,
     );
-    expect(find.textContaining('account not found'), findsNothing);
     expect(find.textContaining('S07'), findsNothing);
   });
 
-  testWidgets('S06 resend instructions uses 30 second cooldown', (
+  testWidgets('S06 unknown-email reset result stays generic', (tester) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      resetUnknownAsAccountExistenceFailure: true,
+    );
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'missing@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.resetCalls, 1);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-confirmation')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'If an account exists for this email, reset instructions have been sent.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Email or password is not correct.'), findsNothing);
+  });
+
+  testWidgets('S06 backend failure shows safe retry copy without enumeration', (
     tester,
   ) async {
-    await tester.pumpAuthScreen(const AuthForgotPasswordScreen());
+    final backendRepository = InMemoryAuthBackendRepository(
+      networkOffline: true,
+    );
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'reset@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.resetCalls, 1);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-request-error')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'You appear to be offline. Check your connection and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-forgot-confirmation')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('S06 loading disables reset CTA and prevents duplicate submit', (
+    tester,
+  ) async {
+    final resetGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      resetGate: resetGate,
+    );
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-forgot-email-field')),
@@ -1074,6 +1151,45 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
     await tester.pump();
 
+    expect(backendRepository.resetCalls, 1);
+    expect(find.text('Sending...'), findsOneWidget);
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-forgot-submit')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+    expect(backendRepository.resetCalls, 1);
+
+    resetGate.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('auth-forgot-confirmation')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('S06 resend instructions uses backend with 30 second cooldown', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository();
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'reset@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.resetCalls, 1);
     expect(find.text('You can resend instructions in 30s.'), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-forgot-resend')), findsNothing);
 
@@ -1084,14 +1200,20 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('auth-forgot-resend')));
     await tester.pump();
+    await tester.pump();
 
+    expect(backendRepository.resetCalls, 2);
     expect(find.text('You can resend instructions in 30s.'), findsOneWidget);
   });
 
-  testWidgets('S06 five request local limit shows neutral rate limit', (
+  testWidgets('S06 five request local limit blocks extra backend calls', (
     tester,
   ) async {
-    await tester.pumpAuthScreen(const AuthForgotPasswordScreen());
+    final backendRepository = InMemoryAuthBackendRepository();
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-forgot-email-field')),
@@ -1100,13 +1222,16 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
     await tester.pump();
+    await tester.pump();
 
     for (var index = 0; index < 4; index += 1) {
       await tester.pump(const Duration(seconds: 31));
       await tester.tap(find.byKey(const ValueKey('auth-forgot-resend')));
       await tester.pump();
+      await tester.pump();
     }
 
+    expect(backendRepository.resetCalls, 5);
     expect(
       find.byKey(const ValueKey('auth-forgot-rate-limit')),
       findsOneWidget,
@@ -1118,6 +1243,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('auth-forgot-resend')), findsNothing);
+
+    await tester.pump(const Duration(seconds: 31));
+    expect(backendRepository.resetCalls, 5);
   });
 
   testWidgets('S06 Back to Sign In returns to S05', (tester) async {

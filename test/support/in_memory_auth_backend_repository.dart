@@ -22,6 +22,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     this.expectedOtp = '123456',
     this.networkOffline = false,
     this.signInGate,
+    this.resetGate,
+    this.resetUnknownAsAccountExistenceFailure = false,
   }) {
     for (final account in accounts) {
       _accounts[_normalize(account.email)] = account;
@@ -31,6 +33,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   final String expectedOtp;
   final bool networkOffline;
   final Completer<void>? signInGate;
+  final Completer<void>? resetGate;
+  final bool resetUnknownAsAccountExistenceFailure;
   final _accounts = <String, InMemoryAuthAccount>{};
   final _pendingSignupEmails = <String>{};
   final _verifiedEmails = <String, EmailOtpVerification>{};
@@ -40,6 +44,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   int signInCalls = 0;
   String? lastSignInEmail;
   String? lastSignInPassword;
+  String? lastResetEmail;
   int signupStartCalls = 0;
   int otpVerifyCalls = 0;
   int passwordCreateCalls = 0;
@@ -198,13 +203,25 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String email,
   }) async {
     resetCalls += 1;
+    final normalized = _normalize(email);
+    lastResetEmail = normalized;
+    final gate = resetGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),
       );
     }
+    if (resetUnknownAsAccountExistenceFailure &&
+        !_accounts.containsKey(normalized)) {
+      return const AuthBackendResult.failure(
+        AuthBackendFailure(AuthBackendFailureCode.accountExistenceNotDisclosed),
+      );
+    }
     return AuthBackendResult.success(
-      PasswordResetRequestResult(email: _normalize(email)),
+      PasswordResetRequestResult(email: normalized),
     );
   }
 

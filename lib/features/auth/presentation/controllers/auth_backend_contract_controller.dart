@@ -314,8 +314,10 @@ class AuthBackendContractController extends Notifier<AuthBackendContractState> {
     );
     final result = await _repository.requestPasswordReset(email: email.trim());
     final failure = result.failure;
-    if (failure != null &&
-        failure.code != AuthBackendFailureCode.accountExistenceNotDisclosed) {
+    final shouldPreserveResetAnonymity =
+        failure?.code == AuthBackendFailureCode.accountExistenceNotDisclosed ||
+        failure?.code == AuthBackendFailureCode.invalidCredentialsNeutral;
+    if (failure != null && !shouldPreserveResetAnonymity) {
       _applyFailure(
         failure,
         fallbackStatus: AuthBackendContractStatus.signedOut,
