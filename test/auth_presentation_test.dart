@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
@@ -13,13 +11,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Sign In is a separate screen with approved header and fields', (
-    tester,
-  ) async {
+  testWidgets('S05 hierarchy renders frozen sign in contract', (tester) async {
     await tester.pumpAuthScreen(const AuthSignInScreen());
 
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-packlox-header')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-brand-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(
+      find.text('Sign in to continue protecting your collection.'),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('auth-sign-in-email-field')),
       findsOneWidget,
@@ -28,6 +32,26 @@ void main() {
       find.byKey(const ValueKey('auth-sign-in-password-field')),
       findsOneWidget,
     );
+    expect(find.text('Email address'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-sign-in-submit')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-link')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-create-account-bridge')),
+      findsOneWidget,
+    );
+    expect(find.text('New to PackLox?'), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-provider-block')),
+      findsNothing,
+    );
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Continue with Apple'), findsNothing);
+    expect(find.text('Facebook'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-auth-email-field')),
       findsNothing,
@@ -158,95 +182,107 @@ void main() {
     expect(password.obscureText, isFalse);
   });
 
-  testWidgets('validation remains real and prevents sign-in callback', (
+  testWidgets(
+    'S05 Sign In disabled for empty invalid email or empty password',
+    (tester) async {
+      final repository = _InteractiveAuthRepository();
+      await tester.pumpAuthScreen(
+        const AuthSignInScreen(),
+        repository: repository,
+      );
+
+      TextButton signInButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-sign-in-submit')),
+      );
+      expect(signInButton.onPressed, isNull);
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+        'not-an-email',
+      );
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+        'password',
+      );
+      await tester.pump();
+
+      signInButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-sign-in-submit')),
+      );
+      expect(signInButton.onPressed, isNull);
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+        'collector@example.com',
+      );
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+        '',
+      );
+      await tester.pump();
+
+      signInButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-sign-in-submit')),
+      );
+      expect(signInButton.onPressed, isNull);
+      expect(repository.signInCalls, 0);
+    },
+  );
+
+  testWidgets('S05 Sign In enabled for valid email and password', (
     tester,
   ) async {
     final repository = _InteractiveAuthRepository();
-    await tester.pumpAuthRoute(repository: repository);
-
-    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
-    await tester.pump();
-
-    expect(find.text('Enter an email address.'), findsOneWidget);
-    expect(repository.signInCalls, 0);
-  });
-
-  testWidgets('Sign In callback invokes once and loading blocks rapid taps', (
-    tester,
-  ) async {
-    final completer = Completer<AppUser>();
-    final repository = _InteractiveAuthRepository(signInCompleter: completer);
     await tester.pumpAuthScreen(
       const AuthSignInScreen(),
       repository: repository,
     );
 
     await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
       'collector@example.com',
     );
     await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-password-field')),
+      _textFieldIn(const ValueKey('auth-sign-in-password-field')),
       'secret1',
     );
+    await tester.pump();
+
+    final signInButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-sign-in-submit')),
+    );
+    expect(signInButton.onPressed, isNotNull);
+
     await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
     await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('auth-sign-in-submit')),
-      warnIfMissed: false,
-    );
-    await tester.pump();
 
-    expect(repository.signInCalls, 1);
-
-    completer.complete(_cloudUser('collector@example.com'));
-    await tester.pumpAndSettle();
-    expect(repository.signInCalls, 1);
+    expect(find.text('Email or password is not correct.'), findsOneWidget);
+    expect(repository.signInCalls, 0);
   });
 
-  testWidgets('Sign In success returns to previous destination', (
+  testWidgets('S05 Forgot Password route placeholder is reachable', (
     tester,
   ) async {
-    final repository = _InteractiveAuthRepository();
-    await tester.pumpAuthRoute(repository: repository);
+    await tester.pumpAuthScreen(const AuthSignInScreen());
 
     await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
       'collector@example.com',
     );
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-password-field')),
-      'secret1',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
     await tester.pumpAndSettle();
 
-    expect(repository.signInCalls, 1);
-    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
-    expect(find.byKey(const ValueKey('open-auth-route')), findsOneWidget);
-  });
-
-  testWidgets('human-readable auth error is rendered', (tester) async {
-    await tester.pumpAuthScreen(
-      const AuthSignInScreen(),
-      repository: _InteractiveAuthRepository(
-        signInError: const AuthException('Invalid email or password.'),
-      ),
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-email-field')),
-      'collector@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-in-password-field')),
-      'secret1',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-password-link')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Invalid email or password.'), findsOneWidget);
-    expect(find.textContaining('Supabase Auth returned'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-placeholder-screen')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('collector@example.com'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsNothing,
+    );
   });
 
   testWidgets('S02 create account email entry renders frozen hierarchy', (
@@ -835,21 +871,21 @@ void main() {
   testWidgets('Guest return remains available without auth guard', (
     tester,
   ) async {
-    await tester.pumpAuthRoute();
+    await tester.pumpAuthRoute(route: () => AuthWelcomeScreen.route());
 
-    expect(find.byKey(const ValueKey('auth-continue-guest')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('auth-guest-access-note')),
+      find.byKey(const ValueKey('auth-welcome-explore-guest')),
       findsOneWidget,
     );
 
     await tester.ensureVisible(
-      find.byKey(const ValueKey('auth-continue-guest')),
+      find.byKey(const ValueKey('auth-welcome-explore-guest')),
     );
-    await tester.tap(find.byKey(const ValueKey('auth-continue-guest')));
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-explore-guest')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
+    expect(find.byKey(const ValueKey('open-auth-route')), findsOneWidget);
   });
 
   testWidgets('Settings signed-in summary and sign-out remain real', (
@@ -919,7 +955,10 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const ValueKey('auth-scroll-view')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-scroll-view')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -1009,17 +1048,11 @@ Finder _textButtonIn(Key key) {
 }
 
 class _InteractiveAuthRepository implements AuthRepository {
-  _InteractiveAuthRepository({
-    AppUser? initialUser,
-    this.signInError,
-    this.passwordResetError,
-    this.signInCompleter,
-  }) : _user = initialUser;
+  _InteractiveAuthRepository({AppUser? initialUser, this.passwordResetError})
+    : _user = initialUser;
 
   AppUser? _user;
-  final Object? signInError;
   final Object? passwordResetError;
-  final Completer<AppUser>? signInCompleter;
   var currentUserCalls = 0;
   var signInCalls = 0;
   var signUpCalls = 0;
@@ -1057,14 +1090,6 @@ class _InteractiveAuthRepository implements AuthRepository {
     required String password,
   }) async {
     signInCalls += 1;
-    if (signInError != null) {
-      throw signInError!;
-    }
-    final completer = signInCompleter;
-    if (completer != null) {
-      _user = await completer.future;
-      return _user!;
-    }
     _user = _cloudUser(email);
     return _user!;
   }

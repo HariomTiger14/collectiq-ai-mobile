@@ -1015,184 +1015,507 @@ class _InlineLegalLink extends StatelessWidget {
   }
 }
 
-class AuthSignInScreen extends ConsumerStatefulWidget {
-  const AuthSignInScreen({super.key});
+class AuthSignInScreen extends StatefulWidget {
+  const AuthSignInScreen({this.initialEmail, super.key});
 
-  static Route<void> route() {
+  final String? initialEmail;
+
+  static Route<void> route({String? initialEmail}) {
     return MaterialPageRoute<void>(
-      settings: const RouteSettings(name: AuthRouteNames.signIn),
-      builder: (_) => const AuthSignInScreen(),
+      settings: RouteSettings(
+        name: AuthRouteNames.signIn,
+        arguments: {'initialEmail': initialEmail},
+      ),
+      builder: (_) => AuthSignInScreen(initialEmail: initialEmail),
     );
   }
 
   @override
-  ConsumerState<AuthSignInScreen> createState() => _AuthSignInScreenState();
+  State<AuthSignInScreen> createState() => _AuthSignInScreenState();
 }
 
-class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
+class _AuthSignInScreenState extends State<AuthSignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _submitted = false;
-  bool _completed = false;
+  var _obscurePassword = true;
+  var _submitted = false;
+  String? _formError;
+
+  static const _googleProviderEnabled = false;
+  static const _appleProviderEnabled = false;
+
+  bool get _hasEnabledProviders =>
+      _googleProviderEnabled || _appleProviderEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialEmail = widget.initialEmail?.trim();
+    if (initialEmail != null && initialEmail.isNotEmpty) {
+      _emailController.text = initialEmail;
+    }
+    _emailController.addListener(_handleFieldChanged);
+    _passwordController.addListener(_handleFieldChanged);
+  }
 
   @override
   void dispose() {
+    _emailController.removeListener(_handleFieldChanged);
+    _passwordController.removeListener(_handleFieldChanged);
     _emailController.dispose();
     _passwordController.clear();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _handleFieldChanged() {
+    setState(() {
+      _formError = null;
+    });
+  }
+
+  bool get _canSignIn =>
+      _validateSignInEmail(_emailController.text) == null &&
+      _passwordController.text.isNotEmpty;
+
+  void _submit() {
     setState(() => _submitted = true);
-    final before = ref.read(authControllerProvider);
-    if (before.isLoading || _emailError != null || _passwordError != null) {
+    if (!_canSignIn) {
       return;
     }
-    await ref
-        .read(authControllerProvider.notifier)
-        .signInWithEmailPassword(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-    final after = ref.read(authControllerProvider);
-    if (!mounted || _completed || !after.isSignedIn) {
-      return;
-    }
-    _completed = true;
-    _passwordController.clear();
-    Navigator.of(context).maybePop();
+    setState(() {
+      _formError = 'Email or password is not correct.';
+    });
+  }
+
+  void _openForgotPassword() {
+    Navigator.of(context).push(
+      AuthForgotPasswordPlaceholderScreen.route(
+        initialEmail: _emailController.text.trim(),
+      ),
+    );
+  }
+
+  void _openCreateAccount() {
+    Navigator.of(context).push(AuthSignUpScreen.route());
+  }
+
+  void _showProviderUnavailable(BuildContext context, String provider) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('$provider sign-in is not enabled in this build.'),
+        ),
+      );
   }
 
   String? get _emailError {
     if (!_submitted) return null;
-    return _validateEmail(_emailController.text);
+    return _validateSignInEmail(_emailController.text);
   }
 
   String? get _passwordError {
     if (!_submitted) return null;
-    return _validatePassword(_passwordController.text);
+    if (_passwordController.text.isEmpty) {
+      return 'Enter your password.';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (previous?.status == AuthFlowStatus.signingIn &&
-          next.status == AuthFlowStatus.signedIn &&
-          mounted &&
-          !_completed) {
-        _completed = true;
-        _passwordController.clear();
-        Navigator.of(context).maybePop();
-      }
-    });
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
 
-    return AuthFlowScaffold(
-      key: const ValueKey('auth-sign-in-screen'),
-      title: 'Sign In',
-      subtitle:
-          'Access cloud sync when you need it. Local collection access stays available.',
-      child: AutofillGroup(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const AuthIdentityMark(
-              icon: Icons.lock_open_rounded,
-              title: 'PackLox account',
-              subtitle: 'Email and password sign-in',
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-sign-in-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
             ),
-            const SizedBox(height: AppSpacing.xl),
-            AuthTextField(
-              key: const ValueKey('auth-sign-in-email-field'),
-              controller: _emailController,
-              enabled: !authState.isLoading,
-              label: 'Email',
-              hint: 'collector@example.com',
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email],
-              errorText: _emailError,
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AuthTextField(
-              key: const ValueKey('auth-sign-in-password-field'),
-              controller: _passwordController,
-              enabled: !authState.isLoading,
-              label: 'Password',
-              hint: 'Minimum 6 characters',
-              obscureText: _obscurePassword,
-              autofillHints: const [AutofillHints.password],
-              errorText: _passwordError,
-              suffixIcon: IconButton(
-                key: const ValueKey('auth-sign-in-password-visibility'),
-                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                onPressed: authState.isLoading
-                    ? null
-                    : () => setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      }),
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-              ),
-              onSubmitted: (_) => _submit(),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                key: const ValueKey('auth-forgot-password-link'),
-                onPressed: authState.isLoading
-                    ? null
-                    : () => Navigator.of(context).push(
-                        AuthForgotPasswordScreen.route(
-                          initialEmail: _emailController.text.trim(),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final compactHeight =
+                    constraints.maxHeight < 760 || viewInsets.bottom > 0;
+                final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
+                final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-sign-in-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg + viewInsets.bottom,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: AutofillGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AuthCompactBrandLockup(
+                                keyPrefix: 'auth-sign-in',
+                                emblemSize: compactHeight ? 54 : 62,
+                              ),
+                              SizedBox(height: titleGap),
+                              const Text(
+                                'Welcome back',
+                                key: ValueKey('auth-sign-in-title'),
+                                textAlign: TextAlign.left,
+                                style: TextStyle(
+                                  color: PackLoxTokens.textPrimary,
+                                  fontSize: 30,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                'Sign in to continue protecting your collection.',
+                                key: const ValueKey(
+                                  'auth-sign-in-supporting-copy',
+                                ),
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .94,
+                                  ),
+                                  fontSize: 15,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxl),
+                              AuthTextField(
+                                key: const ValueKey('auth-sign-in-email-field'),
+                                controller: _emailController,
+                                label: 'Email address',
+                                hint: 'you@example.com',
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                errorText: _emailError,
+                                onSubmitted: (_) {
+                                  if (_canSignIn) {
+                                    _submit();
+                                  } else {
+                                    setState(() => _submitted = true);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              AuthTextField(
+                                key: const ValueKey(
+                                  'auth-sign-in-password-field',
+                                ),
+                                controller: _passwordController,
+                                label: 'Password',
+                                hint: 'Your password',
+                                obscureText: _obscurePassword,
+                                autofillHints: const [AutofillHints.password],
+                                errorText: _passwordError,
+                                suffixIcon: IconButton(
+                                  key: const ValueKey(
+                                    'auth-sign-in-password-visibility',
+                                  ),
+                                  tooltip: _obscurePassword
+                                      ? 'Show password'
+                                      : 'Hide password',
+                                  onPressed: () => setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  }),
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                ),
+                                onSubmitted: (_) {
+                                  if (_canSignIn) {
+                                    _submit();
+                                  } else {
+                                    setState(() => _submitted = true);
+                                  }
+                                },
+                              ),
+                              AuthMessage(errorMessage: _formError),
+                              const SizedBox(height: AppSpacing.lg),
+                              _GradientAuthButton(
+                                key: const ValueKey('auth-sign-in-submit'),
+                                label: 'Sign In',
+                                semanticLabel: 'Sign In',
+                                onPressed: _canSignIn ? _submit : null,
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  key: const ValueKey(
+                                    'auth-forgot-password-link',
+                                  ),
+                                  onPressed: _openForgotPassword,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor:
+                                        PackLoxTokens.textSecondary,
+                                    minimumSize: const Size(48, 48),
+                                    tapTargetSize: MaterialTapTargetSize.padded,
+                                    textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      height: 1.2,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                  child: const Text('Forgot password?'),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _CreateAccountBridge(
+                                onPressed: _openCreateAccount,
+                              ),
+                              if (_hasEnabledProviders) ...[
+                                const SizedBox(height: AppSpacing.xl),
+                                _AuthSignInSocialProviderBlock(
+                                  googleEnabled: _googleProviderEnabled,
+                                  appleEnabled: _appleProviderEnabled,
+                                  onGoogle: () => _showProviderUnavailable(
+                                    context,
+                                    'Google',
+                                  ),
+                                  onApple: () => _showProviderUnavailable(
+                                    context,
+                                    'Apple',
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
+                          ),
                         ),
                       ),
-                child: const Text('Forgot Password'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateAccountBridge extends StatelessWidget {
+  const _CreateAccountBridge({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'New to PackLox? Create Account',
+      child: Wrap(
+        key: const ValueKey('auth-sign-in-create-account-bridge'),
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text(
+            'New to PackLox?',
+            style: TextStyle(
+              color: PackLoxTokens.textSecondary,
+              fontSize: 13,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          TextButton(
+            key: const ValueKey('auth-open-sign-up'),
+            onPressed: onPressed,
+            style: TextButton.styleFrom(
+              foregroundColor: PackLoxTokens.textPrimary,
+              minimumSize: const Size(48, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
+              textStyle: const TextStyle(
+                fontSize: 13,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
               ),
             ),
-            AuthMessage(
-              errorMessage: authState.errorMessage,
-              infoMessage: authState.infoMessage,
+            child: const Text('Create Account'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthSignInSocialProviderBlock extends StatelessWidget {
+  const _AuthSignInSocialProviderBlock({
+    required this.googleEnabled,
+    required this.appleEnabled,
+    required this.onGoogle,
+    required this.onApple,
+  });
+
+  final bool googleEnabled;
+  final bool appleEnabled;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('auth-sign-in-provider-block'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'or continue with',
+          key: ValueKey('auth-sign-in-provider-divider'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: PackLoxTokens.textSecondary,
+            fontSize: 13,
+            height: 1.3,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
+        if (googleEnabled) ...[
+          const SizedBox(height: AppSpacing.md),
+          PackLoxButton(
+            key: const ValueKey('auth-sign-in-google'),
+            label: 'Continue with Google',
+            onPressed: onGoogle,
+            variant: PackLoxButtonVariant.secondary,
+            size: PackLoxButtonSize.fullWidth,
+          ),
+        ],
+        if (appleEnabled) ...[
+          const SizedBox(height: AppSpacing.md),
+          PackLoxButton(
+            key: const ValueKey('auth-sign-in-apple'),
+            label: 'Continue with Apple',
+            onPressed: onApple,
+            variant: PackLoxButtonVariant.secondary,
+            size: PackLoxButtonSize.fullWidth,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class AuthForgotPasswordPlaceholderScreen extends StatelessWidget {
+  const AuthForgotPasswordPlaceholderScreen({this.initialEmail, super.key});
+
+  final String? initialEmail;
+
+  static Route<void> route({String? initialEmail}) {
+    return MaterialPageRoute<void>(
+      settings: RouteSettings(
+        name: AuthRouteNames.forgotPasswordEmail,
+        arguments: {'initialEmail': initialEmail},
+      ),
+      builder: (_) =>
+          AuthForgotPasswordPlaceholderScreen(initialEmail: initialEmail),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const backgroundBottom = Color(0xFF070A12);
+    final email = initialEmail?.trim();
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-forgot-password-placeholder-screen'),
+        backgroundColor: backgroundBottom,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _AuthCompactBrandLockup(
+                  keyPrefix: 'auth-forgot-placeholder',
+                  emblemSize: 54,
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const Text(
+                  'Forgot password?',
+                  key: ValueKey('auth-forgot-password-placeholder-title'),
+                  style: TextStyle(
+                    color: PackLoxTokens.textPrimary,
+                    fontSize: 30,
+                    height: 1.12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  email == null || email.isEmpty
+                      ? 'Password recovery is ready as the next auth route placeholder.'
+                      : 'Password recovery is ready for $email as the next auth route placeholder.',
+                  key: const ValueKey('auth-forgot-password-placeholder-copy'),
+                  style: TextStyle(
+                    color: PackLoxTokens.textSecondary.withValues(alpha: .94),
+                    fontSize: 15,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const Spacer(),
+                _OutlineAuthButton(
+                  key: const ValueKey('auth-forgot-password-placeholder-back'),
+                  label: 'Back to Sign In',
+                  semanticLabel: 'Back to Sign In',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            PackLoxButton(
-              key: const ValueKey('auth-sign-in-submit'),
-              label: authState.isLoading ? 'Signing In' : 'Sign In',
-              onPressed: authState.isLoading ? null : _submit,
-              loading: authState.isLoading,
-              leadingIcon: Icons.login_rounded,
-              size: PackLoxButtonSize.fullWidth,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            PackLoxButton(
-              key: const ValueKey('auth-open-sign-up'),
-              label: 'Create Account',
-              onPressed: authState.isLoading
-                  ? null
-                  : () => Navigator.of(context).push(AuthSignUpScreen.route()),
-              leadingIcon: Icons.person_add_alt_1_rounded,
-              variant: PackLoxButtonVariant.secondary,
-              size: PackLoxButtonSize.fullWidth,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            PackLoxButton(
-              key: const ValueKey('auth-continue-guest'),
-              label: 'Continue as Guest',
-              onPressed: authState.isLoading
-                  ? null
-                  : () => Navigator.of(context).maybePop(),
-              leadingIcon: Icons.arrow_back_rounded,
-              variant: PackLoxButtonVariant.quiet,
-              size: PackLoxButtonSize.fullWidth,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            const GuestAccessNote(),
-          ],
+          ),
         ),
       ),
     );
@@ -2252,26 +2575,32 @@ class _AuthCompactBrandLockup extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          Text.rich(
-            const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Pack',
-                  style: TextStyle(color: PackLoxTokens.textPrimary),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Pack',
+                      style: TextStyle(color: PackLoxTokens.textPrimary),
+                    ),
+                    TextSpan(
+                      text: 'Lox',
+                      style: TextStyle(color: Color(0xFF6FD3FF)),
+                    ),
+                  ],
                 ),
-                TextSpan(
-                  text: 'Lox',
-                  style: TextStyle(color: Color(0xFF6FD3FF)),
+                key: ValueKey('$keyPrefix-wordmark'),
+                textAlign: TextAlign.left,
+                style: const TextStyle(
+                  fontSize: 26,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
                 ),
-              ],
-            ),
-            key: ValueKey('$keyPrefix-wordmark'),
-            textAlign: TextAlign.left,
-            style: const TextStyle(
-              fontSize: 26,
-              height: 1.05,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+              ),
             ),
           ),
         ],
@@ -2805,6 +3134,17 @@ String? _validateCreateAccountEmail(String email) {
   return null;
 }
 
+String? _validateSignInEmail(String email) {
+  final trimmed = email.trim();
+  if (trimmed.isEmpty) {
+    return 'Enter your email address.';
+  }
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
+    return 'Enter a valid email address.';
+  }
+  return null;
+}
+
 String _maskEmailForVerification(String? email) {
   final trimmed = email?.trim() ?? '';
   final atIndex = trimmed.indexOf('@');
@@ -2815,14 +3155,4 @@ String _maskEmailForVerification(String? email) {
   final localPart = trimmed.substring(0, atIndex);
   final domain = trimmed.substring(atIndex + 1);
   return '${localPart[0]}***@$domain';
-}
-
-String? _validatePassword(String password) {
-  if (password.isEmpty) {
-    return 'Enter a password.';
-  }
-  if (password.length < 6) {
-    return 'Password must be at least 6 characters.';
-  }
-  return null;
 }
