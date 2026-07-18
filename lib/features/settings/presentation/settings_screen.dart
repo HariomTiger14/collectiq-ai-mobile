@@ -152,7 +152,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         trailing: authState.isSignedIn ? 'Signed in' : 'Open',
         onTap: authState.isSignedIn
             ? null
-            : () => Navigator.of(context).push(AuthSignInScreen.route()),
+            : () => Navigator.of(context).push(AuthWelcomeScreen.route()),
       ),
       _SettingsRow(
         icon: Icons.logout_outlined,

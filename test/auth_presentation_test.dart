@@ -20,15 +20,80 @@ void main() {
 
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-packlox-header')), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-sign-in-email-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('auth-sign-in-password-field')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('settings-auth-email-field')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-auth-email-field')),
+      findsNothing,
+    );
   });
 
-  testWidgets('Settings opens Sign In without embedding credential fields', (
+  testWidgets('S01 welcome renders approved hierarchy', (tester) async {
+    await tester.pumpAuthScreen(const AuthWelcomeScreen());
+
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-welcome-brand-emblem')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('auth-welcome-wordmark')), findsOneWidget);
+    expect(find.text('PackLox'), findsOneWidget);
+    expect(find.text('Identify. Value. Protect.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-welcome-hero')), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.text('Explore as Guest'), findsOneWidget);
+    expect(find.text('Terms of Service'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+  });
+
+  testWidgets('S01 welcome routes to create account placeholder', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthWelcomeScreen());
+
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-create-account')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('auth-sign-up-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-up-email-field')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('S01 welcome routes to sign in placeholder', (tester) async {
+    await tester.pumpAuthScreen(const AuthWelcomeScreen());
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('S01 guest action returns to previous route', (tester) async {
+    await tester.pumpAuthRoute(route: () => AuthWelcomeScreen.route());
+
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-explore-guest')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
+    expect(find.byKey(const ValueKey('open-auth-route')), findsOneWidget);
+  });
+
+  testWidgets('Settings opens S01 before Sign In without embedding fields', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1000);
@@ -39,7 +104,10 @@ void main() {
     await tester.pumpAuthScreen(const SettingsScreen());
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('settings-auth-email-field')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-auth-email-field')),
+      findsNothing,
+    );
 
     await tester.scrollUntilVisible(
       find.text('Sign In').first,
@@ -49,8 +117,21 @@ void main() {
     await tester.tap(find.text('Sign In').first);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-sign-in-email-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('password visibility toggles on Sign In and Sign Up', (
@@ -63,7 +144,9 @@ void main() {
     );
     expect(password.obscureText, isTrue);
 
-    await tester.tap(find.byKey(const ValueKey('auth-sign-in-password-visibility')));
+    await tester.tap(
+      find.byKey(const ValueKey('auth-sign-in-password-visibility')),
+    );
     await tester.pump();
 
     password = tester.widget(
@@ -74,7 +157,9 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('auth-open-sign-up')));
     await tester.tap(find.byKey(const ValueKey('auth-open-sign-up')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('auth-sign-up-password-visibility')));
+    await tester.tap(
+      find.byKey(const ValueKey('auth-sign-up-password-visibility')),
+    );
     await tester.pump();
 
     password = tester.widget(
@@ -101,7 +186,10 @@ void main() {
   ) async {
     final completer = Completer<AppUser>();
     final repository = _InteractiveAuthRepository(signInCompleter: completer);
-    await tester.pumpAuthScreen(const AuthSignInScreen(), repository: repository);
+    await tester.pumpAuthScreen(
+      const AuthSignInScreen(),
+      repository: repository,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-sign-in-email-field')),
@@ -113,7 +201,10 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')), warnIfMissed: false);
+    await tester.tap(
+      find.byKey(const ValueKey('auth-sign-in-submit')),
+      warnIfMissed: false,
+    );
     await tester.pump();
 
     expect(repository.signInCalls, 1);
@@ -176,9 +267,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('auth-sign-up-screen')), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-sign-up-email-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-up-email-field')),
+      findsOneWidget,
+    );
 
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-return-sign-in')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-return-sign-in')),
+    );
     await tester.tap(find.byKey(const ValueKey('auth-return-sign-in')));
     await tester.pumpAndSettle();
 
@@ -191,7 +287,10 @@ void main() {
     final repository = _InteractiveAuthRepository(
       signUpError: const SupabaseEmailConfirmationSentException(),
     );
-    await tester.pumpAuthScreen(const AuthSignUpScreen(), repository: repository);
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      repository: repository,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-sign-up-email-field')),
@@ -206,7 +305,10 @@ void main() {
 
     expect(find.text('Check Your Email'), findsOneWidget);
     expect(find.text('verify@example.com'), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-resend-confirmation')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-resend-confirmation')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Email verification resend invokes existing contract once', (
@@ -215,7 +317,10 @@ void main() {
     final repository = _InteractiveAuthRepository(
       signUpError: const SupabaseEmailConfirmationRequiredException(),
     );
-    await tester.pumpAuthScreen(const AuthSignUpScreen(), repository: repository);
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      repository: repository,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-sign-up-email-field')),
@@ -246,7 +351,10 @@ void main() {
         cooldownSource: 'fallback',
       ),
     );
-    await tester.pumpAuthScreen(const AuthSignUpScreen(), repository: repository);
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      repository: repository,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-sign-up-email-field')),
@@ -265,27 +373,31 @@ void main() {
     expect(find.text(AuthMessages.confirmationRateLimited), findsOneWidget);
   });
 
-  testWidgets('Forgot Password route invokes recovery once and explains web flow', (
-    tester,
-  ) async {
-    final repository = _InteractiveAuthRepository();
-    await tester.pumpAuthScreen(
-      const AuthForgotPasswordScreen(),
-      repository: repository,
-    );
+  testWidgets(
+    'Forgot Password route invokes recovery once and explains web flow',
+    (tester) async {
+      final repository = _InteractiveAuthRepository();
+      await tester.pumpAuthScreen(
+        const AuthForgotPasswordScreen(),
+        repository: repository,
+      );
 
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-forgot-email-field')),
-      'reset@example.com',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('auth-forgot-email-field')),
+        'reset@example.com',
+      );
+      await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+      await tester.pumpAndSettle();
 
-    expect(repository.passwordResetCalls, 1);
-    expect(repository.lastPasswordResetEmail, 'reset@example.com');
-    expect(find.byKey(const ValueKey('auth-recovery-web-handoff')), findsOneWidget);
-    expect(find.textContaining('secure web link'), findsOneWidget);
-  });
+      expect(repository.passwordResetCalls, 1);
+      expect(repository.lastPasswordResetEmail, 'reset@example.com');
+      expect(
+        find.byKey(const ValueKey('auth-recovery-web-handoff')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('secure web link'), findsOneWidget);
+    },
+  );
 
   testWidgets('Forgot Password rate limit and errors stay human-readable', (
     tester,
@@ -335,13 +447,20 @@ void main() {
     );
   });
 
-  testWidgets('Guest return remains available without auth guard', (tester) async {
+  testWidgets('Guest return remains available without auth guard', (
+    tester,
+  ) async {
     await tester.pumpAuthRoute();
 
     expect(find.byKey(const ValueKey('auth-continue-guest')), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-guest-access-note')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-guest-access-note')),
+      findsOneWidget,
+    );
 
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-continue-guest')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-continue-guest')),
+    );
     await tester.tap(find.byKey(const ValueKey('auth-continue-guest')));
     await tester.pumpAndSettle();
 
@@ -363,8 +482,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('collector@example.com'), findsWidgets);
-    expect(find.byKey(const ValueKey('settings-auth-email-field')), findsNothing);
-    expect(find.byKey(const ValueKey('settings-auth-sign-in-button')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-auth-email-field')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-auth-sign-in-button')),
+      findsNothing,
+    );
     expect(find.text('Sign Out'), findsOneWidget);
 
     await tester.tap(find.text('Sign Out'));
@@ -417,7 +542,10 @@ void main() {
     await tester.pumpAuthScreen(const AuthSignInScreen());
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
 
-    await tester.pumpAuthScreen(const AuthSignInScreen(), themeMode: ThemeMode.light);
+    await tester.pumpAuthScreen(
+      const AuthSignInScreen(),
+      themeMode: ThemeMode.light,
+    );
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
   });
 }
@@ -449,6 +577,7 @@ extension on WidgetTester {
   Future<void> pumpAuthRoute({
     AuthRepository? repository,
     ThemeMode themeMode = ThemeMode.dark,
+    Route<void> Function()? route,
   }) async {
     await pumpWidget(
       ProviderScope(
@@ -466,9 +595,9 @@ extension on WidgetTester {
               body: Center(
                 child: ElevatedButton(
                   key: const ValueKey('open-auth-route'),
-                  onPressed: () => Navigator.of(context).push(
-                    AuthSignInScreen.route(),
-                  ),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).push(route?.call() ?? AuthSignInScreen.route()),
                   child: const Text('Open auth'),
                 ),
               ),

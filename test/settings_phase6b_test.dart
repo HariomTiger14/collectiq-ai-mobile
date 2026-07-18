@@ -47,6 +47,16 @@ void main() {
     await tester.tap(find.text('Sign In').first);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-sign-in-email-field')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('auth-sign-in-email-field')),

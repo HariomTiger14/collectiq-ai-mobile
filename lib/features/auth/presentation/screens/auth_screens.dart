@@ -8,11 +8,930 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+abstract final class AuthRouteNames {
+  static const welcome = 'auth/welcome';
+  static const createAccountEmail = 'auth/create-account/email';
+  static const signIn = 'auth/sign-in';
+  static const forgotPasswordEmail = 'auth/forgot-password/email';
+  static const guestHome = 'app/guest-home';
+}
+
+class AuthWelcomeScreen extends StatelessWidget {
+  const AuthWelcomeScreen({this.onExploreAsGuest, super.key});
+
+  final VoidCallback? onExploreAsGuest;
+
+  static Route<void> route({VoidCallback? onExploreAsGuest}) {
+    return MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AuthRouteNames.welcome),
+      builder: (_) => AuthWelcomeScreen(onExploreAsGuest: onExploreAsGuest),
+    );
+  }
+
+  void _openCreateAccount(BuildContext context) {
+    Navigator.of(context).push(AuthSignUpScreen.route());
+  }
+
+  void _openSignIn(BuildContext context) {
+    Navigator.of(context).push(AuthSignInScreen.route());
+  }
+
+  void _exploreAsGuest(BuildContext context) {
+    final handler = onExploreAsGuest;
+    if (handler != null) {
+      handler();
+      return;
+    }
+    Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-welcome-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
+            ),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compactHeight = constraints.maxHeight < 760;
+                final heroHeight = compactHeight ? 224.0 : 286.0;
+                final topGap = compactHeight ? 18.0 : 28.0;
+                final heroGap = compactHeight ? 12.0 : 20.0;
+                final actionGap = compactHeight ? 14.0 : 20.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-welcome-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _AuthWelcomeBrandLockup(),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              'Identify. Value. Protect.',
+                              key: const ValueKey('auth-welcome-tagline'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: PackLoxTokens.textPrimary.withValues(
+                                  alpha: .84,
+                                ),
+                                fontSize: compactHeight ? 15 : 16,
+                                height: 1.35,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                            SizedBox(height: heroGap),
+                            SizedBox(
+                              key: const ValueKey('auth-welcome-hero'),
+                              height: heroHeight,
+                              child: const _PremiumCollectibleHero(),
+                            ),
+                            SizedBox(height: actionGap),
+                            _GradientAuthButton(
+                              key: const ValueKey(
+                                'auth-welcome-create-account',
+                              ),
+                              label: 'Create Account',
+                              semanticLabel: 'Create Account',
+                              onPressed: () => _openCreateAccount(context),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            _OutlineAuthButton(
+                              key: const ValueKey('auth-welcome-sign-in'),
+                              label: 'Sign In',
+                              semanticLabel: 'Sign In',
+                              onPressed: () => _openSignIn(context),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            _QuietAuthAction(
+                              key: const ValueKey('auth-welcome-explore-guest'),
+                              label: 'Explore as Guest',
+                              semanticLabel: 'Explore as Guest',
+                              onPressed: () => _exploreAsGuest(context),
+                            ),
+                            const Spacer(),
+                            const SizedBox(height: AppSpacing.lg),
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: AppSpacing.xl),
+                              child: _AuthWelcomeLegalCopy(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthWelcomeBrandLockup extends StatelessWidget {
+  const _AuthWelcomeBrandLockup();
+
+  static const _brandV2EmblemPath =
+      'assets/packlox/brand/packlox_brand_v2_emblem_authority_v0_7.png';
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'PackLox Brand v2 emblem and wordmark',
+      child: Column(
+        children: [
+          SizedBox.square(
+            key: const ValueKey('auth-welcome-brand-emblem'),
+            dimension: 88,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                _brandV2EmblemPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) {
+                  return CustomPaint(painter: _BrandV2EmblemPainter());
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text.rich(
+            const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Pack',
+                  style: TextStyle(color: PackLoxTokens.textPrimary),
+                ),
+                TextSpan(
+                  text: 'Lox',
+                  style: TextStyle(color: Color(0xFF6FD3FF)),
+                ),
+              ],
+            ),
+            key: const ValueKey('auth-welcome-wordmark'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 32,
+              height: 1.05,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandV2EmblemPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final glowPaint = Paint()
+      ..color = const Color(0xFF5E5CE6).withValues(alpha: .22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+    canvas.drawOval(rect.deflate(size.width * .08), glowPaint);
+
+    final markRect = Rect.fromCenter(
+      center: rect.center,
+      width: size.width * .58,
+      height: size.height * .72,
+    );
+    final gradient = const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF58E2FF), Color(0xFF0A84FF), Color(0xFF7C3AED)],
+    ).createShader(markRect);
+
+    final path = Path()
+      ..moveTo(markRect.left + markRect.width * .10, markRect.bottom)
+      ..lineTo(markRect.left + markRect.width * .10, markRect.top)
+      ..lineTo(markRect.left + markRect.width * .58, markRect.top)
+      ..cubicTo(
+        markRect.right,
+        markRect.top,
+        markRect.right,
+        markRect.top + markRect.height * .52,
+        markRect.left + markRect.width * .60,
+        markRect.top + markRect.height * .52,
+      )
+      ..lineTo(
+        markRect.left + markRect.width * .38,
+        markRect.top + markRect.height * .52,
+      )
+      ..lineTo(markRect.left + markRect.width * .38, markRect.bottom)
+      ..close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = gradient
+        ..style = PaintingStyle.fill,
+    );
+
+    final cutout = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        markRect.left + markRect.width * .36,
+        markRect.top + markRect.height * .17,
+        markRect.width * .34,
+        markRect.height * .22,
+      ),
+      Radius.circular(markRect.width * .11),
+    );
+    canvas.drawRRect(
+      cutout,
+      Paint()..color = const Color(0xFF071024).withValues(alpha: .94),
+    );
+
+    final highlight = Paint()
+      ..color = Colors.white.withValues(alpha: .22)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(markRect.left + markRect.width * .20, markRect.top + 4),
+      Offset(markRect.left + markRect.width * .46, markRect.top + 4),
+      highlight,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PremiumCollectibleHero extends StatelessWidget {
+  const _PremiumCollectibleHero();
+
+  static const _assetPath =
+      'assets/packlox/s01_hero_premium_collectibles_v0_7.png';
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: Semantics(
+        image: true,
+        label:
+            'Premium acrylic collectible slab with supporting collector car and coin.',
+        child: Image.asset(
+          _assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (context, error, stackTrace) {
+            return CustomPaint(
+              painter: _PremiumCollectibleHeroPainter(),
+              child: const SizedBox.expand(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumCollectibleHeroPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final scene = Offset.zero & size;
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * .50, h * .53),
+        width: w * .92,
+        height: h * .82,
+      ),
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF225DFF).withValues(alpha: .26),
+            const Color(0xFF5E5CE6).withValues(alpha: .12),
+            Colors.transparent,
+          ],
+        ).createShader(scene),
+    );
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * .50, h * .92),
+        width: w * .64,
+        height: h * .10,
+      ),
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF68DFFF).withValues(alpha: .20),
+            const Color(0xFF7C3AED).withValues(alpha: .14),
+            Colors.transparent,
+          ],
+        ).createShader(scene)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * .50, h * .86),
+        width: w * .70,
+        height: h * .16,
+      ),
+      Paint()
+        ..color = const Color(0xFF5E5CE6).withValues(alpha: .22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+    );
+
+    _drawRearCoin(canvas, size);
+    _drawRearCar(canvas, size);
+    _drawCentralSlab(canvas, size);
+  }
+
+  void _drawRearCoin(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final center = Offset(w * .73, h * .48);
+    final radius = w * .15;
+    final coinRect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E5BFF), Color(0xFF6D48E7), Color(0xFF121A3F)],
+        ).createShader(coinRect)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
+    );
+    canvas.drawCircle(
+      center,
+      radius * .93,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..color = const Color(0xFF83E7FF).withValues(alpha: .36),
+    );
+    canvas.drawCircle(
+      center,
+      radius * .72,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: .18),
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * .48),
+      -1.8,
+      2.2,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: .16),
+    );
+    canvas.drawLine(
+      Offset(center.dx - radius * .45, center.dy - radius * .50),
+      Offset(center.dx + radius * .28, center.dy + radius * .42),
+      Paint()
+        ..color = Colors.white.withValues(alpha: .13)
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  void _drawRearCar(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    canvas.save();
+    canvas.translate(w * .26, h * .55);
+    canvas.rotate(-.10);
+
+    final bodyPath = Path()
+      ..moveTo(-w * .22, h * .02)
+      ..cubicTo(-w * .17, -h * .05, -w * .10, -h * .09, -w * .02, -h * .09)
+      ..lineTo(w * .12, -h * .08)
+      ..cubicTo(w * .18, -h * .07, w * .23, -h * .02, w * .26, h * .04)
+      ..lineTo(w * .24, h * .075)
+      ..lineTo(-w * .24, h * .075)
+      ..cubicTo(-w * .27, h * .06, -w * .27, h * .035, -w * .22, h * .02)
+      ..close();
+    final bodyBounds = bodyPath.getBounds();
+    canvas.drawPath(
+      bodyPath,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0C1733),
+            Color(0xFF174CC6),
+            Color(0xFF2C2D91),
+            Color(0xFF0A1025),
+          ],
+        ).createShader(bodyBounds)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4),
+    );
+    canvas.drawPath(
+      bodyPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = const Color(0xFF77DFFF).withValues(alpha: .25),
+    );
+
+    final cabin = Path()
+      ..moveTo(-w * .075, -h * .080)
+      ..lineTo(w * .02, -h * .135)
+      ..lineTo(w * .13, -h * .080)
+      ..lineTo(w * .09, -h * .03)
+      ..lineTo(-w * .11, -h * .032)
+      ..close();
+    canvas.drawPath(
+      cabin,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: .22),
+            const Color(0xFF5E5CE6).withValues(alpha: .10),
+          ],
+        ).createShader(cabin.getBounds()),
+    );
+    final wheelPaint = Paint()..color = const Color(0xFF080D1D);
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = const Color(0xFF73E5FF).withValues(alpha: .25);
+    canvas
+      ..drawCircle(Offset(-w * .13, h * .067), w * .040, wheelPaint)
+      ..drawCircle(Offset(w * .15, h * .067), w * .040, wheelPaint)
+      ..drawCircle(Offset(-w * .13, h * .067), w * .025, rimPaint)
+      ..drawCircle(Offset(w * .15, h * .067), w * .025, rimPaint)
+      ..drawLine(
+        Offset(w * .18, h * .006),
+        Offset(w * .24, h * .016),
+        Paint()
+          ..color = const Color(0xFF9FEAFF).withValues(alpha: .30)
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round,
+      );
+    canvas.restore();
+  }
+
+  void _drawCentralSlab(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final slabRect = Rect.fromCenter(
+      center: Offset(w * .50, h * .47),
+      width: w * .38,
+      height: h * .70,
+    );
+    final slabRadius = Radius.circular(slabRect.width * .12);
+    final slab = RRect.fromRectAndRadius(slabRect, slabRadius);
+
+    canvas.drawRRect(
+      slab.shift(Offset(0, h * .012)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: .30)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+    );
+    canvas.drawRRect(
+      slab.inflate(7),
+      Paint()
+        ..color = const Color(0xFF5E5CE6).withValues(alpha: .15)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
+    );
+
+    canvas.drawRRect(
+      slab,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: .24),
+            const Color(0xFF0A84FF).withValues(alpha: .10),
+            Colors.white.withValues(alpha: .08),
+          ],
+        ).createShader(slabRect),
+    );
+    canvas.drawRRect(
+      slab.deflate(2),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF7ADFFF), Color(0xFF5E5CE6)],
+        ).createShader(slabRect),
+    );
+    canvas.drawRRect(
+      slab.deflate(8),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: .11),
+    );
+
+    final cardRect = Rect.fromLTWH(
+      slabRect.left + slabRect.width * .13,
+      slabRect.top + slabRect.height * .22,
+      slabRect.width * .74,
+      slabRect.height * .64,
+    );
+    final card = RRect.fromRectAndRadius(
+      cardRect,
+      Radius.circular(cardRect.width * .06),
+    );
+    canvas.drawRRect(
+      card,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0E1630), Color(0xFF193FA4), Color(0xFF2A155D)],
+        ).createShader(cardRect),
+    );
+    canvas.drawRRect(
+      card,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = Colors.white.withValues(alpha: .10),
+    );
+
+    final artRect = cardRect.deflate(cardRect.width * .09);
+    final collectibleShape = Path()
+      ..moveTo(artRect.left + artRect.width * .18, artRect.top + artRect.height * .34)
+      ..cubicTo(
+        artRect.left + artRect.width * .25,
+        artRect.top + artRect.height * .08,
+        artRect.left + artRect.width * .75,
+        artRect.top + artRect.height * .10,
+        artRect.left + artRect.width * .82,
+        artRect.top + artRect.height * .34,
+      )
+      ..cubicTo(
+        artRect.left + artRect.width * .86,
+        artRect.top + artRect.height * .58,
+        artRect.left + artRect.width * .30,
+        artRect.top + artRect.height * .62,
+        artRect.left + artRect.width * .18,
+        artRect.top + artRect.height * .34,
+      )
+      ..close();
+    canvas.drawPath(
+      collectibleShape,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF6EE7FF), Color(0xFF0A84FF), Color(0xFF7C3AED)],
+        ).createShader(artRect),
+    );
+    canvas.drawPath(
+      collectibleShape,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1
+        ..color = Colors.white.withValues(alpha: .18),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          artRect.left,
+          artRect.bottom - artRect.height * .24,
+          artRect.width,
+          artRect.height * .06,
+        ),
+        const Radius.circular(6),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: .18),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          artRect.left + artRect.width * .13,
+          artRect.bottom - artRect.height * .14,
+          artRect.width * .74,
+          artRect.height * .045,
+        ),
+        const Radius.circular(6),
+      ),
+      Paint()..color = const Color(0xFF6FD3FF).withValues(alpha: .16),
+    );
+
+    canvas.drawLine(
+      Offset(slabRect.left + slabRect.width * .18, slabRect.top + h * .05),
+      Offset(slabRect.right - slabRect.width * .18, slabRect.top + h * .05),
+      Paint()
+        ..color = Colors.white.withValues(alpha: .20)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      Offset(slabRect.left + slabRect.width * .20, slabRect.top + h * .08),
+      Offset(slabRect.right - slabRect.width * .20, slabRect.top + h * .08),
+      Paint()
+        ..color = const Color(0xFF6FD3FF).withValues(alpha: .22)
+        ..strokeWidth = 1.4
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      Offset(slabRect.left + slabRect.width * .18, slabRect.top + h * .15),
+      Offset(slabRect.right - slabRect.width * .09, slabRect.bottom - h * .09),
+      Paint()
+        ..color = Colors.white.withValues(alpha: .13)
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    for (final corner in [
+      Offset(slabRect.left + slabRect.width * .16, slabRect.top + slabRect.height * .10),
+      Offset(slabRect.right - slabRect.width * .16, slabRect.top + slabRect.height * .10),
+      Offset(slabRect.left + slabRect.width * .16, slabRect.bottom - slabRect.height * .08),
+      Offset(slabRect.right - slabRect.width * .16, slabRect.bottom - slabRect.height * .08),
+    ]) {
+      canvas.drawCircle(
+        corner,
+        2.4,
+        Paint()..color = Colors.white.withValues(alpha: .18),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GradientAuthButton extends StatelessWidget {
+  const _GradientAuthButton({
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: AppGradients.primary,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0A84FF).withValues(alpha: .30),
+              blurRadius: 30,
+              offset: const Offset(0, 16),
+            ),
+          ],
+        ),
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: PackLoxTokens.textPrimary,
+            minimumSize: const Size.fromHeight(58),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(child: Text(label, overflow: TextOverflow.visible)),
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(Icons.arrow_forward_rounded, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OutlineAuthButton extends StatelessWidget {
+  const _OutlineAuthButton({
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: PackLoxTokens.textPrimary,
+          minimumSize: const Size.fromHeight(54),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: .30),
+            width: 1.2,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            height: 1.1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+class _QuietAuthAction extends StatelessWidget {
+  const _QuietAuthAction({
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF9CCBFF),
+          minimumSize: const Size.fromHeight(48),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            height: 1.2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+class _AuthWelcomeLegalCopy extends StatelessWidget {
+  const _AuthWelcomeLegalCopy();
+
+  void _showPlaceholder(BuildContext context, String label) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('$label is not configured yet.')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const baseStyle = TextStyle(
+      color: Color(0xFFB6C3D7),
+      fontSize: 12.5,
+      height: 1.35,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0,
+    );
+    const linkStyle = TextStyle(
+      color: Color(0xFF8DD9FF),
+      fontSize: 12.5,
+      height: 1.35,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0,
+    );
+
+    return Semantics(
+      container: true,
+      label:
+          'By continuing, you agree to our Terms of Service and Privacy Policy.',
+      child: Wrap(
+        key: const ValueKey('auth-welcome-legal-copy'),
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('By continuing, you agree to our ', style: baseStyle),
+          _InlineLegalLink(
+            label: 'Terms of Service',
+            style: linkStyle,
+            onPressed: () => _showPlaceholder(context, 'Terms of Service'),
+          ),
+          const Text(' and ', style: baseStyle),
+          _InlineLegalLink(
+            label: 'Privacy Policy',
+            style: linkStyle,
+            onPressed: () => _showPlaceholder(context, 'Privacy Policy'),
+          ),
+          const Text('.', style: baseStyle),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineLegalLink extends StatelessWidget {
+  const _InlineLegalLink({
+    required this.label,
+    required this.style,
+    required this.onPressed,
+  });
+
+  final String label;
+  final TextStyle style;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: style.color,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          visualDensity: VisualDensity.standard,
+          textStyle: style,
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
 class AuthSignInScreen extends ConsumerStatefulWidget {
   const AuthSignInScreen({super.key});
 
   static Route<void> route() {
-    return MaterialPageRoute<void>(builder: (_) => const AuthSignInScreen());
+    return MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AuthRouteNames.signIn),
+      builder: (_) => const AuthSignInScreen(),
+    );
   }
 
   @override
@@ -40,7 +959,9 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
     if (before.isLoading || _emailError != null || _passwordError != null) {
       return;
     }
-    await ref.read(authControllerProvider.notifier).signInWithEmailPassword(
+    await ref
+        .read(authControllerProvider.notifier)
+        .signInWithEmailPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
@@ -80,7 +1001,8 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
     return AuthFlowScaffold(
       key: const ValueKey('auth-sign-in-screen'),
       title: 'Sign In',
-      subtitle: 'Access cloud sync when you need it. Local collection access stays available.',
+      subtitle:
+          'Access cloud sync when you need it. Local collection access stays available.',
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -135,10 +1057,10 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
                 onPressed: authState.isLoading
                     ? null
                     : () => Navigator.of(context).push(
-                          AuthForgotPasswordScreen.route(
-                            initialEmail: _emailController.text.trim(),
-                          ),
+                        AuthForgotPasswordScreen.route(
+                          initialEmail: _emailController.text.trim(),
                         ),
+                      ),
                 child: const Text('Forgot Password'),
               ),
             ),
@@ -190,7 +1112,10 @@ class AuthSignUpScreen extends ConsumerStatefulWidget {
   const AuthSignUpScreen({super.key});
 
   static Route<void> route() {
-    return MaterialPageRoute<void>(builder: (_) => const AuthSignUpScreen());
+    return MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AuthRouteNames.createAccountEmail),
+      builder: (_) => const AuthSignUpScreen(),
+    );
   }
 
   @override
@@ -217,7 +1142,9 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
     if (state.isLoading || _emailError != null || _passwordError != null) {
       return;
     }
-    await ref.read(authControllerProvider.notifier).signUpWithEmailPassword(
+    await ref
+        .read(authControllerProvider.notifier)
+        .signUpWithEmailPassword(
           email: _emailController.text,
           password: _passwordController.text,
         );
@@ -295,8 +1222,9 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
                     errorText: _passwordError,
                     suffixIcon: IconButton(
                       key: const ValueKey('auth-sign-up-password-visibility'),
-                      tooltip:
-                          _obscurePassword ? 'Show password' : 'Hide password',
+                      tooltip: _obscurePassword
+                          ? 'Show password'
+                          : 'Hide password',
                       onPressed: authState.isLoading
                           ? null
                           : () => setState(() {
@@ -326,7 +1254,9 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
                   const SizedBox(height: AppSpacing.lg),
                   PackLoxButton(
                     key: const ValueKey('auth-sign-up-submit'),
-                    label: authState.isLoading ? 'Creating Account' : 'Create Account',
+                    label: authState.isLoading
+                        ? 'Creating Account'
+                        : 'Create Account',
                     onPressed: authState.isLoading ? null : _submit,
                     loading: authState.isLoading,
                     leadingIcon: Icons.person_add_alt_1_rounded,
@@ -359,6 +1289,7 @@ class AuthForgotPasswordScreen extends ConsumerStatefulWidget {
 
   static Route<void> route({String? initialEmail}) {
     return MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AuthRouteNames.forgotPasswordEmail),
       builder: (_) => AuthForgotPasswordScreen(initialEmail: initialEmail),
     );
   }
@@ -408,7 +1339,8 @@ class _AuthForgotPasswordScreenState
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
-    final sent = _requestSent &&
+    final sent =
+        _requestSent &&
         authState.errorMessage == null &&
         authState.lastPasswordResetStatus != 'failed';
 
@@ -519,9 +1451,8 @@ class AuthFlowScaffold extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: 420,
-                    minHeight: constraints.maxHeight -
-                        AppSpacing.lg -
-                        AppSpacing.xl,
+                    minHeight:
+                        constraints.maxHeight - AppSpacing.lg - AppSpacing.xl,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
