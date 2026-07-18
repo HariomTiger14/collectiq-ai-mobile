@@ -7,6 +7,9 @@ import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
@@ -97,6 +100,10 @@ class _AppShellState extends ConsumerState<AppShell>
       return;
     }
     _selectTab(AppShellTabController.homeTab, reason: 'onboarding-dashboard');
+  }
+
+  void _chooseGuestMode() {
+    unawaited(ref.read(guestModeControllerProvider.notifier).chooseGuestMode());
   }
 
   void _selectTab(int index, {String reason = 'navigation'}) {
@@ -197,8 +204,86 @@ class _AppShellState extends ConsumerState<AppShell>
         : navigation;
   }
 
+  Widget _buildOnboardingEntry() {
+    return PackLoxEntryTransition(
+      stateKey: 'entry-onboarding',
+      child: OnboardingScreen(
+        onStartScanning: _completeOnboardingAndStartScan,
+        onExploreDashboard: _completeOnboardingAndExploreDashboard,
+      ),
+    );
+  }
+
+  Widget _buildShellEntry({
+    required int selectedIndex,
+    required bool hideBottomNavigation,
+  }) {
+    final scannerSelected = selectedIndex == _scanTabIndex;
+    final selectedDestination = _destinationFor(selectedIndex);
+    final shellBackground = scannerSelected
+        ? ScannerVisualTheme.background
+        : Theme.of(context).scaffoldBackgroundColor;
+    final overlayStyle = scannerSelected
+        ? const SystemUiOverlayStyle(
+            statusBarColor: ScannerVisualTheme.background,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: ScannerVisualTheme.backgroundDeep,
+            systemNavigationBarDividerColor: ScannerVisualTheme.backgroundDeep,
+            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarContrastEnforced: false,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+            systemNavigationBarColor: PackLoxTokens.background,
+            systemNavigationBarDividerColor: PackLoxTokens.background,
+            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarContrastEnforced: false,
+          );
+
+    return PackLoxEntryTransition(
+      stateKey: 'entry-shell',
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: Scaffold(
+          key: const ValueKey('app-shell'),
+          backgroundColor: shellBackground,
+          body: _buildActiveDestination(selectedDestination),
+          bottomNavigationBar: hideBottomNavigation
+              ? null
+              : _buildBottomNavigationBar(selectedIndex),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingEntry() {
+    return const PackLoxEntryTransition(
+      stateKey: 'entry-loading',
+      child: Scaffold(body: PackLoxBootstrapSurface.loading()),
+    );
+  }
+
+  Widget _buildEntryError({
+    required int selectedIndex,
+    required VoidCallback onRetry,
+  }) {
+    return PackLoxEntryTransition(
+      stateKey: 'entry-error',
+      child: Scaffold(
+        key: const ValueKey('app-shell'),
+        body: PackLoxBootstrapSurface.recoverableError(onRetry: onRetry),
+        bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final guestMode = ref.watch(guestModeControllerProvider);
     final onboardingCompleted = ref.watch(onboardingControllerProvider);
     final selectedIndex = ref.watch(appShellTabControllerProvider);
     final scannerState = ref.watch(scannerControllerProvider);
@@ -214,72 +299,50 @@ class _AppShellState extends ConsumerState<AppShell>
         hasActiveScannerSession &&
         scannerState.scanResult == null;
 
-    return onboardingCompleted.when(
-      data: (completed) {
-        if (!completed) {
-          return PackLoxEntryTransition(
-            stateKey: 'entry-onboarding',
-            child: OnboardingScreen(
-              onStartScanning: _completeOnboardingAndStartScan,
-              onExploreDashboard: _completeOnboardingAndExploreDashboard,
-            ),
+    return guestMode.when(
+      data: (guestModeChosen) {
+        final authResolving =
+            authState.isLoading ||
+            authState.status == AuthFlowStatus.sessionRestoring;
+        if (authResolving) {
+          return _buildLoadingEntry();
+        }
+
+        if (authState.isSignedIn) {
+          return _buildShellEntry(
+            selectedIndex: selectedIndex,
+            hideBottomNavigation: hideBottomNavigation,
           );
         }
 
-        final scannerSelected = selectedIndex == _scanTabIndex;
-        final selectedDestination = _destinationFor(selectedIndex);
-        final shellBackground = scannerSelected
-            ? ScannerVisualTheme.background
-            : Theme.of(context).scaffoldBackgroundColor;
-        final overlayStyle = scannerSelected
-            ? const SystemUiOverlayStyle(
-                statusBarColor: ScannerVisualTheme.background,
-                statusBarIconBrightness: Brightness.light,
-                statusBarBrightness: Brightness.dark,
-                systemNavigationBarColor: ScannerVisualTheme.backgroundDeep,
-                systemNavigationBarDividerColor:
-                    ScannerVisualTheme.backgroundDeep,
-                systemNavigationBarIconBrightness: Brightness.light,
-                systemNavigationBarContrastEnforced: false,
-              )
-            : const SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.light,
-                statusBarBrightness: Brightness.dark,
-                systemNavigationBarColor: PackLoxTokens.background,
-                systemNavigationBarDividerColor: PackLoxTokens.background,
-                systemNavigationBarIconBrightness: Brightness.light,
-                systemNavigationBarContrastEnforced: false,
-              );
+        if (!guestModeChosen) {
+          return PackLoxEntryTransition(
+            stateKey: 'entry-auth-welcome',
+            child: AuthWelcomeScreen(onExploreAsGuest: _chooseGuestMode),
+          );
+        }
 
-        return PackLoxEntryTransition(
-          stateKey: 'entry-shell',
-          child: AnnotatedRegion<SystemUiOverlayStyle>(
-            value: overlayStyle,
-            child: Scaffold(
-              key: const ValueKey('app-shell'),
-              backgroundColor: shellBackground,
-              body: _buildActiveDestination(selectedDestination),
-              bottomNavigationBar: hideBottomNavigation
-                  ? null
-                  : _buildBottomNavigationBar(selectedIndex),
-            ),
+        return onboardingCompleted.when(
+          data: (completed) {
+            if (!completed) {
+              return _buildOnboardingEntry();
+            }
+            return _buildShellEntry(
+              selectedIndex: selectedIndex,
+              hideBottomNavigation: hideBottomNavigation,
+            );
+          },
+          loading: _buildLoadingEntry,
+          error: (_, _) => _buildEntryError(
+            selectedIndex: selectedIndex,
+            onRetry: () => ref.invalidate(onboardingControllerProvider),
           ),
         );
       },
-      loading: () => const PackLoxEntryTransition(
-        stateKey: 'entry-loading',
-        child: Scaffold(body: PackLoxBootstrapSurface.loading()),
-      ),
-      error: (_, _) => PackLoxEntryTransition(
-        stateKey: 'entry-error',
-        child: Scaffold(
-          key: const ValueKey('app-shell'),
-          body: PackLoxBootstrapSurface.recoverableError(
-            onRetry: () => ref.invalidate(onboardingControllerProvider),
-          ),
-          bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
-        ),
+      loading: _buildLoadingEntry,
+      error: (_, _) => _buildEntryError(
+        selectedIndex: selectedIndex,
+        onRetry: () => ref.invalidate(guestModeControllerProvider),
       ),
     );
   }

@@ -2,6 +2,12 @@ import 'dart:async';
 
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/onboarding/data/repositories/shared_preferences_onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
@@ -81,7 +87,13 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [onboardingRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          onboardingRepositoryProvider.overrideWithValue(repository),
+          authRepositoryProvider.overrideWithValue(_OnboardingAuthRepository()),
+          guestModeRepositoryProvider.overrideWithValue(
+            const _ImmediateGuestModeRepository(chosen: true),
+          ),
+        ],
         child: const _Harness(child: AppShell()),
       ),
     );
@@ -243,4 +255,76 @@ class _MutableOnboardingRepository implements OnboardingRepository {
     writeCalls += 1;
     this.completed = completed;
   }
+}
+
+class _ImmediateGuestModeRepository implements GuestModeRepository {
+  const _ImmediateGuestModeRepository({required this.chosen});
+
+  final bool chosen;
+
+  @override
+  Future<bool> hasChosenGuestMode() async => chosen;
+
+  @override
+  Future<void> setGuestModeChosen(bool chosen) async {}
+}
+
+class _OnboardingAuthRepository implements AuthRepository {
+  @override
+  Future<AppUser?> currentUser() async => null;
+
+  @override
+  Future<AppUser> signIn() => signInAnonymously();
+
+  @override
+  Future<AppUser> signInAnonymously() async {
+    return const AppUser(
+      id: 'local-user',
+      displayName: 'Local Collector',
+      email: null,
+      isAnonymous: true,
+      isLocalOnly: true,
+      provider: AuthProviderType.localAnonymous,
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return AppUser(
+      id: 'cloud-user',
+      displayName: email,
+      email: email,
+      provider: AuthProviderType.emailPassword,
+    );
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) {
+    throw const AuthException('Sign up is out of scope for onboarding tests.');
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {}
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is not enabled.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is not enabled.');
+  }
+
+  @override
+  Future<void> signOut() async {}
 }
