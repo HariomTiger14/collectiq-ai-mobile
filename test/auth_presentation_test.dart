@@ -53,7 +53,7 @@ void main() {
     expect(find.text('Privacy Policy'), findsOneWidget);
   });
 
-  testWidgets('S01 welcome routes to create account placeholder', (
+  testWidgets('S01 welcome routes to S02 create account email entry', (
     tester,
   ) async {
     await tester.pumpAuthScreen(const AuthWelcomeScreen());
@@ -61,16 +61,21 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('auth-welcome-create-account')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('auth-sign-up-screen')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('auth-sign-up-email-field')),
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
       findsOneWidget,
     );
   });
 
   testWidgets('S01 welcome routes to sign in placeholder', (tester) async {
     await tester.pumpAuthScreen(const AuthWelcomeScreen());
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-welcome-sign-in')),
+    );
     await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
     await tester.pumpAndSettle();
 
@@ -134,9 +139,7 @@ void main() {
     );
   });
 
-  testWidgets('password visibility toggles on Sign In and Sign Up', (
-    tester,
-  ) async {
+  testWidgets('password visibility toggles on Sign In', (tester) async {
     await tester.pumpAuthScreen(const AuthSignInScreen());
 
     TextField password = tester.widget(
@@ -151,19 +154,6 @@ void main() {
 
     password = tester.widget(
       _textFieldIn(const ValueKey('auth-sign-in-password-field')),
-    );
-    expect(password.obscureText, isFalse);
-
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-open-sign-up')));
-    await tester.tap(find.byKey(const ValueKey('auth-open-sign-up')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('auth-sign-up-password-visibility')),
-    );
-    await tester.pump();
-
-    password = tester.widget(
-      _textFieldIn(const ValueKey('auth-sign-up-password-field')),
     );
     expect(password.obscureText, isFalse);
   });
@@ -259,118 +249,129 @@ void main() {
     expect(find.textContaining('Supabase Auth returned'), findsNothing);
   });
 
-  testWidgets('Sign Up is separate and can return to Sign In', (tester) async {
+  testWidgets('S02 create account email entry renders frozen hierarchy', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthSignUpScreen());
+
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-account-brand-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Create your PackLox account'), findsOneWidget);
+    expect(
+      find.text(
+        'Enter your email to start protecting and valuing your collection.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Email address'), findsOneWidget);
+    expect(find.text('you@example.com'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-account-sign-in')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-account-legal-copy')),
+      findsOneWidget,
+    );
+    expect(find.text('Terms of Service'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-sign-up-password-field')),
+      findsNothing,
+    );
+    expect(find.text('or continue with'), findsNothing);
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Continue with Apple'), findsNothing);
+    expect(find.textContaining('Facebook'), findsNothing);
+  });
+
+  testWidgets('S02 email validation controls Continue availability', (
+    tester,
+  ) async {
+    final repository = _InteractiveAuthRepository();
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      repository: repository,
+    );
+
+    TextButton continueButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-create-account-continue')),
+    );
+    expect(continueButton.onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'collector',
+    );
+    await tester.pump();
+
+    expect(find.text('Enter a valid email address.'), findsOneWidget);
+    continueButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-create-account-continue')),
+    );
+    expect(continueButton.onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'collector@example.com',
+    );
+    await tester.pump();
+
+    expect(find.text('Enter a valid email address.'), findsNothing);
+    continueButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-create-account-continue')),
+    );
+    expect(continueButton.onPressed, isNotNull);
+
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Email verification continues in the next authentication sprint.',
+      ),
+      findsOneWidget,
+    );
+    expect(repository.signUpCalls, 0);
+  });
+
+  testWidgets('S02 Sign In bridge opens the sign-in route shell', (
+    tester,
+  ) async {
     await tester.pumpAuthScreen(const AuthSignInScreen());
 
     await tester.ensureVisible(find.byKey(const ValueKey('auth-open-sign-up')));
     await tester.tap(find.byKey(const ValueKey('auth-open-sign-up')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('auth-sign-up-screen')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('auth-sign-up-email-field')),
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
       findsOneWidget,
     );
 
     await tester.ensureVisible(
-      find.byKey(const ValueKey('auth-return-sign-in')),
+      find.byKey(const ValueKey('auth-create-account-sign-in')),
     );
-    await tester.tap(find.byKey(const ValueKey('auth-return-sign-in')));
+    await tester.tap(find.byKey(const ValueKey('auth-create-account-sign-in')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
-  });
-
-  testWidgets('Sign Up confirmation state uses controller state only', (
-    tester,
-  ) async {
-    final repository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationSentException(),
-    );
-    await tester.pumpAuthScreen(
-      const AuthSignUpScreen(),
-      repository: repository,
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-email-field')),
-      'verify@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-password-field')),
-      'secret1',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-sign-up-submit')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Check Your Email'), findsOneWidget);
-    expect(find.text('verify@example.com'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('auth-resend-confirmation')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Email verification resend invokes existing contract once', (
-    tester,
-  ) async {
-    final repository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationRequiredException(),
-    );
-    await tester.pumpAuthScreen(
-      const AuthSignUpScreen(),
-      repository: repository,
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-email-field')),
-      'verify@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-password-field')),
-      'secret1',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-sign-up-submit')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('auth-resend-confirmation')));
-    await tester.pumpAndSettle();
-
-    expect(repository.signUpCalls, 1);
-    expect(repository.resendCalls, 1);
-    expect(repository.lastResendEmail, 'verify@example.com');
-    expect(find.text(AuthMessages.confirmationEmailSent), findsOneWidget);
-  });
-
-  testWidgets('Email verification resend rate limit is human-readable', (
-    tester,
-  ) async {
-    final repository = _InteractiveAuthRepository(
-      signUpError: const SupabaseEmailConfirmationRequiredException(),
-      resendError: const SupabaseConfirmationRateLimitedException(
-        cooldown: Duration(minutes: 5),
-        cooldownSource: 'fallback',
-      ),
-    );
-    await tester.pumpAuthScreen(
-      const AuthSignUpScreen(),
-      repository: repository,
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-email-field')),
-      'verify@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-sign-up-password-field')),
-      'secret1',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-sign-up-submit')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('auth-resend-confirmation')));
-    await tester.pumpAndSettle();
-
-    expect(repository.resendCalls, 1);
-    expect(find.text(AuthMessages.confirmationRateLimited), findsOneWidget);
   });
 
   testWidgets(
@@ -616,20 +617,23 @@ Finder _textFieldIn(Key key) {
   return find.descendant(of: find.byKey(key), matching: find.byType(TextField));
 }
 
+Finder _textButtonIn(Key key) {
+  return find.descendant(
+    of: find.byKey(key),
+    matching: find.byType(TextButton),
+  );
+}
+
 class _InteractiveAuthRepository implements AuthRepository {
   _InteractiveAuthRepository({
     AppUser? initialUser,
     this.signInError,
-    this.signUpError,
-    this.resendError,
     this.passwordResetError,
     this.signInCompleter,
   }) : _user = initialUser;
 
   AppUser? _user;
   final Object? signInError;
-  final Object? signUpError;
-  final Object? resendError;
   final Object? passwordResetError;
   final Completer<AppUser>? signInCompleter;
   var currentUserCalls = 0;
@@ -687,9 +691,6 @@ class _InteractiveAuthRepository implements AuthRepository {
     required String password,
   }) async {
     signUpCalls += 1;
-    if (signUpError != null) {
-      throw signUpError!;
-    }
     _user = _cloudUser(email);
     return _user!;
   }
@@ -698,9 +699,6 @@ class _InteractiveAuthRepository implements AuthRepository {
   Future<void> resendEmailConfirmation({required String email}) async {
     resendCalls += 1;
     lastResendEmail = email;
-    if (resendError != null) {
-      throw resendError!;
-    }
   }
 
   @override

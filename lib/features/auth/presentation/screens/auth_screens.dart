@@ -599,7 +599,10 @@ class _PremiumCollectibleHeroPainter extends CustomPainter {
 
     final artRect = cardRect.deflate(cardRect.width * .09);
     final collectibleShape = Path()
-      ..moveTo(artRect.left + artRect.width * .18, artRect.top + artRect.height * .34)
+      ..moveTo(
+        artRect.left + artRect.width * .18,
+        artRect.top + artRect.height * .34,
+      )
       ..cubicTo(
         artRect.left + artRect.width * .25,
         artRect.top + artRect.height * .08,
@@ -681,10 +684,22 @@ class _PremiumCollectibleHeroPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
     for (final corner in [
-      Offset(slabRect.left + slabRect.width * .16, slabRect.top + slabRect.height * .10),
-      Offset(slabRect.right - slabRect.width * .16, slabRect.top + slabRect.height * .10),
-      Offset(slabRect.left + slabRect.width * .16, slabRect.bottom - slabRect.height * .08),
-      Offset(slabRect.right - slabRect.width * .16, slabRect.bottom - slabRect.height * .08),
+      Offset(
+        slabRect.left + slabRect.width * .16,
+        slabRect.top + slabRect.height * .10,
+      ),
+      Offset(
+        slabRect.right - slabRect.width * .16,
+        slabRect.top + slabRect.height * .10,
+      ),
+      Offset(
+        slabRect.left + slabRect.width * .16,
+        slabRect.bottom - slabRect.height * .08,
+      ),
+      Offset(
+        slabRect.right - slabRect.width * .16,
+        slabRect.bottom - slabRect.height * .08,
+      ),
     ]) {
       canvas.drawCircle(
         corner,
@@ -708,30 +723,48 @@ class _GradientAuthButton extends StatelessWidget {
 
   final String label;
   final String semanticLabel;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onPressed != null;
     return Semantics(
       button: true,
+      enabled: enabled,
       label: semanticLabel,
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppGradients.primary,
+          gradient: enabled
+              ? AppGradients.primary
+              : LinearGradient(
+                  colors: [
+                    PackLoxTokens.surfaceRaised.withValues(alpha: .92),
+                    PackLoxTokens.surfaceRaised.withValues(alpha: .74),
+                  ],
+                ),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: enabled
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: .10),
+          ),
           boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0A84FF).withValues(alpha: .30),
-              blurRadius: 30,
-              offset: const Offset(0, 16),
-            ),
+            if (enabled)
+              BoxShadow(
+                color: const Color(0xFF0A84FF).withValues(alpha: .30),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
           ],
         ),
         child: TextButton(
-          onPressed: onPressed,
+          onPressed: enabled ? onPressed : null,
           style: TextButton.styleFrom(
-            foregroundColor: PackLoxTokens.textPrimary,
+            foregroundColor: enabled
+                ? PackLoxTokens.textPrimary
+                : const Color(0xFF93A4BC),
+            disabledForegroundColor: const Color(0xFF93A4BC),
             minimumSize: const Size.fromHeight(58),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
@@ -890,6 +923,60 @@ class _AuthWelcomeLegalCopy extends StatelessWidget {
   }
 }
 
+class _AuthLegalConsentCopy extends StatelessWidget {
+  const _AuthLegalConsentCopy();
+
+  void _showPlaceholder(BuildContext context, String label) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('$label is not configured yet.')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const baseStyle = TextStyle(
+      color: Color(0xFFB6C3D7),
+      fontSize: 12.5,
+      height: 1.35,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0,
+    );
+    const linkStyle = TextStyle(
+      color: Color(0xFF8DD9FF),
+      fontSize: 12.5,
+      height: 1.35,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0,
+    );
+
+    return Semantics(
+      container: true,
+      label:
+          'By continuing, you agree to our Terms of Service and Privacy Policy.',
+      child: Wrap(
+        key: const ValueKey('auth-create-account-legal-copy'),
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('By continuing, you agree to our ', style: baseStyle),
+          _InlineLegalLink(
+            label: 'Terms of Service',
+            style: linkStyle,
+            onPressed: () => _showPlaceholder(context, 'Terms of Service'),
+          ),
+          const Text(' and ', style: baseStyle),
+          _InlineLegalLink(
+            label: 'Privacy Policy',
+            style: linkStyle,
+            onPressed: () => _showPlaceholder(context, 'Privacy Policy'),
+          ),
+          const Text('.', style: baseStyle),
+        ],
+      ),
+    );
+  }
+}
+
 class _InlineLegalLink extends StatelessWidget {
   const _InlineLegalLink({
     required this.label,
@@ -913,7 +1000,7 @@ class _InlineLegalLink extends StatelessWidget {
         style: TextButton.styleFrom(
           foregroundColor: style.color,
           minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.only(left: 4),
           tapTargetSize: MaterialTapTargetSize.padded,
           visualDensity: VisualDensity.standard,
           textStyle: style,
@@ -1124,160 +1211,350 @@ class AuthSignUpScreen extends ConsumerStatefulWidget {
 
 class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
   bool _submitted = false;
+
+  static const _googleProviderEnabled = false;
+  static const _appleProviderEnabled = false;
+
+  bool get _hasEnabledProviders =>
+      _googleProviderEnabled || _appleProviderEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_handleEmailChanged);
+  }
+
+  void _handleEmailChanged() {
+    setState(() {});
+  }
 
   @override
   void dispose() {
+    _emailController.removeListener(_handleEmailChanged);
     _emailController.dispose();
-    _passwordController.clear();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _continue() {
     setState(() => _submitted = true);
-    final state = ref.read(authControllerProvider);
-    if (state.isLoading || _emailError != null || _passwordError != null) {
+    if (_emailError != null) {
       return;
     }
-    await ref
-        .read(authControllerProvider.notifier)
-        .signUpWithEmailPassword(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-    if (mounted && ref.read(authControllerProvider).isSignedIn) {
-      _passwordController.clear();
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Email verification continues in the next authentication sprint.',
+          ),
+        ),
+      );
+  }
+
+  void _openSignIn() {
+    Navigator.of(context).push(AuthSignInScreen.route());
   }
 
   String? get _emailError {
-    if (!_submitted) return null;
-    return _validateEmail(_emailController.text);
+    final email = _emailController.text.trim();
+    if (!_submitted && email.isEmpty) {
+      return null;
+    }
+    return _validateCreateAccountEmail(email);
   }
 
-  String? get _passwordError {
-    if (!_submitted) return null;
-    return _validatePassword(_passwordController.text);
+  bool get _canContinue =>
+      _validateCreateAccountEmail(_emailController.text.trim()) == null;
+
+  void _showProviderUnavailable(BuildContext context, String provider) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('$provider sign-up is not enabled in this build.'),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final pendingEmail =
-        authState.pendingConfirmationEmail ?? _emailController.text.trim();
-    final confirmationRequired =
-        authState.status == AuthFlowStatus.confirmationRequired;
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
 
-    return AuthFlowScaffold(
-      key: const ValueKey('auth-sign-up-screen'),
-      title: confirmationRequired ? 'Check Your Email' : 'Create Account',
-      subtitle: confirmationRequired
-          ? 'Confirm your email before signing in.'
-          : 'Create a cloud account only when you want sync across devices.',
-      child: confirmationRequired
-          ? AuthVerificationPanel(
-              email: pendingEmail,
-              isLoading: authState.isLoading,
-              infoMessage: authState.infoMessage,
-              errorMessage: authState.errorMessage,
-              onResend: () => ref
-                  .read(authControllerProvider.notifier)
-                  .resendConfirmationEmail(email: pendingEmail),
-              onReturnToSignIn: () => Navigator.of(context).maybePop(),
-            )
-          : AutofillGroup(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const AuthIdentityMark(
-                    icon: Icons.person_add_alt_1_rounded,
-                    title: 'Cloud sync account',
-                    subtitle: 'Email and password only',
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-create-account-email-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
+            ),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final compactHeight =
+                    constraints.maxHeight < 760 || viewInsets.bottom > 0;
+                final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
+                final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-create-account-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg + viewInsets.bottom,
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  AuthTextField(
-                    key: const ValueKey('auth-sign-up-email-field'),
-                    controller: _emailController,
-                    enabled: !authState.isLoading,
-                    label: 'Email',
-                    hint: 'collector@example.com',
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    errorText: _emailError,
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AuthTextField(
-                    key: const ValueKey('auth-sign-up-password-field'),
-                    controller: _passwordController,
-                    enabled: !authState.isLoading,
-                    label: 'Password',
-                    hint: 'Minimum 6 characters',
-                    obscureText: _obscurePassword,
-                    autofillHints: const [AutofillHints.newPassword],
-                    errorText: _passwordError,
-                    suffixIcon: IconButton(
-                      key: const ValueKey('auth-sign-up-password-visibility'),
-                      tooltip: _obscurePassword
-                          ? 'Show password'
-                          : 'Hide password',
-                      onPressed: authState.isLoading
-                          ? null
-                          : () => setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            }),
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: AutofillGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AuthCompactBrandLockup(
+                                emblemSize: compactHeight ? 54 : 62,
+                              ),
+                              SizedBox(height: titleGap),
+                              Text(
+                                'Create your PackLox account',
+                                key: const ValueKey(
+                                  'auth-create-account-title',
+                                ),
+                                textAlign: TextAlign.left,
+                                style: const TextStyle(
+                                  color: PackLoxTokens.textPrimary,
+                                  fontSize: 30,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                'Enter your email to start protecting and valuing your collection.',
+                                key: const ValueKey(
+                                  'auth-create-account-supporting-copy',
+                                ),
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .94,
+                                  ),
+                                  fontSize: 15,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxl),
+                              AuthTextField(
+                                key: const ValueKey(
+                                  'auth-create-account-email-field',
+                                ),
+                                controller: _emailController,
+                                label: 'Email address',
+                                hint: 'you@example.com',
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                errorText: _emailError,
+                                onSubmitted: (_) {
+                                  if (_canContinue) {
+                                    _continue();
+                                  } else {
+                                    setState(() => _submitted = true);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _GradientAuthButton(
+                                key: const ValueKey(
+                                  'auth-create-account-continue',
+                                ),
+                                label: 'Continue',
+                                semanticLabel: 'Continue',
+                                onPressed: _canContinue ? _continue : null,
+                              ),
+                              if (_hasEnabledProviders) ...[
+                                const SizedBox(height: AppSpacing.xl),
+                                _AuthSocialProviderBlock(
+                                  googleEnabled: _googleProviderEnabled,
+                                  appleEnabled: _appleProviderEnabled,
+                                  onGoogle: () => _showProviderUnavailable(
+                                    context,
+                                    'Google',
+                                  ),
+                                  onApple: () => _showProviderUnavailable(
+                                    context,
+                                    'Apple',
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: AppSpacing.md),
+                              _OutlineAuthButton(
+                                key: const ValueKey(
+                                  'auth-create-account-sign-in',
+                                ),
+                                label: 'Sign In',
+                                semanticLabel: 'Sign In',
+                                onPressed: _openSignIn,
+                              ),
+                              const Spacer(),
+                              const SizedBox(height: AppSpacing.lg),
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: AppSpacing.xl),
+                                child: _AuthLegalConsentCopy(),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    onSubmitted: (_) => _submit(),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  const Text(
-                    'Use at least 6 characters. Email confirmation may be required before sign-in.',
-                    style: TextStyle(
-                      color: PackLoxTokens.textSecondary,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                  AuthMessage(
-                    errorMessage: authState.errorMessage,
-                    infoMessage: authState.infoMessage,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  PackLoxButton(
-                    key: const ValueKey('auth-sign-up-submit'),
-                    label: authState.isLoading
-                        ? 'Creating Account'
-                        : 'Create Account',
-                    onPressed: authState.isLoading ? null : _submit,
-                    loading: authState.isLoading,
-                    leadingIcon: Icons.person_add_alt_1_rounded,
-                    size: PackLoxButtonSize.fullWidth,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  PackLoxButton(
-                    key: const ValueKey('auth-return-sign-in'),
-                    label: 'Back to Sign In',
-                    onPressed: authState.isLoading
-                        ? null
-                        : () => Navigator.of(context).maybePop(),
-                    leadingIcon: Icons.login_rounded,
-                    variant: PackLoxButtonVariant.secondary,
-                    size: PackLoxButtonSize.fullWidth,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  const GuestAccessNote(),
-                ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthCompactBrandLockup extends StatelessWidget {
+  const _AuthCompactBrandLockup({required this.emblemSize});
+
+  static const _brandV2EmblemPath =
+      'assets/packlox/brand/packlox_brand_v2_emblem_authority_v0_7.png';
+
+  final double emblemSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'PackLox Brand v2 identity',
+      child: Row(
+        key: const ValueKey('auth-create-account-brand-identity'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            key: const ValueKey('auth-create-account-brand-emblem'),
+            dimension: emblemSize,
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: Image.asset(
+                _brandV2EmblemPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) {
+                  return CustomPaint(painter: _BrandV2EmblemPainter());
+                },
               ),
             ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Text.rich(
+            const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Pack',
+                  style: TextStyle(color: PackLoxTokens.textPrimary),
+                ),
+                TextSpan(
+                  text: 'Lox',
+                  style: TextStyle(color: Color(0xFF6FD3FF)),
+                ),
+              ],
+            ),
+            key: const ValueKey('auth-create-account-wordmark'),
+            textAlign: TextAlign.left,
+            style: const TextStyle(
+              fontSize: 26,
+              height: 1.05,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthSocialProviderBlock extends StatelessWidget {
+  const _AuthSocialProviderBlock({
+    required this.googleEnabled,
+    required this.appleEnabled,
+    required this.onGoogle,
+    required this.onApple,
+  });
+
+  final bool googleEnabled;
+  final bool appleEnabled;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('auth-create-account-provider-block'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'or continue with',
+          key: ValueKey('auth-create-account-provider-divider'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: PackLoxTokens.textSecondary,
+            fontSize: 13,
+            height: 1.3,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
+        if (googleEnabled) ...[
+          const SizedBox(height: AppSpacing.md),
+          PackLoxButton(
+            key: const ValueKey('auth-create-account-google'),
+            label: 'Continue with Google',
+            onPressed: onGoogle,
+            variant: PackLoxButtonVariant.secondary,
+            size: PackLoxButtonSize.fullWidth,
+          ),
+        ],
+        if (appleEnabled) ...[
+          const SizedBox(height: AppSpacing.md),
+          PackLoxButton(
+            key: const ValueKey('auth-create-account-apple'),
+            label: 'Continue with Apple',
+            onPressed: onApple,
+            variant: PackLoxButtonVariant.secondary,
+            size: PackLoxButtonSize.fullWidth,
+          ),
+        ],
+      ],
     );
   }
 }
@@ -1580,22 +1857,27 @@ class AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      autofillHints: autofillHints,
-      obscureText: obscureText,
-      textInputAction: TextInputAction.next,
-      onSubmitted: onSubmitted,
-      inputFormatters: keyboardType == TextInputType.emailAddress
-          ? [FilteringTextInputFormatter.deny(RegExp(r'\s'))]
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        errorText: errorText,
-        suffixIcon: suffixIcon,
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: label,
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        obscureText: obscureText,
+        textInputAction: TextInputAction.next,
+        onSubmitted: onSubmitted,
+        inputFormatters: keyboardType == TextInputType.emailAddress
+            ? [FilteringTextInputFormatter.deny(RegExp(r'\s'))]
+            : null,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          errorText: errorText,
+          suffixIcon: suffixIcon,
+        ),
       ),
     );
   }
@@ -1731,6 +2013,17 @@ String? _validateEmail(String email) {
   }
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
     return 'Please enter a valid email address.';
+  }
+  return null;
+}
+
+String? _validateCreateAccountEmail(String email) {
+  final trimmed = email.trim();
+  if (trimmed.isEmpty) {
+    return 'Enter your email address.';
+  }
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
+    return 'Enter a valid email address.';
   }
   return null;
 }
