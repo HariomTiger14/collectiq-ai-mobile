@@ -1,4 +1,3 @@
-import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
@@ -260,7 +259,7 @@ void main() {
     expect(repository.signInCalls, 0);
   });
 
-  testWidgets('S05 Forgot Password route placeholder is reachable', (
+  testWidgets('S05 Forgot Password routes to S06 with valid email prefill', (
     tester,
   ) async {
     await tester.pumpAuthScreen(const AuthSignInScreen());
@@ -275,12 +274,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('auth-forgot-password-placeholder-screen')),
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
       findsOneWidget,
     );
-    expect(find.textContaining('collector@example.com'), findsOneWidget);
+    final emailField = tester.widget<TextField>(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+    );
+    expect(emailField.controller?.text, 'collector@example.com');
+    expect(find.text('Reset your password'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      find.byKey(const ValueKey('auth-forgot-password-placeholder-screen')),
       findsNothing,
     );
   });
@@ -794,77 +797,191 @@ void main() {
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
   });
 
-  testWidgets(
-    'Forgot Password route invokes recovery once and explains web flow',
-    (tester) async {
-      final repository = _InteractiveAuthRepository();
-      await tester.pumpAuthScreen(
-        const AuthForgotPasswordScreen(),
-        repository: repository,
-      );
-
-      await tester.enterText(
-        find.byKey(const ValueKey('auth-forgot-email-field')),
-        'reset@example.com',
-      );
-      await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
-      await tester.pumpAndSettle();
-
-      expect(repository.passwordResetCalls, 1);
-      expect(repository.lastPasswordResetEmail, 'reset@example.com');
-      expect(
-        find.byKey(const ValueKey('auth-recovery-web-handoff')),
-        findsOneWidget,
-      );
-      expect(find.textContaining('secure web link'), findsOneWidget);
-    },
-  );
-
-  testWidgets('Forgot Password rate limit and errors stay human-readable', (
+  testWidgets('S06 hierarchy renders frozen forgot password contract', (
     tester,
   ) async {
-    final rateLimitedRepository = _InteractiveAuthRepository(
-      passwordResetError: const SupabasePasswordResetRateLimitedException(
-        cooldown: Duration(minutes: 5),
-        cooldownSource: 'fallback',
-      ),
-    );
-    await tester.pumpAuthScreen(
-      const AuthForgotPasswordScreen(),
-      repository: rateLimitedRepository,
-    );
+    await tester.pumpAuthScreen(const AuthForgotPasswordScreen());
 
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-forgot-email-field')),
-      'reset@example.com',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
-    await tester.pumpAndSettle();
-
-    expect(rateLimitedRepository.passwordResetCalls, 1);
-    expect(find.text(AuthMessages.passwordResetRateLimited), findsOneWidget);
-
-    final failingRepository = _InteractiveAuthRepository(
-      passwordResetError: const AuthException(
-        'Unable to reach Supabase. Check your internet connection.',
-      ),
-    );
-    await tester.pumpAuthScreen(
-      const AuthForgotPasswordScreen(),
-      repository: failingRepository,
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-forgot-email-field')),
-      'reset@example.com',
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
-    await tester.pumpAndSettle();
-
-    expect(failingRepository.passwordResetCalls, 1);
     expect(
-      find.text('Unable to reach Supabase. Check your internet connection.'),
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-brand-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Reset your password'), findsOneWidget);
+    expect(
+      find.text(
+        "Enter your email and we'll send reset instructions if the account exists.",
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-forgot-email-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Email address'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-forgot-submit')), findsOneWidget);
+    expect(find.text('Send reset instructions'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-return-sign-in')),
+      findsOneWidget,
+    );
+    expect(find.text('Back to Sign In'), findsOneWidget);
+    expect(find.text('Check your email'), findsNothing);
+    expect(find.textContaining('S07'), findsNothing);
+  });
+
+  testWidgets('S06 Send disabled for empty or invalid email', (tester) async {
+    final repository = _InteractiveAuthRepository();
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      repository: repository,
+    );
+
+    TextButton sendButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-forgot-submit')),
+    );
+    expect(sendButton.onPressed, isNull);
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'not-an-email',
+    );
+    await tester.pump();
+
+    sendButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-forgot-submit')),
+    );
+    expect(sendButton.onPressed, isNull);
+    expect(repository.passwordResetCalls, 0);
+  });
+
+  testWidgets('S06 submit shows generic confirmation and stays on S06', (
+    tester,
+  ) async {
+    final repository = _InteractiveAuthRepository();
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      repository: repository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'reset@example.com',
+    );
+    await tester.pump();
+
+    final sendButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-forgot-submit')),
+    );
+    expect(sendButton.onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+
+    expect(repository.passwordResetCalls, 0);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-forgot-confirmation')),
+      findsOneWidget,
+    );
+    expect(find.text('Check your email'), findsOneWidget);
+    expect(
+      find.text(
+        'If an account exists for this email, reset instructions have been sent.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('auth-forgot-email-field')), findsNothing);
+    expect(
+      find.textContaining('account exists for this email'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('account not found'), findsNothing);
+    expect(find.textContaining('S07'), findsNothing);
+  });
+
+  testWidgets('S06 resend instructions uses 30 second cooldown', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthForgotPasswordScreen());
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'reset@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+
+    expect(find.text('You can resend instructions in 30s.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-forgot-resend')), findsNothing);
+
+    await tester.pump(const Duration(seconds: 31));
+
+    expect(find.byKey(const ValueKey('auth-forgot-resend')), findsOneWidget);
+    expect(find.text('Resend instructions'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-resend')));
+    await tester.pump();
+
+    expect(find.text('You can resend instructions in 30s.'), findsOneWidget);
+  });
+
+  testWidgets('S06 five request local limit shows neutral rate limit', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthForgotPasswordScreen());
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'reset@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+
+    for (var index = 0; index < 4; index += 1) {
+      await tester.pump(const Duration(seconds: 31));
+      await tester.tap(find.byKey(const ValueKey('auth-forgot-resend')));
+      await tester.pump();
+    }
+
+    expect(
+      find.byKey(const ValueKey('auth-forgot-rate-limit')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        "We couldn't send more instructions right now. Please wait and try again.",
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('auth-forgot-resend')), findsNothing);
+  });
+
+  testWidgets('S06 Back to Sign In returns to S05', (tester) async {
+    await tester.pumpAuthScreen(const AuthSignInScreen());
+
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-password-link')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-return-sign-in')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsNothing,
     );
   });
 
@@ -1048,11 +1165,9 @@ Finder _textButtonIn(Key key) {
 }
 
 class _InteractiveAuthRepository implements AuthRepository {
-  _InteractiveAuthRepository({AppUser? initialUser, this.passwordResetError})
-    : _user = initialUser;
+  _InteractiveAuthRepository({AppUser? initialUser}) : _user = initialUser;
 
   AppUser? _user;
-  final Object? passwordResetError;
   var currentUserCalls = 0;
   var signInCalls = 0;
   var signUpCalls = 0;
@@ -1114,9 +1229,6 @@ class _InteractiveAuthRepository implements AuthRepository {
   Future<void> sendPasswordResetEmail({required String email}) async {
     passwordResetCalls += 1;
     lastPasswordResetEmail = email;
-    if (passwordResetError != null) {
-      throw passwordResetError!;
-    }
   }
 
   @override

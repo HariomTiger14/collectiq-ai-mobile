@@ -5,7 +5,6 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
-import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1090,7 +1089,7 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
 
   void _openForgotPassword() {
     Navigator.of(context).push(
-      AuthForgotPasswordPlaceholderScreen.route(
+      AuthForgotPasswordScreen.route(
         initialEmail: _emailController.text.trim(),
       ),
     );
@@ -1433,91 +1432,6 @@ class _AuthSignInSocialProviderBlock extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class AuthForgotPasswordPlaceholderScreen extends StatelessWidget {
-  const AuthForgotPasswordPlaceholderScreen({this.initialEmail, super.key});
-
-  final String? initialEmail;
-
-  static Route<void> route({String? initialEmail}) {
-    return MaterialPageRoute<void>(
-      settings: RouteSettings(
-        name: AuthRouteNames.forgotPasswordEmail,
-        arguments: {'initialEmail': initialEmail},
-      ),
-      builder: (_) =>
-          AuthForgotPasswordPlaceholderScreen(initialEmail: initialEmail),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const backgroundBottom = Color(0xFF070A12);
-    final email = initialEmail?.trim();
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: backgroundBottom,
-        systemNavigationBarDividerColor: backgroundBottom,
-        systemNavigationBarIconBrightness: Brightness.light,
-        systemNavigationBarContrastEnforced: false,
-      ),
-      child: Scaffold(
-        key: const ValueKey('auth-forgot-password-placeholder-screen'),
-        backgroundColor: backgroundBottom,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _AuthCompactBrandLockup(
-                  keyPrefix: 'auth-forgot-placeholder',
-                  emblemSize: 54,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                const Text(
-                  'Forgot password?',
-                  key: ValueKey('auth-forgot-password-placeholder-title'),
-                  style: TextStyle(
-                    color: PackLoxTokens.textPrimary,
-                    fontSize: 30,
-                    height: 1.12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  email == null || email.isEmpty
-                      ? 'Password recovery is ready as the next auth route placeholder.'
-                      : 'Password recovery is ready for $email as the next auth route placeholder.',
-                  key: const ValueKey('auth-forgot-password-placeholder-copy'),
-                  style: TextStyle(
-                    color: PackLoxTokens.textSecondary.withValues(alpha: .94),
-                    fontSize: 15,
-                    height: 1.45,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const Spacer(),
-                _OutlineAuthButton(
-                  key: const ValueKey('auth-forgot-password-placeholder-back'),
-                  label: 'Back to Sign In',
-                  semanticLabel: 'Back to Sign In',
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -2665,138 +2579,399 @@ class _AuthSocialProviderBlock extends StatelessWidget {
   }
 }
 
-class AuthForgotPasswordScreen extends ConsumerStatefulWidget {
+class AuthForgotPasswordScreen extends StatefulWidget {
   const AuthForgotPasswordScreen({super.key, this.initialEmail});
 
   final String? initialEmail;
 
   static Route<void> route({String? initialEmail}) {
     return MaterialPageRoute<void>(
-      settings: const RouteSettings(name: AuthRouteNames.forgotPasswordEmail),
+      settings: RouteSettings(
+        name: AuthRouteNames.forgotPasswordEmail,
+        arguments: {'initialEmail': initialEmail},
+      ),
       builder: (_) => AuthForgotPasswordScreen(initialEmail: initialEmail),
     );
   }
 
   @override
-  ConsumerState<AuthForgotPasswordScreen> createState() =>
+  State<AuthForgotPasswordScreen> createState() =>
       _AuthForgotPasswordScreenState();
 }
 
-class _AuthForgotPasswordScreenState
-    extends ConsumerState<AuthForgotPasswordScreen> {
+class _AuthForgotPasswordScreenState extends State<AuthForgotPasswordScreen> {
+  static const _resendCooldownSeconds = 30;
+  static const _maxRequestCount = 5;
+
   late final TextEditingController _emailController;
-  bool _submitted = false;
-  bool _requestSent = false;
+  Timer? _cooldownTimer;
+  var _submitted = false;
+  var _confirmed = false;
+  var _requestCount = 0;
+  var _cooldownRemaining = 0;
+  var _rateLimited = false;
 
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: widget.initialEmail ?? '');
+    final initialEmail = widget.initialEmail?.trim() ?? '';
+    _emailController = TextEditingController(
+      text: _validateForgotPasswordEmail(initialEmail) == null
+          ? initialEmail
+          : '',
+    );
+    _emailController.addListener(_handleEmailChanged);
   }
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
+    _emailController.removeListener(_handleEmailChanged);
     _emailController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    setState(() => _submitted = true);
-    final state = ref.read(authControllerProvider);
-    if (state.isLoading || _emailError != null) {
+  void _handleEmailChanged() {
+    if (_confirmed) {
       return;
     }
-    await ref
-        .read(authControllerProvider.notifier)
-        .sendPasswordResetEmail(email: _emailController.text);
-    if (mounted && ref.read(authControllerProvider).errorMessage == null) {
-      setState(() => _requestSent = true);
-    }
+    setState(() {
+      _submitted = false;
+      _rateLimited = false;
+    });
   }
+
+  bool get _canSend =>
+      _validateForgotPasswordEmail(_emailController.text) == null;
 
   String? get _emailError {
     if (!_submitted) return null;
-    return _validateEmail(_emailController.text);
+    return _validateForgotPasswordEmail(_emailController.text);
+  }
+
+  void _submit() {
+    setState(() => _submitted = true);
+    if (!_canSend) {
+      return;
+    }
+    _acceptRequest();
+  }
+
+  void _resend() {
+    if (_cooldownRemaining > 0 || _rateLimited) {
+      return;
+    }
+    _acceptRequest();
+  }
+
+  void _acceptRequest() {
+    _cooldownTimer?.cancel();
+    setState(() {
+      _submitted = false;
+      _confirmed = true;
+      _requestCount += 1;
+      _rateLimited = _requestCount >= _maxRequestCount;
+    });
+    if (!_rateLimited) {
+      _startCooldown();
+    }
+  }
+
+  void _startCooldown() {
+    setState(() => _cooldownRemaining = _resendCooldownSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_cooldownRemaining <= 1) {
+        timer.cancel();
+        setState(() => _cooldownRemaining = 0);
+        return;
+      }
+      setState(() => _cooldownRemaining -= 1);
+    });
+  }
+
+  void _backToSignIn() {
+    Navigator.of(context).maybePop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final sent =
-        _requestSent &&
-        authState.errorMessage == null &&
-        authState.lastPasswordResetStatus != 'failed';
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
 
-    return AuthFlowScaffold(
-      key: const ValueKey('auth-forgot-password-screen'),
-      title: sent ? 'Check Your Email' : 'Forgot Password',
-      subtitle: sent
-          ? 'The reset continues through the secure web link sent by email.'
-          : 'Enter your email and PackLox will send the existing web reset flow.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AuthIdentityMark(
-            icon: sent
-                ? Icons.mark_email_read_outlined
-                : Icons.mark_email_unread_outlined,
-            title: sent ? 'Reset email sent' : 'Password recovery',
-            subtitle: sent
-                ? 'Open the email link to finish on the approved web flow.'
-                : 'No in-app password reset form is used here.',
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          if (!sent)
-            AuthTextField(
-              key: const ValueKey('auth-forgot-email-field'),
-              controller: _emailController,
-              enabled: !authState.isLoading,
-              label: 'Email',
-              hint: 'collector@example.com',
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email],
-              errorText: _emailError,
-              onSubmitted: (_) => _submit(),
-            )
-          else
-            PackLoxEntryTile(
-              key: const ValueKey('auth-recovery-web-handoff'),
-              icon: Icons.open_in_browser_rounded,
-              title: 'Secure web reset',
-              supportingText:
-                  'Use the email link to set a new password. Return here when complete.',
-              onTap: null,
-              state: PackLoxEntryTileState.success,
-              showTrailing: false,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-forgot-password-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
             ),
-          AuthMessage(
-            errorMessage: authState.errorMessage,
-            infoMessage: authState.infoMessage,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (!sent)
-            PackLoxButton(
-              key: const ValueKey('auth-forgot-submit'),
-              label: authState.isLoading ? 'Sending Email' : 'Send Reset Email',
-              onPressed: authState.isLoading ? null : _submit,
-              loading: authState.isLoading,
-              leadingIcon: Icons.send_rounded,
-              size: PackLoxButtonSize.fullWidth,
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final compactHeight =
+                    constraints.maxHeight < 760 || viewInsets.bottom > 0;
+                final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
+                final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-forgot-password-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg + viewInsets.bottom,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: AutofillGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AuthCompactBrandLockup(
+                                keyPrefix: 'auth-forgot-password',
+                                emblemSize: compactHeight ? 54 : 62,
+                              ),
+                              SizedBox(height: titleGap),
+                              if (_confirmed)
+                                _ForgotPasswordConfirmationContent(
+                                  cooldownRemaining: _cooldownRemaining,
+                                  rateLimited: _rateLimited,
+                                  onBackToSignIn: _backToSignIn,
+                                  onResend: _resend,
+                                )
+                              else
+                                _ForgotPasswordRequestContent(
+                                  emailController: _emailController,
+                                  emailError: _emailError,
+                                  canSend: _canSend,
+                                  onSubmit: _submit,
+                                  onBackToSignIn: _backToSignIn,
+                                ),
+                              const Spacer(),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          if (!sent) const SizedBox(height: AppSpacing.md),
-          PackLoxButton(
-            key: const ValueKey('auth-forgot-return-sign-in'),
-            label: 'Back to Sign In',
-            onPressed: authState.isLoading
-                ? null
-                : () => Navigator.of(context).maybePop(),
-            leadingIcon: Icons.login_rounded,
-            variant: sent
-                ? PackLoxButtonVariant.primary
-                : PackLoxButtonVariant.secondary,
-            size: PackLoxButtonSize.fullWidth,
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ForgotPasswordRequestContent extends StatelessWidget {
+  const _ForgotPasswordRequestContent({
+    required this.emailController,
+    required this.emailError,
+    required this.canSend,
+    required this.onSubmit,
+    required this.onBackToSignIn,
+  });
+
+  final TextEditingController emailController;
+  final String? emailError;
+  final bool canSend;
+  final VoidCallback onSubmit;
+  final VoidCallback onBackToSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Reset your password',
+          key: ValueKey('auth-forgot-password-title'),
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            color: PackLoxTokens.textPrimary,
+            fontSize: 30,
+            height: 1.12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          "Enter your email and we'll send reset instructions if the account exists.",
+          key: const ValueKey('auth-forgot-password-supporting-copy'),
+          style: TextStyle(
+            color: PackLoxTokens.textSecondary.withValues(alpha: .94),
+            fontSize: 15,
+            height: 1.45,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        AuthTextField(
+          key: const ValueKey('auth-forgot-email-field'),
+          controller: emailController,
+          label: 'Email address',
+          hint: 'you@example.com',
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          errorText: emailError,
+          onSubmitted: (_) => onSubmit(),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _GradientAuthButton(
+          key: const ValueKey('auth-forgot-submit'),
+          label: 'Send reset instructions',
+          semanticLabel: 'Send reset instructions',
+          onPressed: canSend ? onSubmit : null,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _OutlineAuthButton(
+          key: const ValueKey('auth-forgot-return-sign-in'),
+          label: 'Back to Sign In',
+          semanticLabel: 'Back to Sign In',
+          onPressed: onBackToSignIn,
+        ),
+      ],
+    );
+  }
+}
+
+class _ForgotPasswordConfirmationContent extends StatelessWidget {
+  const _ForgotPasswordConfirmationContent({
+    required this.cooldownRemaining,
+    required this.rateLimited,
+    required this.onBackToSignIn,
+    required this.onResend,
+  });
+
+  final int cooldownRemaining;
+  final bool rateLimited;
+  final VoidCallback onBackToSignIn;
+  final VoidCallback onResend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('auth-forgot-confirmation'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Check your email',
+          key: ValueKey('auth-forgot-confirmation-title'),
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            color: PackLoxTokens.textPrimary,
+            fontSize: 30,
+            height: 1.12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'If an account exists for this email, reset instructions have been sent.',
+          key: const ValueKey('auth-forgot-confirmation-copy'),
+          style: TextStyle(
+            color: PackLoxTokens.textSecondary.withValues(alpha: .94),
+            fontSize: 15,
+            height: 1.45,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        _OutlineAuthButton(
+          key: const ValueKey('auth-forgot-return-sign-in'),
+          label: 'Back to Sign In',
+          semanticLabel: 'Back to Sign In',
+          onPressed: onBackToSignIn,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (rateLimited)
+          const _ForgotPasswordNotice(
+            key: ValueKey('auth-forgot-rate-limit'),
+            text:
+                "We couldn't send more instructions right now. Please wait and try again.",
+          )
+        else if (cooldownRemaining > 0)
+          _ForgotPasswordNotice(
+            key: const ValueKey('auth-forgot-resend-cooldown'),
+            text: 'You can resend instructions in ${cooldownRemaining}s.',
+          )
+        else
+          _QuietAuthAction(
+            key: const ValueKey('auth-forgot-resend'),
+            label: 'Resend instructions',
+            semanticLabel: 'Resend instructions',
+            onPressed: onResend,
+          ),
+        const SizedBox(height: AppSpacing.lg),
+        const _ForgotPasswordNotice(
+          key: ValueKey('auth-forgot-provider-guidance'),
+          text:
+              'If you use Google or Apple, return to Sign In and continue with that provider.',
+        ),
+      ],
+    );
+  }
+}
+
+class _ForgotPasswordNotice extends StatelessWidget {
+  const _ForgotPasswordNotice({required this.text, super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surfaceRaised.withValues(alpha: .78),
+          border: Border.all(color: PackLoxTokens.border),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: PackLoxTokens.textSecondary,
+            fontSize: 13,
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
       ),
     );
   }
@@ -3112,17 +3287,6 @@ class GuestAccessNote extends StatelessWidget {
   }
 }
 
-String? _validateEmail(String email) {
-  final trimmed = email.trim();
-  if (trimmed.isEmpty) {
-    return 'Enter an email address.';
-  }
-  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
-    return 'Please enter a valid email address.';
-  }
-  return null;
-}
-
 String? _validateCreateAccountEmail(String email) {
   final trimmed = email.trim();
   if (trimmed.isEmpty) {
@@ -3135,6 +3299,17 @@ String? _validateCreateAccountEmail(String email) {
 }
 
 String? _validateSignInEmail(String email) {
+  final trimmed = email.trim();
+  if (trimmed.isEmpty) {
+    return 'Enter your email address.';
+  }
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed)) {
+    return 'Enter a valid email address.';
+  }
+  return null;
+}
+
+String? _validateForgotPasswordEmail(String email) {
   final trimmed = email.trim();
   if (trimmed.isEmpty) {
     return 'Enter your email address.';
