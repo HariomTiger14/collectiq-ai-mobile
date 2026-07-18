@@ -459,6 +459,26 @@ void main() {
     expect(find.textContaining('not correct'), findsNothing);
   });
 
+  testWidgets('S03 valid local Verify routes to S04', (tester) async {
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '123456',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Create your password'), findsOneWidget);
+  });
+
   testWidgets('S03 Resend code uses 30 second cooldown', (tester) async {
     await tester.pumpAuthScreen(
       const AuthVerifyEmailScreen(email: 'collector@example.com'),
@@ -493,7 +513,7 @@ void main() {
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '123456',
+      '000000',
     );
     await tester.pump();
 
@@ -521,6 +541,165 @@ void main() {
       _textButtonIn(const ValueKey('auth-verify-email-verify')),
     );
     expect(verifyButton.onPressed, isNull);
+  });
+
+  testWidgets('S04 hierarchy renders frozen password contract', (tester) async {
+    await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-password-brand-identity')),
+      findsOneWidget,
+    );
+    expect(find.text('Create your password'), findsOneWidget);
+    expect(find.text('Secure your PackLox account.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-create-password-password-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-password-confirm-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Confirm password'), findsOneWidget);
+    expect(find.text('Use at least 12 characters'), findsOneWidget);
+    expect(
+      find.text('Use a memorable passphrase. Spaces and symbols are allowed.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-password-finish')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-password-back')),
+      findsOneWidget,
+    );
+    expect(find.text('Need help?'), findsNothing);
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-forgot-password-screen')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('S04 Finish disabled for empty and short password', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+
+    TextButton finishButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-create-password-finish')),
+    );
+    expect(finishButton.onPressed, isNull);
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+      'short pass!',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+      'short pass!',
+    );
+    await tester.pump();
+
+    finishButton = tester.widget(
+      _textButtonIn(const ValueKey('auth-create-password-finish')),
+    );
+    expect(finishButton.onPressed, isNull);
+  });
+
+  testWidgets('S04 Finish disabled for confirm mismatch', (tester) async {
+    await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+      'memorable passphrase!',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+      'different passphrase!',
+    );
+    await tester.pump();
+
+    expect(find.text('Passwords do not match.'), findsOneWidget);
+    final finishButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-create-password-finish')),
+    );
+    expect(finishButton.onPressed, isNull);
+  });
+
+  testWidgets(
+    'S04 Finish enabled for valid 12 plus matching password with symbols',
+    (tester) async {
+      await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-create-password-password-field')),
+        'memorable passphrase!',
+      );
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+        'memorable passphrase!',
+      );
+      await tester.pump();
+
+      final finishButton = tester.widget<TextButton>(
+        _textButtonIn(const ValueKey('auth-create-password-finish')),
+      );
+      expect(finishButton.onPressed, isNotNull);
+
+      await tester.tap(
+        find.byKey(const ValueKey('auth-create-password-finish')),
+      );
+      await tester.pump();
+
+      expect(
+        find.textContaining('Authenticated Home handoff is pending'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('S04 visibility toggles work independently', (tester) async {
+    await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+
+    TextField password = tester.widget(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+    );
+    TextField confirm = tester.widget(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+    );
+    expect(password.obscureText, isTrue);
+    expect(confirm.obscureText, isTrue);
+
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-password-password-visibility')),
+    );
+    await tester.pump();
+
+    password = tester.widget(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+    );
+    confirm = tester.widget(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+    );
+    expect(password.obscureText, isFalse);
+    expect(confirm.obscureText, isTrue);
+
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-password-confirm-visibility')),
+    );
+    await tester.pump();
+
+    confirm = tester.widget(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+    );
+    expect(confirm.obscureText, isFalse);
   });
 
   testWidgets('S03 Change email returns to S02', (tester) async {

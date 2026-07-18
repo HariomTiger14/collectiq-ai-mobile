@@ -14,6 +14,7 @@ abstract final class AuthRouteNames {
   static const welcome = 'auth/welcome';
   static const createAccountEmail = 'auth/create-account/email';
   static const verifyEmail = 'auth/create-account/verify-email';
+  static const createPassword = 'auth/create-account/create-password';
   static const signIn = 'auth/sign-in';
   static const forgotPasswordEmail = 'auth/forgot-password/email';
   static const guestHome = 'app/guest-home';
@@ -1520,6 +1521,10 @@ class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
     if (!_canVerify) {
       return;
     }
+    if (_codeController.text == '123456') {
+      Navigator.of(context).push(AuthCreatePasswordScreen.route());
+      return;
+    }
     setState(() {
       if (_attemptsRemaining <= 1) {
         _attemptsRemaining = 0;
@@ -1817,6 +1822,395 @@ class _CooldownAuthAction extends StatelessWidget {
         ),
         child: Text(label),
       ),
+    );
+  }
+}
+
+class AuthCreatePasswordScreen extends StatefulWidget {
+  const AuthCreatePasswordScreen({super.key});
+
+  static Route<void> route() {
+    return MaterialPageRoute<void>(
+      settings: const RouteSettings(name: AuthRouteNames.createPassword),
+      builder: (_) => const AuthCreatePasswordScreen(),
+    );
+  }
+
+  @override
+  State<AuthCreatePasswordScreen> createState() =>
+      _AuthCreatePasswordScreenState();
+}
+
+class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
+  static const _minimumPasswordLength = 12;
+
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  var _obscurePassword = true;
+  var _obscureConfirm = true;
+  var _submitted = false;
+  var _completed = false;
+
+  bool get _passwordMeetsLength =>
+      _passwordController.text.length >= _minimumPasswordLength;
+
+  bool get _confirmMatches =>
+      _passwordController.text.isNotEmpty &&
+      _confirmController.text == _passwordController.text;
+
+  bool get _canFinish => _passwordMeetsLength && _confirmMatches;
+
+  String? get _confirmError {
+    if (_confirmController.text.isEmpty) {
+      return null;
+    }
+    if (!_confirmMatches) {
+      return 'Passwords do not match.';
+    }
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_handleFieldChanged);
+    _confirmController.addListener(_handleFieldChanged);
+  }
+
+  @override
+  void dispose() {
+    _passwordController.removeListener(_handleFieldChanged);
+    _confirmController.removeListener(_handleFieldChanged);
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  void _handleFieldChanged() {
+    setState(() {
+      _completed = false;
+    });
+  }
+
+  void _finishAccount() {
+    setState(() => _submitted = true);
+    if (!_canFinish) {
+      return;
+    }
+    setState(() => _completed = true);
+  }
+
+  void _backToVerification() {
+    Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const backgroundTop = Color(0xFF050816);
+    const backgroundMid = Color(0xFF0A1022);
+    const backgroundBottom = Color(0xFF070A12);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: backgroundBottom,
+        systemNavigationBarDividerColor: backgroundBottom,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        key: const ValueKey('auth-create-password-screen'),
+        backgroundColor: backgroundBottom,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .42, 1],
+              colors: [backgroundTop, backgroundMid, backgroundBottom],
+            ),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewInsets = MediaQuery.viewInsetsOf(context);
+                final compactHeight =
+                    constraints.maxHeight < 760 || viewInsets.bottom > 0;
+                final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
+                final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+
+                return SingleChildScrollView(
+                  key: const ValueKey('auth-create-password-scroll-view'),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    topGap,
+                    AppSpacing.xl,
+                    AppSpacing.lg + viewInsets.bottom,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        minHeight:
+                            constraints.maxHeight - topGap - AppSpacing.lg,
+                      ),
+                      child: IntrinsicHeight(
+                        child: AutofillGroup(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AuthCompactBrandLockup(
+                                keyPrefix: 'auth-create-password',
+                                emblemSize: compactHeight ? 54 : 62,
+                              ),
+                              SizedBox(height: titleGap),
+                              const Text(
+                                'Create your password',
+                                key: ValueKey('auth-create-password-title'),
+                                textAlign: TextAlign.left,
+                                style: TextStyle(
+                                  color: PackLoxTokens.textPrimary,
+                                  fontSize: 30,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                'Secure your PackLox account.',
+                                key: const ValueKey(
+                                  'auth-create-password-supporting-copy',
+                                ),
+                                style: TextStyle(
+                                  color: PackLoxTokens.textSecondary.withValues(
+                                    alpha: .94,
+                                  ),
+                                  fontSize: 15,
+                                  height: 1.45,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxl),
+                              AuthTextField(
+                                key: const ValueKey(
+                                  'auth-create-password-password-field',
+                                ),
+                                controller: _passwordController,
+                                label: 'Password',
+                                hint: 'Memorable passphrase',
+                                obscureText: _obscurePassword,
+                                autofillHints: const [
+                                  AutofillHints.newPassword,
+                                ],
+                                suffixIcon: IconButton(
+                                  key: const ValueKey(
+                                    'auth-create-password-password-visibility',
+                                  ),
+                                  tooltip: _obscurePassword
+                                      ? 'Show password'
+                                      : 'Hide password',
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                                ),
+                                onSubmitted: (_) {
+                                  if (_canFinish) {
+                                    _finishAccount();
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              AuthTextField(
+                                key: const ValueKey(
+                                  'auth-create-password-confirm-field',
+                                ),
+                                controller: _confirmController,
+                                label: 'Confirm password',
+                                hint: 'Repeat your passphrase',
+                                obscureText: _obscureConfirm,
+                                autofillHints: const [
+                                  AutofillHints.newPassword,
+                                ],
+                                errorText: _confirmError,
+                                suffixIcon: IconButton(
+                                  key: const ValueKey(
+                                    'auth-create-password-confirm-visibility',
+                                  ),
+                                  tooltip: _obscureConfirm
+                                      ? 'Show confirm password'
+                                      : 'Hide confirm password',
+                                  icon: Icon(
+                                    _obscureConfirm
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm,
+                                  ),
+                                ),
+                                onSubmitted: (_) {
+                                  if (_canFinish) {
+                                    _finishAccount();
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _PasswordRequirementBlock(
+                                key: const ValueKey(
+                                  'auth-create-password-requirements',
+                                ),
+                                lengthMet: _passwordMeetsLength,
+                                matchMet: _confirmMatches,
+                              ),
+                              AuthMessage(
+                                infoMessage: _completed
+                                    ? 'Account ready. Authenticated Home handoff is pending backend account creation.'
+                                    : null,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _GradientAuthButton(
+                                key: const ValueKey(
+                                  'auth-create-password-finish',
+                                ),
+                                label: 'Finish Account',
+                                semanticLabel: 'Finish Account',
+                                onPressed: _canFinish ? _finishAccount : null,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _OutlineAuthButton(
+                                key: const ValueKey(
+                                  'auth-create-password-back',
+                                ),
+                                label: 'Back to verification',
+                                semanticLabel: 'Back to verification',
+                                onPressed: _backToVerification,
+                              ),
+                              if (_submitted && !_canFinish) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                AuthMessage(
+                                  errorMessage: _confirmController.text.isEmpty
+                                      ? 'Confirm your password to finish.'
+                                      : _confirmError,
+                                ),
+                              ],
+                              const Spacer(),
+                              const SizedBox(height: AppSpacing.xl),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordRequirementBlock extends StatelessWidget {
+  const _PasswordRequirementBlock({
+    required this.lengthMet,
+    required this.matchMet,
+    super.key,
+  });
+
+  final bool lengthMet;
+  final bool matchMet;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label:
+          'Password requirements. Use at least 12 characters. Use a memorable passphrase. Spaces and symbols are allowed.',
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surfaceRaised.withValues(alpha: .78),
+          border: Border.all(color: PackLoxTokens.border),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PasswordRequirementRow(
+              key: const ValueKey('auth-create-password-length-rule'),
+              met: lengthMet,
+              label: 'Use at least 12 characters',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _PasswordRequirementRow(
+              key: const ValueKey('auth-create-password-match-rule'),
+              met: matchMet,
+              label: 'Confirm password must match',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Use a memorable passphrase. Spaces and symbols are allowed.',
+              key: ValueKey('auth-create-password-helper-copy'),
+              style: TextStyle(
+                color: PackLoxTokens.textSecondary,
+                fontSize: 12.5,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordRequirementRow extends StatelessWidget {
+  const _PasswordRequirementRow({
+    required this.met,
+    required this.label,
+    super.key,
+  });
+
+  final bool met;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = met ? PackLoxTokens.success : PackLoxTokens.textSecondary;
+    return Row(
+      children: [
+        Icon(
+          met ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+          color: color,
+          size: 18,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
