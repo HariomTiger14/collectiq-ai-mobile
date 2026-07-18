@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend_contract_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
@@ -1490,6 +1491,8 @@ class AuthSignUpScreen extends ConsumerStatefulWidget {
 class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   final _emailController = TextEditingController();
   bool _submitted = false;
+  var _isSubmitting = false;
+  String? _formError;
 
   static const _googleProviderEnabled = false;
   static const _appleProviderEnabled = false;
@@ -1504,7 +1507,9 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   }
 
   void _handleEmailChanged() {
-    setState(() {});
+    setState(() {
+      _formError = null;
+    });
   }
 
   @override
@@ -1514,14 +1519,38 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
     super.dispose();
   }
 
-  void _continue() {
-    setState(() => _submitted = true);
-    if (_emailError != null) {
+  Future<void> _continue() async {
+    setState(() {
+      _submitted = true;
+      _formError = null;
+    });
+    if (!_canContinue || _isSubmitting) {
       return;
     }
-    Navigator.of(
-      context,
-    ).push(AuthVerifyEmailScreen.route(email: _emailController.text.trim()));
+    setState(() => _isSubmitting = true);
+    final email = _emailController.text.trim();
+    await ref
+        .read(authBackendContractControllerProvider.notifier)
+        .startEmailSignup(email: email);
+    if (!mounted) {
+      return;
+    }
+    final backendState = ref.read(authBackendContractControllerProvider);
+    if (backendState.status == AuthBackendContractStatus.verificationSent) {
+      setState(() => _isSubmitting = false);
+      Navigator.of(
+        context,
+      ).push(AuthVerifyEmailScreen.route(email: backendState.email ?? email));
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+      _formError =
+          backendState.failure?.safeMessage ??
+          backendState.infoMessage ??
+          'We could not send a verification code. Check your connection and try again.';
+    });
   }
 
   void _openSignIn() {
@@ -1651,22 +1680,30 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
                                 keyboardType: TextInputType.emailAddress,
                                 autofillHints: const [AutofillHints.email],
                                 errorText: _emailError,
+                                enabled: !_isSubmitting,
                                 onSubmitted: (_) {
                                   if (_canContinue) {
-                                    _continue();
+                                    unawaited(_continue());
                                   } else {
                                     setState(() => _submitted = true);
                                   }
                                 },
                               ),
+                              AuthMessage(errorMessage: _formError),
                               const SizedBox(height: AppSpacing.lg),
                               _GradientAuthButton(
                                 key: const ValueKey(
                                   'auth-create-account-continue',
                                 ),
-                                label: 'Continue',
-                                semanticLabel: 'Continue',
-                                onPressed: _canContinue ? _continue : null,
+                                label: _isSubmitting
+                                    ? 'Sending code'
+                                    : 'Continue',
+                                semanticLabel: _isSubmitting
+                                    ? 'Sending verification code'
+                                    : 'Continue',
+                                onPressed: _canContinue && !_isSubmitting
+                                    ? () => unawaited(_continue())
+                                    : null,
                               ),
                               if (_hasEnabledProviders) ...[
                                 const SizedBox(height: AppSpacing.xl),
@@ -1714,7 +1751,7 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   }
 }
 
-class AuthVerifyEmailScreen extends StatefulWidget {
+class AuthVerifyEmailScreen extends ConsumerStatefulWidget {
   const AuthVerifyEmailScreen({super.key, this.email});
 
   final String? email;
@@ -1730,10 +1767,11 @@ class AuthVerifyEmailScreen extends StatefulWidget {
   }
 
   @override
-  State<AuthVerifyEmailScreen> createState() => _AuthVerifyEmailScreenState();
+  ConsumerState<AuthVerifyEmailScreen> createState() =>
+      _AuthVerifyEmailScreenState();
 }
 
-class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
+class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
   static const _otpLength = 6;
   static const _maxAttempts = 5;
   static const _resendCooldownSeconds = 30;
@@ -1743,15 +1781,17 @@ class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
   var _cooldownRemaining = _resendCooldownSeconds;
   var _attemptsRemaining = _maxAttempts;
   var _requiresResend = false;
+  var _isVerifying = false;
+  var _isResending = false;
   String? _fieldError;
 
   String get _maskedEmail => _maskEmailForVerification(widget.email);
 
   bool get _hasCompleteCode => _codeController.text.length == _otpLength;
 
-  bool get _canVerify => _hasCompleteCode && !_requiresResend;
+  bool get _canVerify => _hasCompleteCode && !_requiresResend && !_isVerifying;
 
-  bool get _canResend => _cooldownRemaining == 0;
+  bool get _canResend => _cooldownRemaining == 0 && !_isResending;
 
   @override
   void initState() {
@@ -1791,38 +1831,99 @@ class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
     });
   }
 
-  void _verify() {
+  Future<void> _verify() async {
     if (!_canVerify) {
       return;
     }
-    if (_codeController.text == '123456') {
+    setState(() {
+      _isVerifying = true;
+      _fieldError = null;
+    });
+
+    await ref
+        .read(authBackendContractControllerProvider.notifier)
+        .verifyEmailOtp(code: _codeController.text);
+    if (!mounted) {
+      return;
+    }
+
+    final backendState = ref.read(authBackendContractControllerProvider);
+    if (backendState.status == AuthBackendContractStatus.otpVerified &&
+        backendState.verification != null) {
+      setState(() => _isVerifying = false);
       Navigator.of(context).push(AuthCreatePasswordScreen.route());
       return;
     }
+
+    final failure = backendState.failure;
     setState(() {
-      if (_attemptsRemaining <= 1) {
-        _attemptsRemaining = 0;
+      _isVerifying = false;
+      if (failure?.code == AuthBackendFailureCode.otpAttemptLimitReached) {
+        _attemptsRemaining = failure?.attemptsRemaining ?? 0;
         _requiresResend = true;
-        _fieldError = 'Too many attempts. Request a new code.';
-      } else {
-        _attemptsRemaining -= 1;
-        _fieldError = 'That code is not correct. Try again.';
+        _fieldError = failure?.safeMessage;
+        return;
       }
+      if (failure?.code == AuthBackendFailureCode.otpInvalid) {
+        final backendAttempts = failure?.attemptsRemaining;
+        _attemptsRemaining = backendAttempts ?? (_attemptsRemaining - 1);
+        if (_attemptsRemaining <= 0) {
+          _attemptsRemaining = 0;
+          _requiresResend = true;
+          _fieldError =
+              AuthBackendFailureCode.otpAttemptLimitReached.safeMessage;
+          return;
+        }
+      } else if (failure?.code == AuthBackendFailureCode.otpExpired) {
+        _requiresResend = true;
+      }
+      _fieldError =
+          failure?.safeMessage ??
+          backendState.infoMessage ??
+          'We could not verify that code. Try again.';
     });
   }
 
-  void _resendCode() {
+  Future<void> _resendCode() async {
     if (!_canResend) {
       return;
     }
-    _codeController.clear();
     setState(() {
-      _cooldownRemaining = _resendCooldownSeconds;
-      _attemptsRemaining = _maxAttempts;
-      _requiresResend = false;
+      _isResending = true;
       _fieldError = null;
     });
-    _startCooldownTimer();
+
+    await ref
+        .read(authBackendContractControllerProvider.notifier)
+        .resendVerificationCode();
+    if (!mounted) {
+      return;
+    }
+
+    final backendState = ref.read(authBackendContractControllerProvider);
+    if (backendState.status == AuthBackendContractStatus.verificationSent &&
+        backendState.failure == null) {
+      _codeController.clear();
+      final cooldown =
+          backendState.cooldownRemaining?.inSeconds ?? _resendCooldownSeconds;
+      setState(() {
+        _isResending = false;
+        _cooldownRemaining = cooldown > 0 ? cooldown : _resendCooldownSeconds;
+        _attemptsRemaining = backendState.attemptsRemaining ?? _maxAttempts;
+        _requiresResend = false;
+        _fieldError = null;
+      });
+      _startCooldownTimer();
+      return;
+    }
+
+    setState(() {
+      _isResending = false;
+      _fieldError =
+          backendState.failure?.safeMessage ??
+          backendState.infoMessage ??
+          'We could not send a new code. Check your connection and try again.';
+    });
   }
 
   void _changeEmail() {
@@ -1935,21 +2036,29 @@ class _AuthVerifyEmailScreenState extends State<AuthVerifyEmailScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               _GradientAuthButton(
                                 key: const ValueKey('auth-verify-email-verify'),
-                                label: 'Verify',
-                                semanticLabel: 'Verify',
-                                onPressed: _canVerify ? _verify : null,
+                                label: _isVerifying ? 'Verifying' : 'Verify',
+                                semanticLabel: _isVerifying
+                                    ? 'Verifying'
+                                    : 'Verify',
+                                onPressed: _canVerify
+                                    ? () => unawaited(_verify())
+                                    : null,
                               ),
                               const SizedBox(height: AppSpacing.md),
                               _CooldownAuthAction(
                                 key: const ValueKey('auth-verify-email-resend'),
-                                label: _canResend
+                                label: _isResending
+                                    ? 'Sending code'
+                                    : _canResend
                                     ? 'Resend code'
                                     : 'Resend code in ${_cooldownRemaining}s',
-                                semanticLabel: _canResend
+                                semanticLabel: _isResending
+                                    ? 'Sending verification code'
+                                    : _canResend
                                     ? 'Resend code'
                                     : 'Resend code available in $_cooldownRemaining seconds',
                                 enabled: _canResend,
-                                onPressed: _resendCode,
+                                onPressed: () => unawaited(_resendCode()),
                               ),
                               _QuietAuthAction(
                                 key: const ValueKey(
@@ -2100,7 +2209,7 @@ class _CooldownAuthAction extends StatelessWidget {
   }
 }
 
-class AuthCreatePasswordScreen extends StatefulWidget {
+class AuthCreatePasswordScreen extends ConsumerStatefulWidget {
   const AuthCreatePasswordScreen({super.key});
 
   static Route<void> route() {
@@ -2111,11 +2220,12 @@ class AuthCreatePasswordScreen extends StatefulWidget {
   }
 
   @override
-  State<AuthCreatePasswordScreen> createState() =>
+  ConsumerState<AuthCreatePasswordScreen> createState() =>
       _AuthCreatePasswordScreenState();
 }
 
-class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
+class _AuthCreatePasswordScreenState
+    extends ConsumerState<AuthCreatePasswordScreen> {
   static const _minimumPasswordLength = 12;
 
   final _passwordController = TextEditingController();
@@ -2124,6 +2234,8 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
   var _obscureConfirm = true;
   var _submitted = false;
   var _completed = false;
+  var _isSubmitting = false;
+  String? _formError;
 
   bool get _passwordMeetsLength =>
       _passwordController.text.length >= _minimumPasswordLength;
@@ -2163,15 +2275,52 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
   void _handleFieldChanged() {
     setState(() {
       _completed = false;
+      _formError = null;
     });
   }
 
-  void _finishAccount() {
-    setState(() => _submitted = true);
-    if (!_canFinish) {
+  Future<void> _finishAccount() async {
+    setState(() {
+      _submitted = true;
+      _formError = null;
+    });
+    if (!_canFinish || _isSubmitting) {
       return;
     }
-    setState(() => _completed = true);
+
+    setState(() => _isSubmitting = true);
+    await ref
+        .read(authBackendContractControllerProvider.notifier)
+        .createPasswordAfterVerification(
+          password: _passwordController.text,
+          confirmPassword: _confirmController.text,
+        );
+    if (!mounted) {
+      return;
+    }
+
+    final backendState = ref.read(authBackendContractControllerProvider);
+    final signedInUser = backendState.user;
+    if (backendState.status == AuthBackendContractStatus.signedIn &&
+        signedInUser != null &&
+        backendState.isSignedIn) {
+      ref.read(authControllerProvider.notifier).applySignedInUser(signedInUser);
+      setState(() {
+        _isSubmitting = false;
+        _completed = true;
+      });
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+      _completed = false;
+      _formError =
+          backendState.failure?.safeMessage ??
+          backendState.infoMessage ??
+          'We could not finish account setup. Try again.';
+    });
   }
 
   void _backToVerification() {
@@ -2298,9 +2447,10 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
                                 ),
                                 onSubmitted: (_) {
                                   if (_canFinish) {
-                                    _finishAccount();
+                                    unawaited(_finishAccount());
                                   }
                                 },
+                                enabled: !_isSubmitting,
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               AuthTextField(
@@ -2333,9 +2483,10 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
                                 ),
                                 onSubmitted: (_) {
                                   if (_canFinish) {
-                                    _finishAccount();
+                                    unawaited(_finishAccount());
                                   }
                                 },
+                                enabled: !_isSubmitting,
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               _PasswordRequirementBlock(
@@ -2346,8 +2497,9 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
                                 matchMet: _confirmMatches,
                               ),
                               AuthMessage(
+                                errorMessage: _formError,
                                 infoMessage: _completed
-                                    ? 'Account ready. Authenticated Home handoff is pending backend account creation.'
+                                    ? 'Account ready.'
                                     : null,
                               ),
                               const SizedBox(height: AppSpacing.lg),
@@ -2355,9 +2507,15 @@ class _AuthCreatePasswordScreenState extends State<AuthCreatePasswordScreen> {
                                 key: const ValueKey(
                                   'auth-create-password-finish',
                                 ),
-                                label: 'Finish Account',
-                                semanticLabel: 'Finish Account',
-                                onPressed: _canFinish ? _finishAccount : null,
+                                label: _isSubmitting
+                                    ? 'Finishing'
+                                    : 'Finish Account',
+                                semanticLabel: _isSubmitting
+                                    ? 'Finishing Account'
+                                    : 'Finish Account',
+                                onPressed: _canFinish && !_isSubmitting
+                                    ? () => unawaited(_finishAccount())
+                                    : null,
                               ),
                               const SizedBox(height: AppSpacing.md),
                               _OutlineAuthButton(

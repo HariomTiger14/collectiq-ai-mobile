@@ -21,8 +21,12 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     Iterable<InMemoryAuthAccount> accounts = const [],
     this.expectedOtp = '123456',
     this.networkOffline = false,
+    this.signupStartGate,
+    this.otpVerifyGate,
+    this.passwordCreateGate,
     this.signInGate,
     this.resetGate,
+    this.passwordCreateFailure,
     this.resetUnknownAsAccountExistenceFailure = false,
   }) {
     for (final account in accounts) {
@@ -32,8 +36,12 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
 
   final String expectedOtp;
   final bool networkOffline;
+  final Completer<void>? signupStartGate;
+  final Completer<void>? otpVerifyGate;
+  final Completer<void>? passwordCreateGate;
   final Completer<void>? signInGate;
   final Completer<void>? resetGate;
+  final AuthBackendFailure? passwordCreateFailure;
   final bool resetUnknownAsAccountExistenceFailure;
   final _accounts = <String, InMemoryAuthAccount>{};
   final _pendingSignupEmails = <String>{};
@@ -44,6 +52,12 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   int signInCalls = 0;
   String? lastSignInEmail;
   String? lastSignInPassword;
+  String? lastSignupEmail;
+  String? lastOtpEmail;
+  String? lastOtpCode;
+  String? lastCreatedPasswordEmail;
+  String? lastCreatedPassword;
+  String? lastResendEmail;
   String? lastResetEmail;
   int signupStartCalls = 0;
   int otpVerifyCalls = 0;
@@ -101,6 +115,11 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String email,
   }) async {
     signupStartCalls += 1;
+    lastSignupEmail = _normalize(email);
+    final gate = signupStartGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),
@@ -118,6 +137,12 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String code,
   }) async {
     otpVerifyCalls += 1;
+    lastOtpEmail = _normalize(email);
+    lastOtpCode = code;
+    final gate = otpVerifyGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),
@@ -162,10 +187,18 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String password,
   }) async {
     passwordCreateCalls += 1;
+    final gate = passwordCreateGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),
       );
+    }
+    final configuredFailure = passwordCreateFailure;
+    if (configuredFailure != null) {
+      return AuthBackendResult.failure(configuredFailure);
     }
     final normalized = _normalize(verification.email);
     if (_verifiedEmails[normalized]?.verificationToken !=
@@ -174,6 +207,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
         AuthBackendFailure(AuthBackendFailureCode.otpExpired),
       );
     }
+    lastCreatedPasswordEmail = normalized;
+    lastCreatedPassword = password;
     _accounts[normalized] = InMemoryAuthAccount(
       email: normalized,
       password: password,
@@ -187,6 +222,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String email,
   }) async {
     resendCalls += 1;
+    lastResendEmail = _normalize(email);
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_backend_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
@@ -496,10 +497,10 @@ void main() {
   testWidgets('S02 email validation controls Continue availability', (
     tester,
   ) async {
-    final repository = _InteractiveAuthRepository();
+    final backendRepository = InMemoryAuthBackendRepository();
     await tester.pumpAuthScreen(
       const AuthSignUpScreen(),
-      repository: repository,
+      backendRepository: backendRepository,
     );
 
     TextButton continueButton = tester.widget(
@@ -544,11 +545,16 @@ void main() {
       find.text('Enter the code we sent to c***@example.com.'),
       findsOneWidget,
     );
-    expect(repository.signUpCalls, 0);
+    expect(backendRepository.signupStartCalls, 1);
+    expect(backendRepository.lastSignupEmail, 'collector@example.com');
   });
 
   testWidgets('S02 Continue with valid email navigates to S03', (tester) async {
-    await tester.pumpAuthScreen(const AuthSignUpScreen());
+    final backendRepository = InMemoryAuthBackendRepository();
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      backendRepository: backendRepository,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('auth-create-account-email-field')),
@@ -567,6 +573,82 @@ void main() {
     expect(find.text('Verify your email'), findsOneWidget);
     expect(
       find.text('Enter the code we sent to h***@example.com.'),
+      findsOneWidget,
+    );
+    expect(backendRepository.signupStartCalls, 1);
+    expect(backendRepository.lastSignupEmail, 'hari@example.com');
+  });
+
+  testWidgets('S02 signup start failure shows safe retryable copy', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      networkOffline: true,
+    );
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'collector@example.com',
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.signupStartCalls, 1);
+    expect(
+      find.text(
+        'You appear to be offline. Check your connection and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsNothing,
+    );
+    expect(find.textContaining('account exists'), findsNothing);
+    expect(find.textContaining('already'), findsNothing);
+  });
+
+  testWidgets('S02 loading state disables Continue during signup start', (
+    tester,
+  ) async {
+    final signupGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      signupStartGate: signupGate,
+    );
+    await tester.pumpAuthScreen(
+      const AuthSignUpScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'collector@example.com',
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pump();
+
+    expect(backendRepository.signupStartCalls, 1);
+    expect(find.text('Sending code'), findsOneWidget);
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-create-account-continue')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    signupGate.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
       findsOneWidget,
     );
   });
@@ -653,10 +735,11 @@ void main() {
     expect(find.textContaining('not correct'), findsNothing);
   });
 
-  testWidgets('S03 valid local Verify routes to S04', (tester) async {
-    await tester.pumpAuthScreen(
-      const AuthVerifyEmailScreen(email: 'collector@example.com'),
-    );
+  testWidgets('S03 Verify calls backend and routes to S04 on success', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository();
+    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
@@ -671,12 +754,46 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Create your password'), findsOneWidget);
+    expect(backendRepository.otpVerifyCalls, 1);
+    expect(backendRepository.lastOtpEmail, 'collector@example.com');
+    expect(backendRepository.lastOtpCode, '123456');
+  });
+
+  testWidgets('S03 loading state disables Verify while OTP verifies', (
+    tester,
+  ) async {
+    final otpGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      otpVerifyGate: otpGate,
+    );
+    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '123456',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+    await tester.pump();
+
+    expect(backendRepository.otpVerifyCalls, 1);
+    expect(find.text('Verifying'), findsOneWidget);
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    otpGate.complete();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('S03 Resend code uses 30 second cooldown', (tester) async {
-    await tester.pumpAuthScreen(
-      const AuthVerifyEmailScreen(email: 'collector@example.com'),
-    );
+    final backendRepository = InMemoryAuthBackendRepository();
+    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
 
     expect(find.text('Resend code in 30s'), findsOneWidget);
     TextButton resendButton = tester.widget(
@@ -695,15 +812,17 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('Resend code in 30s'), findsOneWidget);
     expect(find.text('5 attempts remaining.'), findsOneWidget);
+    expect(backendRepository.resendCalls, 1);
+    expect(backendRepository.lastResendEmail, 'collector@example.com');
   });
 
   testWidgets('S03 five attempt lockout requires resend', (tester) async {
-    await tester.pumpAuthScreen(
-      const AuthVerifyEmailScreen(email: 'collector@example.com'),
-    );
+    final backendRepository = InMemoryAuthBackendRepository();
+    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
@@ -713,6 +832,7 @@ void main() {
 
     for (var attempt = 0; attempt < 5; attempt += 1) {
       await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+      await tester.pump();
       await tester.pump();
     }
 
@@ -728,6 +848,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('Too many attempts. Request a new code.'), findsNothing);
     expect(find.text('5 attempts remaining.'), findsOneWidget);
@@ -735,6 +856,8 @@ void main() {
       _textButtonIn(const ValueKey('auth-verify-email-verify')),
     );
     expect(verifyButton.onPressed, isNull);
+    expect(backendRepository.otpVerifyCalls, 5);
+    expect(backendRepository.resendCalls, 1);
   });
 
   testWidgets('S04 hierarchy renders frozen password contract', (tester) async {
@@ -830,7 +953,11 @@ void main() {
   testWidgets(
     'S04 Finish enabled for valid 12 plus matching password with symbols',
     (tester) async {
-      await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
+      final backendRepository = InMemoryAuthBackendRepository();
+      final container = await _pumpSignupFlowToS04(
+        tester,
+        backendRepository: backendRepository,
+      );
 
       await tester.enterText(
         _textFieldIn(const ValueKey('auth-create-password-password-field')),
@@ -850,14 +977,118 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('auth-create-password-finish')),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
+      expect(backendRepository.passwordCreateCalls, 1);
       expect(
-        find.textContaining('Authenticated Home handoff is pending'),
-        findsOneWidget,
+        backendRepository.lastCreatedPasswordEmail,
+        'collector@example.com',
       );
+      expect(backendRepository.lastCreatedPassword, 'memorable passphrase!');
+      expect(container.read(authControllerProvider).isSignedIn, isTrue);
     },
   );
+
+  testWidgets('S04 authenticated signup success wins over local guest mode', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository();
+    final container = await _pumpSignupFlowToS04(
+      tester,
+      backendRepository: backendRepository,
+      guestModeRepository: const _ImmediateGuestModeRepository(chosen: true),
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+      'memorable passphrase!',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+      'memorable passphrase!',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-create-password-finish')));
+    await tester.pumpAndSettle();
+
+    expect(backendRepository.passwordCreateCalls, 1);
+    expect(container.read(authControllerProvider).isSignedIn, isTrue);
+    expect(await container.read(guestModeControllerProvider.future), isTrue);
+  });
+
+  testWidgets('S04 capability failure shows safe error without fake auth', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      passwordCreateFailure: const AuthBackendFailure(
+        AuthBackendFailureCode.capabilityUnavailable,
+      ),
+    );
+    final container = await _pumpSignupFlowToS04(
+      tester,
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+      'memorable passphrase!',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+      'memorable passphrase!',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-create-password-finish')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.passwordCreateCalls, 1);
+    expect(
+      find.text('This authentication step is not available yet.'),
+      findsOneWidget,
+    );
+    expect(container.read(authControllerProvider).isSignedIn, isFalse);
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('S04 loading state disables Finish during password creation', (
+    tester,
+  ) async {
+    final passwordGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      passwordCreateGate: passwordGate,
+    );
+    final container = await _pumpSignupFlowToS04(
+      tester,
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-password-field')),
+      'memorable passphrase!',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+      'memorable passphrase!',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-create-password-finish')));
+    await tester.pump();
+
+    expect(backendRepository.passwordCreateCalls, 1);
+    expect(find.text('Finishing'), findsOneWidget);
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-create-password-finish')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    passwordGate.complete();
+    await tester.pumpAndSettle();
+    expect(container.read(authControllerProvider).isSignedIn, isTrue);
+  });
 
   testWidgets('S04 visibility toggles work independently', (tester) async {
     await tester.pumpAuthScreen(const AuthCreatePasswordScreen());
@@ -897,21 +1128,9 @@ void main() {
   });
 
   testWidgets('S03 Change email returns to S02', (tester) async {
-    await tester.pumpAuthScreen(const AuthSignUpScreen());
-
-    await tester.enterText(
-      find.byKey(const ValueKey('auth-create-account-email-field')),
-      'collector@example.com',
-    );
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('auth-create-account-continue')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('auth-verify-email-screen')),
-      findsOneWidget,
+    await _pumpSignupFlowToS03(
+      tester,
+      backendRepository: InMemoryAuthBackendRepository(),
     );
 
     await tester.tap(
@@ -1470,6 +1689,58 @@ Finder _textButtonIn(Key key) {
     of: find.byKey(key),
     matching: find.byType(TextButton),
   );
+}
+
+Future<ProviderContainer> _pumpSignupFlowToS03(
+  WidgetTester tester, {
+  required InMemoryAuthBackendRepository backendRepository,
+  GuestModeRepository? guestModeRepository,
+  String email = 'collector@example.com',
+}) async {
+  final container = await tester.pumpAuthScreenWithContainer(
+    const AuthSignUpScreen(),
+    backendRepository: backendRepository,
+    guestModeRepository: guestModeRepository,
+  );
+  await tester.enterText(
+    find.byKey(const ValueKey('auth-create-account-email-field')),
+    email,
+  );
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('auth-create-account-continue')));
+  await tester.pumpAndSettle();
+  expect(
+    find.byKey(const ValueKey('auth-verify-email-screen')),
+    findsOneWidget,
+  );
+  return container;
+}
+
+Future<ProviderContainer> _pumpSignupFlowToS04(
+  WidgetTester tester, {
+  required InMemoryAuthBackendRepository backendRepository,
+  GuestModeRepository? guestModeRepository,
+  String email = 'collector@example.com',
+  String otp = '123456',
+}) async {
+  final container = await _pumpSignupFlowToS03(
+    tester,
+    backendRepository: backendRepository,
+    guestModeRepository: guestModeRepository,
+    email: email,
+  );
+  await tester.enterText(
+    _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+    otp,
+  );
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+  await tester.pumpAndSettle();
+  expect(
+    find.byKey(const ValueKey('auth-create-password-screen')),
+    findsOneWidget,
+  );
+  return container;
 }
 
 class _ImmediateGuestModeRepository implements GuestModeRepository {
