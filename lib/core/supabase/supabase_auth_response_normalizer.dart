@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 
 enum SupabaseAuthAction {
   signUp,
+  otpSignupStart,
+  otpVerify,
+  passwordUpdate,
   signIn,
   resendConfirmation,
   passwordReset,
@@ -12,6 +15,9 @@ enum SupabaseAuthAction {
 enum SupabaseAuthNormalizedStatus {
   signedIn,
   signedOut,
+  otpSent,
+  otpVerified,
+  passwordUpdated,
   confirmationRequired,
   confirmationEmailSent,
   passwordResetSent,
@@ -165,6 +171,10 @@ class SupabaseAuthResponseNormalizer {
         'Confirmation email sent. Please check Inbox, Spam, Junk, and Promotions.',
       SupabaseAuthNormalizedStatus.passwordResetSent =>
         'Password reset email sent. Please wait before requesting another.',
+      SupabaseAuthNormalizedStatus.otpSent =>
+        'Verification code sent. Please check your email.',
+      SupabaseAuthNormalizedStatus.otpVerified => 'Verification code accepted.',
+      SupabaseAuthNormalizedStatus.passwordUpdated => 'Password updated.',
       SupabaseAuthNormalizedStatus.emailNotConfirmed =>
         'Please confirm your email before signing in.',
       SupabaseAuthNormalizedStatus.emailNotRegistered =>
@@ -185,6 +195,9 @@ class SupabaseAuthResponseNormalizer {
         'Session expired. Please sign in again.',
       SupabaseAuthNormalizedStatus.temporaryFailure =>
         'Supabase is temporarily unavailable. Please try again soon.',
+      SupabaseAuthNormalizedStatus.otpSent ||
+      SupabaseAuthNormalizedStatus.otpVerified ||
+      SupabaseAuthNormalizedStatus.passwordUpdated ||
       SupabaseAuthNormalizedStatus.signedIn ||
       SupabaseAuthNormalizedStatus.signedOut =>
         'Supabase Auth request completed.',
@@ -211,6 +224,15 @@ class SupabaseAuthResponseNormalizer {
   }) {
     return switch (action) {
       SupabaseAuthAction.signUp => _signUpSuccessStatus(body),
+      SupabaseAuthAction.otpSignupStart => SupabaseAuthNormalizedStatus.otpSent,
+      SupabaseAuthAction.otpVerify =>
+        _hasAuthenticatedSession(body)
+            ? SupabaseAuthNormalizedStatus.otpVerified
+            : SupabaseAuthNormalizedStatus.emailNotConfirmed,
+      SupabaseAuthAction.passwordUpdate =>
+        _hasUser(body)
+            ? SupabaseAuthNormalizedStatus.passwordUpdated
+            : SupabaseAuthNormalizedStatus.unknownFailure,
       SupabaseAuthAction.signIn =>
         _hasAuthenticatedSession(body)
             ? SupabaseAuthNormalizedStatus.signedIn

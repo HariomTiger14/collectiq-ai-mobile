@@ -1,4 +1,6 @@
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
+import 'package:collectiq_ai/core/supabase/supabase_auth_response_normalizer.dart';
+import 'package:collectiq_ai/features/auth/data/repositories/auth_repository_backend_adapter.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
@@ -214,6 +216,161 @@ void main() {
     );
   });
 
+  group('Supabase OTP signup normalizer capability', () {
+    test(
+      'normalizes OTP signup, verification, and password update success',
+      () {
+        final otpStart = SupabaseAuthResponseNormalizer.normalizeResponse(
+          action: SupabaseAuthAction.otpSignupStart,
+          statusCode: 200,
+          body: const <String, dynamic>{},
+        );
+        expect(otpStart.status, SupabaseAuthNormalizedStatus.otpSent);
+
+        final otpVerify = SupabaseAuthResponseNormalizer.normalizeResponse(
+          action: SupabaseAuthAction.otpVerify,
+          statusCode: 200,
+          body: const {
+            'access_token': 'otp-session-token',
+            'user': {'id': 'new-user', 'email': 'new@example.com'},
+          },
+        );
+        expect(otpVerify.status, SupabaseAuthNormalizedStatus.otpVerified);
+
+        final passwordUpdate = SupabaseAuthResponseNormalizer.normalizeResponse(
+          action: SupabaseAuthAction.passwordUpdate,
+          statusCode: 200,
+          body: const {'id': 'new-user', 'email': 'new@example.com'},
+        );
+        expect(
+          passwordUpdate.status,
+          SupabaseAuthNormalizedStatus.passwordUpdated,
+        );
+      },
+    );
+  });
+
+  group('AuthRepositoryBackendAdapter OTP signup capability spike', () {
+    test(
+      'uses optional OTP signup repository methods without UI wiring',
+      () async {
+        final repository = _OtpCapableAuthRepository();
+        final adapter = AuthRepositoryBackendAdapter(repository: repository);
+
+        final start = await adapter.startEmailSignup(
+          email: ' NewUser@Example.com ',
+        );
+        expect(start.isSuccess, isTrue);
+        expect(start.requireValue.email, 'newuser@example.com');
+        expect(repository.signupStartCalls, 1);
+        expect(repository.lastSignupEmail, 'newuser@example.com');
+
+        final verification = await adapter.verifyEmailOtp(
+          email: 'NewUser@Example.com',
+          code: '123456',
+        );
+        expect(verification.isSuccess, isTrue);
+        expect(verification.requireValue.email, 'newuser@example.com');
+        expect(repository.otpVerifyCalls, 1);
+
+        final password = await adapter.createPasswordAfterVerification(
+          verification: verification.requireValue,
+          password: 'correct horse battery staple',
+        );
+        expect(password.isSuccess, isTrue);
+        expect(password.requireValue.email, 'newuser@example.com');
+        expect(repository.passwordCreateCalls, 1);
+
+        final resend = await adapter.resendVerificationCode(
+          email: 'NewUser@Example.com',
+        );
+        expect(resend.isSuccess, isTrue);
+        expect(repository.signupStartCalls, 2);
+      },
+    );
+
+    test(
+      'returns capability unavailable when repository lacks OTP support',
+      () async {
+        final adapter = AuthRepositoryBackendAdapter(
+          repository: const _ShellAuthRepository(),
+        );
+
+        final start = await adapter.startEmailSignup(email: 'new@example.com');
+        final verify = await adapter.verifyEmailOtp(
+          email: 'new@example.com',
+          code: '123456',
+        );
+        final password = await adapter.createPasswordAfterVerification(
+          verification: EmailOtpVerification(
+            email: 'new@example.com',
+            verifiedAt: DateTime.utc(2026, 7, 18),
+          ),
+          password: 'correct horse battery staple',
+        );
+
+        expect(
+          start.failure?.code,
+          AuthBackendFailureCode.capabilityUnavailable,
+        );
+        expect(
+          verify.failure?.code,
+          AuthBackendFailureCode.capabilityUnavailable,
+        );
+        expect(
+          password.failure?.code,
+          AuthBackendFailureCode.capabilityUnavailable,
+        );
+      },
+    );
+
+    test('maps OTP signup failures to UI-safe categories', () async {
+      final existingEmailAdapter = AuthRepositoryBackendAdapter(
+        repository: _OtpCapableAuthRepository(
+          startError: const AuthException('User already registered'),
+        ),
+      );
+      final existingEmail = await existingEmailAdapter.startEmailSignup(
+        email: 'known@example.com',
+      );
+      expect(
+        existingEmail.failure?.code,
+        AuthBackendFailureCode.accountExistenceNotDisclosed,
+      );
+      expect(existingEmail.failure?.safeMessage, isNot(contains('registered')));
+
+      final invalidOtpAdapter = AuthRepositoryBackendAdapter(
+        repository: _OtpCapableAuthRepository(
+          verifyError: const AuthException('Invalid OTP token'),
+        ),
+      );
+      final invalidOtp = await invalidOtpAdapter.verifyEmailOtp(
+        email: 'new@example.com',
+        code: '000000',
+      );
+      expect(invalidOtp.failure?.code, AuthBackendFailureCode.otpInvalid);
+
+      final sessionExpiredAdapter = AuthRepositoryBackendAdapter(
+        repository: _OtpCapableAuthRepository(
+          passwordError: const AuthException('Verified auth session missing'),
+        ),
+      );
+      final sessionExpired = await sessionExpiredAdapter
+          .createPasswordAfterVerification(
+            verification: EmailOtpVerification(
+              email: 'new@example.com',
+              verifiedAt: DateTime.utc(2026, 7, 18),
+            ),
+            password: 'correct horse battery staple',
+          );
+      expect(sessionExpired.failure?.code, AuthBackendFailureCode.otpExpired);
+      expect(
+        sessionExpired.failure?.safeMessage,
+        'Verification expired. Request a new code.',
+      );
+    });
+  });
+
   group('AppShell auth precedence contract', () {
     testWidgets('guest mode never overrides authenticated session', (
       tester,
@@ -366,4 +523,116 @@ class _ShellOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<void> setOnboardingCompleted(bool completed) async {}
+}
+
+class _OtpCapableAuthRepository
+    implements AuthRepository, OtpSignupAuthRepository {
+  _OtpCapableAuthRepository({
+    this.startError,
+    this.verifyError,
+    this.passwordError,
+  });
+
+  final Object? startError;
+  final Object? verifyError;
+  final Object? passwordError;
+  var signupStartCalls = 0;
+  var otpVerifyCalls = 0;
+  var passwordCreateCalls = 0;
+  String? lastSignupEmail;
+  String? lastVerifyEmail;
+  String? lastVerifyCode;
+  String? lastPassword;
+
+  @override
+  Future<AppUser?> currentUser() async => null;
+
+  @override
+  Future<AppUser> signIn() => signInAnonymously();
+
+  @override
+  Future<AppUser> signInAnonymously() async {
+    return const AppUser(
+      id: 'local-user',
+      displayName: 'Local Collector',
+      email: null,
+      isAnonymous: true,
+      isLocalOnly: true,
+      provider: AuthProviderType.localAnonymous,
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return emailPasswordUser(email: email.trim().toLowerCase());
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return emailPasswordUser(email: email.trim().toLowerCase());
+  }
+
+  @override
+  Future<void> startEmailOtpSignup({required String email}) async {
+    signupStartCalls += 1;
+    lastSignupEmail = email.trim().toLowerCase();
+    final error = startError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
+  Future<EmailOtpVerification> verifyEmailOtp({
+    required String email,
+    required String code,
+  }) async {
+    otpVerifyCalls += 1;
+    lastVerifyEmail = email.trim().toLowerCase();
+    lastVerifyCode = code;
+    final error = verifyError;
+    if (error != null) {
+      throw error;
+    }
+    return EmailOtpVerification(
+      email: email.trim().toLowerCase(),
+      verifiedAt: DateTime.utc(2026, 7, 18),
+    );
+  }
+
+  @override
+  Future<AppUser> createPasswordAfterOtp({required String password}) async {
+    passwordCreateCalls += 1;
+    lastPassword = password;
+    final error = passwordError;
+    if (error != null) {
+      throw error;
+    }
+    return emailPasswordUser(email: lastVerifyEmail ?? 'new@example.com');
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {}
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is not enabled.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is not enabled.');
+  }
+
+  @override
+  Future<void> signOut() async {}
 }

@@ -61,6 +61,21 @@ abstract interface class SupabaseAuthGateway {
   Future<void> signOut(String accessToken);
 }
 
+abstract interface class SupabaseOtpSignupGateway {
+  bool get isConfigured;
+
+  Future<void> startEmailOtpSignup({required String email});
+
+  Future<SupabaseAuthSession> verifyEmailOtp({
+    required String email,
+    required String token,
+  });
+
+  Future<SupabaseAuthSession> createPasswordAfterOtp({
+    required String password,
+  });
+}
+
 abstract interface class SupabaseDataGateway implements SupabaseAuthGateway {
   SupabaseConfig get config;
 
@@ -79,7 +94,7 @@ abstract interface class SupabaseDataGateway implements SupabaseAuthGateway {
   });
 }
 
-class SupabaseService implements SupabaseDataGateway {
+class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
   SupabaseService._(this.config, this._onAuthAttempt)
     : _dio = Dio(
         BaseOptions(
@@ -306,6 +321,124 @@ class SupabaseService implements SupabaseDataGateway {
     _ensureValidSession(session);
     await _saveSession(session);
     return session;
+  }
+
+  @override
+  Future<void> startEmailOtpSignup({required String email}) async {
+    _ensureConfigured();
+    late final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/auth/v1/otp',
+        data: {
+          'email': email,
+          'create_user': true,
+          'data': {'display_name': email},
+        },
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: const {'email': ''});
+      final normalized = _normalizeException(
+        action: SupabaseAuthAction.otpSignupStart,
+        error: error,
+      );
+      _throwForNormalizedResult(normalized, confirmationOnly: true);
+    }
+
+    final normalized = _normalizeResponse(
+      action: SupabaseAuthAction.otpSignupStart,
+      response: response,
+    );
+    if (normalized.status != SupabaseAuthNormalizedStatus.otpSent) {
+      _throwForNormalizedResult(normalized, confirmationOnly: true);
+    }
+  }
+
+  @override
+  Future<SupabaseAuthSession> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    _ensureConfigured();
+    late final Response<dynamic> response;
+    try {
+      response = await _dio.post<dynamic>(
+        '/auth/v1/verify',
+        data: {'email': email, 'token': token, 'type': 'email'},
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: const {'email': '', 'token': ''});
+      final normalized = _normalizeException(
+        action: SupabaseAuthAction.otpVerify,
+        error: error,
+      );
+      _throwForNormalizedResult(normalized);
+    }
+
+    final normalized = _normalizeResponse(
+      action: SupabaseAuthAction.otpVerify,
+      response: response,
+    );
+    if (normalized.status != SupabaseAuthNormalizedStatus.otpVerified) {
+      _throwForNormalizedResult(normalized);
+    }
+
+    final session = SupabaseAuthSession.fromJson(
+      _mapBody(response.data),
+      projectUrl: config.url,
+    );
+    _ensureValidSession(session);
+    await _saveSession(session);
+    return session;
+  }
+
+  @override
+  Future<SupabaseAuthSession> createPasswordAfterOtp({
+    required String password,
+  }) async {
+    _ensureConfigured();
+    final session = await currentSession();
+    if (session == null || session.accessToken.isEmpty) {
+      throw const SupabaseAuthException(
+        'Verified auth session is required before creating a password.',
+      );
+    }
+
+    late final Response<dynamic> response;
+    try {
+      response = await _dio.put<dynamic>(
+        '/auth/v1/user',
+        data: {'password': password},
+        options: _authOptions(session),
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: const {'password': ''});
+      final normalized = _normalizeException(
+        action: SupabaseAuthAction.passwordUpdate,
+        error: error,
+      );
+      _throwForNormalizedResult(normalized);
+    }
+
+    final normalized = _normalizeResponse(
+      action: SupabaseAuthAction.passwordUpdate,
+      response: response,
+    );
+    if (normalized.status != SupabaseAuthNormalizedStatus.passwordUpdated) {
+      _throwForNormalizedResult(normalized);
+    }
+
+    final body = _mapBody(response.data);
+    final userBody = body['user'] is Map<String, dynamic>
+        ? body['user'] as Map<String, dynamic>
+        : body;
+    final updatedSession = SupabaseAuthSession.fromJson({
+      'access_token': session.accessToken,
+      'user': userBody,
+    }, projectUrl: config.url);
+    _ensureValidSession(updatedSession);
+    await _saveSession(updatedSession);
+    return updatedSession;
   }
 
   @override
@@ -642,6 +775,12 @@ class SupabaseService implements SupabaseDataGateway {
         }
         throw const SupabaseAuthException(
           'Too many auth requests. Wait a moment and try again.',
+        );
+      case SupabaseAuthNormalizedStatus.otpSent:
+      case SupabaseAuthNormalizedStatus.otpVerified:
+      case SupabaseAuthNormalizedStatus.passwordUpdated:
+        throw const SupabaseAuthException(
+          'Supabase Auth request completed unexpectedly.',
         );
       case SupabaseAuthNormalizedStatus.invalidCredentials:
       case SupabaseAuthNormalizedStatus.emailNotRegistered:

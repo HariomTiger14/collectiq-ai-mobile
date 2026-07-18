@@ -1,11 +1,13 @@
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flutter/foundation.dart';
 
-class SupabaseAuthRepository implements AuthRepository {
+class SupabaseAuthRepository
+    implements AuthRepository, OtpSignupAuthRepository {
   const SupabaseAuthRepository({
     required this.supabaseService,
     this.fallbackRepository = const MockAuthRepository(),
@@ -79,6 +81,51 @@ class SupabaseAuthRepository implements AuthRepository {
       password: password,
     );
     return _userFromSession(session);
+  }
+
+  @override
+  Future<void> startEmailOtpSignup({required String email}) async {
+    if (!supabaseService.isConfigured) {
+      throw const SupabaseNotConfiguredException();
+    }
+    final gateway = _otpSignupGateway;
+    await gateway.startEmailOtpSignup(email: email);
+  }
+
+  @override
+  Future<EmailOtpVerification> verifyEmailOtp({
+    required String email,
+    required String code,
+  }) async {
+    if (!supabaseService.isConfigured) {
+      throw const SupabaseNotConfiguredException();
+    }
+    final gateway = _otpSignupGateway;
+    final session = await gateway.verifyEmailOtp(email: email, token: code);
+    return EmailOtpVerification(
+      email: session.email ?? email,
+      verifiedAt: DateTime.now().toUtc(),
+    );
+  }
+
+  @override
+  Future<AppUser> createPasswordAfterOtp({required String password}) async {
+    if (!supabaseService.isConfigured) {
+      throw const SupabaseNotConfiguredException();
+    }
+    final gateway = _otpSignupGateway;
+    final session = await gateway.createPasswordAfterOtp(password: password);
+    return _userFromSession(session);
+  }
+
+  SupabaseOtpSignupGateway get _otpSignupGateway {
+    final gateway = supabaseService;
+    if (gateway is SupabaseOtpSignupGateway) {
+      return gateway as SupabaseOtpSignupGateway;
+    }
+    throw const SupabaseAuthException(
+      'Supabase OTP signup is not available in this runtime.',
+    );
   }
 
   @override

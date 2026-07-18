@@ -7,9 +7,9 @@ import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.d
 
 /// Adapter from the existing auth repository to the reset backend contract.
 ///
-/// S02-S06 UI is not wired to this adapter yet. Unsupported OTP/password-finalize
-/// operations intentionally return capability gaps until the Supabase path is
-/// implemented.
+/// S02-S04 UI is still not wired to signup methods. Repositories that expose
+/// [OtpSignupAuthRepository] can prove the frozen OTP signup path; others
+/// continue to return explicit capability gaps.
 class AuthRepositoryBackendAdapter implements AuthBackendRepository {
   const AuthRepositoryBackendAdapter({required this.repository});
 
@@ -44,13 +44,24 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
   Future<AuthBackendResult<EmailSignupStart>> startEmailSignup({
     required String email,
   }) async {
-    return const AuthBackendResult.failure(
-      AuthBackendFailure(
-        AuthBackendFailureCode.capabilityUnavailable,
-        message:
-            'Mobile Supabase OTP signup is not implemented in this adapter yet.',
-      ),
-    );
+    if (repository is! OtpSignupAuthRepository) {
+      return const AuthBackendResult.failure(
+        AuthBackendFailure(
+          AuthBackendFailureCode.capabilityUnavailable,
+          message: 'Mobile OTP signup is not available for this auth provider.',
+        ),
+      );
+    }
+    final otpRepository = repository as OtpSignupAuthRepository;
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      await otpRepository.startEmailOtpSignup(email: normalizedEmail);
+      return AuthBackendResult.success(
+        EmailSignupStart(email: normalizedEmail),
+      );
+    } on Object catch (error) {
+      return AuthBackendResult.failure(_failureFor(error, signupStart: true));
+    }
   }
 
   @override
@@ -58,12 +69,25 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     required String email,
     required String code,
   }) async {
-    return const AuthBackendResult.failure(
-      AuthBackendFailure(
-        AuthBackendFailureCode.capabilityUnavailable,
-        message: 'Mobile Supabase OTP verification is not implemented yet.',
-      ),
-    );
+    if (repository is! OtpSignupAuthRepository) {
+      return const AuthBackendResult.failure(
+        AuthBackendFailure(
+          AuthBackendFailureCode.capabilityUnavailable,
+          message:
+              'Mobile OTP verification is not available for this auth provider.',
+        ),
+      );
+    }
+    final otpRepository = repository as OtpSignupAuthRepository;
+    try {
+      final verification = await otpRepository.verifyEmailOtp(
+        email: email.trim().toLowerCase(),
+        code: code,
+      );
+      return AuthBackendResult.success(verification);
+    } on Object catch (error) {
+      return AuthBackendResult.failure(_failureFor(error, otp: true));
+    }
   }
 
   @override
@@ -71,19 +95,36 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     required EmailOtpVerification verification,
     required String password,
   }) async {
-    return const AuthBackendResult.failure(
-      AuthBackendFailure(
-        AuthBackendFailureCode.capabilityUnavailable,
-        message:
-            'Post-OTP password creation requires a Supabase implementation decision.',
-      ),
-    );
+    if (repository is! OtpSignupAuthRepository) {
+      return const AuthBackendResult.failure(
+        AuthBackendFailure(
+          AuthBackendFailureCode.capabilityUnavailable,
+          message:
+              'Post-OTP password creation is not available for this auth provider.',
+        ),
+      );
+    }
+    final otpRepository = repository as OtpSignupAuthRepository;
+    try {
+      final user = await otpRepository.createPasswordAfterOtp(
+        password: password,
+      );
+      return AuthBackendResult.success(user);
+    } on Object catch (error) {
+      return AuthBackendResult.failure(
+        _failureFor(error, requiresVerifiedSession: true),
+      );
+    }
   }
 
   @override
   Future<AuthBackendResult<EmailSignupStart>> resendVerificationCode({
     required String email,
   }) async {
+    final otpRepository = repository;
+    if (otpRepository is OtpSignupAuthRepository) {
+      return startEmailSignup(email: email);
+    }
     try {
       await repository.resendEmailConfirmation(email: email);
       return AuthBackendResult.success(EmailSignupStart(email: email));
@@ -123,7 +164,13 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     }
   }
 
-  AuthBackendFailure _failureFor(Object error, {bool signIn = false}) {
+  AuthBackendFailure _failureFor(
+    Object error, {
+    bool signIn = false,
+    bool signupStart = false,
+    bool otp = false,
+    bool requiresVerifiedSession = false,
+  }) {
     final message = _messageFor(error).toLowerCase();
     if (error is SupabaseNotConfiguredException) {
       return const AuthBackendFailure(
@@ -138,6 +185,33 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     if (message.contains('too many') || message.contains('rate')) {
       return const AuthBackendFailure(
         AuthBackendFailureCode.cooldownRateLimited,
+      );
+    }
+    if (requiresVerifiedSession &&
+        (message.contains('session') || message.contains('verified'))) {
+      return const AuthBackendFailure(
+        AuthBackendFailureCode.otpExpired,
+        message: 'Verification expired. Request a new code.',
+      );
+    }
+    if (otp && (message.contains('expired') || message.contains('stale'))) {
+      return const AuthBackendFailure(AuthBackendFailureCode.otpExpired);
+    }
+    if (otp &&
+        (message.contains('otp') ||
+            message.contains('token') ||
+            message.contains('code') ||
+            message.contains('invalid'))) {
+      return const AuthBackendFailure(AuthBackendFailureCode.otpInvalid);
+    }
+    if (signupStart &&
+        (message.contains('registered') ||
+            message.contains('exists') ||
+            message.contains('not found'))) {
+      return const AuthBackendFailure(
+        AuthBackendFailureCode.accountExistenceNotDisclosed,
+        message:
+            'If this email can be used, a verification code has been sent.',
       );
     }
     if (message.contains('confirm') || message.contains('not confirmed')) {
