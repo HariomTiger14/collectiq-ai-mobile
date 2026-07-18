@@ -350,16 +350,22 @@ class AuthController extends Notifier<AuthState> {
   static const authRequestTimeout = Duration(seconds: 20);
 
   late AuthRepository _repository;
+  var _sessionMutationVersion = 0;
 
   @override
   AuthState build() {
     _repository = ref.watch(authRepositoryProvider);
-    Future.microtask(loadCurrentUser);
+    final scheduledRestoreVersion = _sessionMutationVersion;
+    Future.microtask(() => _loadCurrentUser(scheduledRestoreVersion));
     return const AuthState();
   }
 
   /// Loads the current user without requiring sign-in.
-  Future<void> loadCurrentUser() async {
+  Future<void> loadCurrentUser() {
+    return _loadCurrentUser(_sessionMutationVersion);
+  }
+
+  Future<void> _loadCurrentUser(int restoreVersion) async {
     state = state.copyWith(
       isLoading: true,
       status: AuthFlowStatus.sessionRestoring,
@@ -368,6 +374,9 @@ class AuthController extends Notifier<AuthState> {
     );
     try {
       final user = await _repository.currentUser();
+      if (restoreVersion != _sessionMutationVersion) {
+        return;
+      }
       state = state.copyWith(
         user: user,
         isLoading: false,
@@ -380,6 +389,9 @@ class AuthController extends Notifier<AuthState> {
         clearResendRateLimitedUntil: user != null && user.isCloudBacked,
       );
     } on Object catch (error) {
+      if (restoreVersion != _sessionMutationVersion) {
+        return;
+      }
       debugPrint('[Auth] load current user failed: $error');
       final message = _messageForError(error);
       state = state.copyWith(
@@ -735,6 +747,24 @@ class AuthController extends Notifier<AuthState> {
         clearInfoMessage: true,
       );
     }
+  }
+
+  /// Applies an authenticated backend-contract user to the app shell state.
+  void applySignedInUser(AppUser user) {
+    _sessionMutationVersion += 1;
+    state = state.copyWith(
+      user: user,
+      isLoading: false,
+      status: AuthFlowStatus.signedIn,
+      infoMessage: AuthMessages.signedIn,
+      clearErrorMessage: true,
+      clearPendingConfirmationEmail: true,
+      clearResendCooldownUntil: true,
+      clearResendRateLimitedUntil: true,
+      clearResendCooldownSource: true,
+      clearPasswordResetCooldownUntil: true,
+      clearPasswordResetRateLimitedUntil: true,
+    );
   }
 
   /// Applies a successfully completed email confirmation session.

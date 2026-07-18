@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_backend_repository.dart';
@@ -19,6 +21,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     Iterable<InMemoryAuthAccount> accounts = const [],
     this.expectedOtp = '123456',
     this.networkOffline = false,
+    this.signInGate,
   }) {
     for (final account in accounts) {
       _accounts[_normalize(account.email)] = account;
@@ -27,6 +30,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
 
   final String expectedOtp;
   final bool networkOffline;
+  final Completer<void>? signInGate;
   final _accounts = <String, InMemoryAuthAccount>{};
   final _pendingSignupEmails = <String>{};
   final _verifiedEmails = <String, EmailOtpVerification>{};
@@ -34,6 +38,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   AppUser? _currentUser;
 
   int signInCalls = 0;
+  String? lastSignInEmail;
+  String? lastSignInPassword;
   int signupStartCalls = 0;
   int otpVerifyCalls = 0;
   int passwordCreateCalls = 0;
@@ -59,6 +65,12 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     required String password,
   }) async {
     signInCalls += 1;
+    lastSignInEmail = _normalize(email);
+    lastSignInPassword = password;
+    final gate = signInGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),

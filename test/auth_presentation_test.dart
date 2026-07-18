@@ -1,13 +1,21 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_backend_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend_contract_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/in_memory_auth_backend_repository.dart';
 
 void main() {
   testWidgets('S05 hierarchy renders frozen sign in contract', (tester) async {
@@ -228,22 +236,29 @@ void main() {
     },
   );
 
-  testWidgets('S05 Sign In enabled for valid email and password', (
+  testWidgets('S05 Sign In calls backend contract with email and password', (
     tester,
   ) async {
-    final repository = _InteractiveAuthRepository();
+    final backendRepository = InMemoryAuthBackendRepository(
+      accounts: const [
+        InMemoryAuthAccount(
+          email: 'collector@example.com',
+          password: 'correct horse battery staple',
+        ),
+      ],
+    );
     await tester.pumpAuthScreen(
       const AuthSignInScreen(),
-      repository: repository,
+      backendRepository: backendRepository,
     );
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-sign-in-email-field')),
-      'collector@example.com',
+      'Collector@Example.com ',
     );
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-sign-in-password-field')),
-      'secret1',
+      'correct horse battery staple',
     );
     await tester.pump();
 
@@ -253,12 +268,152 @@ void main() {
     expect(signInButton.onPressed, isNotNull);
 
     await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.text('Email or password is not correct.'), findsOneWidget);
-    expect(repository.signInCalls, 0);
+    expect(backendRepository.signInCalls, 1);
+    expect(backendRepository.lastSignInEmail, 'collector@example.com');
+    expect(
+      backendRepository.lastSignInPassword,
+      'correct horse battery staple',
+    );
+    expect(find.text('Email or password is not correct.'), findsNothing);
   });
 
+  testWidgets('S05 successful sign-in updates app authenticated state', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      accounts: const [
+        InMemoryAuthAccount(
+          email: 'collector@example.com',
+          password: 'correct horse battery staple',
+        ),
+      ],
+    );
+    final container = await tester.pumpAuthScreenWithContainer(
+      const AuthSignInScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+      'collector@example.com',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+      'correct horse battery staple',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(authBackendContractControllerProvider).status,
+      AuthBackendContractStatus.signedIn,
+    );
+    expect(container.read(authControllerProvider).isSignedIn, isTrue);
+  });
+
+  testWidgets(
+    'S05 invalid credentials use neutral copy without account disclosure',
+    (tester) async {
+      final backendRepository = InMemoryAuthBackendRepository();
+      await tester.pumpAuthScreen(
+        const AuthSignInScreen(),
+        backendRepository: backendRepository,
+      );
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+        'missing@example.com',
+      );
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+        'wrong password',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+      await tester.pumpAndSettle();
+
+      expect(backendRepository.signInCalls, 1);
+      expect(find.text('Email or password is not correct.'), findsOneWidget);
+      expect(find.textContaining('not found'), findsNothing);
+      expect(find.textContaining('sign up first'), findsNothing);
+    },
+  );
+
+  testWidgets('S05 loading state disables Sign In CTA', (tester) async {
+    final signInGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      accounts: const [
+        InMemoryAuthAccount(
+          email: 'collector@example.com',
+          password: 'correct horse battery staple',
+        ),
+      ],
+      signInGate: signInGate,
+    );
+    await tester.pumpAuthScreen(
+      const AuthSignInScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+      'collector@example.com',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+      'correct horse battery staple',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.pump();
+
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-sign-in-submit')),
+    );
+    expect(backendRepository.signInCalls, 1);
+    expect(find.text('Signing In'), findsOneWidget);
+    expect(loadingButton.onPressed, isNull);
+
+    signInGate.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('S05 authenticated success wins over local guest mode', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      accounts: const [
+        InMemoryAuthAccount(
+          email: 'collector@example.com',
+          password: 'correct horse battery staple',
+        ),
+      ],
+    );
+    final container = await tester.pumpAuthScreenWithContainer(
+      const AuthSignInScreen(),
+      backendRepository: backendRepository,
+      guestModeRepository: const _ImmediateGuestModeRepository(chosen: true),
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+      'collector@example.com',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+      'correct horse battery staple',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.pumpAndSettle();
+
+    expect(backendRepository.signInCalls, 1);
+    expect(container.read(authControllerProvider).isSignedIn, isTrue);
+    expect(await container.read(guestModeControllerProvider.future), isTrue);
+  });
   testWidgets('S05 Forgot Password routes to S06 with valid email prefill', (
     tester,
   ) async {
@@ -1095,15 +1250,39 @@ extension on WidgetTester {
   Future<void> pumpAuthScreen(
     Widget child, {
     AuthRepository? repository,
+    AuthBackendRepository? backendRepository,
     ThemeMode themeMode = ThemeMode.dark,
   }) async {
+    await pumpAuthScreenWithContainer(
+      child,
+      repository: repository,
+      backendRepository: backendRepository,
+      themeMode: themeMode,
+    );
+  }
+
+  Future<ProviderContainer> pumpAuthScreenWithContainer(
+    Widget child, {
+    AuthRepository? repository,
+    AuthBackendRepository? backendRepository,
+    GuestModeRepository? guestModeRepository,
+    ThemeMode themeMode = ThemeMode.dark,
+  }) async {
+    final overrides = [
+      authRepositoryProvider.overrideWithValue(
+        repository ?? _InteractiveAuthRepository(),
+      ),
+      if (backendRepository != null)
+        authBackendRepositoryProvider.overrideWithValue(backendRepository),
+      if (guestModeRepository != null)
+        guestModeRepositoryProvider.overrideWithValue(guestModeRepository),
+    ];
+    final container = ProviderContainer(overrides: overrides);
+    addTearDown(container.dispose);
+
     await pumpWidget(
-      ProviderScope(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(
-            repository ?? _InteractiveAuthRepository(),
-          ),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
@@ -1113,6 +1292,7 @@ extension on WidgetTester {
       ),
     );
     await pump();
+    return container;
   }
 
   Future<void> pumpAuthRoute({
@@ -1162,6 +1342,18 @@ Finder _textButtonIn(Key key) {
     of: find.byKey(key),
     matching: find.byType(TextButton),
   );
+}
+
+class _ImmediateGuestModeRepository implements GuestModeRepository {
+  const _ImmediateGuestModeRepository({required this.chosen});
+
+  final bool chosen;
+
+  @override
+  Future<bool> hasChosenGuestMode() async => chosen;
+
+  @override
+  Future<void> setGuestModeChosen(bool chosen) async {}
 }
 
 class _InteractiveAuthRepository implements AuthRepository {

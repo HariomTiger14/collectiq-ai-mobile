@@ -5,6 +5,8 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend_contract_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1014,7 +1016,7 @@ class _InlineLegalLink extends StatelessWidget {
   }
 }
 
-class AuthSignInScreen extends StatefulWidget {
+class AuthSignInScreen extends ConsumerStatefulWidget {
   const AuthSignInScreen({this.initialEmail, super.key});
 
   final String? initialEmail;
@@ -1030,14 +1032,15 @@ class AuthSignInScreen extends StatefulWidget {
   }
 
   @override
-  State<AuthSignInScreen> createState() => _AuthSignInScreenState();
+  ConsumerState<AuthSignInScreen> createState() => _AuthSignInScreenState();
 }
 
-class _AuthSignInScreenState extends State<AuthSignInScreen> {
+class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   var _obscurePassword = true;
   var _submitted = false;
+  var _isSubmitting = false;
   String? _formError;
 
   static const _googleProviderEnabled = false;
@@ -1077,13 +1080,44 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
       _validateSignInEmail(_emailController.text) == null &&
       _passwordController.text.isNotEmpty;
 
-  void _submit() {
-    setState(() => _submitted = true);
-    if (!_canSignIn) {
+  Future<void> _submit() async {
+    setState(() {
+      _submitted = true;
+      _formError = null;
+    });
+    if (!_canSignIn || _isSubmitting) {
       return;
     }
+
+    setState(() => _isSubmitting = true);
+    await ref
+        .read(authBackendContractControllerProvider.notifier)
+        .signInWithEmailPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    final backendState = ref.read(authBackendContractControllerProvider);
+    final signedInUser = backendState.user;
+    if (backendState.status == AuthBackendContractStatus.signedIn &&
+        signedInUser != null &&
+        backendState.isSignedIn) {
+      ref.read(authControllerProvider.notifier).applySignedInUser(signedInUser);
+      setState(() => _isSubmitting = false);
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
     setState(() {
-      _formError = 'Email or password is not correct.';
+      _isSubmitting = false;
+      _formError =
+          backendState.failure?.safeMessage ??
+          backendState.infoMessage ??
+          'Email or password is not correct.';
     });
   }
 
@@ -1158,6 +1192,7 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
                     constraints.maxHeight < 760 || viewInsets.bottom > 0;
                 final topGap = compactHeight ? AppSpacing.lg : AppSpacing.xl;
                 final titleGap = compactHeight ? AppSpacing.xl : 34.0;
+                final canSubmit = _canSignIn && !_isSubmitting;
 
                 return SingleChildScrollView(
                   key: const ValueKey('auth-sign-in-scroll-view'),
@@ -1222,8 +1257,8 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
                                 autofillHints: const [AutofillHints.email],
                                 errorText: _emailError,
                                 onSubmitted: (_) {
-                                  if (_canSignIn) {
-                                    _submit();
+                                  if (canSubmit) {
+                                    unawaited(_submit());
                                   } else {
                                     setState(() => _submitted = true);
                                   }
@@ -1257,8 +1292,8 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
                                   ),
                                 ),
                                 onSubmitted: (_) {
-                                  if (_canSignIn) {
-                                    _submit();
+                                  if (canSubmit) {
+                                    unawaited(_submit());
                                   } else {
                                     setState(() => _submitted = true);
                                   }
@@ -1268,9 +1303,11 @@ class _AuthSignInScreenState extends State<AuthSignInScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               _GradientAuthButton(
                                 key: const ValueKey('auth-sign-in-submit'),
-                                label: 'Sign In',
-                                semanticLabel: 'Sign In',
-                                onPressed: _canSignIn ? _submit : null,
+                                label: _isSubmitting ? 'Signing In' : 'Sign In',
+                                semanticLabel: _isSubmitting
+                                    ? 'Signing In'
+                                    : 'Sign In',
+                                onPressed: canSubmit ? _submit : null,
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Align(
