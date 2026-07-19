@@ -87,6 +87,53 @@ void main() {
       expect(repository.signupStartCalls, 1);
     });
 
+    test(
+      'existing email signup fails safely without auth or overwrite',
+      () async {
+        final repository = InMemoryAuthBackendRepository(
+          accounts: const [
+            InMemoryAuthAccount(
+              email: 'collector@example.com',
+              password: 'original passphrase',
+            ),
+          ],
+        );
+        final container = _contractContainer(repository);
+        addTearDown(container.dispose);
+        final controller = container.read(
+          authBackendContractControllerProvider.notifier,
+        );
+
+        await controller.startEmailSignup(email: 'Collector@Example.com');
+
+        final state = container.read(authBackendContractControllerProvider);
+        expect(state.status, AuthBackendContractStatus.signedOut);
+        expect(
+          state.failure?.code,
+          AuthBackendFailureCode.accountExistenceNotDisclosed,
+        );
+        expect(
+          state.infoMessage,
+          'If this email can be used, a verification code has been sent.',
+        );
+        expect(state.infoMessage, isNot(contains('registered')));
+        expect(state.infoMessage, isNot(contains('already')));
+        expect(state.infoMessage, isNot(contains('exists')));
+        expect(state.user, isNull);
+        expect(repository.currentSignedInUser, isNull);
+        expect(repository.passwordCreateCalls, 0);
+
+        final newPasswordResult = await repository.signInWithEmailPassword(
+          email: 'collector@example.com',
+          password: 'new passphrase should not work',
+        );
+        expect(
+          newPasswordResult.failure?.code,
+          AuthBackendFailureCode.invalidCredentialsNeutral,
+        );
+      },
+    );
+
     test('OTP verify success and failure map attempts safely', () async {
       final repository = InMemoryAuthBackendRepository();
       final container = _contractContainer(repository);
@@ -108,6 +155,29 @@ void main() {
       state = container.read(authBackendContractControllerProvider);
       expect(state.status, AuthBackendContractStatus.otpVerified);
       expect(state.verification?.email, 'collector@example.com');
+    });
+
+    test('expired or reused OTP maps to safe retry state', () async {
+      final repository = InMemoryAuthBackendRepository(
+        otpVerifyFailure: const AuthBackendFailure(
+          AuthBackendFailureCode.otpExpired,
+        ),
+      );
+      final container = _contractContainer(repository);
+      addTearDown(container.dispose);
+      final controller = container.read(
+        authBackendContractControllerProvider.notifier,
+      );
+
+      await controller.startEmailSignup(email: 'collector@example.com');
+      await controller.verifyEmailOtp(code: '12345678');
+
+      final state = container.read(authBackendContractControllerProvider);
+      expect(state.status, AuthBackendContractStatus.verificationSent);
+      expect(state.failure?.code, AuthBackendFailureCode.otpExpired);
+      expect(state.infoMessage, 'Code expired. Request a new code.');
+      expect(state.isSignedIn, isFalse);
+      expect(repository.currentSignedInUser, isNull);
     });
 
     test(
@@ -174,6 +244,30 @@ void main() {
       expect(state.user?.email, 'collector@example.com');
       expect(repository.passwordCreateCalls, 1);
     });
+
+    test(
+      'create password requires verified backend state before repository call',
+      () async {
+        final repository = InMemoryAuthBackendRepository();
+        final container = _contractContainer(repository);
+        addTearDown(container.dispose);
+        final controller = container.read(
+          authBackendContractControllerProvider.notifier,
+        );
+
+        await controller.createPasswordAfterVerification(
+          password: 'memorable passphrase!',
+          confirmPassword: 'memorable passphrase!',
+        );
+
+        final state = container.read(authBackendContractControllerProvider);
+        expect(state.status, AuthBackendContractStatus.verificationSent);
+        expect(state.failure?.code, AuthBackendFailureCode.otpInvalid);
+        expect(repository.passwordCreateCalls, 0);
+        expect(state.isSignedIn, isFalse);
+        expect(repository.currentSignedInUser, isNull);
+      },
+    );
 
     test(
       'reset request returns generic success for registered and unknown email',

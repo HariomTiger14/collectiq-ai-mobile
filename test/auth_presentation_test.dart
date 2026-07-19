@@ -410,6 +410,10 @@ void main() {
     expect(find.text('Signing In'), findsOneWidget);
     expect(loadingButton.onPressed, isNull);
 
+    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.pump();
+    expect(backendRepository.signInCalls, 1);
+
     signInGate.complete();
     await tester.pumpAndSettle();
   });
@@ -677,6 +681,54 @@ void main() {
     expect(find.textContaining('already'), findsNothing);
   });
 
+  testWidgets(
+    'S02 existing registered email stays neutral and does not authenticate',
+    (tester) async {
+      final backendRepository = InMemoryAuthBackendRepository(
+        accounts: const [
+          InMemoryAuthAccount(
+            email: 'collector@example.com',
+            password: 'original passphrase',
+          ),
+        ],
+      );
+      final container = await tester.pumpAuthScreenWithContainer(
+        const AuthSignUpScreen(),
+        backendRepository: backendRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('auth-create-account-email-field')),
+        'Collector@Example.com',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('auth-create-account-continue')),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(backendRepository.signupStartCalls, 1);
+      expect(
+        find.text(
+          'If this email can be used, a verification code has been sent.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('auth-verify-email-screen')),
+        findsNothing,
+      );
+      expect(find.textContaining('already'), findsNothing);
+      expect(find.textContaining('registered'), findsNothing);
+      expect(find.textContaining('account exists'), findsNothing);
+      expect(container.read(authControllerProvider).isSignedIn, isFalse);
+      expect(backendRepository.currentSignedInUser, isNull);
+      expect(backendRepository.passwordCreateCalls, 0);
+      expect(backendRepository.lastCreatedPassword, isNull);
+    },
+  );
+
   testWidgets('S02 loading state disables Continue during signup start', (
     tester,
   ) async {
@@ -859,7 +911,10 @@ void main() {
     tester,
   ) async {
     final backendRepository = InMemoryAuthBackendRepository();
-    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
+    final container = await _pumpSignupFlowToS03(
+      tester,
+      backendRepository: backendRepository,
+    );
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
@@ -877,6 +932,43 @@ void main() {
     expect(backendRepository.otpVerifyCalls, 1);
     expect(backendRepository.lastOtpEmail, 'collector@example.com');
     expect(backendRepository.lastOtpCode, '12345678');
+    expect(container.read(authControllerProvider).isSignedIn, isFalse);
+  });
+
+  testWidgets('S03 expired OTP uses safe copy and requires resend', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      otpVerifyFailure: const AuthBackendFailure(
+        AuthBackendFailureCode.otpExpired,
+      ),
+    );
+    final container = await _pumpSignupFlowToS03(
+      tester,
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '12345678',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.otpVerifyCalls, 1);
+    expect(find.text('Code expired. Request a new code.'), findsOneWidget);
+    expect(find.text('Request a new code to try again.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsNothing,
+    );
+    final verifyButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    );
+    expect(verifyButton.onPressed, isNull);
+    expect(container.read(authControllerProvider).isSignedIn, isFalse);
   });
 
   testWidgets('S03 loading state disables Verify while OTP verifies', (

@@ -26,6 +26,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     this.passwordCreateGate,
     this.signInGate,
     this.resetGate,
+    this.otpVerifyFailure,
     this.passwordCreateFailure,
     this.resetUnknownAsAccountExistenceFailure = false,
   }) {
@@ -41,6 +42,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   final Completer<void>? passwordCreateGate;
   final Completer<void>? signInGate;
   final Completer<void>? resetGate;
+  final AuthBackendFailure? otpVerifyFailure;
   final AuthBackendFailure? passwordCreateFailure;
   final bool resetUnknownAsAccountExistenceFailure;
   final _accounts = <String, InMemoryAuthAccount>{};
@@ -126,6 +128,15 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
       );
     }
     final normalized = _normalize(email);
+    if (_accounts.containsKey(normalized)) {
+      return const AuthBackendResult.failure(
+        AuthBackendFailure(
+          AuthBackendFailureCode.accountExistenceNotDisclosed,
+          message:
+              'If this email can be used, a verification code has been sent.',
+        ),
+      );
+    }
     _pendingSignupEmails.add(normalized);
     _attemptsByEmail[normalized] = 0;
     return AuthBackendResult.success(EmailSignupStart(email: normalized));
@@ -153,6 +164,10 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.otpExpired),
       );
+    }
+    final configuredFailure = otpVerifyFailure;
+    if (configuredFailure != null) {
+      return AuthBackendResult.failure(configuredFailure);
     }
     final attempts = (_attemptsByEmail[normalized] ?? 0) + 1;
     _attemptsByEmail[normalized] = attempts;
