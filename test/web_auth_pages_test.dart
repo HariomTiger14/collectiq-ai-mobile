@@ -56,7 +56,14 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
-      expect(html, contains('Return to Login'));
+      expect(
+        html,
+        contains(
+          'Your password has been updated. You can now return to the PackLox app and sign in with your new password.',
+        ),
+      );
+      expect(html, isNot(contains('return-button')));
+      expect(html, isNot(contains('/auth/login')));
       expect(html, isNot(contains('@supabase/supabase-js@2')));
       expect(html, contains('/auth/reset-password/styles.css'));
       expect(html, contains('/auth/reset-password/vendor/supabase-js-v2.js'));
@@ -66,9 +73,12 @@ void main() {
       expect(html, contains('togglePassword'));
       expect(html, contains('toggleConfirmPassword'));
       expect(html, contains('strength-bar'));
-      expect(styles, contains('prefers-color-scheme: dark'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
+      expect(styles, contains('brand-wordmark'));
+      expect(styles, contains('success-icon span'));
+      expect(styles, contains('--background-top: #050816'));
+      expect(styles, isNot(contains('return-button')));
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
