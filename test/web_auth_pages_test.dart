@@ -23,6 +23,9 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
+      final logo = File(
+        'web/assets/brand/packlox_logo_horizontal_v1.svg',
+      ).readAsStringSync();
 
       expect(
         File('docs/SIT_REAL_APP_SETUP.md').readAsStringSync(),
@@ -56,6 +59,8 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
+      expect(html, contains('/assets/brand/packlox_logo_horizontal_v1.svg'));
+      expect(html, contains('class="brand-logo"'));
       expect(
         html,
         contains(
@@ -79,8 +84,12 @@ void main() {
       expect(html, contains('strength-bar'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
-      expect(styles, contains('brand-wordmark'));
+      expect(styles, contains('brand-logo'));
       expect(styles, contains('success-icon span'));
+      expect(styles, contains('--brand-blue: #1ea7ff'));
+      expect(styles, contains('--surface-dark: #0b111a'));
+      expect(styles, isNot(contains('return-button')));
+      expect(logo, contains('PackLox horizontal logo'));
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
