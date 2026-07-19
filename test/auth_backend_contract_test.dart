@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/supabase/supabase_auth_response_normalizer.dart';
 import 'package:collectiq_ai/features/auth/data/repositories/auth_repository_backend_adapter.dart';
+import 'package:collectiq_ai/features/auth/data/services/signup_start_guard_client.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
@@ -369,19 +370,25 @@ void main() {
 
   group('AuthRepositoryBackendAdapter OTP signup capability spike', () {
     test(
-      'uses optional OTP signup repository methods without UI wiring',
+      'uses optional OTP signup repository methods after guard allows',
       () async {
         final repository = _OtpCapableAuthRepository();
-        final adapter = AuthRepositoryBackendAdapter(repository: repository);
+        final guard = _SignupStartGuardFake();
+        final adapter = AuthRepositoryBackendAdapter(
+          repository: repository,
+          signupStartGuard: guard,
+        );
 
         final start = await adapter.startEmailSignup(
           email: ' NewUser@Example.com ',
         );
         expect(start.isSuccess, isTrue);
         expect(start.requireValue.email, 'newuser@example.com');
-        expect(start.requireValue.safeForAccountCreation, isFalse);
+        expect(start.requireValue.safeForAccountCreation, isTrue);
         expect(repository.signupStartCalls, 1);
         expect(repository.lastSignupEmail, 'newuser@example.com');
+        expect(guard.calls, 1);
+        expect(guard.lastEmail, 'newuser@example.com');
 
         final verification = await adapter.verifyEmailOtp(
           email: 'NewUser@Example.com',
@@ -404,6 +411,43 @@ void main() {
         );
         expect(resend.isSuccess, isTrue);
         expect(repository.signupStartCalls, 2);
+      },
+    );
+
+    test('blocked signup-start guard never sends Supabase OTP', () async {
+      final repository = _OtpCapableAuthRepository();
+      final adapter = AuthRepositoryBackendAdapter(
+        repository: repository,
+        signupStartGuard: _SignupStartGuardFake(safeForAccountCreation: false),
+      );
+
+      final start = await adapter.startEmailSignup(email: 'known@example.com');
+
+      expect(start.isSuccess, isFalse);
+      expect(
+        start.failure?.code,
+        AuthBackendFailureCode.accountExistenceNotDisclosed,
+      );
+      expect(start.failure?.safeMessage, authSignupStartBlockedMessage);
+      expect(repository.signupStartCalls, 0);
+    });
+
+    test(
+      'signup-start guard failure stays retryable and skips Supabase OTP',
+      () async {
+        final repository = _OtpCapableAuthRepository();
+        final adapter = AuthRepositoryBackendAdapter(
+          repository: repository,
+          signupStartGuard: _SignupStartGuardFake(
+            error: const AuthException('Network connection failed.'),
+          ),
+        );
+
+        final start = await adapter.startEmailSignup(email: 'new@example.com');
+
+        expect(start.isSuccess, isFalse);
+        expect(start.failure?.code, AuthBackendFailureCode.networkOffline);
+        expect(repository.signupStartCalls, 0);
       },
     );
 
@@ -447,6 +491,7 @@ void main() {
         repository: _OtpCapableAuthRepository(
           startError: const AuthException('User already registered'),
         ),
+        signupStartGuard: _SignupStartGuardFake(),
       );
       final existingEmail = await existingEmailAdapter.startEmailSignup(
         email: 'known@example.com',
@@ -461,6 +506,7 @@ void main() {
         repository: _OtpCapableAuthRepository(
           verifyError: const AuthException('Invalid OTP token'),
         ),
+        signupStartGuard: _SignupStartGuardFake(),
       );
       final invalidOtp = await invalidOtpAdapter.verifyEmailOtp(
         email: 'new@example.com',
@@ -644,6 +690,28 @@ class _ResetFailingAuthRepository extends _ShellAuthRepository {
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     throw error;
+  }
+}
+
+class _SignupStartGuardFake implements SignupStartGuardClient {
+  _SignupStartGuardFake({this.safeForAccountCreation = true, this.error});
+
+  final bool safeForAccountCreation;
+  final Object? error;
+  var calls = 0;
+  String? lastEmail;
+
+  @override
+  Future<SignupStartGuardResult> start({required String email}) async {
+    calls += 1;
+    lastEmail = email.trim().toLowerCase();
+    final configuredError = error;
+    if (configuredError != null) {
+      throw configuredError;
+    }
+    return SignupStartGuardResult(
+      safeForAccountCreation: safeForAccountCreation,
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/features/auth/data/services/signup_start_guard_client.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
@@ -7,13 +8,17 @@ import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.d
 
 /// Adapter from the existing auth repository to the reset backend contract.
 ///
-/// S02-S04 UI is still not wired to signup methods. Repositories that expose
-/// [OtpSignupAuthRepository] can prove the frozen OTP signup path; others
-/// continue to return explicit capability gaps.
+/// S02-S04 signup uses a server-side guard before starting Supabase OTP.
+/// Repositories that expose [OtpSignupAuthRepository] can complete the frozen
+/// OTP signup path; others continue to return explicit capability gaps.
 class AuthRepositoryBackendAdapter implements AuthBackendRepository {
-  const AuthRepositoryBackendAdapter({required this.repository});
+  const AuthRepositoryBackendAdapter({
+    required this.repository,
+    this.signupStartGuard,
+  });
 
   final AuthRepository repository;
+  final SignupStartGuardClient? signupStartGuard;
 
   @override
   Future<AuthBackendResult<AppUser?>> currentUser() async {
@@ -55,9 +60,32 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     final otpRepository = repository as OtpSignupAuthRepository;
     try {
       final normalizedEmail = email.trim().toLowerCase();
+      final guard = signupStartGuard;
+      if (guard == null) {
+        return const AuthBackendResult.failure(
+          AuthBackendFailure(
+            AuthBackendFailureCode.capabilityUnavailable,
+            message:
+                'Signup start guard is not configured for this auth provider.',
+          ),
+        );
+      }
+      final guardResult = await guard.start(email: normalizedEmail);
+      if (!guardResult.safeForAccountCreation) {
+        return const AuthBackendResult.failure(
+          AuthBackendFailure(
+            AuthBackendFailureCode.accountExistenceNotDisclosed,
+            message: authSignupStartBlockedMessage,
+          ),
+        );
+      }
       await otpRepository.startEmailOtpSignup(email: normalizedEmail);
       return AuthBackendResult.success(
-        EmailSignupStart(email: normalizedEmail, safeForAccountCreation: false),
+        EmailSignupStart(
+          email: normalizedEmail,
+          safeForAccountCreation: true,
+          cooldownRemaining: guardResult.cooldownRemaining,
+        ),
       );
     } on Object catch (error) {
       return AuthBackendResult.failure(_failureFor(error, signupStart: true));

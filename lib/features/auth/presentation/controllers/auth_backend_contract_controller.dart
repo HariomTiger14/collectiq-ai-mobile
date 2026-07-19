@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/auth/data/repositories/auth_repository_backend_adapter.dart';
+import 'package:collectiq_ai/features/auth/data/services/signup_start_guard_client.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_backend_repository.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final authBackendRepositoryProvider = Provider<AuthBackendRepository>((ref) {
   return AuthRepositoryBackendAdapter(
     repository: ref.watch(authRepositoryProvider),
+    signupStartGuard: ref.watch(signupStartGuardClientProvider),
   );
 });
 

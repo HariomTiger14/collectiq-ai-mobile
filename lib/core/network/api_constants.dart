@@ -94,6 +94,9 @@ class ApiConstants {
   /// Portfolio item endpoint prefix.
   static const portfolioItemPath = '/portfolio/items';
 
+  /// Server-side signup-start guard endpoint.
+  static const authSignupStartPath = '/auth/signup-start';
+
   /// Returns the base URL for an environment.
   static String baseUrlFor(AppEnvironment environment) {
     return switch (environment) {
