@@ -59,7 +59,7 @@ void main() {
       expect(
         html,
         contains(
-          'Return to the PackLox app and sign in with your new password.',
+          'Your password has been updated. You can now return to the PackLox app and sign in with your new password.',
         ),
       );
       expect(
@@ -77,9 +77,10 @@ void main() {
       expect(html, contains('togglePassword'));
       expect(html, contains('toggleConfirmPassword'));
       expect(html, contains('strength-bar'));
-      expect(styles, contains('prefers-color-scheme: dark'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
+      expect(styles, contains('brand-wordmark'));
+      expect(styles, contains('success-icon span'));
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
@@ -125,8 +126,8 @@ void main() {
       expect(script, contains('attachSubmitHandler'));
       expect(script, contains('Supabase not ready - handlers not attached'));
       expect(script, contains('clearRecoverySession'));
-      expect(styles, contains('--background: #050816'));
-      expect(styles, contains('mobile-guidance'));
+      expect(styles, contains('--background-top: #050816'));
+      expect(styles, isNot(contains('return-button')));
     });
 
     test('callback page handles email confirmation', () {

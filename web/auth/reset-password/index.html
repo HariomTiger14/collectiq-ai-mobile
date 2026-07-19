@@ -20,9 +20,14 @@
   <main class="page-shell">
     <section class="reset-card fade-in" aria-labelledby="page-title">
       <div id="form-panel" class="form-panel">
-        <div class="brand-mark" aria-hidden="true">P</div>
-        <p class="brand-name">PackLox</p>
-        <div class="gradient-header">
+        <header class="brand-lockup" aria-label="PackLox password reset">
+          <span class="brand-emblem" aria-hidden="true">P</span>
+          <span class="brand-wordmark" aria-hidden="true">
+            <span>Pack</span><span>Lox</span>
+          </span>
+        </header>
+
+        <div class="auth-heading">
           <h1 id="page-title">Reset your password</h1>
           <p class="subtitle">Create a memorable passphrase for your PackLox account.</p>
         </div>
@@ -104,10 +109,17 @@
       </div>
 
       <section id="success-panel" class="success-panel" hidden aria-live="polite">
-        <div class="success-icon" aria-hidden="true">&#10003;</div>
+        <header class="brand-lockup success-brand" aria-label="PackLox password updated">
+          <span class="brand-emblem" aria-hidden="true">P</span>
+          <span class="brand-wordmark" aria-hidden="true">
+            <span>Pack</span><span>Lox</span>
+          </span>
+        </header>
+        <div class="success-icon" aria-hidden="true">
+          <span></span>
+        </div>
         <h2>Password updated successfully</h2>
-        <p>Return to the PackLox app and sign in with your new password.</p>
-        <p class="mobile-guidance">This mobile-first flow continues in the PackLox app.</p>
+        <p>Your password has been updated. You can now return to the PackLox app and sign in with your new password.</p>
       </section>
     </section>
   </main>
