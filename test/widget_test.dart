@@ -946,7 +946,7 @@ void main() {
     await tester.openSettings();
     await tester.enterSettingsAuthCredentials(
       email: 'harry@example.com',
-      password: 'password123',
+      password: 'Password123!',
     );
     final signInButton = tester.widget<FilledButton>(
       find.byKey(const ValueKey('settings-auth-sign-in-button')),
@@ -5717,7 +5717,7 @@ extension on WidgetTester {
 
   Future<void> enterSettingsAuthCredentials({
     String email = 'collector@example.com',
-    String password = 'password123',
+    String password = 'Password123!',
   }) async {
     await enterSettingsAuthEmail(email);
     await enterText(

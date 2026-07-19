@@ -38,6 +38,8 @@ class AuthMessages {
       "Your account already exists but hasn't been confirmed. We've sent (or re-sent) the confirmation email. Please confirm your email then sign in.";
   static const confirmationEmailSent =
       'Confirmation email sent. Please check Inbox, Spam, Junk, and Promotions.';
+  static const passwordPolicyHelp =
+      'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
   static const confirmationEmailSentSignIn =
       'Check your email to confirm your account, then sign in.';
   static const confirmationRateLimited =
@@ -71,6 +73,31 @@ class AuthMessages {
       'This confirmation link is invalid or expired. Please request a new confirmation email.';
   static const confirmationCallbackFailed =
       'Could not complete email confirmation. Please try again.';
+}
+
+/// Minimum password length required for PackLox email authentication.
+const authPasswordMinLength = 12;
+
+/// Returns the current PackLox password policy validation message, if any.
+String? validateAuthPassword(String password) {
+  if (password.isEmpty) {
+    return 'Enter a password.';
+  }
+  if (authPasswordPolicyScore(password) < 5) {
+    return AuthMessages.passwordPolicyHelp;
+  }
+  return null;
+}
+
+/// Scores a password against the PackLox policy requirements.
+int authPasswordPolicyScore(String password) {
+  var value = 0;
+  if (password.length >= authPasswordMinLength) value++;
+  if (RegExp(r'[a-z]').hasMatch(password)) value++;
+  if (RegExp(r'[A-Z]').hasMatch(password)) value++;
+  if (RegExp(r'\d').hasMatch(password)) value++;
+  if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) value++;
+  return value;
 }
 
 /// Placeholder auth state for future account support.
@@ -876,13 +903,7 @@ class AuthController extends Notifier<AuthState> {
     if (emailError != null) {
       return emailError;
     }
-    if (password.isEmpty) {
-      return 'Enter a password.';
-    }
-    if (password.length < 6) {
-      return 'Password must be at least 6 characters.';
-    }
-    return null;
+    return validateAuthPassword(password);
   }
 
   String? _validateEmail(String email) {

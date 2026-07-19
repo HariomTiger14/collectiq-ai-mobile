@@ -79,13 +79,7 @@ class _AuthAccessPanelState extends State<AuthAccessPanel> {
       return null;
     }
     final password = widget.passwordController.text;
-    if (password.isEmpty) {
-      return 'Enter a password.';
-    }
-    if (password.length < 6) {
-      return 'Password must be at least 6 characters.';
-    }
-    return null;
+    return validateAuthPassword(password);
   }
 
   bool get _hasLocalErrors => _emailError != null || _passwordError != null;
@@ -239,7 +233,7 @@ class _AuthAccessPanelState extends State<AuthAccessPanel> {
             decoration: _authInputDecoration(
               context: context,
               labelText: 'Password',
-              hintText: 'Minimum 6 characters',
+              hintText: AuthMessages.passwordPolicyHelp,
               errorText: _passwordError,
               suffixIcon: IconButton(
                 tooltip: _obscurePassword ? 'Show password' : 'Hide password',
@@ -477,13 +471,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
   final String password;
 
   int get _score {
-    var value = 0;
-    if (password.length >= 8) value++;
-    if (RegExp(r'[a-z]').hasMatch(password)) value++;
-    if (RegExp(r'[A-Z]').hasMatch(password)) value++;
-    if (RegExp(r'\d').hasMatch(password)) value++;
-    if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) value++;
-    return value;
+    return authPasswordPolicyScore(password);
   }
 
   double get _progress {
