@@ -1916,7 +1916,7 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
 
     await ref
         .read(authBackendContractControllerProvider.notifier)
-        .verifyEmailOtp(code: _codeController.text);
+        .verifyEmailOtp(code: _codeController.text, email: widget.email);
     if (!mounted) {
       return;
     }
@@ -1969,7 +1969,7 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
 
     await ref
         .read(authBackendContractControllerProvider.notifier)
-        .resendVerificationCode();
+        .resendVerificationCode(email: widget.email);
     if (!mounted) {
       return;
     }

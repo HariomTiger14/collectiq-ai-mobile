@@ -207,6 +207,12 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
         message.contains('anon key') ||
         message.contains('api key') ||
         (message.contains('supabase') && message.contains('config'))) {
+      if (otp) {
+        return const AuthBackendFailure(
+          AuthBackendFailureCode.networkOffline,
+          message: authOtpVerificationRetryableMessage,
+        );
+      }
       if (passwordReset) {
         return const AuthBackendFailure(
           AuthBackendFailureCode.networkOffline,
@@ -221,6 +227,12 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
         message.contains('internet') ||
         message.contains('connection')) {
       return const AuthBackendFailure(AuthBackendFailureCode.networkOffline);
+    }
+    if (otp && message.contains('not available')) {
+      return const AuthBackendFailure(
+        AuthBackendFailureCode.networkOffline,
+        message: authOtpVerificationRetryableMessage,
+      );
     }
     if (message.contains('too many') || message.contains('rate')) {
       return const AuthBackendFailure(

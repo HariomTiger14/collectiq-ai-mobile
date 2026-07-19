@@ -1066,6 +1066,31 @@ void main() {
     expect(container.read(authControllerProvider).isSignedIn, isFalse);
   });
 
+  testWidgets('S03 Verify calls backend with route email when state is fresh', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository();
+    await tester.pumpAuthScreen(
+      const AuthVerifyEmailScreen(email: 'collector@example.com'),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      '12345678',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
+    await tester.pumpAndSettle();
+
+    expect(backendRepository.otpVerifyCalls, 1);
+    expect(backendRepository.lastOtpEmail, 'collector@example.com');
+    expect(
+      find.text('This authentication step is not available yet.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('S03 expired OTP uses safe copy and requires resend', (
     tester,
   ) async {

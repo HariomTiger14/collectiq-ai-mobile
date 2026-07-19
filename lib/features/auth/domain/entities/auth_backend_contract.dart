@@ -6,6 +6,9 @@ const authSignupStartBlockedMessage =
 const authResetRequestRetryableMessage =
     'We could not send reset instructions. Check your connection and try again.';
 
+const authOtpVerificationRetryableMessage =
+    'We could not verify that code. Check your connection and try again.';
+
 /// UI-safe backend failure categories for the reset auth flow.
 enum AuthBackendFailureCode {
   invalidCredentialsNeutral,

@@ -202,8 +202,8 @@ class AuthBackendContractController extends Notifier<AuthBackendContractState> {
     );
   }
 
-  Future<void> verifyEmailOtp({required String code}) async {
-    final currentEmail = state.email;
+  Future<void> verifyEmailOtp({required String code, String? email}) async {
+    final currentEmail = (state.email ?? email)?.trim();
     if (currentEmail == null || currentEmail.isEmpty) {
       _applyFailure(
         const AuthBackendFailure(AuthBackendFailureCode.otpInvalid),
@@ -213,6 +213,7 @@ class AuthBackendContractController extends Notifier<AuthBackendContractState> {
     }
     state = state.copyWith(
       status: AuthBackendContractStatus.verifyingOtp,
+      email: currentEmail,
       clearFailure: true,
       clearInfoMessage: true,
     );
@@ -286,8 +287,8 @@ class AuthBackendContractController extends Notifier<AuthBackendContractState> {
     );
   }
 
-  Future<void> resendVerificationCode() async {
-    final currentEmail = state.email;
+  Future<void> resendVerificationCode({String? email}) async {
+    final currentEmail = (state.email ?? email)?.trim();
     if (currentEmail == null || currentEmail.isEmpty) {
       _applyFailure(
         const AuthBackendFailure(AuthBackendFailureCode.otpInvalid),

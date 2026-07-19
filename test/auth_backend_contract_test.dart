@@ -514,6 +514,31 @@ void main() {
       );
       expect(invalidOtp.failure?.code, AuthBackendFailureCode.otpInvalid);
 
+      final configFailureAdapter = AuthRepositoryBackendAdapter(
+        repository: _OtpCapableAuthRepository(
+          verifyError: const AuthException(
+            'Supabase anon key is missing from SIT config.',
+          ),
+        ),
+        signupStartGuard: _SignupStartGuardFake(),
+      );
+      final configFailure = await configFailureAdapter.verifyEmailOtp(
+        email: 'new@example.com',
+        code: '12345678',
+      );
+      expect(
+        configFailure.failure?.code,
+        AuthBackendFailureCode.networkOffline,
+      );
+      expect(
+        configFailure.failure?.safeMessage,
+        authOtpVerificationRetryableMessage,
+      );
+      expect(
+        configFailure.failure?.safeMessage,
+        isNot('This authentication step is not available yet.'),
+      );
+
       final sessionExpiredAdapter = AuthRepositoryBackendAdapter(
         repository: _OtpCapableAuthRepository(
           passwordError: const AuthException('Verified auth session missing'),
