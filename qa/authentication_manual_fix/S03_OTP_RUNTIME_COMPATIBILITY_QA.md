@@ -18,7 +18,8 @@ The S03 OTP field has been updated for runtime compatibility with the Supabase S
 - No auto-submit was introduced.
 - Existing S03 resend cooldown, 5-attempt lockout, Change Email route, and backend `verifyEmailOtp` call are preserved.
 - The OTP input no longer uses a floating label. A visible label appears above the field and the field uses an `8-digit code` hint, avoiding label/border/text overlap.
-- OTP text now uses explicit high-contrast primary text styling while typing.
+- OTP text now uses explicit high-contrast dark text while typing: `#0B111A`.
+- OTP hint text uses muted gray `#64748B`; the cursor uses `#0066CC`; selection color uses translucent PackLox blue.
 
 ## Product Note
 
@@ -29,6 +30,6 @@ This is a runtime compatibility adjustment, not a broader product redesign. The 
 No new device screenshot was captured in this local pass. Manual SIT recheck should confirm:
 
 - The full 8-digit OTP can be entered.
-- Typed digits are visible while the field is focused.
+- Typed digits are visible while the field is focused against the light OTP field background.
 - No OTP field label overlap appears with the keyboard open.
 - Verify enables only after exactly 8 digits.

@@ -26,6 +26,10 @@ const _authRouteBackground = Color(0xFF070A12);
 const _authRouteDuration = Duration(milliseconds: 220);
 const _authRouteReverseDuration = Duration(milliseconds: 180);
 const authEmailOtpLength = 8;
+const authOtpInputTextColor = Color(0xFF0B111A);
+const authOtpInputHintColor = Color(0xFF64748B);
+const authOtpInputCursorColor = Color(0xFF0066CC);
+const authOtpInputSelectionColor = Color(0x331EA7FF);
 
 Route<T> _authRoute<T>({
   required RouteSettings settings,
@@ -2206,29 +2210,42 @@ class _OtpCodeField extends StatelessWidget {
               ),
             ),
           ),
-          TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            maxLength: authEmailOtpLength,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(authEmailOtpLength),
-            ],
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: PackLoxTokens.textPrimary,
-              fontSize: 26,
-              height: 1.2,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 5,
+          TextSelectionTheme(
+            data: TextSelectionTheme.of(context).copyWith(
+              cursorColor: authOtpInputCursorColor,
+              selectionColor: authOtpInputSelectionColor,
+              selectionHandleColor: authOtpInputCursorColor,
             ),
-            decoration: InputDecoration(
-              hintText: hint,
-              counterText: '',
-              errorText: errorText,
-              floatingLabelBehavior: FloatingLabelBehavior.never,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              maxLength: authEmailOtpLength,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(authEmailOtpLength),
+              ],
+              cursorColor: authOtpInputCursorColor,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: authOtpInputTextColor,
+                fontSize: 26,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 5,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(
+                  color: authOtpInputHintColor,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+                counterText: '',
+                errorText: errorText,
+                floatingLabelBehavior: FloatingLabelBehavior.never,
+              ),
             ),
           ),
         ],

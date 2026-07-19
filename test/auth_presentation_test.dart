@@ -879,7 +879,18 @@ void main() {
       FloatingLabelBehavior.never,
     );
     expect(otpField.decoration?.hintText, '8-digit code');
-    expect(otpField.style?.color, isNotNull);
+    expect(otpField.style?.color, authOtpInputTextColor);
+    expect(otpField.decoration?.hintStyle?.color, authOtpInputHintColor);
+    expect(otpField.cursorColor, authOtpInputCursorColor);
+
+    final selectionTheme = tester.widget<TextSelectionTheme>(
+      find.ancestor(
+        of: _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+        matching: find.byType(TextSelectionTheme),
+      ),
+    );
+    expect(selectionTheme.data.selectionColor, authOtpInputSelectionColor);
+    expect(selectionTheme.data.selectionHandleColor, authOtpInputCursorColor);
   });
 
   testWidgets(
