@@ -96,14 +96,14 @@ void main() {
       );
 
       await controller.startEmailSignup(email: 'collector@example.com');
-      await controller.verifyEmailOtp(code: '000000');
+      await controller.verifyEmailOtp(code: '00000000');
 
       var state = container.read(authBackendContractControllerProvider);
       expect(state.status, AuthBackendContractStatus.verificationSent);
       expect(state.failure?.code, AuthBackendFailureCode.otpInvalid);
       expect(state.attemptsRemaining, 4);
 
-      await controller.verifyEmailOtp(code: '123456');
+      await controller.verifyEmailOtp(code: '12345678');
 
       state = container.read(authBackendContractControllerProvider);
       expect(state.status, AuthBackendContractStatus.otpVerified);
@@ -122,7 +122,7 @@ void main() {
 
         await controller.startEmailSignup(email: 'collector@example.com');
         for (var i = 0; i < 6; i += 1) {
-          await controller.verifyEmailOtp(code: '000000');
+          await controller.verifyEmailOtp(code: '00000000');
         }
 
         var state = container.read(authBackendContractControllerProvider);
@@ -149,7 +149,7 @@ void main() {
       );
 
       await controller.startEmailSignup(email: 'collector@example.com');
-      await controller.verifyEmailOtp(code: '123456');
+      await controller.verifyEmailOtp(code: '12345678');
       await controller.createPasswordAfterVerification(
         password: 'short',
         confirmPassword: 'short',
@@ -267,7 +267,7 @@ void main() {
 
         final verification = await adapter.verifyEmailOtp(
           email: 'NewUser@Example.com',
-          code: '123456',
+          code: '12345678',
         );
         expect(verification.isSuccess, isTrue);
         expect(verification.requireValue.email, 'newuser@example.com');
@@ -299,7 +299,7 @@ void main() {
         final start = await adapter.startEmailSignup(email: 'new@example.com');
         final verify = await adapter.verifyEmailOtp(
           email: 'new@example.com',
-          code: '123456',
+          code: '12345678',
         );
         final password = await adapter.createPasswordAfterVerification(
           verification: EmailOtpVerification(
@@ -346,7 +346,7 @@ void main() {
       );
       final invalidOtp = await invalidOtpAdapter.verifyEmailOtp(
         email: 'new@example.com',
-        code: '000000',
+        code: '00000000',
       );
       expect(invalidOtp.failure?.code, AuthBackendFailureCode.otpInvalid);
 

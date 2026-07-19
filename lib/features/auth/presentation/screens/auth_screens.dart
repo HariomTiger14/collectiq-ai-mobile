@@ -25,6 +25,7 @@ abstract final class AuthRouteNames {
 const _authRouteBackground = Color(0xFF070A12);
 const _authRouteDuration = Duration(milliseconds: 220);
 const _authRouteReverseDuration = Duration(milliseconds: 180);
+const authEmailOtpLength = 8;
 
 Route<T> _authRoute<T>({
   required RouteSettings settings,
@@ -1815,7 +1816,7 @@ class AuthVerifyEmailScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
-  static const _otpLength = 6;
+  static const _otpLength = authEmailOtpLength;
   static const _maxAttempts = 5;
   static const _resendCooldownSeconds = 30;
 
@@ -1830,7 +1831,9 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
 
   String get _maskedEmail => _maskEmailForVerification(widget.email);
 
-  bool get _hasCompleteCode => _codeController.text.length == _otpLength;
+  bool get _hasCompleteCode {
+    return RegExp('^\\d{$_otpLength}\$').hasMatch(_codeController.text);
+  }
 
   bool get _canVerify => _hasCompleteCode && !_requiresResend && !_isVerifying;
 
@@ -2175,34 +2178,60 @@ class _OtpCodeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const label = 'Verification code';
+    const hint = '$authEmailOtpLength-digit code';
+
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: 'Verification code, 6-digit code',
-      child: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        textInputAction: TextInputAction.done,
-        autofillHints: const [AutofillHints.oneTimeCode],
-        maxLength: 6,
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(6),
+      label: '$label, $hint',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: AppSpacing.xs,
+                bottom: AppSpacing.xs,
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: PackLoxTokens.textSecondary.withValues(alpha: .92),
+                  fontSize: 13,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ),
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            maxLength: authEmailOtpLength,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(authEmailOtpLength),
+            ],
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: PackLoxTokens.textPrimary,
+              fontSize: 26,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 5,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              counterText: '',
+              errorText: errorText,
+              floatingLabelBehavior: FloatingLabelBehavior.never,
+            ),
+          ),
         ],
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: PackLoxTokens.textPrimary,
-          fontSize: 26,
-          height: 1.2,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 8,
-        ),
-        decoration: InputDecoration(
-          labelText: 'Verification code',
-          hintText: '6-digit code',
-          counterText: '',
-          errorText: errorText,
-        ),
       ),
     );
   }

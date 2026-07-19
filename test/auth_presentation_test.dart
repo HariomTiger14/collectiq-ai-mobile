@@ -737,7 +737,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Verification code'), findsOneWidget);
-    expect(find.text('6-digit code'), findsOneWidget);
+    expect(find.text('8-digit code'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('auth-verify-email-verify')),
       findsOneWidget,
@@ -759,42 +759,101 @@ void main() {
     );
   });
 
-  testWidgets('S03 Verify enables only for 6 digits without auto-submit', (
+  testWidgets(
+    'S03 Verify enables only for expected OTP length without auto-submit',
+    (tester) async {
+      await tester.pumpAuthScreen(
+        const AuthVerifyEmailScreen(email: 'collector@example.com'),
+      );
+
+      TextButton verifyButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-verify-email-verify')),
+      );
+      expect(verifyButton.onPressed, isNull);
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+        '12345',
+      );
+      await tester.pump();
+
+      verifyButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-verify-email-verify')),
+      );
+      expect(verifyButton.onPressed, isNull);
+      expect(find.textContaining('not correct'), findsNothing);
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+        '123456',
+      );
+      await tester.pump();
+
+      verifyButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-verify-email-verify')),
+      );
+      expect(verifyButton.onPressed, isNull);
+      expect(find.textContaining('not correct'), findsNothing);
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+        '12345678',
+      );
+      await tester.pump();
+
+      verifyButton = tester.widget(
+        _textButtonIn(const ValueKey('auth-verify-email-verify')),
+      );
+      expect(verifyButton.onPressed, isNotNull);
+      expect(find.textContaining('not correct'), findsNothing);
+    },
+  );
+
+  testWidgets('S03 OTP field uses a non-overlapping visible label', (
     tester,
   ) async {
     await tester.pumpAuthScreen(
       const AuthVerifyEmailScreen(email: 'collector@example.com'),
     );
 
-    TextButton verifyButton = tester.widget(
-      _textButtonIn(const ValueKey('auth-verify-email-verify')),
-    );
-    expect(verifyButton.onPressed, isNull);
-
-    await tester.enterText(
+    final otpField = tester.widget<TextField>(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '12345',
     );
-    await tester.pump();
 
-    verifyButton = tester.widget(
-      _textButtonIn(const ValueKey('auth-verify-email-verify')),
+    expect(otpField.maxLength, authEmailOtpLength);
+    expect(otpField.decoration?.labelText, isNull);
+    expect(
+      otpField.decoration?.floatingLabelBehavior,
+      FloatingLabelBehavior.never,
     );
-    expect(verifyButton.onPressed, isNull);
-    expect(find.textContaining('not correct'), findsNothing);
-
-    await tester.enterText(
-      _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '123456',
-    );
-    await tester.pump();
-
-    verifyButton = tester.widget(
-      _textButtonIn(const ValueKey('auth-verify-email-verify')),
-    );
-    expect(verifyButton.onPressed, isNotNull);
-    expect(find.textContaining('not correct'), findsNothing);
+    expect(otpField.decoration?.hintText, '8-digit code');
+    expect(otpField.style?.color, isNotNull);
   });
+
+  testWidgets(
+    'S03 OTP field keeps only digits and allows full expected length',
+    (tester) async {
+      await tester.pumpAuthScreen(
+        const AuthVerifyEmailScreen(email: 'collector@example.com'),
+      );
+
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+        '12a34 56b789',
+      );
+      await tester.pump();
+
+      final otpField = tester.widget<TextField>(
+        _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
+      );
+      expect(otpField.controller?.text, '12345678');
+
+      final verifyButton = tester.widget<TextButton>(
+        _textButtonIn(const ValueKey('auth-verify-email-verify')),
+      );
+      expect(verifyButton.onPressed, isNotNull);
+    },
+  );
 
   testWidgets('S03 Verify calls backend and routes to S04 on success', (
     tester,
@@ -804,7 +863,7 @@ void main() {
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '123456',
+      '12345678',
     );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
@@ -817,7 +876,7 @@ void main() {
     expect(find.text('Create your password'), findsOneWidget);
     expect(backendRepository.otpVerifyCalls, 1);
     expect(backendRepository.lastOtpEmail, 'collector@example.com');
-    expect(backendRepository.lastOtpCode, '123456');
+    expect(backendRepository.lastOtpCode, '12345678');
   });
 
   testWidgets('S03 loading state disables Verify while OTP verifies', (
@@ -831,7 +890,7 @@ void main() {
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '123456',
+      '12345678',
     );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('auth-verify-email-verify')));
@@ -887,7 +946,7 @@ void main() {
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-verify-email-otp-field')),
-      '000000',
+      '00000000',
     );
     await tester.pump();
 
@@ -1878,7 +1937,7 @@ Future<ProviderContainer> _pumpSignupFlowToS04(
   required InMemoryAuthBackendRepository backendRepository,
   GuestModeRepository? guestModeRepository,
   String email = 'collector@example.com',
-  String otp = '123456',
+  String otp = '12345678',
 }) async {
   final container = await _pumpSignupFlowToS03(
     tester,

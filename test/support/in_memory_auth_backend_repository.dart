@@ -19,7 +19,7 @@ class InMemoryAuthAccount {
 class InMemoryAuthBackendRepository implements AuthBackendRepository {
   InMemoryAuthBackendRepository({
     Iterable<InMemoryAuthAccount> accounts = const [],
-    this.expectedOtp = '123456',
+    this.expectedOtp = '12345678',
     this.networkOffline = false,
     this.signupStartGate,
     this.otpVerifyGate,
