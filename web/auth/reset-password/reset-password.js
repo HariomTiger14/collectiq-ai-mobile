@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient.v2.js';
 
-const minimumPasswordLength = 12;
 const elements = {};
 
 function getElement(id) {
@@ -30,8 +29,16 @@ function showMessage(text, type = 'error') {
 
 function setMissingTokenMessage() {
   elements.message.className = 'message error';
-  elements.message.textContent =
-    'This reset link is missing or invalid. Return to the PackLox app and request a new password reset email.';
+  elements.message.replaceChildren(
+    document.createTextNode(
+      'This reset link is missing its recovery token. ',
+    ),
+  );
+
+  const link = document.createElement('a');
+  link.href = '/auth/login';
+  link.textContent = 'Request a new password reset email.';
+  elements.message.appendChild(link);
   elements.message.hidden = false;
 }
 
@@ -150,27 +157,34 @@ async function establishRecoverySession() {
   return null;
 }
 
-function passwordProgress(password) {
-  if (!password) return 0;
-  return Math.min(100, Math.round((password.length / minimumPasswordLength) * 100));
+function passwordScore(password) {
+  let score = 0;
+
+  if (password.length >= 12) score += 1;
+  if (/[a-z]/.test(password)) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+  return Math.min(score, 4);
 }
 
-function progressDetails(progress) {
-  if (progress <= 0) {
-    return { label: 'empty', className: '' };
+function strengthDetails(score) {
+  if (score <= 1) {
+    return { label: 'weak', className: 'weak' };
   }
 
-  if (progress < 100) {
-    return { label: `${minimumPasswordLength - elements.password.value.length} more characters`, className: 'partial' };
+  if (score <= 3) {
+    return { label: 'medium', className: 'medium' };
   }
 
-  return { label: 'ready', className: 'ready' };
+  return { label: 'strong', className: 'strong' };
 }
 
 function passwordValidationMessage(password) {
   if (!password) return 'Please enter a new password.';
-  if (password.length < minimumPasswordLength) {
-    return 'Password must be at least 12 characters.';
+  if (passwordScore(password) < 5) {
+    return 'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
   }
 
   return '';
@@ -178,14 +192,15 @@ function passwordValidationMessage(password) {
 
 function updateStrengthMeter() {
   const password = elements.password.value;
-  const progress = passwordProgress(password);
-  const details = progressDetails(progress);
+  const score = passwordScore(password);
+  const details = strengthDetails(score);
 
-  elements.strengthBar.className = details.className
+  elements.strengthBar.className = password
     ? `strength-bar ${details.className}`
     : 'strength-bar';
-  elements.strengthBar.style.width = `${progress}%`;
-  elements.strengthLabel.textContent = `Passphrase length: ${details.label}`;
+  elements.strengthLabel.textContent = password
+    ? `Password strength: ${details.label}`
+    : 'Password strength: empty';
 }
 
 function validatePasswordField({ showErrors = true } = {}) {
@@ -280,7 +295,7 @@ function friendlyError(error) {
   }
 
   if (message.includes('password')) {
-    return 'Use a password with at least 12 characters.';
+    return 'This password does not meet the security requirements.';
   }
 
   if (
@@ -291,7 +306,7 @@ function friendlyError(error) {
     return 'Network error. Please check your connection and try again.';
   }
 
-  return 'Unable to update password. Return to the PackLox app and request a new reset email if this continues.';
+  return error?.message || 'Unable to update password. Please try again.';
 }
 
 async function clearRecoverySession() {
@@ -437,13 +452,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = paramsFromUrl();
 
   if (params.get('error_description')) {
-    showMessage(
-      'This reset link is invalid or expired. Return to the PackLox app and request a new reset email.',
-    );
+    showMessage(params.get('error_description'));
   } else if (params.get('error')) {
-    showMessage(
-      'This reset link is invalid or expired. Return to the PackLox app and request a new reset email.',
-    );
+    showMessage(params.get('error'));
   } else if (!hasRecoveryToken()) {
     setMissingTokenMessage();
   }

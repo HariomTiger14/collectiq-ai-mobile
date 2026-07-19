@@ -2981,14 +2981,14 @@ void main() {
       await expectLater(
         repository.signInWithEmailPassword(
           email: 'collector@example.com',
-          password: 'password123',
+          password: 'Password123!',
         ),
         throwsA(isA<SupabaseNotConfiguredException>()),
       );
       await expectLater(
         repository.signUpWithEmailPassword(
           email: 'collector@example.com',
-          password: 'password123',
+          password: 'Password123!',
         ),
         throwsA(isA<SupabaseNotConfiguredException>()),
       );
@@ -3013,7 +3013,7 @@ void main() {
 
       final user = await repository.signInWithEmailPassword(
         email: 'harry@example.com',
-        password: 'password123',
+        password: 'Password123!',
       );
 
       expect(user.id, 'user-email');
@@ -3038,7 +3038,7 @@ void main() {
 
       final user = await repository.signUpWithEmailPassword(
         email: 'new@example.com',
-        password: 'password123',
+        password: 'Password123!',
       );
 
       expect(user.id, 'new-user');
@@ -3057,7 +3057,7 @@ void main() {
       await expectLater(
         repository.signUpWithEmailPassword(
           email: 'new@example.com',
-          password: 'password123',
+          password: 'Password123!',
         ),
         throwsA(isA<SupabaseEmailConfirmationRequiredException>()),
       );
@@ -3196,7 +3196,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'user-b@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -3356,7 +3356,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -3382,7 +3382,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
       await Future<void>.delayed(Duration.zero);
 
@@ -3421,7 +3421,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -3461,7 +3461,10 @@ void main() {
 
       await container
           .read(authControllerProvider.notifier)
-          .signInWithEmailPassword(email: 'not-an-email', password: 'secret');
+          .signInWithEmailPassword(
+            email: 'not-an-email',
+            password: 'Password123!',
+          );
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isFalse);
@@ -3483,16 +3486,70 @@ void main() {
           .read(authControllerProvider.notifier)
           .signUpWithEmailPassword(
             email: 'collector@example.com',
-            password: '12345',
+            password: 'Short1!',
           );
 
       final state = container.read(authControllerProvider);
       expect(state.isSignedIn, isFalse);
       expect(state.status, AuthFlowStatus.signedOut);
-      expect(state.errorMessage, 'Password must be at least 6 characters.');
+      expect(state.errorMessage, AuthMessages.passwordPolicyHelp);
       expect(repository.signUpCalls, 0);
     });
 
+    test(
+      'email sign-up password policy rejects missing requirements',
+      () async {
+        final invalidPasswords = <String>[
+          'Aa1!Aa1!Aa1',
+          'password123!',
+          'PASSWORD123!',
+          'Password!!!!',
+          'Password1234',
+        ];
+
+        for (final password in invalidPasswords) {
+          final repository = _ScriptedAuthRepository();
+          final container = ProviderContainer(
+            overrides: [authRepositoryProvider.overrideWithValue(repository)],
+          );
+          addTearDown(container.dispose);
+          container.read(authControllerProvider);
+          await Future<void>.delayed(Duration.zero);
+
+          await container
+              .read(authControllerProvider.notifier)
+              .signUpWithEmailPassword(
+                email: 'collector@example.com',
+                password: password,
+              );
+
+          final state = container.read(authControllerProvider);
+          expect(state.isSignedIn, isFalse);
+          expect(state.status, AuthFlowStatus.signedOut);
+          expect(state.errorMessage, AuthMessages.passwordPolicyHelp);
+          expect(repository.signUpCalls, 0);
+        }
+      },
+    );
+
+    test('email sign-up password policy allows complete password', () async {
+      final repository = _ScriptedAuthRepository();
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .signUpWithEmailPassword(
+            email: 'collector@example.com',
+            password: 'Password123!',
+          );
+
+      expect(repository.signUpCalls, 1);
+    });
     test('password reset sends email and shows success message', () async {
       final repository = _ScriptedAuthRepository();
       final container = ProviderContainer(
@@ -3656,7 +3713,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signUpWithEmailPassword(
             email: 'new@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -3685,7 +3742,7 @@ void main() {
             .read(authControllerProvider.notifier)
             .signUpWithEmailPassword(
               email: 'new@example.com',
-              password: 'password123',
+              password: 'Password123!',
             );
 
         final state = container.read(authControllerProvider);
@@ -3718,7 +3775,7 @@ void main() {
             .read(authControllerProvider.notifier)
             .signUpWithEmailPassword(
               email: 'new@example.com',
-              password: 'password123',
+              password: 'Password123!',
             );
 
         final state = container.read(authControllerProvider);
@@ -3748,7 +3805,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signUpWithEmailPassword(
             email: 'new@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -3831,7 +3888,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'new@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -4204,13 +4261,13 @@ void main() {
           .read(authControllerProvider.notifier)
           .signUpWithEmailPassword(
             email: 'new@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
       await container
           .read(authControllerProvider.notifier)
           .signUpWithEmailPassword(
             email: 'new@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -4236,7 +4293,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -4266,7 +4323,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
 
       final state = container.read(authControllerProvider);
@@ -4321,7 +4378,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'password123',
+            password: 'Password123!',
           );
       await container.read(authControllerProvider.notifier).signOut();
 

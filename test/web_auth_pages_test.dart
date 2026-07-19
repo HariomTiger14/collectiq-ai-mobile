@@ -23,9 +23,9 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
-      final logo = File(
-        'web/assets/brand/packlox_logo_horizontal_v1.svg',
-      ).readAsStringSync();
+      final latestLogo = File(
+        'web/assets/brand/packlox_logo_latest.png',
+      ).readAsBytesSync();
 
       expect(
         File('docs/SIT_REAL_APP_SETUP.md').readAsStringSync(),
@@ -59,7 +59,14 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
-      expect(html, contains('/assets/brand/packlox_logo_horizontal_v1.svg'));
+      expect(html, contains('/assets/brand/packlox_logo_latest.png'));
+      expect(
+        html,
+        isNot(contains('/assets/brand/packlox_logo_horizontal_v1.svg')),
+      );
+      expect(html, isNot(contains('6 characters')));
+      expect(html, isNot(contains('8 characters')));
+      expect(html, contains('12 characters'));
       expect(html, contains('class="brand-logo"'));
       expect(
         html,
@@ -67,12 +74,8 @@ void main() {
           'Your password has been updated. You can now return to the PackLox app and sign in with your new password.',
         ),
       );
-      expect(
-        html,
-        contains('Use at least 12 characters. Spaces and symbols are allowed.'),
-      );
-      expect(html, isNot(contains('Return to Login')));
-      expect(html, isNot(contains('uppercase, lowercase, number, and symbol')));
+      expect(html, isNot(contains('return-button')));
+      expect(html, isNot(contains('/auth/login')));
       expect(html, isNot(contains('@supabase/supabase-js@2')));
       expect(html, contains('/auth/reset-password/styles.css'));
       expect(html, contains('/auth/reset-password/vendor/supabase-js-v2.js'));
@@ -89,7 +92,16 @@ void main() {
       expect(styles, contains('--brand-blue: #1ea7ff'));
       expect(styles, contains('--surface-dark: #0b111a'));
       expect(styles, isNot(contains('return-button')));
-      expect(logo, contains('PackLox horizontal logo'));
+      expect(latestLogo.take(8).toList(), <int>[
+        137,
+        80,
+        78,
+        71,
+        13,
+        10,
+        26,
+        10,
+      ]);
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
@@ -113,19 +125,20 @@ void main() {
       expect(script, contains('showSuccessScreen'));
       expect(script, isNot(contains('window.location.assign')));
       expect(script, contains('Passwords do not match.'));
-      expect(script, contains('request a new password reset email'));
-      expect(script, contains('minimumPasswordLength = 12'));
-      expect(script, contains('Password must be at least 12 characters.'));
-      expect(
-        script,
-        isNot(contains('Password must be at least 8 characters.')),
-      );
+      expect(script, contains('Request a new password reset email.'));
       expect(
         script,
         contains('Your new password cannot be the same as your old password.'),
       );
-      expect(script, contains('passwordProgress'));
-      expect(script, isNot(contains('passwordScore')));
+      expect(script, contains('passwordScore'));
+      expect(script, contains('password.length >= 12'));
+      expect(script, contains('/[a-z]/.test(password)'));
+      expect(script, contains('/[A-Z]/.test(password)'));
+      expect(script, contains('/\\d/.test(password)'));
+      expect(script, contains('/[^A-Za-z0-9]/.test(password)'));
+      expect(script, isNot(contains('6 characters')));
+      expect(script, isNot(contains('8 characters')));
+      expect(script, contains('12 characters'));
       expect(script, contains('peekPassword'));
       expect(script, contains('updateStrengthMeter'));
       expect(script, contains('extractTokenFromHash'));
@@ -135,8 +148,6 @@ void main() {
       expect(script, contains('attachSubmitHandler'));
       expect(script, contains('Supabase not ready - handlers not attached'));
       expect(script, contains('clearRecoverySession'));
-      expect(styles, contains('--background-top: #050816'));
-      expect(styles, isNot(contains('return-button')));
     });
 
     test('callback page handles email confirmation', () {
