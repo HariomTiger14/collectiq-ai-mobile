@@ -181,6 +181,16 @@ class AuthBackendContractController extends Notifier<AuthBackendContractState> {
       return;
     }
     final start = result.requireValue;
+    if (!start.safeForAccountCreation) {
+      _applyFailure(
+        const AuthBackendFailure(
+          AuthBackendFailureCode.accountExistenceNotDisclosed,
+          message: authSignupStartBlockedMessage,
+        ),
+        fallbackStatus: AuthBackendContractStatus.signedOut,
+      );
+      return;
+    }
     state = state.copyWith(
       status: AuthBackendContractStatus.verificationSent,
       email: start.email,

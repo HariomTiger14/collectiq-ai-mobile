@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/navigation/app_shell.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
@@ -11,6 +13,8 @@ import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
+import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
+import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -451,6 +455,94 @@ void main() {
     expect(container.read(authControllerProvider).isSignedIn, isTrue);
     expect(await container.read(guestModeControllerProvider.future), isTrue);
   });
+
+  testWidgets('Settings-launched successful sign-in returns to Home shell', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final backendRepository = InMemoryAuthBackendRepository(
+      accounts: const [
+        InMemoryAuthAccount(
+          email: 'collector@example.com',
+          password: 'correct horse battery staple',
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(_InteractiveAuthRepository()),
+        authBackendRepositoryProvider.overrideWithValue(backendRepository),
+        guestModeRepositoryProvider.overrideWithValue(
+          const _ImmediateGuestModeRepository(chosen: true),
+        ),
+        onboardingRepositoryProvider.overrideWithValue(
+          const _ImmediateOnboardingRepository(completed: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: const AppShell(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    container
+        .read(appShellTabControllerProvider.notifier)
+        .selectTab(AppShellTabController.settingsTab, reason: 'test-settings');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('shell-destination-settings')),
+      findsOneWidget,
+    );
+
+    await tester.revealText('Sign In');
+    await tester.tap(find.text('Sign In').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-email-field')),
+      'collector@example.com',
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-sign-in-password-field')),
+      'correct horse battery staple',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(authControllerProvider).isSignedIn, isTrue);
+    expect(
+      container.read(appShellTabControllerProvider),
+      AppShellTabController.homeTab,
+    );
+    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('shell-destination-home')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('shell-destination-settings')),
+      findsNothing,
+    );
+  });
+
   testWidgets('S05 Forgot Password routes to S06 with valid email prefill', (
     tester,
   ) async {
@@ -709,12 +801,7 @@ void main() {
       await tester.pump();
 
       expect(backendRepository.signupStartCalls, 1);
-      expect(
-        find.text(
-          'If this email can be used, a verification code has been sent.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text(authSignupStartBlockedMessage), findsOneWidget);
       expect(
         find.byKey(const ValueKey('auth-verify-email-screen')),
         findsNothing,
@@ -728,6 +815,39 @@ void main() {
       expect(backendRepository.lastCreatedPassword, isNull);
     },
   );
+
+  testWidgets('S02 backend ambiguity blocks OTP route without authenticating', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      signupStartSafeForAccountCreation: false,
+    );
+    final container = await tester.pumpAuthScreenWithContainer(
+      const AuthSignUpScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-create-account-email-field')),
+      'new@example.com',
+    );
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('auth-create-account-continue')),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.signupStartCalls, 1);
+    expect(find.text(authSignupStartBlockedMessage), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsNothing,
+    );
+    expect(container.read(authControllerProvider).isSignedIn, isFalse);
+    expect(backendRepository.currentSignedInUser, isNull);
+    expect(backendRepository.passwordCreateCalls, 0);
+  });
 
   testWidgets('S02 loading state disables Continue during signup start', (
     tester,
@@ -1649,12 +1769,40 @@ void main() {
       find.byKey(const ValueKey('auth-forgot-request-error')),
       findsOneWidget,
     );
+    expect(find.text(authResetRequestRetryableMessage), findsOneWidget);
     expect(
-      find.text(
-        'You appear to be offline. Check your connection and try again.',
-      ),
-      findsOneWidget,
+      find.byKey(const ValueKey('auth-forgot-confirmation')),
+      findsNothing,
     );
+  });
+
+  testWidgets('S06 raw backend/config errors render safe retryable copy', (
+    tester,
+  ) async {
+    final backendRepository = InMemoryAuthBackendRepository(
+      resetFailure: const AuthBackendFailure(
+        AuthBackendFailureCode.unknown,
+        message: 'Supabase anon key is missing from SIT config.',
+      ),
+    );
+    await tester.pumpAuthScreen(
+      const AuthForgotPasswordScreen(),
+      backendRepository: backendRepository,
+    );
+
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-forgot-email-field')),
+      'unknown@example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-forgot-submit')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(backendRepository.resetCalls, 1);
+    expect(find.text(authResetRequestRetryableMessage), findsOneWidget);
+    expect(find.textContaining('anon key'), findsNothing);
+    expect(find.textContaining('Supabase'), findsNothing);
     expect(
       find.byKey(const ValueKey('auth-forgot-confirmation')),
       findsNothing,
@@ -1997,6 +2145,20 @@ extension on WidgetTester {
     expect(decoration?.floatingLabelBehavior, FloatingLabelBehavior.never);
     expect(decoration?.hintText, hint);
   }
+
+  Future<void> revealText(String text) async {
+    final scrollable = find.byType(Scrollable).first;
+    for (var attempt = 0; attempt < 24; attempt += 1) {
+      if (find.text(text).evaluate().isNotEmpty) {
+        await ensureVisible(find.text(text).first);
+        await pump();
+        return;
+      }
+      await drag(scrollable, const Offset(0, -320));
+      await pump();
+    }
+    fail('Could not reveal "$text" in Settings.');
+  }
 }
 
 Finder _textFieldIn(Key key) {
@@ -2072,6 +2234,18 @@ class _ImmediateGuestModeRepository implements GuestModeRepository {
 
   @override
   Future<void> setGuestModeChosen(bool chosen) async {}
+}
+
+class _ImmediateOnboardingRepository implements OnboardingRepository {
+  const _ImmediateOnboardingRepository({required this.completed});
+
+  final bool completed;
+
+  @override
+  Future<bool> hasCompletedOnboarding() async => completed;
+
+  @override
+  Future<void> setOnboardingCompleted(bool completed) async {}
 }
 
 class _InteractiveAuthRepository implements AuthRepository {

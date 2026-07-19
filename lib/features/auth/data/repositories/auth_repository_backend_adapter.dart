@@ -57,7 +57,7 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
       final normalizedEmail = email.trim().toLowerCase();
       await otpRepository.startEmailOtpSignup(email: normalizedEmail);
       return AuthBackendResult.success(
-        EmailSignupStart(email: normalizedEmail),
+        EmailSignupStart(email: normalizedEmail, safeForAccountCreation: false),
       );
     } on Object catch (error) {
       return AuthBackendResult.failure(_failureFor(error, signupStart: true));
@@ -127,7 +127,9 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     }
     try {
       await repository.resendEmailConfirmation(email: email);
-      return AuthBackendResult.success(EmailSignupStart(email: email));
+      return AuthBackendResult.success(
+        EmailSignupStart(email: email, safeForAccountCreation: true),
+      );
     } on Object catch (error) {
       return AuthBackendResult.failure(_failureFor(error));
     }
@@ -143,7 +145,7 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
         PasswordResetRequestResult(email: email),
       );
     } on Object catch (error) {
-      final failure = _failureFor(error);
+      final failure = _failureFor(error, passwordReset: true);
       if (failure.code == AuthBackendFailureCode.invalidCredentialsNeutral ||
           failure.code == AuthBackendFailureCode.accountExistenceNotDisclosed) {
         return AuthBackendResult.success(
@@ -170,9 +172,19 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
     bool signupStart = false,
     bool otp = false,
     bool requiresVerifiedSession = false,
+    bool passwordReset = false,
   }) {
     final message = _messageFor(error).toLowerCase();
-    if (error is SupabaseNotConfiguredException) {
+    if (error is SupabaseNotConfiguredException ||
+        message.contains('anon key') ||
+        message.contains('api key') ||
+        (message.contains('supabase') && message.contains('config'))) {
+      if (passwordReset) {
+        return const AuthBackendFailure(
+          AuthBackendFailureCode.networkOffline,
+          message: authResetRequestRetryableMessage,
+        );
+      }
       return const AuthBackendFailure(
         AuthBackendFailureCode.capabilityUnavailable,
       );
@@ -210,8 +222,7 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
             message.contains('not found'))) {
       return const AuthBackendFailure(
         AuthBackendFailureCode.accountExistenceNotDisclosed,
-        message:
-            'If this email can be used, a verification code has been sent.',
+        message: authSignupStartBlockedMessage,
       );
     }
     if (message.contains('confirm') || message.contains('not confirmed')) {
@@ -230,6 +241,12 @@ class AuthRepositoryBackendAdapter implements AuthBackendRepository {
         message.contains('not found')) {
       return const AuthBackendFailure(
         AuthBackendFailureCode.invalidCredentialsNeutral,
+      );
+    }
+    if (passwordReset) {
+      return const AuthBackendFailure(
+        AuthBackendFailureCode.networkOffline,
+        message: authResetRequestRetryableMessage,
       );
     }
     return AuthBackendFailure(

@@ -4,6 +4,7 @@ import 'package:collectiq_ai/features/auth/data/repositories/auth_repository_bac
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_backend_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend_contract_controller.dart';
@@ -112,10 +113,7 @@ void main() {
           state.failure?.code,
           AuthBackendFailureCode.accountExistenceNotDisclosed,
         );
-        expect(
-          state.infoMessage,
-          'If this email can be used, a verification code has been sent.',
-        );
+        expect(state.infoMessage, authSignupStartBlockedMessage);
         expect(state.infoMessage, isNot(contains('registered')));
         expect(state.infoMessage, isNot(contains('already')));
         expect(state.infoMessage, isNot(contains('exists')));
@@ -131,6 +129,31 @@ void main() {
           newPasswordResult.failure?.code,
           AuthBackendFailureCode.invalidCredentialsNeutral,
         );
+      },
+    );
+
+    test(
+      'signup start requires explicit account-creation safety before verification',
+      () async {
+        final repository = InMemoryAuthBackendRepository(
+          signupStartSafeForAccountCreation: false,
+        );
+        final container = _contractContainer(repository);
+        addTearDown(container.dispose);
+
+        await container
+            .read(authBackendContractControllerProvider.notifier)
+            .startEmailSignup(email: 'new@example.com');
+
+        final state = container.read(authBackendContractControllerProvider);
+        expect(state.status, AuthBackendContractStatus.signedOut);
+        expect(
+          state.failure?.code,
+          AuthBackendFailureCode.accountExistenceNotDisclosed,
+        );
+        expect(state.infoMessage, authSignupStartBlockedMessage);
+        expect(repository.signupStartCalls, 1);
+        expect(repository.currentSignedInUser, isNull);
       },
     );
 
@@ -356,6 +379,7 @@ void main() {
         );
         expect(start.isSuccess, isTrue);
         expect(start.requireValue.email, 'newuser@example.com');
+        expect(start.requireValue.safeForAccountCreation, isFalse);
         expect(repository.signupStartCalls, 1);
         expect(repository.lastSignupEmail, 'newuser@example.com');
 
@@ -463,6 +487,23 @@ void main() {
         'Verification expired. Request a new code.',
       );
     });
+
+    test('password reset config failures map to safe retryable copy', () async {
+      final adapter = AuthRepositoryBackendAdapter(
+        repository: const _ResetFailingAuthRepository(
+          AuthException('Supabase anon key is missing from SIT config.'),
+        ),
+      );
+
+      final reset = await adapter.requestPasswordReset(
+        email: 'unknown@example.com',
+      );
+
+      expect(reset.isSuccess, isFalse);
+      expect(reset.failure?.safeMessage, authResetRequestRetryableMessage);
+      expect(reset.failure?.safeMessage, isNot(contains('anon key')));
+      expect(reset.failure?.safeMessage, isNot(contains('Supabase')));
+    });
   });
 
   group('AppShell auth precedence contract', () {
@@ -503,7 +544,7 @@ void main() {
   });
 }
 
-ProviderContainer _contractContainer(InMemoryAuthBackendRepository repository) {
+ProviderContainer _contractContainer(AuthBackendRepository repository) {
   return ProviderContainer(
     overrides: [authBackendRepositoryProvider.overrideWithValue(repository)],
   );
@@ -593,6 +634,17 @@ class _ShellAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {}
+}
+
+class _ResetFailingAuthRepository extends _ShellAuthRepository {
+  const _ResetFailingAuthRepository(this.error);
+
+  final Object error;
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    throw error;
+  }
 }
 
 class _ShellGuestModeRepository implements GuestModeRepository {

@@ -28,6 +28,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     this.resetGate,
     this.otpVerifyFailure,
     this.passwordCreateFailure,
+    this.resetFailure,
+    this.signupStartSafeForAccountCreation = true,
     this.resetUnknownAsAccountExistenceFailure = false,
   }) {
     for (final account in accounts) {
@@ -44,6 +46,8 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   final Completer<void>? resetGate;
   final AuthBackendFailure? otpVerifyFailure;
   final AuthBackendFailure? passwordCreateFailure;
+  final AuthBackendFailure? resetFailure;
+  final bool signupStartSafeForAccountCreation;
   final bool resetUnknownAsAccountExistenceFailure;
   final _accounts = <String, InMemoryAuthAccount>{};
   final _pendingSignupEmails = <String>{};
@@ -132,14 +136,18 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
       return const AuthBackendResult.failure(
         AuthBackendFailure(
           AuthBackendFailureCode.accountExistenceNotDisclosed,
-          message:
-              'If this email can be used, a verification code has been sent.',
+          message: authSignupStartBlockedMessage,
         ),
       );
     }
     _pendingSignupEmails.add(normalized);
     _attemptsByEmail[normalized] = 0;
-    return AuthBackendResult.success(EmailSignupStart(email: normalized));
+    return AuthBackendResult.success(
+      EmailSignupStart(
+        email: normalized,
+        safeForAccountCreation: signupStartSafeForAccountCreation,
+      ),
+    );
   }
 
   @override
@@ -246,7 +254,9 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     final normalized = _normalize(email);
     _pendingSignupEmails.add(normalized);
     _attemptsByEmail[normalized] = 0;
-    return AuthBackendResult.success(EmailSignupStart(email: normalized));
+    return AuthBackendResult.success(
+      EmailSignupStart(email: normalized, safeForAccountCreation: true),
+    );
   }
 
   @override
@@ -264,6 +274,10 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),
       );
+    }
+    final configuredFailure = resetFailure;
+    if (configuredFailure != null) {
+      return AuthBackendResult.failure(configuredFailure);
     }
     if (resetUnknownAsAccountExistenceFailure &&
         !_accounts.containsKey(normalized)) {

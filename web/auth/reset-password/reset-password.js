@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.v2.js';
 
+const minimumPasswordLength = 12;
 const elements = {};
 
 function getElement(id) {
@@ -29,16 +30,8 @@ function showMessage(text, type = 'error') {
 
 function setMissingTokenMessage() {
   elements.message.className = 'message error';
-  elements.message.replaceChildren(
-    document.createTextNode(
-      'This reset link is missing its recovery token. ',
-    ),
-  );
-
-  const link = document.createElement('a');
-  link.href = '/auth/login';
-  link.textContent = 'Request a new password reset email.';
-  elements.message.appendChild(link);
+  elements.message.textContent =
+    'This reset link is missing or invalid. Return to the PackLox app and request a new password reset email.';
   elements.message.hidden = false;
 }
 
@@ -157,48 +150,42 @@ async function establishRecoverySession() {
   return null;
 }
 
-function passwordScore(password) {
-  let score = 0;
-
-  if (password.length >= 8) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-
-  return Math.min(score, 4);
+function passwordProgress(password) {
+  if (!password) return 0;
+  return Math.min(100, Math.round((password.length / minimumPasswordLength) * 100));
 }
 
-function strengthDetails(score) {
-  if (score <= 1) {
-    return { label: 'weak', className: 'weak' };
+function progressDetails(progress) {
+  if (progress <= 0) {
+    return { label: 'empty', className: '' };
   }
 
-  if (score <= 3) {
-    return { label: 'medium', className: 'medium' };
+  if (progress < 100) {
+    return { label: `${minimumPasswordLength - elements.password.value.length} more characters`, className: 'partial' };
   }
 
-  return { label: 'strong', className: 'strong' };
+  return { label: 'ready', className: 'ready' };
 }
 
 function passwordValidationMessage(password) {
   if (!password) return 'Please enter a new password.';
-  if (password.length < 8) return 'Password must be at least 8 characters.';
+  if (password.length < minimumPasswordLength) {
+    return 'Password must be at least 12 characters.';
+  }
 
   return '';
 }
 
 function updateStrengthMeter() {
   const password = elements.password.value;
-  const score = passwordScore(password);
-  const details = strengthDetails(score);
+  const progress = passwordProgress(password);
+  const details = progressDetails(progress);
 
-  elements.strengthBar.className = password
+  elements.strengthBar.className = details.className
     ? `strength-bar ${details.className}`
     : 'strength-bar';
-  elements.strengthLabel.textContent = password
-    ? `Password strength: ${details.label}`
-    : 'Password strength: empty';
+  elements.strengthBar.style.width = `${progress}%`;
+  elements.strengthLabel.textContent = `Passphrase length: ${details.label}`;
 }
 
 function validatePasswordField({ showErrors = true } = {}) {
@@ -293,7 +280,7 @@ function friendlyError(error) {
   }
 
   if (message.includes('password')) {
-    return 'This password does not meet the security requirements.';
+    return 'Use a password with at least 12 characters.';
   }
 
   if (
@@ -304,7 +291,7 @@ function friendlyError(error) {
     return 'Network error. Please check your connection and try again.';
   }
 
-  return error?.message || 'Unable to update password. Please try again.';
+  return 'Unable to update password. Return to the PackLox app and request a new reset email if this continues.';
 }
 
 async function clearRecoverySession() {
@@ -450,9 +437,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = paramsFromUrl();
 
   if (params.get('error_description')) {
-    showMessage(params.get('error_description'));
+    showMessage(
+      'This reset link is invalid or expired. Return to the PackLox app and request a new reset email.',
+    );
   } else if (params.get('error')) {
-    showMessage(params.get('error'));
+    showMessage(
+      'This reset link is invalid or expired. Return to the PackLox app and request a new reset email.',
+    );
   } else if (!hasRecoveryToken()) {
     setMissingTokenMessage();
   }

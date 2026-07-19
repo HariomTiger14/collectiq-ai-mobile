@@ -56,7 +56,18 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
-      expect(html, contains('Return to Login'));
+      expect(
+        html,
+        contains(
+          'Return to the PackLox app and sign in with your new password.',
+        ),
+      );
+      expect(
+        html,
+        contains('Use at least 12 characters. Spaces and symbols are allowed.'),
+      );
+      expect(html, isNot(contains('Return to Login')));
+      expect(html, isNot(contains('uppercase, lowercase, number, and symbol')));
       expect(html, isNot(contains('@supabase/supabase-js@2')));
       expect(html, contains('/auth/reset-password/styles.css'));
       expect(html, contains('/auth/reset-password/vendor/supabase-js-v2.js'));
@@ -92,12 +103,19 @@ void main() {
       expect(script, contains('showSuccessScreen'));
       expect(script, isNot(contains('window.location.assign')));
       expect(script, contains('Passwords do not match.'));
-      expect(script, contains('Request a new password reset email.'));
+      expect(script, contains('request a new password reset email'));
+      expect(script, contains('minimumPasswordLength = 12'));
+      expect(script, contains('Password must be at least 12 characters.'));
+      expect(
+        script,
+        isNot(contains('Password must be at least 8 characters.')),
+      );
       expect(
         script,
         contains('Your new password cannot be the same as your old password.'),
       );
-      expect(script, contains('passwordScore'));
+      expect(script, contains('passwordProgress'));
+      expect(script, isNot(contains('passwordScore')));
       expect(script, contains('peekPassword'));
       expect(script, contains('updateStrengthMeter'));
       expect(script, contains('extractTokenFromHash'));
@@ -107,6 +125,8 @@ void main() {
       expect(script, contains('attachSubmitHandler'));
       expect(script, contains('Supabase not ready - handlers not attached'));
       expect(script, contains('clearRecoverySession'));
+      expect(styles, contains('--background: #050816'));
+      expect(styles, contains('mobile-guidance'));
     });
 
     test('callback page handles email confirmation', () {

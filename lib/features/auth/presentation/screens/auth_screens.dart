@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_button.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_backend_contract.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_backend_contract_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
@@ -68,6 +70,19 @@ Route<T> _authRoute<T>({
       );
     },
   );
+}
+
+void _completeAuthenticatedAuthFlow({
+  required WidgetRef ref,
+  required BuildContext context,
+  required AppUser signedInUser,
+  required String reason,
+}) {
+  ref.read(authControllerProvider.notifier).applySignedInUser(signedInUser);
+  ref
+      .read(appShellTabControllerProvider.notifier)
+      .selectTab(AppShellTabController.homeTab, reason: reason);
+  Navigator.of(context).popUntil((route) => route.isFirst);
 }
 
 class AuthWelcomeScreen extends StatelessWidget {
@@ -1155,9 +1170,13 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
     if (backendState.status == AuthBackendContractStatus.signedIn &&
         signedInUser != null &&
         backendState.isSignedIn) {
-      ref.read(authControllerProvider.notifier).applySignedInUser(signedInUser);
       setState(() => _isSubmitting = false);
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      _completeAuthenticatedAuthFlow(
+        ref: ref,
+        context: context,
+        signedInUser: signedInUser,
+        reason: 'auth-sign-in-success',
+      );
       return;
     }
 
@@ -1594,10 +1613,15 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
 
     setState(() {
       _isSubmitting = false;
-      _formError =
-          backendState.failure?.safeMessage ??
-          backendState.infoMessage ??
-          'We could not send a verification code. Check your connection and try again.';
+      if (backendState.failure?.code ==
+          AuthBackendFailureCode.accountExistenceNotDisclosed) {
+        _formError = authSignupStartBlockedMessage;
+      } else {
+        _formError =
+            backendState.failure?.safeMessage ??
+            backendState.infoMessage ??
+            'We could not send a verification code. Check your connection and try again.';
+      }
     });
   }
 
@@ -2393,12 +2417,16 @@ class _AuthCreatePasswordScreenState
     if (backendState.status == AuthBackendContractStatus.signedIn &&
         signedInUser != null &&
         backendState.isSignedIn) {
-      ref.read(authControllerProvider.notifier).applySignedInUser(signedInUser);
       setState(() {
         _isSubmitting = false;
         _completed = true;
       });
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      _completeAuthenticatedAuthFlow(
+        ref: ref,
+        context: context,
+        signedInUser: signedInUser,
+        reason: 'auth-signup-success',
+      );
       return;
     }
 
@@ -2991,11 +3019,15 @@ class _AuthForgotPasswordScreenState
 
     setState(() {
       _isRequesting = false;
-      _requestError =
-          backendState.failure?.safeMessage ??
-          backendState.infoMessage ??
-          'We could not send reset instructions. Check your connection and try again.';
+      _requestError = _resetRequestFailureMessage(backendState.failure);
     });
+  }
+
+  String _resetRequestFailureMessage(AuthBackendFailure? failure) {
+    if (failure?.code == AuthBackendFailureCode.cooldownRateLimited) {
+      return failure!.safeMessage;
+    }
+    return authResetRequestRetryableMessage;
   }
 
   void _acceptRequest({Duration? cooldown}) {

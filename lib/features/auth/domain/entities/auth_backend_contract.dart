@@ -1,5 +1,11 @@
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 
+const authSignupStartBlockedMessage =
+    "We couldn't start account creation for this email. Try signing in or resetting your password.";
+
+const authResetRequestRetryableMessage =
+    'We could not send reset instructions. Check your connection and try again.';
+
 /// UI-safe backend failure categories for the reset auth flow.
 enum AuthBackendFailureCode {
   invalidCredentialsNeutral,
@@ -92,12 +98,14 @@ enum EmailVerificationDelivery { otpCode, emailLink }
 class EmailSignupStart {
   const EmailSignupStart({
     required this.email,
+    required this.safeForAccountCreation,
     this.delivery = EmailVerificationDelivery.otpCode,
     this.cooldownRemaining = const Duration(seconds: 30),
     this.requestId,
   });
 
   final String email;
+  final bool safeForAccountCreation;
   final EmailVerificationDelivery delivery;
   final Duration cooldownRemaining;
   final String? requestId;
