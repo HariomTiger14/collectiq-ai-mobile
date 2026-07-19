@@ -19,6 +19,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/in_memory_auth_backend_repository.dart';
 
 void main() {
+  test('auth route factories use PackLox dark transition routes', () {
+    final routes = <Route<void>>[
+      AuthWelcomeScreen.route(),
+      AuthSignInScreen.route(),
+      AuthSignUpScreen.route(),
+      AuthVerifyEmailScreen.route(email: 'collector@example.com'),
+      AuthCreatePasswordScreen.route(),
+      AuthForgotPasswordScreen.route(initialEmail: 'collector@example.com'),
+    ];
+
+    for (final route in routes) {
+      expect(route, isA<PageRouteBuilder<void>>());
+      final transitionRoute = route as PageRouteBuilder<void>;
+      expect(
+        transitionRoute.transitionDuration,
+        const Duration(milliseconds: 220),
+      );
+      expect(
+        transitionRoute.reverseTransitionDuration,
+        const Duration(milliseconds: 180),
+      );
+    }
+  });
+
   testWidgets('S05 hierarchy renders frozen sign in contract', (tester) async {
     await tester.pumpAuthScreen(const AuthSignInScreen());
 
@@ -41,7 +65,15 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Email address'), findsOneWidget);
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-sign-in-email-field'),
+      hint: 'you@example.com',
+    );
     expect(find.text('Password'), findsOneWidget);
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-sign-in-password-field'),
+      hint: 'Your password',
+    );
     expect(find.byKey(const ValueKey('auth-sign-in-submit')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('auth-forgot-password-link')),
@@ -470,6 +502,10 @@ void main() {
     );
     expect(find.text('Email address'), findsOneWidget);
     expect(find.text('you@example.com'), findsOneWidget);
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-create-account-email-field'),
+      hint: 'you@example.com',
+    );
     expect(
       find.byKey(const ValueKey('auth-create-account-continue')),
       findsOneWidget,
@@ -547,6 +583,31 @@ void main() {
     );
     expect(backendRepository.signupStartCalls, 1);
     expect(backendRepository.lastSignupEmail, 'collector@example.com');
+  });
+
+  testWidgets('S02 focused email field does not use floating label behavior', (
+    tester,
+  ) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpAuthScreen(const AuthSignUpScreen());
+
+    await tester.tap(
+      _textFieldIn(const ValueKey('auth-create-account-email-field')),
+    );
+    await tester.enterText(
+      _textFieldIn(const ValueKey('auth-create-account-email-field')),
+      'collector@example.com',
+    );
+    await tester.pump();
+
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-create-account-email-field'),
+      hint: 'you@example.com',
+    );
+    expect(find.text('Email address'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('S02 Continue with valid email navigates to S03', (tester) async {
@@ -883,6 +944,14 @@ void main() {
     );
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Confirm password'), findsOneWidget);
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-create-password-password-field'),
+      hint: 'Memorable passphrase',
+    );
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-create-password-confirm-field'),
+      hint: 'Repeat your passphrase',
+    );
     expect(find.text('Use at least 12 characters'), findsOneWidget);
     expect(
       find.text('Use a memorable passphrase. Spaces and symbols are allowed.'),
@@ -1127,6 +1196,28 @@ void main() {
     expect(confirm.obscureText, isFalse);
   });
 
+  testWidgets('S04 Back to verification returns to S03', (tester) async {
+    await _pumpSignupFlowToS04(
+      tester,
+      backendRepository: InMemoryAuthBackendRepository(),
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-create-password-back')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-create-password-back')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('auth-verify-email-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('auth-create-password-screen')),
+      findsNothing,
+    );
+  });
+
   testWidgets('S03 Change email returns to S02', (tester) async {
     await _pumpSignupFlowToS03(
       tester,
@@ -1171,6 +1262,60 @@ void main() {
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
   });
 
+  testWidgets('S02 and S05 bridge switching remains stack-safe', (
+    tester,
+  ) async {
+    await tester.pumpAuthScreen(const AuthWelcomeScreen());
+
+    await tester.tap(find.byKey(const ValueKey('auth-welcome-create-account')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-create-account-sign-in')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-create-account-sign-in')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsNothing,
+    );
+
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-open-sign-up')));
+    await tester.tap(find.byKey(const ValueKey('auth-open-sign-up')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('auth-create-account-sign-in')),
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-create-account-sign-in')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsNothing,
+    );
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-create-account-email-screen')),
+      findsNothing,
+    );
+  });
+
   testWidgets('S06 hierarchy renders frozen forgot password contract', (
     tester,
   ) async {
@@ -1196,6 +1341,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Email address'), findsOneWidget);
+    tester.expectAuthFieldHasExternalLabel(
+      const ValueKey('auth-forgot-email-field'),
+      hint: 'you@example.com',
+    );
     expect(find.byKey(const ValueKey('auth-forgot-submit')), findsOneWidget);
     expect(find.text('Send reset instructions'), findsOneWidget);
     expect(
@@ -1677,6 +1826,14 @@ extension on WidgetTester {
     await pump();
     await tap(find.byKey(const ValueKey('open-auth-route')));
     await pumpAndSettle();
+  }
+
+  void expectAuthFieldHasExternalLabel(Key key, {required String hint}) {
+    final textField = widget<TextField>(_textFieldIn(key));
+    final decoration = textField.decoration;
+    expect(decoration?.labelText, isNull);
+    expect(decoration?.floatingLabelBehavior, FloatingLabelBehavior.never);
+    expect(decoration?.hintText, hint);
   }
 }
 

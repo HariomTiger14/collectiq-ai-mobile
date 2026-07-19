@@ -22,13 +22,56 @@ abstract final class AuthRouteNames {
   static const guestHome = 'app/guest-home';
 }
 
+const _authRouteBackground = Color(0xFF070A12);
+const _authRouteDuration = Duration(milliseconds: 220);
+const _authRouteReverseDuration = Duration(milliseconds: 180);
+
+Route<T> _authRoute<T>({
+  required RouteSettings settings,
+  required WidgetBuilder builder,
+}) {
+  return PageRouteBuilder<T>(
+    settings: settings,
+    transitionDuration: _authRouteDuration,
+    reverseTransitionDuration: _authRouteReverseDuration,
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return ColoredBox(color: _authRouteBackground, child: builder(context));
+    },
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final disableAnimations =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (disableAnimations) {
+        return child;
+      }
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return ColoredBox(
+        color: _authRouteBackground,
+        child: FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.035, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class AuthWelcomeScreen extends StatelessWidget {
   const AuthWelcomeScreen({this.onExploreAsGuest, super.key});
 
   final VoidCallback? onExploreAsGuest;
 
   static Route<void> route({VoidCallback? onExploreAsGuest}) {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: const RouteSettings(name: AuthRouteNames.welcome),
       builder: (_) => AuthWelcomeScreen(onExploreAsGuest: onExploreAsGuest),
     );
@@ -1023,7 +1066,7 @@ class AuthSignInScreen extends ConsumerStatefulWidget {
   final String? initialEmail;
 
   static Route<void> route({String? initialEmail}) {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: RouteSettings(
         name: AuthRouteNames.signIn,
         arguments: {'initialEmail': initialEmail},
@@ -1131,7 +1174,7 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
   }
 
   void _openCreateAccount() {
-    Navigator.of(context).push(AuthSignUpScreen.route());
+    Navigator.of(context).pushReplacement(AuthSignUpScreen.route());
   }
 
   void _showProviderUnavailable(BuildContext context, String provider) {
@@ -1478,7 +1521,7 @@ class AuthSignUpScreen extends ConsumerStatefulWidget {
   const AuthSignUpScreen({super.key});
 
   static Route<void> route() {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: const RouteSettings(name: AuthRouteNames.createAccountEmail),
       builder: (_) => const AuthSignUpScreen(),
     );
@@ -1554,7 +1597,7 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
   }
 
   void _openSignIn() {
-    Navigator.of(context).push(AuthSignInScreen.route());
+    Navigator.of(context).pushReplacement(AuthSignInScreen.route());
   }
 
   String? get _emailError {
@@ -1757,7 +1800,7 @@ class AuthVerifyEmailScreen extends ConsumerStatefulWidget {
   final String? email;
 
   static Route<void> route({String? email}) {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: RouteSettings(
         name: AuthRouteNames.verifyEmail,
         arguments: {'email': email},
@@ -2213,7 +2256,7 @@ class AuthCreatePasswordScreen extends ConsumerStatefulWidget {
   const AuthCreatePasswordScreen({super.key});
 
   static Route<void> route() {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: const RouteSettings(name: AuthRouteNames.createPassword),
       builder: (_) => const AuthCreatePasswordScreen(),
     );
@@ -2780,7 +2823,7 @@ class AuthForgotPasswordScreen extends ConsumerStatefulWidget {
   final String? initialEmail;
 
   static Route<void> route({String? initialEmail}) {
-    return MaterialPageRoute<void>(
+    return _authRoute<void>(
       settings: RouteSettings(
         name: AuthRouteNames.forgotPasswordEmail,
         arguments: {'initialEmail': initialEmail},
@@ -3423,23 +3466,48 @@ class AuthTextField extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: label,
-      child: TextField(
-        controller: controller,
-        enabled: enabled,
-        keyboardType: keyboardType,
-        autofillHints: autofillHints,
-        obscureText: obscureText,
-        textInputAction: TextInputAction.next,
-        onSubmitted: onSubmitted,
-        inputFormatters: keyboardType == TextInputType.emailAddress
-            ? [FilteringTextInputFormatter.deny(RegExp(r'\s'))]
-            : null,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          errorText: errorText,
-          suffixIcon: suffixIcon,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: AppSpacing.xs,
+                bottom: AppSpacing.xs,
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: enabled
+                      ? PackLoxTokens.textSecondary.withValues(alpha: .92)
+                      : PackLoxTokens.textSecondary.withValues(alpha: .58),
+                  fontSize: 13,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ),
+          TextField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: keyboardType,
+            autofillHints: autofillHints,
+            obscureText: obscureText,
+            textInputAction: TextInputAction.next,
+            onSubmitted: onSubmitted,
+            inputFormatters: keyboardType == TextInputType.emailAddress
+                ? [FilteringTextInputFormatter.deny(RegExp(r'\s'))]
+                : null,
+            decoration: InputDecoration(
+              hintText: hint,
+              errorText: errorText,
+              suffixIcon: suffixIcon,
+              floatingLabelBehavior: FloatingLabelBehavior.never,
+            ),
+          ),
+        ],
       ),
     );
   }
