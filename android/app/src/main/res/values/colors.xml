@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="app_background">#F8FAF8</color>
-    <color name="splash_background">#F8FAF8</color>
+    <color name="splash_background">#0B111A</color>
     <color name="collectiq_emerald">#18A058</color>
     <color name="collectiq_navy">#10243E</color>
     <color name="ic_launcher_background">#0B111A</color>
