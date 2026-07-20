@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient.v2.js';
 
+const PACKLOX_RESET_PAGE_VERSION = '20260720-validation-logo-fix';
+
 const elements = {};
 
 function getElement(id) {
@@ -167,7 +169,9 @@ function passwordPolicyLength(password) {
 
 function evaluatePasswordPolicy(password) {
   const checks = {
-    hasMinimumLength: passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH,
+    hasMinimumLength:
+      password.length >= PASSWORD_MIN_LENGTH &&
+      passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH,
     hasLowercase: /[a-z]/.test(password),
     hasUppercase: /[A-Z]/.test(password),
     hasNumber: /\d/.test(password),
@@ -285,6 +289,7 @@ function updateSubmitState(forceDisabled = false) {
   updateStrengthMeter(state);
   elements.submit.disabled = forceDisabled || !state.canSubmit;
 }
+
 function isSamePasswordResult(error, updateData, beforeUpdatedAt) {
   const message = (error?.message || '').toLowerCase();
 
@@ -459,6 +464,7 @@ function attachStrengthHandlers() {
     });
   }
 }
+
 function attachSubmitHandler() {
   elements.form.addEventListener('submit', submitNewPassword);
 }
