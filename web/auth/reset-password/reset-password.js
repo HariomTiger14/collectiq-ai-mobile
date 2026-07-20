@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient.v2.js';
 
-const PACKLOX_RESET_PAGE_VERSION = '20260720-validation-logo-fix';
+const PACKLOX_RESET_PAGE_VERSION = '20260720-boundary-password-fix';
 
 const elements = {};
 
@@ -163,15 +163,10 @@ const PASSWORD_MIN_LENGTH = 12;
 const PASSWORD_POLICY_MESSAGE =
   'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
 
-function passwordPolicyLength(password) {
-  return password.replace(/[^A-Za-z0-9]/g, '').length;
-}
 
 function evaluatePasswordPolicy(password) {
   const checks = {
-    hasMinimumLength:
-      password.length >= PASSWORD_MIN_LENGTH &&
-      passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH,
+    hasMinimumLength: password.length >= PASSWORD_MIN_LENGTH,
     hasLowercase: /[a-z]/.test(password),
     hasUppercase: /[A-Z]/.test(password),
     hasNumber: /\d/.test(password),

@@ -60,23 +60,23 @@ void main() {
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
       expect(html, contains('PACKLOX_RESET_PAGE_VERSION'));
-      expect(html, contains('20260720-validation-logo-fix'));
+      expect(html, contains('20260720-boundary-password-fix'));
       expect(
         html,
         contains(
-          '/auth/reset-password/styles.css?v=20260720-validation-logo-fix',
+          '/auth/reset-password/styles.css?v=20260720-boundary-password-fix',
         ),
       );
       expect(
         html,
         contains(
-          '/auth/reset-password/reset-password.js?v=20260720-validation-logo-fix',
+          '/auth/reset-password/reset-password.js?v=20260720-boundary-password-fix',
         ),
       );
       expect(
         html,
         contains(
-          '/assets/brand/packlox_logo_authority.svg?v=20260720-validation-logo-fix',
+          '/assets/brand/packlox_logo_authority.svg?v=20260720-boundary-password-fix',
         ),
       );
       expect(html, contains('class="brand-logo"'));
@@ -133,7 +133,7 @@ void main() {
         contains("import { supabase } from './supabaseClient.v2.js'"),
       );
       expect(script, contains('PACKLOX_RESET_PAGE_VERSION'));
-      expect(script, contains('20260720-validation-logo-fix'));
+      expect(script, contains('20260720-boundary-password-fix'));
       expect(script, contains('params.get(\'token\')'));
       expect(script, contains('verifyOtp'));
       expect(script, contains('setSession'));
@@ -153,11 +153,7 @@ void main() {
       expect(script, contains('passwordScore'));
       expect(script, isNot(contains('Math.min(score, 4)')));
       expect(script, contains('password.length >= PASSWORD_MIN_LENGTH'));
-      expect(
-        script,
-        contains('passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH'),
-      );
-      expect(script, contains("password.replace(/[^A-Za-z0-9]/g, '')"));
+      expect(script, isNot(contains('passwordPolicyLength')));
       expect(script, contains('/[a-z]/.test(password)'));
       expect(script, contains('/[A-Z]/.test(password)'));
       expect(script, contains('/\\d/.test(password)'));
@@ -179,7 +175,12 @@ void main() {
     });
 
     test('reset password policy examples drive submit state', () {
-      for (final password in <String>['Australia@100', 'Australia@121']) {
+      for (final password in <String>[
+        'Australia@10',
+        'Australia@12',
+        'Australia@100',
+        'Australia@121',
+      ]) {
         final valid = _resetPasswordState(password, password);
         expect(valid.canSubmit, isTrue, reason: password);
         expect(valid.passwordMessage, isEmpty, reason: password);
@@ -187,12 +188,11 @@ void main() {
       }
 
       const invalidExamples = <String, String>{
-        'Australia@10': 'too short',
-        'australia@121': 'missing uppercase',
-        'AUSTRALIA@121': 'missing lowercase',
-        'AustraliaTest': 'missing number and symbol',
-        'Australia121': 'missing symbol',
-        'Australia@ABC': 'missing number',
+        'Australia@1': 'too short',
+        'australia@12': 'missing uppercase',
+        'AUSTRALIA@12': 'missing lowercase',
+        'Australia12': 'missing symbol',
+        'Australia@Test': 'missing number',
       };
 
       for (final entry in invalidExamples.entries) {
@@ -205,7 +205,7 @@ void main() {
         );
       }
 
-      final mismatch = _resetPasswordState('Australia@121', 'Australia@100');
+      final mismatch = _resetPasswordState('Australia@12', 'Australia@10');
       expect(mismatch.canSubmit, isFalse);
       expect(mismatch.confirmMessage, 'Passwords do not match.');
     });
@@ -251,9 +251,8 @@ _ResetPasswordPolicyState _resetPasswordState(
   String confirmPassword,
 ) {
   const minLength = 12;
-  final policyLength = password.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length;
   final checks = <bool>[
-    password.length >= minLength && policyLength >= minLength,
+    password.length >= minLength,
     RegExp('[a-z]').hasMatch(password),
     RegExp('[A-Z]').hasMatch(password),
     RegExp(r'\d').hasMatch(password),
