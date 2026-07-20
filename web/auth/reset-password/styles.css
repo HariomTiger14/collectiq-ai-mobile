@@ -68,7 +68,7 @@ input {
 .reset-card {
   width: min(100%, calc(100vw - 40px));
   max-width: 430px;
-  padding: 28px 24px;
+  padding: 26px 24px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background:
@@ -87,25 +87,39 @@ input {
 
 .brand-lockup {
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 28px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
-.brand-logo {
+.brand-emblem {
   display: block;
-  width: min(204px, 62vw);
-  height: auto;
+  width: 34px;
+  height: 34px;
+}
+
+.brand-wordmark {
+  color: var(--text-bright);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.brand-wordmark-accent {
+  color: var(--brand-blue);
 }
 
 .auth-heading {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
   text-align: left;
 }
 
 .auth-heading h1 {
   margin: 0;
   color: var(--text-bright);
-  font-size: clamp(2rem, 8vw, 2.55rem);
+  font-size: clamp(1.85rem, 7vw, 2.35rem);
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: 0;
@@ -270,7 +284,7 @@ input {
   border: 0;
   border-radius: 8px;
   padding: 0 18px;
-  background: linear-gradient(135deg, var(--brand-blue), var(--brand-deep-blue) 54%, var(--brand-purple));
+  background: linear-gradient(135deg, #2fc2ff, var(--brand-blue) 48%, var(--brand-indigo));
   color: #ffffff;
   cursor: pointer;
   font-weight: 800;
@@ -288,8 +302,9 @@ input {
 
 .submit-button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.42;
   box-shadow: none;
+  filter: saturate(0.72);
 }
 
 .submit-button.loading .button-label {
@@ -387,8 +402,13 @@ input {
     padding: 34px 32px;
   }
 
-  .brand-logo {
-    width: 218px;
+  .brand-emblem {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-wordmark {
+    font-size: 1.65rem;
   }
 }
 
@@ -404,8 +424,13 @@ input {
     padding: 24px 20px;
   }
 
-  .brand-logo {
-    width: min(196px, 68vw);
+  .brand-emblem {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-wordmark {
+    font-size: 1.42rem;
   }
 }
 

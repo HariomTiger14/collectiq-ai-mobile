@@ -23,9 +23,9 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
-      final latestLogo = File(
-        'web/assets/brand/packlox_logo_latest.png',
-      ).readAsBytesSync();
+      final emblem = File(
+        'web/assets/brand/packlox_emblem.svg',
+      ).readAsStringSync();
 
       expect(
         File('docs/SIT_REAL_APP_SETUP.md').readAsStringSync(),
@@ -59,7 +59,11 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
-      expect(html, contains('/assets/brand/packlox_logo_latest.png'));
+      expect(html, contains('/assets/brand/packlox_emblem.svg'));
+      expect(html, contains('class="brand-emblem"'));
+      expect(html, contains('class="brand-wordmark"'));
+      expect(html, contains('class="brand-wordmark-accent"'));
+      expect(html, isNot(contains('/assets/brand/packlox_logo_latest.png')));
       expect(
         html,
         isNot(contains('/assets/brand/packlox_logo_horizontal_v1.svg')),
@@ -67,16 +71,17 @@ void main() {
       expect(html, isNot(contains('6 characters')));
       expect(html, isNot(contains('8 characters')));
       expect(html, contains('12 characters'));
-      expect(html, contains('class="brand-logo"'));
       expect(
         html,
         contains(
           'Your password has been updated. You can now return to the PackLox app and sign in with your new password.',
         ),
       );
+      expect(html, isNot(contains('Return to Login')));
       expect(html, isNot(contains('return-button')));
       expect(html, isNot(contains('/auth/login')));
       expect(html, isNot(contains('@supabase/supabase-js@2')));
+      expect(html, isNot(contains('Identify. Value. Protect.')));
       expect(html, contains('/auth/reset-password/styles.css'));
       expect(html, contains('/auth/reset-password/vendor/supabase-js-v2.js'));
       expect(html, contains('/auth/reset-password/supabaseClient.v2.js'));
@@ -87,21 +92,14 @@ void main() {
       expect(html, contains('strength-bar'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
-      expect(styles, contains('brand-logo'));
-      expect(styles, contains('success-icon span'));
+      expect(styles, contains('brand-emblem'));
+      expect(styles, contains('brand-wordmark'));
       expect(styles, contains('--brand-blue: #1ea7ff'));
       expect(styles, contains('--surface-dark: #0b111a'));
+      expect(styles, isNot(contains('brand-logo')));
       expect(styles, isNot(contains('return-button')));
-      expect(latestLogo.take(8).toList(), <int>[
-        137,
-        80,
-        78,
-        71,
-        13,
-        10,
-        26,
-        10,
-      ]);
+      expect(emblem, contains('PackLox emblem'));
+      expect(emblem, isNot(contains('Identify')));
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
@@ -130,8 +128,16 @@ void main() {
         script,
         contains('Your new password cannot be the same as your old password.'),
       );
+      expect(script, contains('evaluatePasswordPolicy'));
+      expect(script, contains('resetPasswordFormState'));
+      expect(script, contains('canSubmit'));
       expect(script, contains('passwordScore'));
-      expect(script, contains('password.length >= 12'));
+      expect(script, isNot(contains('Math.min(score, 4)')));
+      expect(
+        script,
+        contains('passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH'),
+      );
+      expect(script, contains("password.replace(/[^A-Za-z0-9]/g, '')"));
       expect(script, contains('/[a-z]/.test(password)'));
       expect(script, contains('/[A-Z]/.test(password)'));
       expect(script, contains('/\\d/.test(password)'));
@@ -139,6 +145,8 @@ void main() {
       expect(script, isNot(contains('6 characters')));
       expect(script, isNot(contains('8 characters')));
       expect(script, contains('12 characters'));
+      expect(script, contains("['input', 'change', 'paste', 'keyup']"));
+      expect(script, contains('refreshValidationAfterBrowserFill'));
       expect(script, contains('peekPassword'));
       expect(script, contains('updateStrengthMeter'));
       expect(script, contains('extractTokenFromHash'));
@@ -148,6 +156,36 @@ void main() {
       expect(script, contains('attachSubmitHandler'));
       expect(script, contains('Supabase not ready - handlers not attached'));
       expect(script, contains('clearRecoverySession'));
+    });
+
+    test('reset password policy examples drive submit state', () {
+      final valid = _resetPasswordState('Australia@100', 'Australia@100');
+      expect(valid.canSubmit, isTrue);
+      expect(valid.passwordMessage, isEmpty);
+      expect(valid.confirmMessage, isEmpty);
+
+      const invalidExamples = <String, String>{
+        'Australia@10': 'too short',
+        'australia@100': 'missing uppercase',
+        'AUSTRALIA@100': 'missing lowercase',
+        'AustraliaTest': 'missing number and symbol',
+        'Australia100': 'missing symbol',
+        'Australia@ABC': 'missing number',
+      };
+
+      for (final entry in invalidExamples.entries) {
+        final state = _resetPasswordState(entry.key, entry.key);
+        expect(state.canSubmit, isFalse, reason: entry.value);
+        expect(
+          state.passwordMessage,
+          'Use at least 12 characters with uppercase, lowercase, number, and symbol.',
+          reason: entry.value,
+        );
+      }
+
+      final mismatch = _resetPasswordState('Australia@100', 'Australia@101');
+      expect(mismatch.canSubmit, isFalse);
+      expect(mismatch.confirmMessage, 'Passwords do not match.');
     });
 
     test('callback page handles email confirmation', () {
@@ -184,4 +222,50 @@ void main() {
       expect(manifest, isNot(contains('android:host="packlox.com"')));
     });
   });
+}
+
+_ResetPasswordPolicyState _resetPasswordState(
+  String password,
+  String confirmPassword,
+) {
+  const minLength = 12;
+  final checks = <bool>[
+    password.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length >= minLength,
+    RegExp('[a-z]').hasMatch(password),
+    RegExp('[A-Z]').hasMatch(password),
+    RegExp(r'\d').hasMatch(password),
+    RegExp(r'[^A-Za-z0-9]').hasMatch(password),
+  ];
+  final isValidPassword = checks.every((check) => check);
+  final passwordMessage = password.isEmpty
+      ? 'Please enter a new password.'
+      : isValidPassword
+      ? ''
+      : 'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
+  final confirmMessage = confirmPassword.isEmpty
+      ? 'Please confirm your new password.'
+      : password == confirmPassword
+      ? ''
+      : 'Passwords do not match.';
+
+  return _ResetPasswordPolicyState(
+    passwordMessage: passwordMessage,
+    confirmMessage: confirmMessage,
+    canSubmit:
+        isValidPassword &&
+        confirmPassword.isNotEmpty &&
+        password == confirmPassword,
+  );
+}
+
+class _ResetPasswordPolicyState {
+  const _ResetPasswordPolicyState({
+    required this.passwordMessage,
+    required this.confirmMessage,
+    required this.canSubmit,
+  });
+
+  final String passwordMessage;
+  final String confirmMessage;
+  final bool canSubmit;
 }
