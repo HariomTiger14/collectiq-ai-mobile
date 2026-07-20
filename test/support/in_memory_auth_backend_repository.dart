@@ -26,6 +26,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
     this.passwordCreateGate,
     this.signInGate,
     this.resetGate,
+    this.resendGate,
     this.otpVerifyFailure,
     this.passwordCreateFailure,
     this.resetFailure,
@@ -44,6 +45,7 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   final Completer<void>? passwordCreateGate;
   final Completer<void>? signInGate;
   final Completer<void>? resetGate;
+  final Completer<void>? resendGate;
   final AuthBackendFailure? otpVerifyFailure;
   final AuthBackendFailure? passwordCreateFailure;
   final AuthBackendFailure? resetFailure;
@@ -246,6 +248,10 @@ class InMemoryAuthBackendRepository implements AuthBackendRepository {
   }) async {
     resendCalls += 1;
     lastResendEmail = _normalize(email);
+    final gate = resendGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (networkOffline) {
       return const AuthBackendResult.failure(
         AuthBackendFailure(AuthBackendFailureCode.networkOffline),

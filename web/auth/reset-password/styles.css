@@ -309,17 +309,15 @@ input {
   filter: saturate(0.55) brightness(0.82);
 }
 
-.submit-button.loading .button-label {
-  opacity: 0;
-}
-
 .submit-button.loading .spinner {
   display: inline-block;
 }
 
 .spinner {
   display: none;
-  position: absolute;
+  position: static;
+  flex: 0 0 auto;
+  margin-left: 10px;
   width: 20px;
   height: 20px;
   border: 3px solid rgba(255, 255, 255, 0.42);

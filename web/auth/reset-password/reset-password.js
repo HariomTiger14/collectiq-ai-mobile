@@ -59,7 +59,7 @@ function setBusy(isBusy) {
   elements.password.disabled = isBusy;
   elements.confirmPassword.disabled = isBusy;
   elements.submit.classList.toggle('loading', isBusy);
-  elements.buttonLabel.textContent = isBusy ? 'Updating password' : 'Update password';
+  elements.buttonLabel.textContent = isBusy ? 'Updating...' : 'Update password';
   updateSubmitState(isBusy);
 }
 

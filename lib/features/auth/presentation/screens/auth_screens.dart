@@ -787,16 +787,19 @@ class _GradientAuthButton extends StatelessWidget {
     required this.label,
     required this.semanticLabel,
     required this.onPressed,
+    this.loading = false,
     super.key,
   });
 
   final String label;
   final String semanticLabel;
   final VoidCallback? onPressed;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
+    final visualActive = enabled || loading;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -804,7 +807,7 @@ class _GradientAuthButton extends StatelessWidget {
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: enabled
+          gradient: visualActive
               ? AppGradients.primary
               : LinearGradient(
                   colors: [
@@ -814,12 +817,12 @@ class _GradientAuthButton extends StatelessWidget {
                 ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: enabled
+            color: visualActive
                 ? Colors.transparent
                 : Colors.white.withValues(alpha: .10),
           ),
           boxShadow: [
-            if (enabled)
+            if (visualActive)
               BoxShadow(
                 color: const Color(0xFF0A84FF).withValues(alpha: .30),
                 blurRadius: 30,
@@ -833,7 +836,9 @@ class _GradientAuthButton extends StatelessWidget {
             foregroundColor: enabled
                 ? PackLoxTokens.textPrimary
                 : const Color(0xFF93A4BC),
-            disabledForegroundColor: const Color(0xFF93A4BC),
+            disabledForegroundColor: loading
+                ? PackLoxTokens.textPrimary
+                : const Color(0xFF93A4BC),
             minimumSize: const Size.fromHeight(58),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
@@ -848,9 +853,25 @@ class _GradientAuthButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              if (loading) ...[
+                const SizedBox(
+                  key: ValueKey('auth-action-loading-indicator'),
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      PackLoxTokens.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Flexible(child: Text(label, overflow: TextOverflow.visible)),
-              const SizedBox(width: AppSpacing.sm),
-              const Icon(Icons.arrow_forward_rounded, size: 20),
+              if (!loading) ...[
+                const SizedBox(width: AppSpacing.sm),
+                const Icon(Icons.arrow_forward_rounded, size: 20),
+              ],
             ],
           ),
         ),
@@ -1371,10 +1392,13 @@ class _AuthSignInScreenState extends ConsumerState<AuthSignInScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               _GradientAuthButton(
                                 key: const ValueKey('auth-sign-in-submit'),
-                                label: _isSubmitting ? 'Signing In' : 'Sign In',
-                                semanticLabel: _isSubmitting
-                                    ? 'Signing In'
+                                label: _isSubmitting
+                                    ? 'Signing in...'
                                     : 'Sign In',
+                                semanticLabel: _isSubmitting
+                                    ? 'Signing in'
+                                    : 'Sign In',
+                                loading: _isSubmitting,
                                 onPressed: canSubmit ? _submit : null,
                               ),
                               const SizedBox(height: AppSpacing.sm),
@@ -1768,11 +1792,12 @@ class _AuthSignUpScreenState extends ConsumerState<AuthSignUpScreen> {
                                   'auth-create-account-continue',
                                 ),
                                 label: _isSubmitting
-                                    ? 'Sending code'
+                                    ? 'Processing...'
                                     : 'Continue',
                                 semanticLabel: _isSubmitting
-                                    ? 'Sending verification code'
+                                    ? 'Processing'
                                     : 'Continue',
+                                loading: _isSubmitting,
                                 onPressed: _canContinue && !_isSubmitting
                                     ? () => unawaited(_continue())
                                     : null,
@@ -2110,10 +2135,11 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               _GradientAuthButton(
                                 key: const ValueKey('auth-verify-email-verify'),
-                                label: _isVerifying ? 'Verifying' : 'Verify',
+                                label: _isVerifying ? 'Verifying...' : 'Verify',
                                 semanticLabel: _isVerifying
                                     ? 'Verifying'
                                     : 'Verify',
+                                loading: _isVerifying,
                                 onPressed: _canVerify
                                     ? () => unawaited(_verify())
                                     : null,
@@ -2122,7 +2148,7 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
                               _CooldownAuthAction(
                                 key: const ValueKey('auth-verify-email-resend'),
                                 label: _isResending
-                                    ? 'Sending code'
+                                    ? 'Sending...'
                                     : _canResend
                                     ? 'Resend code'
                                     : 'Resend code in ${_cooldownRemaining}s',
@@ -2132,6 +2158,7 @@ class _AuthVerifyEmailScreenState extends ConsumerState<AuthVerifyEmailScreen> {
                                     ? 'Resend code'
                                     : 'Resend code available in $_cooldownRemaining seconds',
                                 enabled: _canResend,
+                                loading: _isResending,
                                 onPressed: () => unawaited(_resendCode()),
                               ),
                               _QuietAuthAction(
@@ -2284,6 +2311,7 @@ class _CooldownAuthAction extends StatelessWidget {
     required this.semanticLabel,
     required this.enabled,
     required this.onPressed,
+    this.loading = false,
     super.key,
   });
 
@@ -2291,18 +2319,20 @@ class _CooldownAuthAction extends StatelessWidget {
   final String semanticLabel;
   final bool enabled;
   final VoidCallback onPressed;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
+    final isEnabled = enabled && !loading;
     return Semantics(
       button: true,
-      enabled: enabled,
+      enabled: isEnabled,
       label: semanticLabel,
       excludeSemantics: true,
       child: TextButton(
-        onPressed: enabled ? onPressed : null,
+        onPressed: isEnabled ? onPressed : null,
         style: TextButton.styleFrom(
-          foregroundColor: enabled
+          foregroundColor: isEnabled || loading
               ? const Color(0xFF9CCBFF)
               : PackLoxTokens.textSecondary.withValues(alpha: .70),
           disabledForegroundColor: PackLoxTokens.textSecondary.withValues(
@@ -2316,7 +2346,25 @@ class _CooldownAuthAction extends StatelessWidget {
             letterSpacing: 0,
           ),
         ),
-        child: Text(label),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading) ...[
+              const SizedBox(
+                key: ValueKey('auth-action-loading-indicator'),
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF9CCBFF)),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            Flexible(child: Text(label)),
+          ],
+        ),
       ),
     );
   }
@@ -2625,11 +2673,12 @@ class _AuthCreatePasswordScreenState
                                   'auth-create-password-finish',
                                 ),
                                 label: _isSubmitting
-                                    ? 'Finishing'
+                                    ? 'Processing...'
                                     : 'Finish Account',
                                 semanticLabel: _isSubmitting
-                                    ? 'Finishing Account'
+                                    ? 'Processing'
                                     : 'Finish Account',
+                                loading: _isSubmitting,
                                 onPressed: _canFinish && !_isSubmitting
                                     ? () => unawaited(_finishAccount())
                                     : null,
@@ -3236,8 +3285,11 @@ class _ForgotPasswordRequestContent extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         _GradientAuthButton(
           key: const ValueKey('auth-forgot-submit'),
-          label: isLoading ? 'Sending...' : 'Send reset instructions',
+          label: isLoading
+              ? 'Sending reset link...'
+              : 'Send reset instructions',
           semanticLabel: 'Send reset instructions',
+          loading: isLoading,
           onPressed: canSend && !isLoading ? onSubmit : null,
         ),
         const SizedBox(height: AppSpacing.md),

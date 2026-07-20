@@ -374,6 +374,11 @@ void main() {
 
       expect(backendRepository.signInCalls, 1);
       expect(find.text('Email or password is not correct.'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('auth-action-loading-indicator')),
+        findsNothing,
+      );
       expect(find.textContaining('not found'), findsNothing);
       expect(find.textContaining('sign up first'), findsNothing);
     },
@@ -411,7 +416,11 @@ void main() {
       _textButtonIn(const ValueKey('auth-sign-in-submit')),
     );
     expect(backendRepository.signInCalls, 1);
-    expect(find.text('Signing In'), findsOneWidget);
+    expect(find.text('Signing in...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
     expect(loadingButton.onPressed, isNull);
 
     await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
@@ -769,6 +778,11 @@ void main() {
       find.byKey(const ValueKey('auth-verify-email-screen')),
       findsNothing,
     );
+    expect(find.text('Continue'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsNothing,
+    );
     expect(find.textContaining('account exists'), findsNothing);
     expect(find.textContaining('already'), findsNothing);
   });
@@ -872,7 +886,11 @@ void main() {
     await tester.pump();
 
     expect(backendRepository.signupStartCalls, 1);
-    expect(find.text('Sending code'), findsOneWidget);
+    expect(find.text('Processing...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
     final loadingButton = tester.widget<TextButton>(
       _textButtonIn(const ValueKey('auth-create-account-continue')),
     );
@@ -1145,7 +1163,11 @@ void main() {
     await tester.pump();
 
     expect(backendRepository.otpVerifyCalls, 1);
-    expect(find.text('Verifying'), findsOneWidget);
+    expect(find.text('Verifying...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
     final loadingButton = tester.widget<TextButton>(
       _textButtonIn(const ValueKey('auth-verify-email-verify')),
     );
@@ -1186,6 +1208,41 @@ void main() {
     expect(find.text('5 attempts remaining.'), findsOneWidget);
     expect(backendRepository.resendCalls, 1);
     expect(backendRepository.lastResendEmail, 'collector@example.com');
+  });
+
+  testWidgets('S03 Resend code shows loading feedback while sending', (
+    tester,
+  ) async {
+    final resendGate = Completer<void>();
+    final backendRepository = InMemoryAuthBackendRepository(
+      resendGate: resendGate,
+    );
+    await _pumpSignupFlowToS03(tester, backendRepository: backendRepository);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
+    await tester.pump();
+
+    expect(backendRepository.resendCalls, 1);
+    expect(find.text('Sending...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
+    final loadingButton = tester.widget<TextButton>(
+      _textButtonIn(const ValueKey('auth-verify-email-resend')),
+    );
+    expect(loadingButton.onPressed, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('auth-verify-email-resend')));
+    await tester.pump();
+    expect(backendRepository.resendCalls, 1);
+
+    resendGate.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Resend code in 30s'), findsOneWidget);
   });
 
   testWidgets('S03 five attempt lockout requires resend', (tester) async {
@@ -1455,7 +1512,11 @@ void main() {
     await tester.pump();
 
     expect(backendRepository.passwordCreateCalls, 1);
-    expect(find.text('Finishing'), findsOneWidget);
+    expect(find.text('Processing...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
     final loadingButton = tester.widget<TextButton>(
       _textButtonIn(const ValueKey('auth-create-password-finish')),
     );
@@ -1795,6 +1856,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(authResetRequestRetryableMessage), findsOneWidget);
+    expect(find.text('Send reset instructions'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsNothing,
+    );
     expect(
       find.byKey(const ValueKey('auth-forgot-confirmation')),
       findsNothing,
@@ -1855,7 +1921,11 @@ void main() {
     await tester.pump();
 
     expect(backendRepository.resetCalls, 1);
-    expect(find.text('Sending...'), findsOneWidget);
+    expect(find.text('Sending reset link...'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-action-loading-indicator')),
+      findsOneWidget,
+    );
     final loadingButton = tester.widget<TextButton>(
       _textButtonIn(const ValueKey('auth-forgot-submit')),
     );

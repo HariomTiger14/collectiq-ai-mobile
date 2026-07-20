@@ -114,6 +114,10 @@ void main() {
       expect(styles, contains('@keyframes fadeIn'));
       expect(styles, contains('brand-icon'));
       expect(styles, contains('brand-name'));
+      expect(styles, contains('.submit-button.loading .spinner'));
+      expect(styles, contains('display: inline-block'));
+      expect(styles, contains('margin-left: 10px'));
+      expect(styles, isNot(contains('.submit-button.loading .button-label')));
       expect(styles, contains('--brand-blue: #1ea7ff'));
       expect(styles, contains('--surface-dark: #0b111a'));
       expect(styles, isNot(contains('brand-logo')));
@@ -180,6 +184,18 @@ void main() {
       expect(script, contains('updateStrengthMeter'));
       expect(script, contains('extractTokenFromHash'));
       expect(script, contains('submitNewPassword'));
+      expect(
+        script,
+        contains(
+          "elements.buttonLabel.textContent = isBusy ? 'Updating...' : 'Update password'",
+        ),
+      );
+      expect(
+        script,
+        contains("elements.submit.classList.toggle('loading', isBusy)"),
+      );
+      expect(script, contains('elements.password.disabled = isBusy'));
+      expect(script, contains('elements.confirmPassword.disabled = isBusy'));
       expect(script, contains('attachPeekHandlers'));
       expect(script, contains('attachStrengthHandlers'));
       expect(script, contains('attachSubmitHandler'));
