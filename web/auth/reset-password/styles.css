@@ -87,28 +87,15 @@ input {
 
 .brand-lockup {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
-.brand-emblem {
+.brand-logo {
   display: block;
-  width: 34px;
-  height: 34px;
-}
-
-.brand-wordmark {
-  color: var(--text-bright);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.brand-wordmark-accent {
-  color: var(--brand-blue);
+  width: min(136px, 44vw);
+  height: auto;
+  opacity: 0.96;
 }
 
 .auth-heading {
@@ -291,7 +278,8 @@ input {
   border: 0;
   border-radius: 8px;
   padding: 0 18px;
-  background: linear-gradient(135deg, #2fc2ff, var(--brand-blue) 48%, var(--brand-indigo));
+  background:
+    linear-gradient(135deg, #42d3ff, var(--brand-blue) 45%, var(--brand-indigo));
   color: #ffffff;
   cursor: pointer;
   font-weight: 800;
@@ -309,9 +297,9 @@ input {
 
 .submit-button:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
+  opacity: 0.38;
   box-shadow: none;
-  filter: saturate(0.72);
+  filter: saturate(0.55) brightness(0.82);
 }
 
 .submit-button.loading .button-label {
@@ -409,13 +397,8 @@ input {
     padding: 34px 32px;
   }
 
-  .brand-emblem {
-    width: 36px;
-    height: 36px;
-  }
-
-  .brand-wordmark {
-    font-size: 1.65rem;
+  .brand-logo {
+    width: 148px;
   }
 }
 
@@ -431,13 +414,8 @@ input {
     padding: 24px 20px;
   }
 
-  .brand-emblem {
-    width: 32px;
-    height: 32px;
-  }
-
-  .brand-wordmark {
-    font-size: 1.42rem;
+  .brand-logo {
+    width: 128px;
   }
 }
 

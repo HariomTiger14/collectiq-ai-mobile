@@ -23,8 +23,8 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
-      final emblem = File(
-        'web/assets/brand/packlox_emblem.svg',
+      final authorityLogo = File(
+        'web/assets/brand/packlox_logo_authority.svg',
       ).readAsStringSync();
 
       expect(
@@ -59,10 +59,28 @@ void main() {
       );
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
-      expect(html, contains('/assets/brand/packlox_emblem.svg'));
-      expect(html, contains('class="brand-emblem"'));
-      expect(html, contains('class="brand-wordmark"'));
-      expect(html, contains('class="brand-wordmark-accent"'));
+      expect(html, contains('PACKLOX_RESET_PAGE_VERSION'));
+      expect(html, contains('20260720-validation-logo-fix'));
+      expect(
+        html,
+        contains(
+          '/auth/reset-password/styles.css?v=20260720-validation-logo-fix',
+        ),
+      );
+      expect(
+        html,
+        contains(
+          '/auth/reset-password/reset-password.js?v=20260720-validation-logo-fix',
+        ),
+      );
+      expect(
+        html,
+        contains(
+          '/assets/brand/packlox_logo_authority.svg?v=20260720-validation-logo-fix',
+        ),
+      );
+      expect(html, contains('class="brand-logo"'));
+      expect(html, isNot(contains('/assets/brand/packlox_emblem.svg')));
       expect(html, isNot(contains('/assets/brand/packlox_logo_latest.png')));
       expect(
         html,
@@ -82,24 +100,23 @@ void main() {
       expect(html, isNot(contains('/auth/login')));
       expect(html, isNot(contains('@supabase/supabase-js@2')));
       expect(html, isNot(contains('Identify. Value. Protect.')));
-      expect(html, contains('/auth/reset-password/styles.css'));
       expect(html, contains('/auth/reset-password/vendor/supabase-js-v2.js'));
       expect(html, contains('/auth/reset-password/supabaseClient.v2.js'));
-      expect(html, contains('/auth/reset-password/reset-password.js'));
       expect(html, contains('toggle-password'));
       expect(html, contains('togglePassword'));
       expect(html, contains('toggleConfirmPassword'));
       expect(html, contains('strength-bar'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
-      expect(styles, contains('brand-emblem'));
-      expect(styles, contains('brand-wordmark'));
+      expect(styles, contains('brand-logo'));
       expect(styles, contains('--brand-blue: #1ea7ff'));
       expect(styles, contains('--surface-dark: #0b111a'));
-      expect(styles, isNot(contains('brand-logo')));
+      expect(styles, isNot(contains('brand-emblem')));
+      expect(styles, isNot(contains('brand-wordmark')));
       expect(styles, isNot(contains('return-button')));
-      expect(emblem, contains('PackLox emblem'));
-      expect(emblem, isNot(contains('Identify')));
+      expect(authorityLogo, contains('PackLox'));
+      expect(authorityLogo, contains('#1EA7FF'));
+      expect(authorityLogo, isNot(contains('Identify')));
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
@@ -115,6 +132,8 @@ void main() {
         script,
         contains("import { supabase } from './supabaseClient.v2.js'"),
       );
+      expect(script, contains('PACKLOX_RESET_PAGE_VERSION'));
+      expect(script, contains('20260720-validation-logo-fix'));
       expect(script, contains('params.get(\'token\')'));
       expect(script, contains('verifyOtp'));
       expect(script, contains('setSession'));
@@ -133,6 +152,7 @@ void main() {
       expect(script, contains('canSubmit'));
       expect(script, contains('passwordScore'));
       expect(script, isNot(contains('Math.min(score, 4)')));
+      expect(script, contains('password.length >= PASSWORD_MIN_LENGTH'));
       expect(
         script,
         contains('passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH'),
@@ -159,17 +179,19 @@ void main() {
     });
 
     test('reset password policy examples drive submit state', () {
-      final valid = _resetPasswordState('Australia@100', 'Australia@100');
-      expect(valid.canSubmit, isTrue);
-      expect(valid.passwordMessage, isEmpty);
-      expect(valid.confirmMessage, isEmpty);
+      for (final password in <String>['Australia@100', 'Australia@121']) {
+        final valid = _resetPasswordState(password, password);
+        expect(valid.canSubmit, isTrue, reason: password);
+        expect(valid.passwordMessage, isEmpty, reason: password);
+        expect(valid.confirmMessage, isEmpty, reason: password);
+      }
 
       const invalidExamples = <String, String>{
         'Australia@10': 'too short',
-        'australia@100': 'missing uppercase',
-        'AUSTRALIA@100': 'missing lowercase',
+        'australia@121': 'missing uppercase',
+        'AUSTRALIA@121': 'missing lowercase',
         'AustraliaTest': 'missing number and symbol',
-        'Australia100': 'missing symbol',
+        'Australia121': 'missing symbol',
         'Australia@ABC': 'missing number',
       };
 
@@ -183,7 +205,7 @@ void main() {
         );
       }
 
-      final mismatch = _resetPasswordState('Australia@100', 'Australia@101');
+      final mismatch = _resetPasswordState('Australia@121', 'Australia@100');
       expect(mismatch.canSubmit, isFalse);
       expect(mismatch.confirmMessage, 'Passwords do not match.');
     });
@@ -229,8 +251,9 @@ _ResetPasswordPolicyState _resetPasswordState(
   String confirmPassword,
 ) {
   const minLength = 12;
+  final policyLength = password.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length;
   final checks = <bool>[
-    password.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length >= minLength,
+    password.length >= minLength && policyLength >= minLength,
     RegExp('[a-z]').hasMatch(password),
     RegExp('[A-Z]').hasMatch(password),
     RegExp(r'\d').hasMatch(password),
