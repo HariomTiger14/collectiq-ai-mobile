@@ -87,15 +87,29 @@ input {
 
 .brand-lockup {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 10px;
   margin-bottom: 18px;
 }
 
-.brand-logo {
+.brand-icon {
   display: block;
-  width: min(136px, 44vw);
-  height: auto;
-  opacity: 0.96;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.brand-name {
+  color: var(--text-bright);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.brand-name-accent {
+  color: var(--brand-blue);
 }
 
 .auth-heading {
@@ -396,9 +410,13 @@ input {
     max-width: 456px;
     padding: 34px 32px;
   }
+  .brand-icon {
+    width: 42px;
+    height: 42px;
+  }
 
-  .brand-logo {
-    width: 148px;
+  .brand-name {
+    font-size: 1.58rem;
   }
 }
 
@@ -413,9 +431,13 @@ input {
     max-width: 100%;
     padding: 24px 20px;
   }
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+  }
 
-  .brand-logo {
-    width: 128px;
+  .brand-name {
+    font-size: 1.38rem;
   }
 }
 

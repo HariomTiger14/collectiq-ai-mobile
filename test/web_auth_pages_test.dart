@@ -23,9 +23,9 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
-      final authorityLogo = File(
-        'web/assets/brand/packlox_logo_authority.svg',
-      ).readAsStringSync();
+      final appIcon = File(
+        'web/assets/brand/packlox_app_icon.png',
+      ).readAsBytesSync();
 
       expect(
         File('docs/SIT_REAL_APP_SETUP.md').readAsStringSync(),
@@ -60,11 +60,11 @@ void main() {
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
       expect(html, contains('PACKLOX_RESET_PAGE_VERSION'));
-      expect(html, contains('20260720-boundary-password-fix'));
+      expect(html, contains('20260720-app-icon-logo-fix'));
       expect(
         html,
         contains(
-          '/auth/reset-password/styles.css?v=20260720-boundary-password-fix',
+          '/auth/reset-password/styles.css?v=20260720-app-icon-logo-fix',
         ),
       );
       expect(
@@ -76,11 +76,14 @@ void main() {
       expect(
         html,
         contains(
-          '/assets/brand/packlox_logo_authority.svg?v=20260720-boundary-password-fix',
+          '/assets/brand/packlox_app_icon.png?v=20260720-app-icon-logo-fix',
         ),
       );
-      expect(html, contains('class="brand-logo"'));
+      expect(html, contains('class="brand-icon"'));
+      expect(html, contains('class="brand-name"'));
+      expect(html, contains('class="brand-name-accent"'));
       expect(html, isNot(contains('/assets/brand/packlox_emblem.svg')));
+      expect(html, isNot(contains('/assets/brand/packlox_logo_authority.svg')));
       expect(html, isNot(contains('/assets/brand/packlox_logo_latest.png')));
       expect(
         html,
@@ -108,15 +111,15 @@ void main() {
       expect(html, contains('strength-bar'));
       expect(styles, contains('@keyframes shake'));
       expect(styles, contains('@keyframes fadeIn'));
-      expect(styles, contains('brand-logo'));
+      expect(styles, contains('brand-icon'));
+      expect(styles, contains('brand-name'));
       expect(styles, contains('--brand-blue: #1ea7ff'));
       expect(styles, contains('--surface-dark: #0b111a'));
+      expect(styles, isNot(contains('brand-logo')));
       expect(styles, isNot(contains('brand-emblem')));
       expect(styles, isNot(contains('brand-wordmark')));
       expect(styles, isNot(contains('return-button')));
-      expect(authorityLogo, contains('PackLox'));
-      expect(authorityLogo, contains('#1EA7FF'));
-      expect(authorityLogo, isNot(contains('Identify')));
+      expect(appIcon.take(8).toList(), <int>[137, 80, 78, 71, 13, 10, 26, 10]);
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
