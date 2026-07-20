@@ -157,108 +157,134 @@ async function establishRecoverySession() {
   return null;
 }
 
-function passwordScore(password) {
-  let score = 0;
+const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_POLICY_MESSAGE =
+  'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
 
-  if (password.length >= 12) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-
-  return Math.min(score, 4);
+function passwordPolicyLength(password) {
+  return password.replace(/[^A-Za-z0-9]/g, '').length;
 }
 
-function strengthDetails(score) {
-  if (score <= 1) {
+function evaluatePasswordPolicy(password) {
+  const checks = {
+    hasMinimumLength: passwordPolicyLength(password) >= PASSWORD_MIN_LENGTH,
+    hasLowercase: /[a-z]/.test(password),
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSymbol: /[^A-Za-z0-9]/.test(password),
+  };
+  const score = Object.values(checks).filter(Boolean).length;
+
+  return {
+    checks,
+    score,
+    isValid: score === Object.keys(checks).length,
+  };
+}
+
+function passwordScore(password) {
+  return evaluatePasswordPolicy(password).score;
+}
+
+function strengthDetails(policy) {
+  if (!policy.score) {
+    return { label: 'empty', className: '' };
+  }
+
+  if (!policy.isValid && policy.score <= 2) {
     return { label: 'weak', className: 'weak' };
   }
 
-  if (score <= 3) {
+  if (!policy.isValid) {
     return { label: 'medium', className: 'medium' };
   }
 
   return { label: 'strong', className: 'strong' };
 }
 
-function passwordValidationMessage(password) {
-  if (!password) return 'Please enter a new password.';
-  if (passwordScore(password) < 5) {
-    return 'Use at least 12 characters with uppercase, lowercase, number, and symbol.';
-  }
+function resetPasswordFormState(password, confirmPassword) {
+  const policy = evaluatePasswordPolicy(password);
+  const passwordMessage = !password
+    ? 'Please enter a new password.'
+    : policy.isValid
+      ? ''
+      : PASSWORD_POLICY_MESSAGE;
+  const confirmMessage = !confirmPassword
+    ? 'Please confirm your new password.'
+    : password === confirmPassword
+      ? ''
+      : 'Passwords do not match.';
 
-  return '';
+  return {
+    policy,
+    passwordMessage,
+    confirmMessage,
+    passwordsMatch: Boolean(confirmPassword) && password === confirmPassword,
+    canSubmit:
+      policy.isValid && Boolean(confirmPassword) && password === confirmPassword,
+  };
 }
 
-function updateStrengthMeter() {
-  const password = elements.password.value;
-  const score = passwordScore(password);
-  const details = strengthDetails(score);
+function currentFormState() {
+  return resetPasswordFormState(
+    elements.password.value,
+    elements.confirmPassword.value,
+  );
+}
 
-  elements.strengthBar.className = password
+function updateStrengthMeter(state = currentFormState()) {
+  const details = strengthDetails(state.policy);
+
+  elements.strengthBar.className = details.className
     ? `strength-bar ${details.className}`
     : 'strength-bar';
-  elements.strengthLabel.textContent = password
-    ? `Password strength: ${details.label}`
-    : 'Password strength: empty';
+  elements.strengthLabel.textContent = `Password strength: ${details.label}`;
 }
 
-function validatePasswordField({ showErrors = true } = {}) {
-  const message = passwordValidationMessage(elements.password.value);
-  elements.password.setAttribute('aria-invalid', String(Boolean(message)));
+function validatePasswordField({ showErrors = true, state = currentFormState() } = {}) {
+  elements.password.setAttribute(
+    'aria-invalid',
+    String(Boolean(state.passwordMessage)),
+  );
 
   if (showErrors) {
-    setFieldMessage(elements.passwordError, message);
+    setFieldMessage(elements.passwordError, state.passwordMessage);
   }
 
-  updateStrengthMeter();
-  return !message;
+  updateStrengthMeter(state);
+  return !state.passwordMessage;
 }
 
-function validateConfirmField({ showErrors = true } = {}) {
-  const password = elements.password.value;
-  const confirmPassword = elements.confirmPassword.value;
-
-  if (!confirmPassword) {
-    elements.confirmPassword.setAttribute('aria-invalid', 'true');
-
-    if (showErrors) {
-      setFieldMessage(elements.confirmError, 'Please confirm your new password.');
-    }
-
-    return false;
-  }
-
-  if (password !== confirmPassword) {
-    elements.confirmPassword.setAttribute('aria-invalid', 'true');
-
-    if (showErrors) {
-      setFieldMessage(elements.confirmError, 'Passwords do not match.');
-    }
-
-    return false;
-  }
-
-  elements.confirmPassword.setAttribute('aria-invalid', 'false');
+function validateConfirmField({ showErrors = true, state = currentFormState() } = {}) {
+  elements.confirmPassword.setAttribute(
+    'aria-invalid',
+    String(Boolean(state.confirmMessage)),
+  );
 
   if (showErrors) {
-    setFieldMessage(elements.confirmError, 'Passwords match.', 'success');
+    setFieldMessage(
+      elements.confirmError,
+      state.passwordsMatch ? 'Passwords match.' : state.confirmMessage,
+      state.passwordsMatch ? 'success' : 'error',
+    );
   }
 
-  return true;
+  return !state.confirmMessage;
 }
 
 function validateForm({ showErrors = true } = {}) {
-  const isPasswordValid = validatePasswordField({ showErrors });
-  const isConfirmValid = validateConfirmField({ showErrors });
+  const state = currentFormState();
+  validatePasswordField({ showErrors, state });
+  validateConfirmField({ showErrors, state });
 
-  return isPasswordValid && isConfirmValid;
+  return state.canSubmit;
 }
 
 function updateSubmitState(forceDisabled = false) {
-  elements.submit.disabled = forceDisabled || !validateForm({ showErrors: false });
+  const state = currentFormState();
+  updateStrengthMeter(state);
+  elements.submit.disabled = forceDisabled || !state.canSubmit;
 }
-
 function isSamePasswordResult(error, updateData, beforeUpdatedAt) {
   const message = (error?.message || '').toLowerCase();
 
@@ -403,35 +429,36 @@ function attachPeekHandlers() {
   if (passwordToggle) {
     passwordToggle.addEventListener('click', () => {
       peekPassword(passwordToggle, elements.password);
+      updateSubmitState();
     });
   }
 
   if (confirmToggle) {
     confirmToggle.addEventListener('click', () => {
       peekPassword(confirmToggle, elements.confirmPassword);
+      updateSubmitState();
     });
   }
 }
 
-function attachStrengthHandlers() {
-  elements.password.addEventListener('input', () => {
-    clearMessage();
-    validatePasswordField();
-
-    if (elements.confirmPassword.value) {
-      validateConfirmField();
-    }
-
-    updateSubmitState();
-  });
-
-  elements.confirmPassword.addEventListener('input', () => {
-    clearMessage();
-    validateConfirmField();
-    updateSubmitState();
-  });
+function refreshValidation({ showErrors = true } = {}) {
+  clearMessage();
+  const state = currentFormState();
+  validatePasswordField({ showErrors, state });
+  validateConfirmField({ showErrors, state });
+  updateSubmitState();
 }
 
+function attachStrengthHandlers() {
+  for (const eventName of ['input', 'change', 'paste', 'keyup']) {
+    elements.password.addEventListener(eventName, () => {
+      window.setTimeout(() => refreshValidation(), 0);
+    });
+    elements.confirmPassword.addEventListener(eventName, () => {
+      window.setTimeout(() => refreshValidation(), 0);
+    });
+  }
+}
 function attachSubmitHandler() {
   elements.form.addEventListener('submit', submitNewPassword);
 }
@@ -448,6 +475,8 @@ document.addEventListener('DOMContentLoaded', () => {
   attachSubmitHandler();
   updateStrengthMeter();
   updateSubmitState();
+  refreshValidationAfterBrowserFill();
+  window.addEventListener('pageshow', refreshValidationAfterBrowserFill);
 
   const params = paramsFromUrl();
 
