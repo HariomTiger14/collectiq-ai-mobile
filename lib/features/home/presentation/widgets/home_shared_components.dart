@@ -36,6 +36,456 @@ class HomeTokens {
   static const controlRadius = 10.0;
 }
 
+class HomeBrandLockup extends StatelessWidget {
+  const HomeBrandLockup({
+    this.showAlert = false,
+    this.onAlertPressed,
+    super.key,
+  });
+
+  final bool showAlert;
+  final VoidCallback? onAlertPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SvgPicture.asset(
+          PackLoxAssets.emblem,
+          key: const ValueKey('home-brand-emblem'),
+          width: 42,
+          height: 42,
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            'PackLox',
+            key: const ValueKey('home-brand-wordmark'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+        ),
+        if (showAlert)
+          IconButton(
+            key: const ValueKey('home-alert-button'),
+            tooltip: 'Collection alert',
+            onPressed: onAlertPressed,
+            icon: const Icon(Icons.priority_high_rounded),
+            color: HomeTokens.warning,
+            style: IconButton.styleFrom(
+              backgroundColor: HomeTokens.surfaceRaised,
+              side: const BorderSide(color: HomeTokens.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              fixedSize: const Size.square(54),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class HomeTitleBlock extends StatelessWidget {
+  const HomeTitleBlock({required this.subtitle, super.key});
+
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Home',
+          key: const ValueKey('home-title'),
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            color: HomeTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          subtitle,
+          key: const ValueKey('home-state-subtitle'),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: HomeTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class HomeAuthorityHero extends StatelessWidget {
+  const HomeAuthorityHero({
+    required this.eyebrow,
+    required this.title,
+    required this.body,
+    required this.ctaLabel,
+    required this.icon,
+    this.onPressed,
+    super.key,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String body;
+  final String ctaLabel;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return HomeSurface(
+      keyPrefix: 'home',
+      keySeed: 'authority-hero',
+      semanticLabel: '$eyebrow. $title. $body',
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+      radius: 24,
+      backgroundColor: HomeTokens.surfaceRaised.withValues(alpha: .92),
+      borderColor: HomeTokens.border,
+      child: Stack(
+        children: [
+          Positioned(
+            right: 8,
+            top: 28,
+            child: ExcludeSemantics(
+              child: Container(
+                width: 76,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: HomeTokens.accent.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(icon, color: const Color(0xFF8BC7FF), size: 34),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 92),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF67B6FF),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    height: 1.12,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  body,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    height: 1.32,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  key: const ValueKey('home-primary-scan'),
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: enabled ? onPressed : null,
+                    icon: const Icon(Icons.photo_camera_outlined, size: 19),
+                    label: Text(
+                      ctaLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: HomeTokens.accentStrong,
+                      disabledBackgroundColor: HomeTokens.accentStrong
+                          .withValues(alpha: .38),
+                      foregroundColor: HomeTokens.textPrimary,
+                      disabledForegroundColor: HomeTokens.textPrimary
+                          .withValues(alpha: .68),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeMetricTile extends StatelessWidget {
+  const HomeMetricTile({
+    required this.label,
+    required this.value,
+    required this.supportingText,
+    super.key,
+  });
+
+  final String label;
+  final String value;
+  final String supportingText;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeSurface(
+      keySeed: 'metric-${label.toLowerCase().replaceAll(' ', '-')}',
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            supportingText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.positive,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeActionRow extends StatelessWidget {
+  const HomeActionRow({
+    required this.keySeed,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor = const Color(0xFF8BC7FF),
+    this.onTap,
+    super.key,
+  });
+
+  final String keySeed;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color iconColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return MotionTapScale(
+      onTap: onTap,
+      child: Semantics(
+        button: onTap != null,
+        enabled: onTap != null,
+        label: '$title. $subtitle',
+        excludeSemantics: true,
+        child: Container(
+          key: ValueKey('home-action-$keySeed'),
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 84),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: HomeTokens.surfaceRaised,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        height: 1.22,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: onTap == null
+                    ? HomeTokens.textMuted
+                    : const Color(0xFF8BC7FF),
+                size: 28,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeSkeletonBlock extends StatelessWidget {
+  const HomeSkeletonBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('home-loading-skeleton'),
+      children: const [
+        _SkeletonSurface(height: 230),
+        SizedBox(height: HomeTokens.sectionGap),
+        _SkeletonSurface(height: 100),
+        SizedBox(height: HomeTokens.cardGap),
+        _SkeletonSurface(height: 100),
+      ],
+    );
+  }
+}
+
+class _SkeletonSurface extends StatelessWidget {
+  const _SkeletonSurface({required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised.withValues(alpha: .62),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: .62)),
+      ),
+    );
+  }
+}
+
+class HomeErrorPanel extends StatelessWidget {
+  const HomeErrorPanel({required this.message, this.onRetry, super.key});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeSurface(
+      keyPrefix: 'home',
+      keySeed: 'error-panel',
+      padding: const EdgeInsets.all(22),
+      semanticLabel: 'Home error. $message',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: HomeTokens.warning,
+            size: 32,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Collection could not load',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            key: const ValueKey('home-retry'),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({
     required this.firstName,

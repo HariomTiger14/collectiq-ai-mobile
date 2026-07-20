@@ -1,14 +1,10 @@
-import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
-import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
@@ -58,13 +54,13 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final portfolio = ref.watch(portfolioControllerProvider);
-    final items = portfolio.orderedItems;
-    final insights = const CollectorDashboardAnalyticsService().build(items);
-    final homeData = _HomeViewData.fromInsights(insights);
-    final recentItems = homeData.recentItems.take(3).toList(growable: false);
-    final greetingText = _homeGreetingFor(DateTime.now());
+    final portfolioController = ref.read(portfolioControllerProvider.notifier);
+    final homeData = _HomeViewData.fromInsights(
+      const CollectorDashboardAnalyticsService().build(portfolio.orderedItems),
+    );
+    final hasBlockingError = portfolio.errorMessage != null && homeData.isEmpty;
+    final isInitialLoading = portfolio.isLoading && homeData.isEmpty;
 
-    // Home follows the approved dark authority independent of system brightness.
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
@@ -75,61 +71,146 @@ class _HomePageState extends ConsumerState<HomePage> {
             bottomClearance: 104,
             sections: [
               HomeSection(
-                topPadding: AppSpacing.xs,
-                child: HomeAppBar(
-                  firstName: '',
-                  fallbackName: 'Collector',
-                  greetingText: greetingText,
-                  onNotifications: null,
+                topPadding: AppSpacing.sm,
+                child: HomeBrandLockup(showAlert: homeData.hasStateAlert),
+              ),
+              HomeSection(
+                topPadding: AppSpacing.lg,
+                child: HomeTitleBlock(
+                  subtitle: _subtitleFor(portfolio, homeData),
                 ),
               ),
-              if (homeData.isEmpty)
+              if (isInitialLoading)
+                const HomeSection(
+                  topPadding: AppSpacing.xl,
+                  child: HomeSkeletonBlock(),
+                )
+              else if (hasBlockingError)
                 HomeSection(
-                  topPadding: AppSpacing.xs,
-                  child: HomeEmptyCollectionHero(
-                    onScanPressed: widget.onScanPressed == null
-                        ? null
-                        : _handleScanPressed,
-                    onSampleScanPressed: widget.onSampleScanPressed,
+                  topPadding: AppSpacing.xl,
+                  child: HomeErrorPanel(
+                    message: portfolio.errorMessage!,
+                    onRetry: portfolioController.loadItems,
                   ),
                 )
-              else ...[
+              else if (homeData.isEmpty) ...[
                 HomeSection(
-                  topPadding: AppSpacing.sm,
-                  child: _CollectionSnapshotSection(data: homeData),
-                ),
-                HomeSection(
-                  topPadding: AppSpacing.sm,
-                  child: _CompactQuickActions(
-                    onScanPressed: widget.onScanPressed == null
+                  topPadding: AppSpacing.xl,
+                  child: HomeAuthorityHero(
+                    eyebrow: 'New collector',
+                    title: 'Your collection is waiting',
+                    body:
+                        'Start with a scan, then let PackLox build value history from real items.',
+                    ctaLabel: 'Add first item',
+                    icon: Icons.inventory_2_outlined,
+                    onPressed: widget.onScanPressed == null
                         ? null
                         : _handleScanPressed,
-                    onImportPhotoPressed:
-                        widget.onImportPhotoPressed ?? widget.onScanPressed,
-                    onPortfolioPressed: widget.onPortfolioPressed,
+                  ),
+                ),
+                HomeSection(
+                  topPadding: AppSpacing.xl,
+                  child: _HomeActionStack(
+                    actions: [
+                      HomeActionRow(
+                        keySeed: 'start-first-item',
+                        icon: Icons.photo_camera_outlined,
+                        title: 'Start with your first item',
+                        subtitle: 'Scan or add a collectible to begin.',
+                        onTap: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                      ),
+                      HomeActionRow(
+                        keySeed: 'guided-scan',
+                        icon: Icons.add_rounded,
+                        title: 'Try a guided scan',
+                        subtitle: 'Use the scanner to capture details clearly.',
+                        iconColor: HomeTokens.categoryMore,
+                        onTap: widget.onSampleScanPressed,
+                      ),
+                      const HomeActionRow(
+                        keySeed: 'supported-categories',
+                        icon: Icons.category_outlined,
+                        title: 'Browse supported categories',
+                        subtitle: 'Cards, coins, figures, and more.',
+                        iconColor: HomeTokens.categoryCoins,
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                HomeSection(
+                  topPadding: AppSpacing.xl,
+                  child: HomeAuthorityHero(
+                    eyebrow: homeData.hasPartialValuation
+                        ? 'Collection overview'
+                        : 'Collection overview',
+                    title: 'Know what your collection is worth',
+                    body:
+                        'Track collection health, recent scans, and the next useful action.',
+                    ctaLabel: 'Scan next item',
+                    icon: Icons.show_chart_rounded,
+                    onPressed: widget.onScanPressed == null
+                        ? null
+                        : _handleScanPressed,
+                  ),
+                ),
+                if (homeData.hasRealMetrics)
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _MetricGrid(data: homeData),
+                  ),
+                HomeSection(
+                  topPadding: AppSpacing.xl,
+                  bottomPadding: AppSpacing.xxl,
+                  child: _HomeActionStack(
+                    actions: [
+                      HomeActionRow(
+                        keySeed: 'scan-collectible',
+                        icon: Icons.photo_camera_outlined,
+                        title: 'Scan a collectible',
+                        subtitle: 'Identify, value, and protect the next item.',
+                        onTap: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                      ),
+                      HomeActionRow(
+                        keySeed: 'market-insights',
+                        icon: Icons.trending_up_rounded,
+                        title: 'Market insights',
+                        subtitle: homeData.hasValuedItems
+                            ? 'Review recent changes across your collection.'
+                            : 'Add valuations before insights appear.',
+                        iconColor: HomeTokens.categoryFigures,
+                        onTap: widget.onPortfolioPressed,
+                      ),
+                      if (homeData.mostRecentItem != null)
+                        HomeActionRow(
+                          keySeed: 'recent-scan',
+                          icon: Icons.monitor_heart_outlined,
+                          title: 'Recent scan',
+                          subtitle: homeData.mostRecentItem!.title,
+                          iconColor: HomeTokens.categoryMore,
+                          onTap: () => _openCollectibleDetail(
+                            context,
+                            homeData.mostRecentItem!,
+                          ),
+                        ),
+                      if (homeData.hasPartialValuation)
+                        HomeActionRow(
+                          keySeed: 'partial-valuation',
+                          icon: Icons.priority_high_rounded,
+                          title: 'Finish collection valuations',
+                          subtitle:
+                              '${homeData.unvaluedCount} ${homeData.unvaluedCount == 1 ? 'item needs' : 'items need'} a real valuation.',
+                          iconColor: HomeTokens.warning,
+                          onTap: widget.onPortfolioPressed,
+                        ),
+                    ],
                   ),
                 ),
               ],
-              if (homeData.isEmpty)
-                const HomeSection(
-                  topPadding: AppSpacing.sm,
-                  child: _PopularCategoriesSection(),
-                ),
-              if (recentItems.isNotEmpty)
-                HomeSection(
-                  topPadding: AppSpacing.lg,
-                  child: _RecentCollectiblesSection(
-                    items: recentItems,
-                    hasMore: homeData.itemCount > recentItems.length,
-                    onViewAll: widget.onPortfolioPressed,
-                  ),
-                ),
-              if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
-                HomeSection(
-                  topPadding: AppSpacing.lg,
-                  bottomPadding: AppSpacing.xxl,
-                  child: _GroundedInsightCard(data: homeData),
-                ),
             ],
           ),
         ),
@@ -138,77 +219,79 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-String _homeGreetingFor(DateTime now) {
-  final hour = now.hour;
-  if (hour < 12) {
-    return 'Good morning,';
+String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
+  if (portfolio.isLoading && data.isEmpty) {
+    return 'Preparing your collection overview.';
   }
-  if (hour < 17) {
-    return 'Good afternoon,';
+  if (portfolio.errorMessage != null && data.isEmpty) {
+    return 'Your collection overview will return after a retry.';
   }
-  return 'Good evening,';
+  if (data.isEmpty) {
+    return 'Start your collection with a clear first scan.';
+  }
+  if (data.hasPartialValuation) {
+    return 'Your collection has real saved items, with some values still pending.';
+  }
+  return 'Your collection overview, recent scans, and next actions.';
 }
 
-class _CompactQuickActions extends StatelessWidget {
-  const _CompactQuickActions({
-    this.onScanPressed,
-    this.onImportPhotoPressed,
-    this.onPortfolioPressed,
-  });
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.data});
 
-  final VoidCallback? onScanPressed;
-  final VoidCallback? onImportPhotoPressed;
-  final VoidCallback? onPortfolioPressed;
+  final _HomeViewData data;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final actions = [
-      HomeQuickAction(
-        key: 'scan',
-        icon: Icons.photo_camera_outlined,
-        label: 'Scan',
-        semanticLabel: 'Scan a collectible',
-        onTap: onScanPressed,
-      ),
-      HomeQuickAction(
-        key: 'import',
-        icon: Icons.image_outlined,
-        label: 'Import',
-        semanticLabel: 'Import photo',
-        onTap: onImportPhotoPressed,
-      ),
-      HomeQuickAction(
-        key: 'portfolio',
-        icon: Icons.inventory_2_outlined,
-        label: 'Portfolio',
-        semanticLabel: 'Open portfolio',
-        onTap: onPortfolioPressed,
+    final metrics = <Widget>[
+      if (data.hasValuedItems)
+        HomeMetricTile(
+          label: 'Collection value',
+          value: _formatCurrency(data.totalValuedAmount),
+          supportingText: data.hasPartialValuation
+              ? 'Partial valuation'
+              : 'Estimated trend',
+        ),
+      HomeMetricTile(
+        label: 'Collection items',
+        value: '${data.itemCount}',
+        supportingText: data.hasPartialValuation
+            ? '${data.valuedItemCount} valued'
+            : 'Verified items',
       ),
     ];
 
-    return HomeSectionSurface(
-      title: 'Quick actions',
-      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
-      borderColor: _packLoxSurfaceBorderColor(colorScheme),
-      child: Semantics(
-        container: true,
-        label: 'Collection actions',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 360 ? 2 : 1;
+        final width = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - HomeTokens.cardGap) / 2;
+        return Wrap(
+          spacing: HomeTokens.cardGap,
+          runSpacing: HomeTokens.cardGap,
           children: [
-            Text(
-              'Start adding to your collection',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: HomeTokens.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            HomeQuickActionGrid(actions: actions),
+            for (final metric in metrics) SizedBox(width: width, child: metric),
           ],
-        ),
-      ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeActionStack extends StatelessWidget {
+  const _HomeActionStack({required this.actions});
+
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < actions.length; i++) ...[
+          if (i > 0) const SizedBox(height: HomeTokens.cardGap),
+          actions[i],
+        ],
+      ],
     );
   }
 }
@@ -220,9 +303,6 @@ class _HomeViewData {
     required this.totalValuedAmount,
     required this.valuedItemCount,
     required this.unvaluedCount,
-    required this.categoryCount,
-    required this.lastScanAt,
-    required this.topCollectible,
     required this.recentItems,
   });
 
@@ -231,58 +311,15 @@ class _HomeViewData {
   final double totalValuedAmount;
   final int valuedItemCount;
   final int unvaluedCount;
-  final int categoryCount;
-  final DateTime? lastScanAt;
-  final CollectibleItem? topCollectible;
   final List<CollectibleItem> recentItems;
 
   bool get isEmpty => itemCount == 0;
   bool get hasValuedItems => valuedItemCount > 0;
-
-  String get heroSupport {
-    if (isEmpty) {
-      return 'Scan your first collectible and start building your collection.';
-    }
-    final valueText = hasValuedItems
-        ? ' worth an estimated ${_formatCurrency(totalValuedAmount)}'
-        : '';
-    return 'You have $_itemCountLabel$valueText.';
-  }
-
-  String get overviewTitle {
-    if (isEmpty) {
-      return 'Your collection is waiting';
-    }
-    return 'Your collection';
-  }
-
-  String get overviewSubtitle {
-    if (isEmpty) {
-      return 'No items yet';
-    }
-    return _itemCountLabel;
-  }
-
-  String get _itemCountLabel =>
-      '$itemCount ${itemCount == 1 ? 'collectible' : 'collectibles'}';
-
-  String get snapshotValue => hasValuedItems
-      ? '${_formatCurrency(totalValuedAmount)} estimated value'
-      : 'Value unavailable';
-
-  String get itemMetric =>
-      '$itemCount ${itemCount == 1 ? 'collectible' : 'collectibles'}';
-
-  String? get categoryMetric {
-    if (categoryCount <= 0) {
-      return null;
-    }
-    return '$categoryCount ${categoryCount == 1 ? 'category' : 'categories'}';
-  }
-
-  String? get lastScanMetric => lastScanAt == null
-      ? null
-      : 'Last scan ${_formatRelativeTime(lastScanAt!)}';
+  bool get hasPartialValuation => itemCount > 0 && unvaluedCount > 0;
+  bool get hasRealMetrics => itemCount > 0;
+  bool get hasStateAlert => hasPartialValuation;
+  CollectibleItem? get mostRecentItem =>
+      recentItems.isEmpty ? null : recentItems.first;
 
   factory _HomeViewData.fromInsights(CollectorDashboardAnalytics insights) {
     final items = insights.items;
@@ -291,632 +328,15 @@ class _HomeViewData {
       0,
       (sum, item) => sum + item.estimatedValue,
     );
-    final topCollectible = valuedItems.isNotEmpty
-        ? valuedItems.reduce(
-            (best, item) =>
-                item.estimatedValue > best.estimatedValue ? item : best,
-          )
-        : (items.isEmpty ? null : items.first);
-
     return _HomeViewData(
       items: items,
       itemCount: items.length,
       totalValuedAmount: totalValuedAmount,
       valuedItemCount: valuedItems.length,
       unvaluedCount: items.length - valuedItems.length,
-      categoryCount: _categoryCount(insights),
-      lastScanAt: insights.mostRecentItem?.createdAt,
-      topCollectible: topCollectible,
       recentItems: items,
     );
   }
-}
-
-class _CollectionSnapshotSection extends StatelessWidget {
-  const _CollectionSnapshotSection({required this.data});
-
-  final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return HomeSectionSurface(
-      title: data.isEmpty ? 'Collection status' : 'Collection snapshot',
-      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
-      borderColor: _packLoxSurfaceBorderColor(colorScheme),
-      child: data.isEmpty
-          ? _EmptySnapshot(data: data)
-          : _SnapshotContent(data: data),
-    );
-  }
-}
-
-class _SnapshotContent extends StatelessWidget {
-  const _SnapshotContent({required this.data});
-
-  final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      data.itemMetric,
-      if (data.categoryMetric != null) data.categoryMetric!,
-      if (data.lastScanMetric != null) data.lastScanMetric!,
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          data.snapshotValue,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            for (final metric in metrics) _SnapshotPill(label: metric),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _TopCollectiblePreview(item: data.topCollectible),
-      ],
-    );
-  }
-}
-
-class _SnapshotPill extends StatelessWidget {
-  const _SnapshotPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _TopCollectiblePreview extends StatelessWidget {
-  const _TopCollectiblePreview({required this.item});
-
-  final CollectibleItem? item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    if (item == null) {
-      return const SizedBox.shrink();
-    }
-
-    return MotionTapScale(
-      onTap: () => _openCollectibleDetail(context, item!),
-      child: Container(
-        key: ValueKey('home-top-collectible-${item!.id}'),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: _packLoxRaisedSurfaceColor(colorScheme),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: PortfolioThumbnail(imagePath: item!.imagePath, size: 72),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _hasDisplayValue(item!)
-                        ? 'Top collectible'
-                        : 'Latest collectible',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    item!.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                      height: 1.12,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    item!.category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Flexible(
-              child: Text(
-                _formatItemValue(item!),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: textTheme.titleSmall?.copyWith(
-                  color: _hasDisplayValue(item!)
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptySnapshot extends StatelessWidget {
-  const _EmptySnapshot({required this.data});
-
-  final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      container: true,
-      label:
-          'Collection dashboard summary. Zero items. Estimated value unavailable. Average condition unavailable.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 300;
-              final metrics = <Widget>[
-                _StatusMetric(
-                  key: const ValueKey('home-status-metric-items'),
-                  icon: Icons.layers_outlined,
-                  value: '${data.itemCount}',
-                  label: 'Items',
-                ),
-                const _StatusMetric(
-                  key: ValueKey('home-status-metric-estimated-value'),
-                  icon: Icons.inventory_2_outlined,
-                  value: '\u2014',
-                  label: 'Est. value',
-                  semanticValue: 'unavailable',
-                ),
-                const _StatusMetric(
-                  key: ValueKey('home-status-metric-average-condition'),
-                  icon: Icons.verified_user_outlined,
-                  value: '\u2014',
-                  label: 'Avg. condition',
-                  semanticValue: 'unavailable',
-                ),
-              ];
-
-              if (compact) {
-                return Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.md,
-                  children: [
-                    for (final metric in metrics)
-                      SizedBox(
-                        width: (constraints.maxWidth - AppSpacing.sm) / 2,
-                        child: metric,
-                      ),
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  for (var i = 0; i < metrics.length; i++) ...[
-                    if (i > 0) const _MetricDivider(),
-                    Expanded(child: metrics[i]),
-                  ],
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Value and condition stay unavailable until items are saved.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusMetric extends StatelessWidget {
-  const _StatusMetric({
-    super.key,
-    required this.icon,
-    required this.value,
-    required this.label,
-    this.semanticValue,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final String? semanticValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      container: true,
-      label: '$label ${semanticValue ?? value}',
-      excludeSemantics: true,
-      child: Column(
-        key: ValueKey(
-          'home-status-metric-${label.toLowerCase().replaceAll(' ', '-').replaceAll('.', '')}',
-        ),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: colorScheme.onSurfaceVariant,
-            size: AppIconSizes.sm,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricDivider extends StatelessWidget {
-  const _MetricDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 52,
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-      color: _packLoxSurfaceBorderColor(Theme.of(context).colorScheme),
-    );
-  }
-}
-
-class _PopularCategoriesSection extends StatelessWidget {
-  const _PopularCategoriesSection();
-
-  static const _categories = [
-    (
-      label: 'Cards',
-      icon: Icons.style_outlined,
-      assetPath: PackLoxAssets.categoryCards,
-      semanticMeaning: 'trading cards',
-      iconColor: HomeTokens.categoryCards,
-    ),
-    (
-      label: 'Coins',
-      icon: Icons.album_outlined,
-      assetPath: PackLoxAssets.categoryCoins,
-      semanticMeaning: 'collectible coins and medallions',
-      iconColor: HomeTokens.categoryCoins,
-    ),
-    (
-      label: 'Figures',
-      icon: Icons.smart_toy_outlined,
-      assetPath: PackLoxAssets.categoryFigures,
-      semanticMeaning: 'figurines and action figures',
-      iconColor: HomeTokens.categoryFigures,
-    ),
-    (
-      label: 'More',
-      icon: Icons.grid_view_outlined,
-      assetPath: PackLoxAssets.categoryMore,
-      semanticMeaning: 'more categories grid',
-      iconColor: HomeTokens.categoryMore,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: 'Popular Categories. See what collectors love.',
-      child: Column(
-        key: const ValueKey('home-section-popular-categories'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Popular Categories',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: HomeTokens.textPrimary,
-              fontWeight: FontWeight.w800,
-              height: 1.18,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'See what collectors love',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: HomeTokens.textSecondary,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          HomeCategoryGrid(
-            categories: [
-              for (final category in _categories)
-                HomeCategoryTile(
-                  label: category.label,
-                  icon: category.icon,
-                  assetPath: category.assetPath,
-                  semanticMeaning: category.semanticMeaning,
-                  iconColor: category.iconColor,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentCollectiblesSection extends StatelessWidget {
-  const _RecentCollectiblesSection({
-    required this.items,
-    required this.hasMore,
-    this.onViewAll,
-  });
-
-  final List<CollectibleItem> items;
-  final bool hasMore;
-  final VoidCallback? onViewAll;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return HomeSectionSurface(
-      title: 'Recent collectibles',
-      actionLabel: hasMore ? 'View all' : null,
-      onAction: hasMore ? onViewAll : null,
-      backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
-      borderColor: _packLoxSurfaceBorderColor(colorScheme),
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            HomeRecentItemCard(
-              id: items[i].id,
-              title: items[i].title,
-              category: items[i].category,
-              condition: items[i].condition,
-              imagePath: items[i].imagePath,
-              valueLabel: _formatItemValue(items[i]),
-              valueUnavailable: !_hasDisplayValue(items[i]),
-              addedLabel: 'Added ${_formatRelativeTime(items[i].createdAt)}',
-              onTap: () => _openCollectibleDetail(context, items[i]),
-              backgroundColor: _packLoxRaisedSurfaceColor(colorScheme),
-              borderColor: _packLoxSurfaceBorderColor(colorScheme),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _RecentCollectibleTile extends StatelessWidget {
-  const _RecentCollectibleTile({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final detail = [
-      item.category,
-      if (item.condition.trim().isNotEmpty) item.condition,
-    ].join(' • ');
-
-    return MotionTapScale(
-      onTap: () => _openCollectibleDetail(context, item),
-      child: Container(
-        key: ValueKey('home-recent-${item.id}'),
-        constraints: const BoxConstraints(minHeight: 86),
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: _packLoxRaisedSurfaceColor(colorScheme),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: PortfolioThumbnail(imagePath: item.imagePath, size: 64),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                      height: 1.12,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Added ${_formatRelativeTime(item.createdAt)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            SizedBox(
-              width: 74,
-              child: Text(
-                _formatItemValue(item),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: textTheme.labelLarge?.copyWith(
-                  color: _hasDisplayValue(item)
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GroundedInsightCard extends StatelessWidget {
-  const _GroundedInsightCard({required this.data});
-
-  final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final count = data.unvaluedCount;
-
-    return Container(
-      key: const ValueKey('home-grounded-insight'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: _packLoxRaisedSurfaceColor(colorScheme),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: _packLoxSurfaceBorderColor(colorScheme)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(
-              '$count ${count == 1 ? 'collectible still needs' : 'collectibles still need'} a valuation',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Color _packLoxRaisedSurfaceColor(ColorScheme colorScheme) {
-  return PackLoxTokens.surfaceRaised.withValues(
-    alpha: colorScheme.brightness == Brightness.dark ? 0.94 : 0.90,
-  );
-}
-
-Color _packLoxSurfaceBorderColor(ColorScheme colorScheme) {
-  return PackLoxTokens.border.withValues(
-    alpha: colorScheme.brightness == Brightness.dark ? 0.82 : 0.68,
-  );
 }
 
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
@@ -931,13 +351,6 @@ bool _hasDisplayValue(CollectibleItem item) {
       item.valuationStatus == ValuationStatus.aiEstimated;
 }
 
-String _formatItemValue(CollectibleItem item) {
-  if (!_hasDisplayValue(item)) {
-    return 'Value unavailable';
-  }
-  return _formatCurrency(item.estimatedValue);
-}
-
 String _formatCurrency(double value) {
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
@@ -945,32 +358,4 @@ String _formatCurrency(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
-}
-
-int _categoryCount(CollectorDashboardAnalytics insights) {
-  return insights.categoryDistribution.values
-      .where((count) => count > 0)
-      .length;
-}
-
-String _formatRelativeTime(DateTime date, {DateTime? now}) {
-  final reference = now ?? DateTime.now();
-  final difference = reference.difference(date);
-  if (difference.inMinutes < 1) {
-    return 'just now';
-  }
-  if (difference.inMinutes < 60) {
-    return '${difference.inMinutes}m ago';
-  }
-  if (_isSameDay(date, reference)) {
-    return 'today';
-  }
-  if (_isSameDay(date, reference.subtract(const Duration(days: 1)))) {
-    return 'yesterday';
-  }
-  return '${difference.inDays}d ago';
-}
-
-bool _isSameDay(DateTime a, DateTime b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
 }
