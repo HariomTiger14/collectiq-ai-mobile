@@ -50,11 +50,12 @@ class HomeBrandLockup extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SvgPicture.asset(
-          PackLoxAssets.emblem,
+        Image.asset(
+          PackLoxAssets.brandV2Emblem,
           key: const ValueKey('home-brand-emblem'),
           width: 42,
           height: 42,
+          filterQuality: FilterQuality.high,
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -701,15 +702,12 @@ class HomeEmptyCollectionHero extends StatelessWidget {
                 color: HomeTokens.accent.withValues(alpha: .4),
               ),
             ),
-            child: SvgPicture.asset(
-              key: ValueKey('home-empty-hero-archive-icon'),
-              PackLoxAssets.emblem,
-              width: 30,
-              height: 30,
-              colorFilter: const ColorFilter.mode(
-                HomeTokens.accent,
-                BlendMode.srcIn,
-              ),
+            child: Image.asset(
+              PackLoxAssets.brandV2Emblem,
+              key: const ValueKey('home-empty-hero-archive-icon'),
+              width: 34,
+              height: 34,
+              filterQuality: FilterQuality.high,
             ),
           ),
           const SizedBox(height: 8),

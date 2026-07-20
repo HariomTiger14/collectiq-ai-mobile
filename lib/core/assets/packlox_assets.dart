@@ -2,6 +2,8 @@ class PackLoxAssets {
   const PackLoxAssets._();
 
   static const emblem = 'assets/packlox/brand/packlox_emblem_layered_v1.svg';
+  static const brandV2Emblem =
+      'assets/packlox/brand/packlox_brand_v2_emblem_authority_v0_7.png';
 
   static const navHome =
       'assets/packlox/icons/navigation/packlox_icon_nav_home_v1.svg';
@@ -26,6 +28,7 @@ class PackLoxAssets {
 
   static const all = [
     emblem,
+    brandV2Emblem,
     navHome,
     navPortfolio,
     navScan,

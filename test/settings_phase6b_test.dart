@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/config/app_environment.dart';
+import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
@@ -139,11 +141,46 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testWidgets('Home State Preview is hidden in production settings', (
+    tester,
+  ) async {
+    await tester.pumpSettings(
+      environmentConfig: const EnvironmentConfig(
+        environment: AppEnvironment.prod,
+      ),
+    );
+
+    expect(find.text('Home State Preview'), findsNothing);
+  });
+
+  testWidgets('Home State Preview opens from SIT developer surfaces', (
+    tester,
+  ) async {
+    await tester.pumpSettings(
+      environmentConfig: const EnvironmentConfig(
+        environment: AppEnvironment.sit,
+      ),
+    );
+
+    await tester.revealText('Home State Preview');
+    expect(find.text('Home State Preview'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('settings-home-state-preview')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home State Preview'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('home-preview-scenario-picker')),
+      findsOneWidget,
+    );
+  });
 }
 
 extension on WidgetTester {
   Future<void> pumpSettings({
     AuthRepository? repository,
+    EnvironmentConfig? environmentConfig,
     ThemeMode themeMode = ThemeMode.dark,
     MediaQueryData? mediaQueryData,
   }) async {
@@ -153,6 +190,8 @@ extension on WidgetTester {
     await pumpWidget(
       ProviderScope(
         overrides: [
+          if (environmentConfig != null)
+            environmentConfigProvider.overrideWithValue(environmentConfig),
           authRepositoryProvider.overrideWithValue(
             repository ?? _SettingsAuthRepository(),
           ),

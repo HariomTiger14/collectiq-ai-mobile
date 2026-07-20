@@ -18,6 +18,7 @@ import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart'
 import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
+import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
@@ -1540,6 +1541,16 @@ class _DeveloperToolsSection extends StatelessWidget {
               trailing: diagnostics.appMode,
             ),
             const SizedBox(height: AppSpacing.lg),
+            _SettingsRow(
+              key: const ValueKey('settings-home-state-preview'),
+              icon: Icons.dashboard_customize_outlined,
+              title: 'Home State Preview',
+              subtitle: 'Design QA states use mocked local data only.',
+              trailing: 'Open',
+              onTap: () =>
+                  Navigator.of(context).push(HomeStatePreviewScreen.route()),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             Theme(
               data: Theme.of(context).copyWith(
                 dividerColor: Colors.transparent,
@@ -1710,6 +1721,7 @@ class _DeveloperToolsSection extends StatelessWidget {
 
 class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
+    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

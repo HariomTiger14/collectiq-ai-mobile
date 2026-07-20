@@ -10,12 +10,139 @@ import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+enum HomePreviewScenario {
+  empty('Empty/new collector'),
+  defaultData('Default/signed-in'),
+  loading('Loading'),
+  error('Error/retry'),
+  partial('Partial/syncing'),
+  guest('Guest fallback');
+
+  const HomePreviewScenario(this.label);
+
+  final String label;
+
+  String get subtitle {
+    return switch (this) {
+      HomePreviewScenario.empty => 'No saved items and no fake metrics.',
+      HomePreviewScenario.defaultData => 'Representative local QA data only.',
+      HomePreviewScenario.loading => 'Skeleton state without sample values.',
+      HomePreviewScenario.error => 'Retry state without backend calls.',
+      HomePreviewScenario.partial => 'Real items with pending valuations.',
+      HomePreviewScenario.guest => 'Conditional guest fallback surface.',
+    };
+  }
+
+  PortfolioState get portfolioState {
+    return switch (this) {
+      HomePreviewScenario.empty => const PortfolioState(),
+      HomePreviewScenario.defaultData => PortfolioState(
+        items: _previewItems(includeUnvalued: false),
+      ),
+      HomePreviewScenario.loading => const PortfolioState(isLoading: true),
+      HomePreviewScenario.error => const PortfolioState(
+        errorMessage: 'Unable to load portfolio.',
+      ),
+      HomePreviewScenario.partial => PortfolioState(
+        items: _previewItems(includeUnvalued: true),
+      ),
+      HomePreviewScenario.guest => const PortfolioState(),
+    };
+  }
+}
+
+class HomeStatePreviewScreen extends StatefulWidget {
+  const HomeStatePreviewScreen({super.key});
+
+  static Route<void> route() {
+    return MaterialPageRoute<void>(
+      builder: (_) => const HomeStatePreviewScreen(),
+      settings: const RouteSettings(name: 'home-state-preview'),
+    );
+  }
+
+  @override
+  State<HomeStatePreviewScreen> createState() => _HomeStatePreviewScreenState();
+}
+
+class _HomeStatePreviewScreenState extends State<HomeStatePreviewScreen> {
+  HomePreviewScenario _scenario = HomePreviewScenario.empty;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: AppTheme.dark,
+      child: Scaffold(
+        backgroundColor: HomeTokens.background,
+        appBar: AppBar(
+          title: const Text('Home State Preview'),
+          backgroundColor: HomeTokens.background,
+          foregroundColor: HomeTokens.textPrimary,
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<HomePreviewScenario>(
+                    key: const ValueKey('home-preview-scenario-picker'),
+                    initialValue: _scenario,
+                    dropdownColor: HomeTokens.surfaceRaised,
+                    decoration: const InputDecoration(
+                      labelText: 'Preview state',
+                    ),
+                    items: [
+                      for (final scenario in HomePreviewScenario.values)
+                        DropdownMenuItem(
+                          value: scenario,
+                          child: Text(scenario.label),
+                        ),
+                    ],
+                    onChanged: (scenario) {
+                      if (scenario != null) {
+                        setState(() => _scenario = scenario);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    _scenario.subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: HomeTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: HomePage(
+                previewScenario: _scenario,
+                onScanPressed: () {},
+                onSampleScanPressed: () {},
+                onPortfolioPressed: () {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     this.onScanPressed,
     this.onSampleScanPressed,
     this.onImportPhotoPressed,
     this.onPortfolioPressed,
+    this.previewScenario,
     super.key,
   });
 
@@ -23,6 +150,7 @@ class HomePage extends ConsumerStatefulWidget {
   final VoidCallback? onSampleScanPressed;
   final VoidCallback? onImportPhotoPressed;
   final VoidCallback? onPortfolioPressed;
+  final HomePreviewScenario? previewScenario;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
@@ -53,8 +181,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final portfolio = ref.watch(portfolioControllerProvider);
-    final portfolioController = ref.read(portfolioControllerProvider.notifier);
+    final isPreview = widget.previewScenario != null;
+    final portfolio = isPreview
+        ? widget.previewScenario!.portfolioState
+        : ref.watch(portfolioControllerProvider);
+    final portfolioController = isPreview
+        ? null
+        : ref.read(portfolioControllerProvider.notifier);
     final homeData = _HomeViewData.fromInsights(
       const CollectorDashboardAnalyticsService().build(portfolio.orderedItems),
     );
@@ -90,7 +223,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   topPadding: AppSpacing.xl,
                   child: HomeErrorPanel(
                     message: portfolio.errorMessage!,
-                    onRetry: portfolioController.loadItems,
+                    onRetry: portfolioController?.loadItems,
                   ),
                 )
               else if (homeData.isEmpty) ...[
@@ -358,4 +491,77 @@ String _formatCurrency(double value) {
     (match) => ',',
   );
   return '\$$withCommas';
+}
+
+List<CollectibleItem> _previewItems({required bool includeUnvalued}) {
+  final now = DateTime(2026, 7, 20, 12);
+  final items = [
+    _previewItem(
+      id: 'preview-card',
+      title: 'Preview Charizard',
+      category: 'Trading Card',
+      value: 1850,
+      condition: 'Near Mint',
+      createdAt: now,
+      valuationStatus: ValuationStatus.marketEstimated,
+    ),
+    _previewItem(
+      id: 'preview-coin',
+      title: 'Preview Silver Eagle',
+      category: 'Coin',
+      value: 300,
+      condition: 'Mint',
+      createdAt: now.subtract(const Duration(days: 1)),
+      valuationStatus: ValuationStatus.marketEstimated,
+    ),
+    _previewItem(
+      id: 'preview-comic',
+      title: 'Preview Variant Comic',
+      category: 'Comic',
+      value: 125,
+      condition: 'Very Fine',
+      createdAt: now.subtract(const Duration(days: 2)),
+      valuationStatus: ValuationStatus.marketEstimated,
+    ),
+  ];
+
+  if (includeUnvalued) {
+    items.add(
+      _previewItem(
+        id: 'preview-pending',
+        title: 'Preview Pending Figure',
+        category: 'Figure',
+        value: 0,
+        condition: 'Excellent',
+        createdAt: now.subtract(const Duration(days: 3)),
+        valuationStatus: ValuationStatus.unavailable,
+      ),
+    );
+  }
+
+  return items;
+}
+
+CollectibleItem _previewItem({
+  required String id,
+  required String title,
+  required String category,
+  required double value,
+  required String condition,
+  required DateTime createdAt,
+  required ValuationStatus valuationStatus,
+}) {
+  return CollectibleItem(
+    id: id,
+    title: title,
+    category: category,
+    estimatedValue: value,
+    confidence: 0.92,
+    condition: condition,
+    recommendation: 'Preview-only design QA data.',
+    imagePath: 'sample://$id',
+    createdAt: createdAt,
+    valuationStatus: valuationStatus,
+    valuationSource: 'preview',
+  );
 }

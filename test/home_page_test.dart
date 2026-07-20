@@ -11,7 +11,6 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -249,13 +248,61 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pump(const Duration(milliseconds: 120));
 
-    final emblem = tester.widget<SvgPicture>(
+    final emblem = tester.widget<Image>(
       find.byKey(const ValueKey('home-brand-emblem')),
     );
+    expect((emblem.image as AssetImage).assetName, PackLoxAssets.brandV2Emblem);
+    expect(PackLoxAssets.brandV2Emblem, isNot(PackLoxAssets.emblem));
+  });
+
+  testWidgets('Home State Preview exposes the scenario picker', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HomeStatePreviewScreen()));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.text('Home State Preview'), findsOneWidget);
+    expect(find.text('Empty/new collector'), findsOneWidget);
     expect(
-      (emblem.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.emblem,
+      find.byKey(const ValueKey('home-preview-scenario-picker')),
+      findsOneWidget,
     );
+    expect(find.text('Your collection is waiting'), findsOneWidget);
+    expect(find.text('Collection value'), findsNothing);
+  });
+
+  testWidgets('Home preview scenarios render every mocked state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.defaultData));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.text('Collection value'), findsOneWidget);
+    expect(find.text('\$2,275'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
+
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.loading));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byKey(const ValueKey('home-loading-skeleton')), findsOneWidget);
+    expect(find.text('\$18.4K'), findsNothing);
+
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.error));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byKey(const ValueKey('home-error-panel')), findsOneWidget);
+    expect(find.text('Unable to load portfolio.'), findsOneWidget);
+
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.partial));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-action-partial-valuation')),
+    );
+    expect(
+      find.byKey(const ValueKey('home-action-partial-valuation')),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.guest));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 }
 
@@ -280,6 +327,19 @@ Widget _homeApp({
         onImportPhotoPressed: onImportPhotoPressed,
         onPortfolioPressed: onPortfolioPressed,
       ),
+    ),
+  );
+}
+
+Widget _previewHomeApp(HomePreviewScenario scenario) {
+  return MaterialApp(
+    theme: AppTheme.light,
+    darkTheme: AppTheme.dark,
+    home: HomePage(
+      previewScenario: scenario,
+      onScanPressed: () {},
+      onSampleScanPressed: () {},
+      onPortfolioPressed: () {},
     ),
   );
 }
