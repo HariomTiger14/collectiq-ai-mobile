@@ -154,7 +154,7 @@ void main() {
     expect(find.text('Home State Preview'), findsNothing);
   });
 
-  testWidgets('Home State Preview opens from SIT developer surfaces', (
+  testWidgets('Home State Preview opens selector from SIT developer surfaces', (
     tester,
   ) async {
     await tester.pumpSettings(
@@ -170,9 +170,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Home State Preview'), findsWidgets);
+    expect(find.text('Empty/new collector'), findsOneWidget);
+    expect(find.text('Default/signed-in'), findsOneWidget);
+    await tester.revealText('Clear preview / return to real data');
+    expect(find.text('Clear preview / return to real data'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-preview-scenario-picker')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 }

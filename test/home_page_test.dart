@@ -255,18 +255,28 @@ void main() {
     expect(PackLoxAssets.brandV2Emblem, isNot(PackLoxAssets.emblem));
   });
 
-  testWidgets('Home State Preview exposes the scenario picker', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: HomeStatePreviewScreen()));
+  testWidgets('Home State Preview lists states without a visible dropdown', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: HomeStatePreviewScreen())),
+    );
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('Home State Preview'), findsOneWidget);
     expect(find.text('Empty/new collector'), findsOneWidget);
+    expect(find.text('Default/signed-in'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('home-preview-scenario-picker')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Your collection is waiting'), findsOneWidget);
-    expect(find.text('Collection value'), findsNothing);
+    expect(
+      find.byType(DropdownButtonFormField<HomePreviewScenario>),
+      findsNothing,
+    );
+
+    await _revealInScrollable(tester, 'Clear preview / return to real data');
+    expect(find.text('Clear preview / return to real data'), findsOneWidget);
   });
 
   testWidgets('Home preview scenarios render every mocked state', (
@@ -274,6 +284,10 @@ void main() {
   ) async {
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.defaultData));
     await tester.pump(const Duration(milliseconds: 120));
+    expect(
+      find.byKey(const ValueKey('home-preview-scenario-picker')),
+      findsNothing,
+    );
     expect(find.text('Collection value'), findsOneWidget);
     expect(find.text('\$2,275'), findsOneWidget);
     expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
@@ -356,6 +370,19 @@ Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
   }
   await tester.pump(const Duration(milliseconds: 120));
+}
+
+Future<void> _revealInScrollable(WidgetTester tester, String text) async {
+  final scrollable = find.byType(Scrollable).first;
+  for (var attempt = 0; attempt < 8; attempt += 1) {
+    if (find.text(text).evaluate().isNotEmpty) {
+      await tester.ensureVisible(find.text(text).first);
+      await tester.pump();
+      return;
+    }
+    await tester.drag(scrollable, const Offset(0, -260));
+    await tester.pump(const Duration(milliseconds: 120));
+  }
 }
 
 void _seedPortfolio(List<Map<String, Object?>> items) {

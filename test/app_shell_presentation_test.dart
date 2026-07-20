@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/config/app_environment.dart';
+import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
@@ -25,12 +27,15 @@ void main() {
       find.byKey(const ValueKey('shell-destination-home')),
       findsOneWidget,
     );
-    expect(find.text('Your collection is waiting'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('shell-destination-portfolio')),
       findsNothing,
     );
     expect(find.byKey(const ValueKey('shell-destination-scan')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('shell-destination-search')),
+      findsNothing,
+    );
     expect(
       find.byKey(const ValueKey('shell-destination-settings')),
       findsNothing,
@@ -42,16 +47,26 @@ void main() {
     expect(navigation.currentIndex, AppShellTabController.homeTab);
   });
 
-  testWidgets('primary destinations are present once and no extras are added', (
+  testWidgets('primary destinations follow F62 five item order', (
     tester,
   ) async {
     await tester.pumpShell();
 
+    final navigation = tester.widget<GlassBottomNavBar>(
+      find.byKey(const ValueKey('bottom-navigation')),
+    );
+    expect(navigation.items.map((item) => item.label), [
+      'Home',
+      'Scan',
+      'Portfolio',
+      'Search',
+      'Settings',
+    ]);
     expect(find.byKey(const ValueKey('nav-home')), findsOneWidget);
-    expect(find.byKey(const ValueKey('nav-portfolio')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav-scan')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-portfolio')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-search')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav-settings')), findsOneWidget);
-    expect(find.text('Search'), findsNothing);
     expect(find.text('Notifications'), findsNothing);
     expect(find.text('Sign in'), findsNothing);
   });
@@ -60,13 +75,6 @@ void main() {
     'selecting each destination displays the existing feature screen',
     (tester) async {
       await tester.pumpShell();
-
-      await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
-      await tester.pumpTabSwitch();
-      expect(
-        find.byKey(const ValueKey('shell-destination-portfolio')),
-        findsOneWidget,
-      );
 
       await tester.tap(find.byKey(const ValueKey('nav-scan')));
       await tester.pumpTabSwitch();
@@ -78,6 +86,21 @@ void main() {
         find.byKey(const ValueKey('scan-hub-capture-button')),
         findsOneWidget,
       );
+
+      await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
+      await tester.pumpTabSwitch();
+      expect(
+        find.byKey(const ValueKey('shell-destination-portfolio')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('nav-search')));
+      await tester.pumpTabSwitch();
+      expect(
+        find.byKey(const ValueKey('shell-destination-search')),
+        findsOneWidget,
+      );
+      expect(find.text('Search is being prepared.'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('nav-settings')));
       await tester.pumpTabSwitch();
@@ -119,6 +142,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
     await tester.tap(find.byKey(const ValueKey('nav-scan')));
+    await tester.tap(find.byKey(const ValueKey('nav-search')));
     await tester.tap(find.byKey(const ValueKey('nav-settings')));
     await tester.tap(find.byKey(const ValueKey('nav-home')));
     await tester.pumpTabSwitch();
@@ -148,7 +172,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('shell-destination-scan')), findsNothing);
     expect(find.byKey(const ValueKey('scan-hub-capture-button')), findsNothing);
-    expect(find.text('Your collection is waiting'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('shell-destination-home')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('selected semantics are announced by shell navigation', (
@@ -162,6 +189,53 @@ void main() {
     final semantics = tester.getSemantics(find.bySemanticsLabel('Scan'));
     expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
   });
+
+  testWidgets(
+    'Settings Home preview selection returns to Home with nav visible',
+    (tester) async {
+      await tester.pumpShell(
+        environmentConfig: const EnvironmentConfig(
+          environment: AppEnvironment.sit,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('nav-settings')));
+      await tester.pumpTabSwitch();
+      await tester.revealText('Home State Preview');
+      await tester.tap(
+        find.byKey(const ValueKey('settings-home-state-preview')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home State Preview'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('home-preview-scenario-picker')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('home-action-preview-defaultData')),
+      );
+      await tester.pumpAndSettle();
+
+      final navigation = tester.widget<GlassBottomNavBar>(
+        find.byKey(const ValueKey('bottom-navigation')),
+      );
+      expect(navigation.currentIndex, AppShellTabController.homeTab);
+      expect(
+        find.byKey(const ValueKey('shell-destination-home')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+      await tester.revealText('Collection value');
+      expect(find.text('Collection value'), findsOneWidget);
+      expect(find.text('\$2,275'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('home-preview-scenario-picker')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('light and dark shell navigation render without overflow', (
     tester,
@@ -223,6 +297,7 @@ void main() {
 extension _ShellPump on WidgetTester {
   Future<void> pumpShell({
     ThemeMode themeMode = ThemeMode.light,
+    EnvironmentConfig? environmentConfig,
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewPadding = EdgeInsets.zero,
@@ -230,6 +305,8 @@ extension _ShellPump on WidgetTester {
     await pumpWidget(
       ProviderScope(
         overrides: [
+          if (environmentConfig != null)
+            environmentConfigProvider.overrideWithValue(environmentConfig),
           onboardingRepositoryProvider.overrideWithValue(
             const _ImmediateOnboardingRepository(completed: true),
           ),
@@ -253,6 +330,20 @@ extension _ShellPump on WidgetTester {
   Future<void> pumpTabSwitch() async {
     await pump();
     await pump(const Duration(milliseconds: 180));
+  }
+
+  Future<void> revealText(String text) async {
+    final scrollable = find.byType(Scrollable).first;
+    for (var attempt = 0; attempt < 24; attempt += 1) {
+      if (find.text(text).evaluate().isNotEmpty) {
+        await ensureVisible(find.text(text).first);
+        await pump();
+        return;
+      }
+      await drag(scrollable, const Offset(0, -320));
+      await pump();
+    }
+    fail('Could not reveal "$text" in AppShell.');
   }
 
   Future<void> pumpNavigationOnly({
@@ -281,6 +372,13 @@ extension _ShellPump on WidgetTester {
                 isActive: false,
               ),
               NavBarItem(
+                key: ValueKey('nav-scan'),
+                icon: Icons.camera_alt_outlined,
+                selectedIcon: Icons.camera_alt_rounded,
+                label: 'Scan',
+                isActive: false,
+              ),
+              NavBarItem(
                 key: ValueKey('nav-portfolio'),
                 icon: Icons.inventory_2_outlined,
                 selectedIcon: Icons.inventory_2_rounded,
@@ -288,10 +386,10 @@ extension _ShellPump on WidgetTester {
                 isActive: false,
               ),
               NavBarItem(
-                key: ValueKey('nav-scan'),
-                icon: Icons.camera_alt_outlined,
-                selectedIcon: Icons.camera_alt_rounded,
-                label: 'Scan',
+                key: ValueKey('nav-search'),
+                icon: Icons.search_outlined,
+                selectedIcon: Icons.search_rounded,
+                label: 'Search',
                 isActive: false,
               ),
               NavBarItem(

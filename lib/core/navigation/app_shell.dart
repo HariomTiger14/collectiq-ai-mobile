@@ -17,6 +17,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.da
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
+import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -131,14 +132,6 @@ class _AppShellState extends ConsumerState<AppShell>
       ),
     ),
     AppShellDestination(
-      index: AppShellTabController.portfolioTab,
-      label: 'Portfolio',
-      icon: Icons.inventory_2_outlined,
-      selectedIcon: Icons.inventory_2_rounded,
-      iconAsset: PackLoxAssets.navPortfolio,
-      builder: (_) => PortfolioScreen(onScanPressed: _startNewScan),
-    ),
-    AppShellDestination(
       index: AppShellTabController.scanTab,
       label: 'Scan',
       icon: Icons.camera_alt_outlined,
@@ -150,6 +143,21 @@ class _AppShellState extends ConsumerState<AppShell>
           reason: 'scan-view-portfolio',
         ),
       ),
+    ),
+    AppShellDestination(
+      index: AppShellTabController.portfolioTab,
+      label: 'Portfolio',
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2_rounded,
+      iconAsset: PackLoxAssets.navPortfolio,
+      builder: (_) => PortfolioScreen(onScanPressed: _startNewScan),
+    ),
+    const AppShellDestination(
+      index: AppShellTabController.searchTab,
+      label: 'Search',
+      icon: Icons.search_outlined,
+      selectedIcon: Icons.search_rounded,
+      builder: _buildSearchDestination,
     ),
     const AppShellDestination(
       index: AppShellTabController.settingsTab,
@@ -163,6 +171,10 @@ class _AppShellState extends ConsumerState<AppShell>
 
   static Widget _buildSettingsDestination(BuildContext context) {
     return const SettingsScreen();
+  }
+
+  static Widget _buildSearchDestination(BuildContext context) {
+    return const SearchScreen();
   }
 
   AppShellDestination _destinationFor(int index) {

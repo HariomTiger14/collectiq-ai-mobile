@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -51,7 +52,21 @@ enum HomePreviewScenario {
   }
 }
 
-class HomeStatePreviewScreen extends StatefulWidget {
+final homePreviewScenarioProvider =
+    NotifierProvider<HomePreviewScenarioController, HomePreviewScenario?>(
+      HomePreviewScenarioController.new,
+    );
+
+class HomePreviewScenarioController extends Notifier<HomePreviewScenario?> {
+  @override
+  HomePreviewScenario? build() => null;
+
+  void select(HomePreviewScenario? scenario) {
+    state = scenario;
+  }
+}
+
+class HomeStatePreviewScreen extends ConsumerWidget {
   const HomeStatePreviewScreen({super.key});
 
   static Route<void> route() {
@@ -62,14 +77,8 @@ class HomeStatePreviewScreen extends StatefulWidget {
   }
 
   @override
-  State<HomeStatePreviewScreen> createState() => _HomeStatePreviewScreenState();
-}
-
-class _HomeStatePreviewScreenState extends State<HomeStatePreviewScreen> {
-  HomePreviewScenario _scenario = HomePreviewScenario.empty;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedScenario = ref.watch(homePreviewScenarioProvider);
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
@@ -79,59 +88,90 @@ class _HomeStatePreviewScreenState extends State<HomeStatePreviewScreen> {
           backgroundColor: HomeTokens.background,
           foregroundColor: HomeTokens.textPrimary,
         ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.sm,
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              Text(
+                'Choose a local Home state to preview in the app shell.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  height: 1.35,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<HomePreviewScenario>(
-                    key: const ValueKey('home-preview-scenario-picker'),
-                    initialValue: _scenario,
-                    dropdownColor: HomeTokens.surfaceRaised,
-                    decoration: const InputDecoration(
-                      labelText: 'Preview state',
-                    ),
-                    items: [
-                      for (final scenario in HomePreviewScenario.values)
-                        DropdownMenuItem(
-                          value: scenario,
-                          child: Text(scenario.label),
-                        ),
-                    ],
-                    onChanged: (scenario) {
-                      if (scenario != null) {
-                        setState(() => _scenario = scenario);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    _scenario.subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: HomeTokens.textSecondary,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: AppSpacing.lg),
+              for (final scenario in HomePreviewScenario.values) ...[
+                _HomePreviewScenarioTile(
+                  scenario: scenario,
+                  isSelected: selectedScenario == scenario,
+                  onTap: () => _selectScenario(context, ref, scenario),
+                ),
+                const SizedBox(height: HomeTokens.cardGap),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              _HomePreviewClearTile(
+                isSelected: selectedScenario == null,
+                onTap: () => _selectScenario(context, ref, null),
               ),
-            ),
-            Expanded(
-              child: HomePage(
-                previewScenario: _scenario,
-                onScanPressed: () {},
-                onSampleScanPressed: () {},
-                onPortfolioPressed: () {},
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  void _selectScenario(
+    BuildContext context,
+    WidgetRef ref,
+    HomePreviewScenario? scenario,
+  ) {
+    ref.read(homePreviewScenarioProvider.notifier).select(scenario);
+    ref
+        .read(appShellTabControllerProvider.notifier)
+        .selectTab(AppShellTabController.homeTab, reason: 'home-preview');
+    Navigator.of(context).pop();
+  }
+}
+
+class _HomePreviewScenarioTile extends StatelessWidget {
+  const _HomePreviewScenarioTile({
+    required this.scenario,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final HomePreviewScenario scenario;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeActionRow(
+      keySeed: 'preview-${scenario.name}',
+      icon: isSelected ? Icons.check_circle_rounded : Icons.visibility_outlined,
+      title: scenario.label,
+      subtitle: scenario.subtitle,
+      iconColor: isSelected ? HomeTokens.positive : HomeTokens.accent,
+      onTap: onTap,
+    );
+  }
+}
+
+class _HomePreviewClearTile extends StatelessWidget {
+  const _HomePreviewClearTile({required this.isSelected, required this.onTap});
+
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeActionRow(
+      keySeed: 'preview-clear',
+      icon: isSelected ? Icons.check_circle_rounded : Icons.restart_alt_rounded,
+      title: 'Clear preview / return to real data',
+      subtitle: 'Use the live local portfolio state again.',
+      iconColor: isSelected ? HomeTokens.positive : HomeTokens.warning,
+      onTap: onTap,
     );
   }
 }
@@ -181,9 +221,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final isPreview = widget.previewScenario != null;
+    final activePreviewScenario =
+        widget.previewScenario ?? ref.watch(homePreviewScenarioProvider);
+    final isPreview = activePreviewScenario != null;
     final portfolio = isPreview
-        ? widget.previewScenario!.portfolioState
+        ? activePreviewScenario.portfolioState
         : ref.watch(portfolioControllerProvider);
     final portfolioController = isPreview
         ? null
