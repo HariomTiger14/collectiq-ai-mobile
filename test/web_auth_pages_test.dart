@@ -23,8 +23,8 @@ void main() {
       final supabaseService = File(
         'lib/core/supabase/supabase_service.dart',
       ).readAsStringSync();
-      final appIcon = File(
-        'web/assets/brand/packlox_app_icon.png',
+      final authorityEmblem = File(
+        'web/assets/brand/packlox_emblem_authority.png',
       ).readAsBytesSync();
 
       expect(
@@ -60,11 +60,11 @@ void main() {
       expect(html, contains('Reset your password'));
       expect(html, contains('Password updated successfully'));
       expect(html, contains('PACKLOX_RESET_PAGE_VERSION'));
-      expect(html, contains('20260720-app-icon-logo-fix'));
+      expect(html, contains('20260720-authority-emblem-fix'));
       expect(
         html,
         contains(
-          '/auth/reset-password/styles.css?v=20260720-app-icon-logo-fix',
+          '/auth/reset-password/styles.css?v=20260720-authority-emblem-fix',
         ),
       );
       expect(
@@ -76,13 +76,14 @@ void main() {
       expect(
         html,
         contains(
-          '/assets/brand/packlox_app_icon.png?v=20260720-app-icon-logo-fix',
+          '/assets/brand/packlox_emblem_authority.png?v=20260720-authority-emblem-fix',
         ),
       );
       expect(html, contains('class="brand-icon"'));
       expect(html, contains('class="brand-name"'));
       expect(html, contains('class="brand-name-accent"'));
       expect(html, isNot(contains('/assets/brand/packlox_emblem.svg')));
+      expect(html, isNot(contains('/assets/brand/packlox_app_icon.png')));
       expect(html, isNot(contains('/assets/brand/packlox_logo_authority.svg')));
       expect(html, isNot(contains('/assets/brand/packlox_logo_latest.png')));
       expect(
@@ -119,7 +120,16 @@ void main() {
       expect(styles, isNot(contains('brand-emblem')));
       expect(styles, isNot(contains('brand-wordmark')));
       expect(styles, isNot(contains('return-button')));
-      expect(appIcon.take(8).toList(), <int>[137, 80, 78, 71, 13, 10, 26, 10]);
+      expect(authorityEmblem.take(8).toList(), <int>[
+        137,
+        80,
+        78,
+        71,
+        13,
+        10,
+        26,
+        10,
+      ]);
       expect(supabaseBundle, contains('createClient'));
       expect(
         supabaseClient,
