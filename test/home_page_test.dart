@@ -31,9 +31,7 @@ void main() {
     expect(find.text('Pack  Lox'), findsNothing);
     expect(find.text('Home'), findsOneWidget);
     expect(
-      find.text(
-        'Your collection has real saved items, with some values still pending.',
-      ),
+      find.text('Some collection values are still pending.'),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('home-authority-hero')), findsOneWidget);
@@ -176,6 +174,22 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('home-loading-skeleton')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-loading-skeleton-hero-title-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-loading-skeleton-cta')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-loading-skeleton-metric-row')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-loading-skeleton-action-row')),
+      findsOneWidget,
+    );
     expect(find.text('Preparing your collection overview.'), findsOneWidget);
     expect(find.text('Collection value'), findsNothing);
     expect(find.text('\$18.4K'), findsNothing);
@@ -191,8 +205,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.byKey(const ValueKey('home-error-panel')), findsOneWidget);
+    expect(
+      find.text('We could not refresh your collection overview.'),
+      findsOneWidget,
+    );
     expect(find.text('Collection could not load'), findsOneWidget);
-    expect(find.text('Unable to load portfolio.'), findsOneWidget);
+    expect(find.text('Check your connection and try again.'), findsOneWidget);
+    final retryButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('home-retry')),
+    );
+    expect(retryButton.onPressed, isNotNull);
 
     await tester.tap(find.byKey(const ValueKey('home-retry')));
     await tester.pump(const Duration(milliseconds: 120));
@@ -295,12 +317,20 @@ void main() {
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.loading));
     await tester.pump(const Duration(milliseconds: 120));
     expect(find.byKey(const ValueKey('home-loading-skeleton')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-loading-skeleton-cta')),
+      findsOneWidget,
+    );
     expect(find.text('\$18.4K'), findsNothing);
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.error));
     await tester.pump(const Duration(milliseconds: 120));
     expect(find.byKey(const ValueKey('home-error-panel')), findsOneWidget);
-    expect(find.text('Unable to load portfolio.'), findsOneWidget);
+    expect(find.text('Check your connection and try again.'), findsOneWidget);
+    final previewRetryButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('home-retry')),
+    );
+    expect(previewRetryButton.onPressed, isNotNull);
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.partial));
     await tester.pump(const Duration(milliseconds: 120));

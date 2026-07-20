@@ -42,7 +42,7 @@ enum HomePreviewScenario {
       ),
       HomePreviewScenario.loading => const PortfolioState(isLoading: true),
       HomePreviewScenario.error => const PortfolioState(
-        errorMessage: 'Unable to load portfolio.',
+        errorMessage: 'Check your connection and try again.',
       ),
       HomePreviewScenario.partial => PortfolioState(
         items: _previewItems(includeUnvalued: true),
@@ -264,8 +264,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 HomeSection(
                   topPadding: AppSpacing.xl,
                   child: HomeErrorPanel(
-                    message: portfolio.errorMessage!,
-                    onRetry: portfolioController?.loadItems,
+                    message: 'Check your connection and try again.',
+                    onRetry: isPreview ? () {} : portfolioController?.loadItems,
                   ),
                 )
               else if (homeData.isEmpty) ...[
@@ -399,13 +399,13 @@ String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
     return 'Preparing your collection overview.';
   }
   if (portfolio.errorMessage != null && data.isEmpty) {
-    return 'Your collection overview will return after a retry.';
+    return 'We could not refresh your collection overview.';
   }
   if (data.isEmpty) {
     return 'Start your collection with a clear first scan.';
   }
   if (data.hasPartialValuation) {
-    return 'Your collection has real saved items, with some values still pending.';
+    return 'Some collection values are still pending.';
   }
   return 'Your collection overview, recent scans, and next actions.';
 }

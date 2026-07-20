@@ -108,14 +108,21 @@ class NavBarItem extends StatelessWidget {
     final reduceMotion =
         mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
     final duration = reduceMotion ? Duration.zero : PackLoxMotionTheme.fast;
-    final foreground = isActive
+    final isScanAction = label == 'Scan';
+    final foreground = isScanAction
         ? PackLoxTokens.textPrimary
+        : isActive
+        ? PackLoxTokens.cyan
         : PackLoxTokens.textSecondary;
-    final borderColor = isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.72)
+    final borderColor = isScanAction
+        ? PackLoxTokens.cyan.withValues(alpha: 0.64)
+        : isActive
+        ? PackLoxTokens.cyan.withValues(alpha: 0.24)
         : Colors.transparent;
-    final fillColor = isActive
-        ? PackLoxTokens.blue.withValues(alpha: 0.28)
+    final fillColor = isScanAction
+        ? PackLoxTokens.blue.withValues(alpha: isActive ? 1 : 0.86)
+        : isActive
+        ? PackLoxTokens.cyan.withValues(alpha: 0.08)
         : Colors.transparent;
     final effectiveIcon = isActive ? selectedIcon ?? icon : icon;
 
@@ -123,14 +130,25 @@ class NavBarItem extends StatelessWidget {
       duration: duration,
       curve: PackLoxMotionTheme.navStateCurve,
       constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(
+      padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.xs,
-        vertical: AppSpacing.sm,
+        vertical: isScanAction ? AppSpacing.sm : AppSpacing.xs,
       ),
       decoration: BoxDecoration(
         color: fillColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(
+          isScanAction ? AppRadius.xl : AppRadius.lg,
+        ),
         border: Border.all(color: borderColor),
+        boxShadow: isScanAction
+            ? [
+                BoxShadow(
+                  color: PackLoxTokens.blue.withValues(alpha: 0.34),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -138,11 +156,15 @@ class NavBarItem extends StatelessWidget {
         children: [
           ExcludeSemantics(
             child: iconAsset == null
-                ? Icon(effectiveIcon, color: foreground, size: 23)
+                ? Icon(
+                    effectiveIcon,
+                    color: foreground,
+                    size: isScanAction ? 25 : 23,
+                  )
                 : SvgPicture.asset(
                     iconAsset!,
-                    width: 23,
-                    height: 23,
+                    width: isScanAction ? 25 : 23,
+                    height: isScanAction ? 25 : 23,
                     colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
                   ),
           ),
@@ -156,9 +178,11 @@ class NavBarItem extends StatelessWidget {
                 softWrap: false,
                 style: TextStyle(
                   color: foreground,
-                  fontSize: 12,
+                  fontSize: isScanAction ? 12.5 : 12,
                   height: 1.08,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w700,
+                  fontWeight: isScanAction || isActive
+                      ? FontWeight.w800
+                      : FontWeight.w700,
                   letterSpacing: 0,
                 ),
               ),

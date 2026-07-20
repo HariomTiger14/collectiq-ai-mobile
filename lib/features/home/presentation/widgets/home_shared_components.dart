@@ -407,30 +407,141 @@ class HomeSkeletonBlock extends StatelessWidget {
     return Column(
       key: const ValueKey('home-loading-skeleton'),
       children: const [
-        _SkeletonSurface(height: 230),
+        _SkeletonSurface(
+          height: 230,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SkeletonLine(
+                key: ValueKey('home-loading-skeleton-hero-eyebrow'),
+                width: 116,
+                height: 12,
+              ),
+              SizedBox(height: 24),
+              _SkeletonLine(
+                key: ValueKey('home-loading-skeleton-hero-title-1'),
+                width: 246,
+                height: 20,
+              ),
+              SizedBox(height: 10),
+              _SkeletonLine(width: 192, height: 20),
+              SizedBox(height: 18),
+              _SkeletonLine(width: 276, height: 11),
+              SizedBox(height: 8),
+              _SkeletonLine(width: 222, height: 11),
+              Spacer(),
+              _SkeletonPill(
+                key: ValueKey('home-loading-skeleton-cta'),
+                height: 46,
+              ),
+            ],
+          ),
+        ),
         SizedBox(height: HomeTokens.sectionGap),
-        _SkeletonSurface(height: 100),
+        _SkeletonSurface(
+          height: 100,
+          child: Row(
+            children: [
+              _SkeletonPill(width: 48, height: 48),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  key: ValueKey('home-loading-skeleton-metric-row'),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SkeletonLine(width: 154, height: 13),
+                    SizedBox(height: 10),
+                    _SkeletonLine(width: 92, height: 24),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         SizedBox(height: HomeTokens.cardGap),
-        _SkeletonSurface(height: 100),
+        _SkeletonSurface(
+          height: 100,
+          child: Row(
+            children: [
+              _SkeletonPill(width: 48, height: 48),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  key: ValueKey('home-loading-skeleton-action-row'),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SkeletonLine(width: 178, height: 13),
+                    SizedBox(height: 10),
+                    _SkeletonLine(width: 236, height: 11),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 class _SkeletonSurface extends StatelessWidget {
-  const _SkeletonSurface({required this.height});
+  const _SkeletonSurface({required this.height, required this.child});
 
   final double height;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: height,
       width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: HomeTokens.surfaceRaised.withValues(alpha: .62),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: HomeTokens.border.withValues(alpha: .62)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  const _SkeletonLine({required this.width, required this.height, super.key});
+
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: HomeTokens.textSecondary.withValues(alpha: .20),
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+class _SkeletonPill extends StatelessWidget {
+  const _SkeletonPill({this.width, required this.height, super.key});
+
+  final double? width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width ?? double.infinity,
+      height: height,
+      decoration: BoxDecoration(
+        color: HomeTokens.accent.withValues(alpha: .18),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: HomeTokens.accent.withValues(alpha: .20)),
       ),
     );
   }
@@ -480,6 +591,20 @@ class HomeErrorPanel extends StatelessWidget {
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Retry'),
+            style: FilledButton.styleFrom(
+              backgroundColor: HomeTokens.accentStrong,
+              disabledBackgroundColor: HomeTokens.surfaceInteractive,
+              foregroundColor: HomeTokens.textPrimary,
+              disabledForegroundColor: HomeTokens.textMuted,
+              minimumSize: const Size.fromHeight(48),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),
