@@ -302,7 +302,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                         title: 'Try a guided scan',
                         subtitle: 'Use the scanner to capture details clearly.',
                         iconColor: HomeTokens.categoryMore,
-                        onTap: widget.onSampleScanPressed,
+                        onTap:
+                            widget.onSampleScanPressed ??
+                            (widget.onScanPressed == null
+                                ? null
+                                : _handleScanPressed),
                       ),
                       const HomeActionRow(
                         keySeed: 'supported-categories',
@@ -425,6 +429,9 @@ class _MetricGrid extends StatelessWidget {
           supportingText: data.hasPartialValuation
               ? 'Partial valuation'
               : 'Estimated trend',
+          supportingColor: data.hasPartialValuation
+              ? HomeTokens.warning
+              : HomeTokens.positive,
         ),
       HomeMetricTile(
         label: 'Collection items',

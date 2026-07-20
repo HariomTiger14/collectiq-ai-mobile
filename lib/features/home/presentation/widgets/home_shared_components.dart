@@ -254,12 +254,14 @@ class HomeMetricTile extends StatelessWidget {
     required this.label,
     required this.value,
     required this.supportingText,
+    this.supportingColor = HomeTokens.positive,
     super.key,
   });
 
   final String label;
   final String value;
   final String supportingText;
+  final Color supportingColor;
 
   @override
   Widget build(BuildContext context) {
@@ -294,8 +296,11 @@ class HomeMetricTile extends StatelessWidget {
             supportingText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            key: ValueKey(
+              'home-metric-supporting-${label.toLowerCase().replaceAll(' ', '-')}',
+            ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: HomeTokens.positive,
+              color: supportingColor,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -325,6 +330,18 @@ class HomeActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final effectiveIconColor = enabled ? iconColor : HomeTokens.textMuted;
+    final titleColor = enabled
+        ? HomeTokens.textPrimary
+        : HomeTokens.textSecondary.withValues(alpha: .78);
+    final subtitleColor = enabled
+        ? HomeTokens.textSecondary
+        : HomeTokens.textMuted;
+    final borderColor = enabled
+        ? HomeTokens.border
+        : HomeTokens.border.withValues(alpha: .58);
+
     return MotionTapScale(
       onTap: onTap,
       child: Semantics(
@@ -338,9 +355,11 @@ class HomeActionRow extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 84),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: HomeTokens.surfaceRaised,
+            color: enabled
+                ? HomeTokens.surfaceRaised
+                : HomeTokens.surfaceRaised.withValues(alpha: .64),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: HomeTokens.border),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             children: [
@@ -348,10 +367,12 @@ class HomeActionRow extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: .18),
+                  color: effectiveIconColor.withValues(
+                    alpha: enabled ? .18 : .10,
+                  ),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: effectiveIconColor, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -364,7 +385,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: HomeTokens.textPrimary,
+                        color: titleColor,
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
@@ -375,7 +396,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: HomeTokens.textSecondary,
+                        color: subtitleColor,
                         fontWeight: FontWeight.w600,
                         height: 1.22,
                       ),
@@ -386,9 +407,8 @@ class HomeActionRow extends StatelessWidget {
               const SizedBox(width: 10),
               Icon(
                 Icons.chevron_right_rounded,
-                color: onTap == null
-                    ? HomeTokens.textMuted
-                    : const Color(0xFF8BC7FF),
+                key: ValueKey('home-action-$keySeed-chevron'),
+                color: enabled ? const Color(0xFF8BC7FF) : HomeTokens.textMuted,
                 size: 28,
               ),
             ],

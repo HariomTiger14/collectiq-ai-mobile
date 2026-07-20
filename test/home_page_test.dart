@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -87,6 +88,18 @@ void main() {
         find.byKey(const ValueKey('home-action-supported-categories')),
         findsOneWidget,
       );
+      final firstItemChevron = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-action-start-first-item-chevron')),
+      );
+      expect(firstItemChevron.color, const Color(0xFF8BC7FF));
+      final guidedScanChevron = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-action-guided-scan-chevron')),
+      );
+      expect(guidedScanChevron.color, const Color(0xFF8BC7FF));
+      final categoriesChevron = tester.widget<Icon>(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+      );
+      expect(categoriesChevron.color, HomeTokens.textMuted);
       expect(find.text('Collection value'), findsNothing);
       expect(find.text('Collection items'), findsNothing);
       expect(find.text('\$0'), findsNothing);
@@ -99,6 +112,15 @@ void main() {
       await tester.pump();
 
       expect(scanTaps, 1);
+
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-action-guided-scan')),
+      );
+      await tester.tap(find.byKey(const ValueKey('home-action-guided-scan')));
+      await tester.pump();
+
+      expect(scanTaps, 2);
     },
   );
 
@@ -127,6 +149,14 @@ void main() {
       expect(find.text('\$50'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
       expect(find.text('1 valued'), findsOneWidget);
+      final valueSupportingText = tester.widget<Text>(
+        find.byKey(const ValueKey('home-metric-supporting-collection-value')),
+      );
+      expect(valueSupportingText.style?.color, HomeTokens.warning);
+      final itemSupportingText = tester.widget<Text>(
+        find.byKey(const ValueKey('home-metric-supporting-collection-items')),
+      );
+      expect(itemSupportingText.style?.color, HomeTokens.positive);
       await _scrollUntilVisible(
         tester,
         find.byKey(const ValueKey('home-action-partial-valuation')),
