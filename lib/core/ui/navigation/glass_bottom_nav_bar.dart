@@ -20,9 +20,9 @@ class GlassBottomNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final List<NavBarItem> items;
 
-  static const compactHeight = 76.0;
-  static const largeTextHeight = 88.0;
-  static const bottomBreathingGap = 24.0;
+  static const compactHeight = 68.0;
+  static const largeTextHeight = 78.0;
+  static const bottomBreathingGap = 16.0;
 
   static double heightFor(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaler.scale(1);
@@ -30,16 +30,12 @@ class GlassBottomNavBar extends StatelessWidget {
   }
 
   static double scrollContentClearance(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    return heightFor(context) +
-        mediaQuery.padding.bottom +
-        AppSpacing.sm +
-        bottomBreathingGap;
+    return heightFor(context) + AppSpacing.xs + bottomBreathingGap;
   }
 
   static double bodyContentInset(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    return heightFor(context) + mediaQuery.padding.bottom + AppSpacing.sm;
+    return heightFor(context) + mediaQuery.padding.bottom + AppSpacing.xs;
   }
 
   @override
@@ -49,12 +45,7 @@ class GlassBottomNavBar extends StatelessWidget {
     return SafeArea(
       key: const ValueKey('bottom-navigation-safe-area-surface'),
       top: false,
-      minimum: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
+      minimum: const EdgeInsets.fromLTRB(24, 0, 24, 12),
       child: Semantics(
         container: true,
         explicitChildNodes: true,
@@ -67,24 +58,24 @@ class GlassBottomNavBar extends StatelessWidget {
               constraints: BoxConstraints(minHeight: navHeight),
               decoration: BoxDecoration(
                 color: PackLoxTokens.surface.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(AppRadius.xl),
+                borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: PackLoxTokens.cyan.withValues(alpha: 0.28),
+                  color: PackLoxTokens.cyan.withValues(alpha: 0.22),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.34),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
                   ),
                   BoxShadow(
-                    color: PackLoxTokens.blue.withValues(alpha: 0.12),
-                    blurRadius: 28,
-                    offset: const Offset(0, -4),
+                    color: PackLoxTokens.cyan.withValues(alpha: 0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, -2),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Row(
                 children: [
                   for (var index = 0; index < items.length; index++)
@@ -149,24 +140,24 @@ class NavBarItem extends StatelessWidget {
         ? PackLoxTokens.textPrimary
         : PackLoxTokens.textSecondary;
     final borderColor = isScanAction
-        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.72 : 0.42)
+        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.58 : 0.24)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.64)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.38)
         : Colors.transparent;
     final fillColor = isScanAction
-        ? PackLoxTokens.blue.withValues(alpha: isActive ? 1 : 0.16)
+        ? PackLoxTokens.blue.withValues(alpha: isActive ? 0.72 : 0.12)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.16)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.12)
         : Colors.transparent;
     final effectiveIcon = isActive ? selectedIcon ?? icon : icon;
 
     final content = AnimatedContainer(
       duration: duration,
       curve: PackLoxMotionTheme.navStateCurve,
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: const BoxConstraints(minHeight: 48),
       padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: isScanAction ? AppSpacing.sm : AppSpacing.xs,
+        horizontal: isScanAction ? 8 : 6,
+        vertical: isScanAction ? 7 : 5,
       ),
       decoration: BoxDecoration(
         color: fillColor,
@@ -177,9 +168,9 @@ class NavBarItem extends StatelessWidget {
         boxShadow: isScanAction && isActive
             ? [
                 BoxShadow(
-                  color: PackLoxTokens.blue.withValues(alpha: 0.34),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                  color: PackLoxTokens.blue.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ]
             : null,
@@ -193,12 +184,12 @@ class NavBarItem extends StatelessWidget {
                 ? Icon(
                     effectiveIcon,
                     color: foreground,
-                    size: isScanAction ? 25 : 23,
+                    size: isScanAction ? 23 : 21,
                   )
                 : SvgPicture.asset(
                     iconAsset!,
-                    width: isScanAction ? 25 : 23,
-                    height: isScanAction ? 25 : 23,
+                    width: isScanAction ? 23 : 21,
+                    height: isScanAction ? 23 : 21,
                     colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
                   ),
           ),
