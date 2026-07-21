@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -284,7 +285,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               color: HomeTokens.background,
               child: HomeStateContainer(
                 controller: _scrollController,
-                bottomClearance: 140,
+                bottomClearance: GlassBottomNavBar.scrollContentClearance(
+                  context,
+                ),
                 sections: [
                   const HomeSection(child: HomeBrandLockup()),
                   const HomeSection(child: _PortfolioTitleBlock()),

@@ -318,6 +318,7 @@ class HomeActionRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.iconColor = const Color(0xFF8BC7FF),
+    this.informational = false,
     this.onTap,
     super.key,
   });
@@ -327,20 +328,27 @@ class HomeActionRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color iconColor;
+  final bool informational;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    final effectiveIconColor = enabled ? iconColor : HomeTokens.textMuted;
+    final effectiveIconColor = enabled || informational
+        ? iconColor
+        : HomeTokens.textMuted;
     final titleColor = enabled
         ? HomeTokens.textPrimary
+        : informational
+        ? HomeTokens.textPrimary.withValues(alpha: .82)
         : HomeTokens.textSecondary.withValues(alpha: .78);
-    final subtitleColor = enabled
+    final subtitleColor = enabled || informational
         ? HomeTokens.textSecondary
         : HomeTokens.textMuted;
     final borderColor = enabled
         ? HomeTokens.border
+        : informational
+        ? HomeTokens.border.withValues(alpha: .82)
         : HomeTokens.border.withValues(alpha: .58);
 
     return MotionTapScale(
@@ -358,6 +366,8 @@ class HomeActionRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: enabled
                 ? HomeTokens.surfaceRaised
+                : informational
+                ? HomeTokens.surfaceRaised.withValues(alpha: .88)
                 : HomeTokens.surfaceRaised.withValues(alpha: .64),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: borderColor),
@@ -369,7 +379,11 @@ class HomeActionRow extends StatelessWidget {
                 height: 46,
                 decoration: BoxDecoration(
                   color: effectiveIconColor.withValues(
-                    alpha: enabled ? .18 : .10,
+                    alpha: enabled
+                        ? .18
+                        : informational
+                        ? .14
+                        : .10,
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -409,7 +423,11 @@ class HomeActionRow extends StatelessWidget {
               Icon(
                 Icons.chevron_right_rounded,
                 key: ValueKey('home-action-$keySeed-chevron'),
-                color: enabled ? const Color(0xFF8BC7FF) : HomeTokens.textMuted,
+                color: enabled
+                    ? const Color(0xFF8BC7FF)
+                    : informational
+                    ? HomeTokens.textSecondary
+                    : HomeTokens.textMuted,
                 size: 26,
               ),
             ],

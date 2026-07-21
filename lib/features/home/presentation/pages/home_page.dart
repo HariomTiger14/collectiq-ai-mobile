@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
@@ -265,7 +266,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           body: SafeArea(
             child: HomeStateContainer(
               controller: _scrollController,
-              bottomClearance: 104,
+              bottomClearance: GlassBottomNavBar.scrollContentClearance(
+                context,
+              ),
               sections: [
                 HomeSection(
                   topPadding: AppSpacing.sm,
@@ -339,6 +342,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           title: 'Browse supported categories',
                           subtitle: 'Cards, coins, figures, and more.',
                           iconColor: HomeTokens.categoryCoins,
+                          informational: true,
                         ),
                       ],
                     ),

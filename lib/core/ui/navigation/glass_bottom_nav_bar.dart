@@ -18,11 +18,26 @@ class GlassBottomNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final List<NavBarItem> items;
 
+  static const compactHeight = 76.0;
+  static const largeTextHeight = 88.0;
+  static const bottomBreathingGap = 24.0;
+
+  static double heightFor(BuildContext context) {
+    final textScale = MediaQuery.of(context).textScaler.scale(1);
+    return textScale >= 1.6 ? largeTextHeight : compactHeight;
+  }
+
+  static double scrollContentClearance(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return heightFor(context) +
+        mediaQuery.padding.bottom +
+        AppSpacing.sm +
+        bottomBreathingGap;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final textScale = mediaQuery.textScaler.scale(1);
-    final navHeight = textScale >= 1.6 ? 88.0 : 76.0;
+    final navHeight = heightFor(context);
 
     return ColoredBox(
       key: const ValueKey('bottom-navigation-safe-area-surface'),
@@ -110,19 +125,21 @@ class NavBarItem extends StatelessWidget {
     final duration = reduceMotion ? Duration.zero : PackLoxMotionTheme.fast;
     final isScanAction = label == 'Scan';
     final foreground = isScanAction
-        ? PackLoxTokens.textPrimary
+        ? isActive
+              ? PackLoxTokens.textPrimary
+              : PackLoxTokens.cyan
         : isActive
-        ? PackLoxTokens.cyan
+        ? PackLoxTokens.textPrimary
         : PackLoxTokens.textSecondary;
     final borderColor = isScanAction
-        ? PackLoxTokens.cyan.withValues(alpha: 0.64)
+        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.72 : 0.42)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.24)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.64)
         : Colors.transparent;
     final fillColor = isScanAction
-        ? PackLoxTokens.blue.withValues(alpha: isActive ? 1 : 0.86)
+        ? PackLoxTokens.blue.withValues(alpha: isActive ? 1 : 0.16)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.08)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.16)
         : Colors.transparent;
     final effectiveIcon = isActive ? selectedIcon ?? icon : icon;
 
@@ -140,7 +157,7 @@ class NavBarItem extends StatelessWidget {
           isScanAction ? AppRadius.xl : AppRadius.lg,
         ),
         border: Border.all(color: borderColor),
-        boxShadow: isScanAction
+        boxShadow: isScanAction && isActive
             ? [
                 BoxShadow(
                   color: PackLoxTokens.blue.withValues(alpha: 0.34),

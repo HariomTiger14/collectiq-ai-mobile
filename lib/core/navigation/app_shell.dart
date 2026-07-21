@@ -262,7 +262,14 @@ class _AppShellState extends ConsumerState<AppShell>
         child: Scaffold(
           key: const ValueKey('app-shell'),
           backgroundColor: shellBackground,
-          body: _buildActiveDestination(selectedDestination),
+          body: Padding(
+            padding: EdgeInsets.only(
+              bottom: hideBottomNavigation
+                  ? 0
+                  : GlassBottomNavBar.bottomBreathingGap,
+            ),
+            child: _buildActiveDestination(selectedDestination),
+          ),
           bottomNavigationBar: hideBottomNavigation
               ? null
               : _buildBottomNavigationBar(selectedIndex),

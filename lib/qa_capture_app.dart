@@ -185,7 +185,12 @@ class _QaShellFrame extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: PackLoxTokens.background,
-        body: child,
+        body: Padding(
+          padding: EdgeInsets.only(
+            bottom: GlassBottomNavBar.bottomBreathingGap,
+          ),
+          child: child,
+        ),
         bottomNavigationBar: GlassBottomNavBar(
           currentIndex: selectedIndex,
           onTap: (_) {},

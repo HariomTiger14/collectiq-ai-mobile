@@ -99,7 +99,7 @@ void main() {
       final categoriesChevron = tester.widget<Icon>(
         find.byKey(const ValueKey('home-action-supported-categories-chevron')),
       );
-      expect(categoriesChevron.color, HomeTokens.textMuted);
+      expect(categoriesChevron.color, HomeTokens.textSecondary);
       expect(find.text('Collection value'), findsNothing);
       expect(find.text('Collection items'), findsNothing);
       expect(find.text('\$0'), findsNothing);
