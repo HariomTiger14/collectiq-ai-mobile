@@ -10,6 +10,7 @@ import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
+import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -83,7 +84,13 @@ void main() {
         return false;
       };
 
-      runApp(const ProviderScope(child: CollectIqApp()));
+      runApp(
+        const ProviderScope(
+          child: packloxQaCaptureActive
+              ? PackLoxQaCaptureApp()
+              : CollectIqApp(),
+        ),
+      );
     },
     (error, stackTrace) {
       _logStartupError(

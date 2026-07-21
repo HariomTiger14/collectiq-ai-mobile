@@ -10,6 +10,7 @@ import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum _PortfolioSortMode {
@@ -22,6 +23,16 @@ enum _PortfolioSortMode {
   const _PortfolioSortMode({required this.label});
 
   final String label;
+
+  String get compactLabel {
+    return switch (this) {
+      _PortfolioSortMode.newest => 'Recent',
+      _PortfolioSortMode.valueHigh => 'High value',
+      _PortfolioSortMode.valueLow => 'Low value',
+      _PortfolioSortMode.confidence => 'Confidence',
+      _PortfolioSortMode.category => 'Category',
+    };
+  }
 }
 
 enum _PortfolioCategoryFilter {
@@ -187,19 +198,23 @@ class PortfolioStatePreviewScreen extends ConsumerWidget {
 }
 
 class PortfolioScreen extends ConsumerStatefulWidget {
-  const PortfolioScreen({this.onScanPressed, this.previewScenario, super.key});
+  const PortfolioScreen({
+    this.onScanPressed,
+    this.previewScenario,
+    this.qaInitialScrollOffset = 0,
+    super.key,
+  });
 
   final VoidCallback? onScanPressed;
   final PortfolioPreviewScenario? previewScenario;
+  final double qaInitialScrollOffset;
 
   @override
   ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
 }
 
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
-  final ScrollController _scrollController = ScrollController(
-    keepScrollOffset: false,
-  );
+  late final ScrollController _scrollController;
   String _searchQuery = '';
   bool _filteredPreviewCleared = false;
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
@@ -210,6 +225,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.qaInitialScrollOffset,
+      keepScrollOffset: false,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -243,109 +262,128 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final showError =
         portfolioState.errorMessage != null && portfolioState.items.isEmpty;
 
-    return Theme(
-      data: AppTheme.dark,
-      child: Scaffold(
-        key: const ValueKey('portfolio-screen-scaffold'),
-        backgroundColor: HomeTokens.background,
-        body: SafeArea(
-          bottom: false,
-          child: ColoredBox(
-            key: const ValueKey('portfolio-screen-surface'),
-            color: HomeTokens.background,
-            child: HomeStateContainer(
-              controller: _scrollController,
-              bottomClearance: 140,
-              sections: [
-                const HomeSection(child: HomeBrandLockup()),
-                const HomeSection(child: _PortfolioTitleBlock()),
-                if (!showError)
-                  HomeSection(
-                    child: HomeAuthorityHero(
-                      eyebrow: 'Portfolio overview',
-                      title: _heroTitle(
-                        state: portfolioState,
-                        showLoading: showLoading,
-                        isFilteredEmpty: isFilteredEmpty,
-                      ),
-                      body: _heroBody(
-                        state: portfolioState,
-                        showLoading: showLoading,
-                        isFilteredEmpty: isFilteredEmpty,
-                      ),
-                      ctaLabel: _heroCtaLabel(
-                        hasItems: hasItems,
-                        showLoading: showLoading,
-                        isFilteredEmpty: isFilteredEmpty,
-                      ),
-                      icon: isFilteredEmpty
-                          ? Icons.filter_alt_off_outlined
-                          : hasItems
-                          ? Icons.inventory_2_outlined
-                          : Icons.add_a_photo_outlined,
-                      onPressed: showLoading
-                          ? null
-                          : isFilteredEmpty
-                          ? _clearFilters
-                          : widget.onScanPressed,
-                    ),
-                  ),
-                if (showError)
-                  HomeSection(
-                    child: _PortfolioErrorPanel(
-                      errorMessage: portfolioState.errorMessage,
-                      onRetry: isPreview
-                          ? () {}
-                          : portfolioController.loadItems,
-                    ),
-                  )
-                else if (showLoading)
-                  const HomeSection(child: _PortfolioLoadingSkeleton())
-                else ...[
-                  if (hasItems)
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: HomeTokens.background,
+        systemNavigationBarDividerColor: HomeTokens.background,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Theme(
+        data: AppTheme.dark,
+        child: Scaffold(
+          key: const ValueKey('portfolio-screen-scaffold'),
+          backgroundColor: HomeTokens.background,
+          body: SafeArea(
+            bottom: false,
+            child: ColoredBox(
+              key: const ValueKey('portfolio-screen-surface'),
+              color: HomeTokens.background,
+              child: HomeStateContainer(
+                controller: _scrollController,
+                bottomClearance: 140,
+                sections: [
+                  const HomeSection(child: HomeBrandLockup()),
+                  const HomeSection(child: _PortfolioTitleBlock()),
+                  if (!showError)
                     HomeSection(
-                      child: _PortfolioToolbar(
-                        searchQuery: effectiveSearchQuery,
-                        onSearchChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                            _filteredPreviewCleared = true;
-                          });
-                        },
-                        onSearchCleared: _clearSearch,
-                        onSort: () => _showSortSheet(context),
-                        onFilter: () => _showFilterSheet(context),
-                        activeFilterCount: _activeFilterCount,
-                        sortLabel: _sortMode.label,
-                      ),
-                    ),
-                  if (hasItems)
-                    HomeSection(
-                      child: _PortfolioMetrics(
-                        totalValue: _displayTotalValue(portfolioState.items),
-                        itemCount: portfolioState.items.length,
-                        valuedItemCount: _valuedItemCount(portfolioState.items),
-                        pendingItemCount: _pendingItemCount(
-                          portfolioState.items,
+                      child: HomeAuthorityHero(
+                        eyebrow: 'Portfolio overview',
+                        title: _heroTitle(
+                          state: portfolioState,
+                          showLoading: showLoading,
+                          isFilteredEmpty: isFilteredEmpty,
+                          isPartialState:
+                              previewScenario ==
+                              PortfolioPreviewScenario.partial,
                         ),
-                        filteredCount: isFilteredEmpty
-                            ? visibleItems.length
-                            : null,
+                        body: _heroBody(
+                          state: portfolioState,
+                          showLoading: showLoading,
+                          isFilteredEmpty: isFilteredEmpty,
+                          isPartialState:
+                              previewScenario ==
+                              PortfolioPreviewScenario.partial,
+                        ),
+                        ctaLabel: _heroCtaLabel(
+                          hasItems: hasItems,
+                          showLoading: showLoading,
+                          isFilteredEmpty: isFilteredEmpty,
+                        ),
+                        icon: isFilteredEmpty
+                            ? Icons.filter_alt_off_outlined
+                            : hasItems
+                            ? Icons.inventory_2_outlined
+                            : Icons.add_a_photo_outlined,
+                        onPressed: showLoading
+                            ? null
+                            : isFilteredEmpty
+                            ? _clearFilters
+                            : widget.onScanPressed,
                       ),
                     ),
-                  HomeSection(
-                    bottomPadding: AppSpacing.xl,
-                    child: _PortfolioContent(
-                      allItems: portfolioState.items,
-                      visibleItems: visibleItems,
-                      isFilteredEmpty: isFilteredEmpty,
-                      onScanPressed: widget.onScanPressed,
-                      onClearFilters: _clearFilters,
-                      onItemTap: _openItem,
+                  if (showError)
+                    HomeSection(
+                      child: _PortfolioErrorPanel(
+                        errorMessage: portfolioState.errorMessage,
+                        onRetry: isPreview
+                            ? () {}
+                            : portfolioController.loadItems,
+                      ),
+                    )
+                  else if (showLoading)
+                    const HomeSection(child: _PortfolioLoadingSkeleton())
+                  else ...[
+                    if (hasItems)
+                      HomeSection(
+                        child: _PortfolioToolbar(
+                          searchQuery: effectiveSearchQuery,
+                          onSearchChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                              _filteredPreviewCleared = true;
+                            });
+                          },
+                          onSearchCleared: _clearSearch,
+                          onSort: () => _showSortSheet(context),
+                          onFilter: () => _showFilterSheet(context),
+                          activeFilterCount: _activeFilterCount,
+                          sortLabel: _sortMode.compactLabel,
+                        ),
+                      ),
+                    if (hasItems)
+                      HomeSection(
+                        child: _PortfolioMetrics(
+                          totalValue: _displayTotalValue(portfolioState.items),
+                          itemCount: portfolioState.items.length,
+                          valuedItemCount: _valuedItemCount(
+                            portfolioState.items,
+                          ),
+                          pendingItemCount: _pendingItemCount(
+                            portfolioState.items,
+                          ),
+                          filteredCount: isFilteredEmpty
+                              ? visibleItems.length
+                              : null,
+                        ),
+                      ),
+                    HomeSection(
+                      bottomPadding: AppSpacing.xl,
+                      child: _PortfolioContent(
+                        allItems: portfolioState.items,
+                        visibleItems: visibleItems,
+                        isFilteredEmpty: isFilteredEmpty,
+                        onScanPressed: widget.onScanPressed,
+                        onClearFilters: _clearFilters,
+                        onItemTap: _openItem,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -584,7 +622,7 @@ class _PortfolioTitleBlock extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Track saved collectibles, values, and items that need attention.',
+          'Saved collectibles, values, and item health.',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -714,7 +752,7 @@ class _ToolbarButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: onPressed,
         icon: Icon(icon, size: 18),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.visible),
         style: OutlinedButton.styleFrom(
           foregroundColor: HomeTokens.textPrimary,
           side: const BorderSide(color: HomeTokens.border),
@@ -746,47 +784,49 @@ class _PortfolioMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final metrics = [
+      HomeMetricTile(
+        label: 'Collection value',
+        value: _formatAud(totalValue),
+        supportingText: pendingItemCount == 0
+            ? 'Estimated'
+            : '$pendingItemCount pending',
+        supportingColor: pendingItemCount == 0
+            ? HomeTokens.positive
+            : HomeTokens.warning,
+      ),
+      HomeMetricTile(
+        label: 'Collection items',
+        value: '$itemCount',
+        supportingText: '$valuedItemCount valued',
+      ),
+      HomeMetricTile(
+        label: filteredCount == null ? 'Pending' : 'Filtered',
+        value: filteredCount == null ? '$pendingItemCount' : '$filteredCount',
+        supportingText: filteredCount == null
+            ? (pendingItemCount == 0 ? 'Healthy' : 'Review')
+            : 'No matches',
+        supportingColor: filteredCount == null && pendingItemCount > 0
+            ? HomeTokens.warning
+            : HomeTokens.positive,
+      ),
+    ];
+
     return KeyedSubtree(
       key: const ValueKey('portfolio-compact-snapshot'),
-      child: GridView.count(
-        key: const ValueKey('portfolio-metric-grid'),
-        crossAxisCount: 2,
-        mainAxisSpacing: AppSpacing.sm,
-        crossAxisSpacing: AppSpacing.sm,
-        childAspectRatio: .96,
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        children: [
-          HomeMetricTile(
-            label: 'Collection value',
-            value: _formatAud(totalValue),
-            supportingText: pendingItemCount == 0
-                ? 'All values confirmed'
-                : '$pendingItemCount pending',
-            supportingColor: pendingItemCount == 0
-                ? HomeTokens.positive
-                : HomeTokens.warning,
-          ),
-          HomeMetricTile(
-            label: 'Collection items',
-            value: '$itemCount',
-            supportingText: '$valuedItemCount valued',
-          ),
-          HomeMetricTile(
-            label: filteredCount == null
-                ? 'Needs attention'
-                : 'Filtered results',
-            value: filteredCount == null
-                ? '$pendingItemCount'
-                : '$filteredCount',
-            supportingText: filteredCount == null
-                ? (pendingItemCount == 0 ? 'Healthy' : 'Review pending')
-                : 'Clear filters',
-            supportingColor: filteredCount == null && pendingItemCount > 0
-                ? HomeTokens.warning
-                : HomeTokens.positive,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (constraints.maxWidth - AppSpacing.sm) / 2;
+          return Wrap(
+            key: const ValueKey('portfolio-metric-grid'),
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final metric in metrics)
+                SizedBox(width: width, child: metric),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1056,6 +1096,11 @@ class _PortfolioFilteredEmptyPanel extends StatelessWidget {
                 onPressed: onClearFilters,
                 icon: const Icon(Icons.filter_alt_off_outlined),
                 label: const Text('Clear filters'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: HomeTokens.accentStrong,
+                  foregroundColor: HomeTokens.textPrimary,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
               ),
             ),
           ],
@@ -1110,6 +1155,11 @@ class _PortfolioErrorPanel extends StatelessWidget {
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_outlined),
                 label: const Text('Retry'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: HomeTokens.accentStrong,
+                  foregroundColor: HomeTokens.textPrimary,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
               ),
             ),
           ],
@@ -1268,6 +1318,7 @@ String _heroTitle({
   required PortfolioState state,
   required bool showLoading,
   required bool isFilteredEmpty,
+  required bool isPartialState,
 }) {
   if (showLoading) {
     return 'Preparing portfolio';
@@ -1278,6 +1329,9 @@ String _heroTitle({
   if (state.items.isEmpty) {
     return 'Start your portfolio';
   }
+  if (isPartialState) {
+    return 'Review pending values';
+  }
   return 'Your collection at a glance';
 }
 
@@ -1285,6 +1339,7 @@ String _heroBody({
   required PortfolioState state,
   required bool showLoading,
   required bool isFilteredEmpty,
+  required bool isPartialState,
 }) {
   if (showLoading) {
     return 'Preparing your saved items, values, and filters.';
@@ -1294,6 +1349,9 @@ String _heroBody({
   }
   if (state.items.isEmpty) {
     return 'Scan your first collectible to start building a saved portfolio.';
+  }
+  if (isPartialState) {
+    return 'Confirmed values stay visible while pending items are marked for review.';
   }
   return 'Review saved collectibles, values, and items that need attention.';
 }

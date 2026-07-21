@@ -9,6 +9,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum HomePreviewScenario {
@@ -183,6 +184,7 @@ class HomePage extends ConsumerStatefulWidget {
     this.onImportPhotoPressed,
     this.onPortfolioPressed,
     this.previewScenario,
+    this.qaInitialScrollOffset = 0,
     super.key,
   });
 
@@ -191,14 +193,24 @@ class HomePage extends ConsumerStatefulWidget {
   final VoidCallback? onImportPhotoPressed;
   final VoidCallback? onPortfolioPressed;
   final HomePreviewScenario? previewScenario;
+  final double qaInitialScrollOffset;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  final ScrollController _scrollController = ScrollController();
+  late final ScrollController _scrollController;
   bool _scanRequestPending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.qaInitialScrollOffset,
+      keepScrollOffset: false,
+    );
+  }
 
   @override
   void dispose() {
@@ -236,161 +248,176 @@ class _HomePageState extends ConsumerState<HomePage> {
     final hasBlockingError = portfolio.errorMessage != null && homeData.isEmpty;
     final isInitialLoading = portfolio.isLoading && homeData.isEmpty;
 
-    return Theme(
-      data: AppTheme.dark,
-      child: Scaffold(
-        backgroundColor: HomeTokens.background,
-        body: SafeArea(
-          child: HomeStateContainer(
-            controller: _scrollController,
-            bottomClearance: 104,
-            sections: [
-              HomeSection(
-                topPadding: AppSpacing.sm,
-                child: HomeBrandLockup(showAlert: homeData.hasStateAlert),
-              ),
-              HomeSection(
-                topPadding: AppSpacing.lg,
-                child: HomeTitleBlock(
-                  subtitle: _subtitleFor(portfolio, homeData),
-                ),
-              ),
-              if (isInitialLoading)
-                const HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: HomeSkeletonBlock(),
-                )
-              else if (hasBlockingError)
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: HomeTokens.background,
+        systemNavigationBarDividerColor: HomeTokens.background,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Theme(
+        data: AppTheme.dark,
+        child: Scaffold(
+          backgroundColor: HomeTokens.background,
+          body: SafeArea(
+            child: HomeStateContainer(
+              controller: _scrollController,
+              bottomClearance: 104,
+              sections: [
                 HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: HomeErrorPanel(
-                    message: 'Check your connection and try again.',
-                    onRetry: isPreview ? () {} : portfolioController?.loadItems,
-                  ),
-                )
-              else if (homeData.isEmpty) ...[
-                HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: HomeAuthorityHero(
-                    eyebrow: 'New collector',
-                    title: 'Your collection is waiting',
-                    body:
-                        'Start with a scan, then let PackLox build value history from real items.',
-                    ctaLabel: 'Add first item',
-                    icon: Icons.inventory_2_outlined,
-                    onPressed: widget.onScanPressed == null
-                        ? null
-                        : _handleScanPressed,
-                  ),
+                  topPadding: AppSpacing.sm,
+                  child: HomeBrandLockup(showAlert: homeData.hasStateAlert),
                 ),
                 HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: _HomeActionStack(
-                    actions: [
-                      HomeActionRow(
-                        keySeed: 'start-first-item',
-                        icon: Icons.photo_camera_outlined,
-                        title: 'Start with your first item',
-                        subtitle: 'Scan or add a collectible to begin.',
-                        onTap: widget.onScanPressed == null
-                            ? null
-                            : _handleScanPressed,
-                      ),
-                      HomeActionRow(
-                        keySeed: 'guided-scan',
-                        icon: Icons.add_rounded,
-                        title: 'Try a guided scan',
-                        subtitle: 'Use the scanner to capture details clearly.',
-                        iconColor: HomeTokens.categoryMore,
-                        onTap:
-                            widget.onSampleScanPressed ??
-                            (widget.onScanPressed == null
-                                ? null
-                                : _handleScanPressed),
-                      ),
-                      const HomeActionRow(
-                        keySeed: 'supported-categories',
-                        icon: Icons.category_outlined,
-                        title: 'Browse supported categories',
-                        subtitle: 'Cards, coins, figures, and more.',
-                        iconColor: HomeTokens.categoryCoins,
-                      ),
-                    ],
+                  topPadding: AppSpacing.lg,
+                  child: HomeTitleBlock(
+                    subtitle: _subtitleFor(portfolio, homeData),
                   ),
                 ),
-              ] else ...[
-                HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: HomeAuthorityHero(
-                    eyebrow: homeData.hasPartialValuation
-                        ? 'Collection overview'
-                        : 'Collection overview',
-                    title: 'Know what your collection is worth',
-                    body:
-                        'Track collection health, recent scans, and the next useful action.',
-                    ctaLabel: 'Scan next item',
-                    icon: Icons.show_chart_rounded,
-                    onPressed: widget.onScanPressed == null
-                        ? null
-                        : _handleScanPressed,
-                  ),
-                ),
-                if (homeData.hasRealMetrics)
+                if (isInitialLoading)
+                  const HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: HomeSkeletonBlock(),
+                  )
+                else if (hasBlockingError)
                   HomeSection(
                     topPadding: AppSpacing.xl,
-                    child: _MetricGrid(data: homeData),
+                    child: HomeErrorPanel(
+                      message: 'Check your connection and try again.',
+                      onRetry: isPreview
+                          ? () {}
+                          : portfolioController?.loadItems,
+                    ),
+                  )
+                else if (homeData.isEmpty) ...[
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: HomeAuthorityHero(
+                      eyebrow: 'New collector',
+                      title: 'Your collection is waiting',
+                      body:
+                          'Start with a scan, then let PackLox build value history from real items.',
+                      ctaLabel: 'Add first item',
+                      icon: Icons.inventory_2_outlined,
+                      onPressed: widget.onScanPressed == null
+                          ? null
+                          : _handleScanPressed,
+                    ),
                   ),
-                HomeSection(
-                  topPadding: AppSpacing.xl,
-                  bottomPadding: AppSpacing.xxl,
-                  child: _HomeActionStack(
-                    actions: [
-                      HomeActionRow(
-                        keySeed: 'scan-collectible',
-                        icon: Icons.photo_camera_outlined,
-                        title: 'Scan a collectible',
-                        subtitle: 'Identify, value, and protect the next item.',
-                        onTap: widget.onScanPressed == null
-                            ? null
-                            : _handleScanPressed,
-                      ),
-                      HomeActionRow(
-                        keySeed: 'market-insights',
-                        icon: Icons.trending_up_rounded,
-                        title: 'Market insights',
-                        subtitle: homeData.hasValuedItems
-                            ? 'Review recent changes across your collection.'
-                            : 'Add valuations before insights appear.',
-                        iconColor: HomeTokens.categoryFigures,
-                        onTap: widget.onPortfolioPressed,
-                      ),
-                      if (homeData.mostRecentItem != null)
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _HomeActionStack(
+                      actions: [
                         HomeActionRow(
-                          keySeed: 'recent-scan',
-                          icon: Icons.monitor_heart_outlined,
-                          title: 'Recent scan',
-                          subtitle: homeData.mostRecentItem!.title,
-                          iconColor: HomeTokens.categoryMore,
-                          onTap: () => _openCollectibleDetail(
-                            context,
-                            homeData.mostRecentItem!,
-                          ),
+                          keySeed: 'start-first-item',
+                          icon: Icons.photo_camera_outlined,
+                          title: 'Start with your first item',
+                          subtitle: 'Scan or add a collectible to begin.',
+                          onTap: widget.onScanPressed == null
+                              ? null
+                              : _handleScanPressed,
                         ),
-                      if (homeData.hasPartialValuation)
                         HomeActionRow(
-                          keySeed: 'partial-valuation',
-                          icon: Icons.priority_high_rounded,
-                          title: 'Finish collection valuations',
+                          keySeed: 'guided-scan',
+                          icon: Icons.add_rounded,
+                          title: 'Try a guided scan',
                           subtitle:
-                              '${homeData.unvaluedCount} ${homeData.unvaluedCount == 1 ? 'item needs' : 'items need'} a real valuation.',
-                          iconColor: HomeTokens.warning,
+                              'Use the scanner to capture details clearly.',
+                          iconColor: HomeTokens.categoryMore,
+                          onTap:
+                              widget.onSampleScanPressed ??
+                              (widget.onScanPressed == null
+                                  ? null
+                                  : _handleScanPressed),
+                        ),
+                        const HomeActionRow(
+                          keySeed: 'supported-categories',
+                          icon: Icons.category_outlined,
+                          title: 'Browse supported categories',
+                          subtitle: 'Cards, coins, figures, and more.',
+                          iconColor: HomeTokens.categoryCoins,
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: HomeAuthorityHero(
+                      eyebrow: homeData.hasPartialValuation
+                          ? 'Collection overview'
+                          : 'Collection overview',
+                      title: 'Know what your collection is worth',
+                      body:
+                          'Track collection health, recent scans, and the next useful action.',
+                      ctaLabel: 'Scan next item',
+                      icon: Icons.show_chart_rounded,
+                      onPressed: widget.onScanPressed == null
+                          ? null
+                          : _handleScanPressed,
+                    ),
+                  ),
+                  if (homeData.hasRealMetrics)
+                    HomeSection(
+                      topPadding: AppSpacing.xl,
+                      child: _MetricGrid(data: homeData),
+                    ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    bottomPadding: AppSpacing.xxl,
+                    child: _HomeActionStack(
+                      actions: [
+                        HomeActionRow(
+                          keySeed: 'scan-collectible',
+                          icon: Icons.photo_camera_outlined,
+                          title: 'Scan a collectible',
+                          subtitle:
+                              'Identify, value, and protect the next item.',
+                          onTap: widget.onScanPressed == null
+                              ? null
+                              : _handleScanPressed,
+                        ),
+                        HomeActionRow(
+                          keySeed: 'market-insights',
+                          icon: Icons.trending_up_rounded,
+                          title: 'Market insights',
+                          subtitle: homeData.hasValuedItems
+                              ? 'Review recent changes across your collection.'
+                              : 'Add valuations before insights appear.',
+                          iconColor: HomeTokens.categoryFigures,
                           onTap: widget.onPortfolioPressed,
                         ),
-                    ],
+                        if (homeData.mostRecentItem != null)
+                          HomeActionRow(
+                            keySeed: 'recent-scan',
+                            icon: Icons.monitor_heart_outlined,
+                            title: 'Recent scan',
+                            subtitle: homeData.mostRecentItem!.title,
+                            iconColor: HomeTokens.categoryMore,
+                            onTap: () => _openCollectibleDetail(
+                              context,
+                              homeData.mostRecentItem!,
+                            ),
+                          ),
+                        if (homeData.hasPartialValuation)
+                          HomeActionRow(
+                            keySeed: 'partial-valuation',
+                            icon: Icons.priority_high_rounded,
+                            title: 'Finish collection valuations',
+                            subtitle:
+                                '${homeData.unvaluedCount} ${homeData.unvaluedCount == 1 ? 'item needs' : 'items need'} a real valuation.',
+                            iconColor: HomeTokens.warning,
+                            onTap: widget.onPortfolioPressed,
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

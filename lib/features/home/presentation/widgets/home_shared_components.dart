@@ -217,7 +217,7 @@ class HomeAuthorityHero extends StatelessWidget {
                   height: 48,
                   child: FilledButton.icon(
                     onPressed: enabled ? onPressed : null,
-                    icon: const Icon(Icons.photo_camera_outlined, size: 19),
+                    icon: Icon(icon, size: 19),
                     label: Text(
                       ctaLabel,
                       maxLines: 1,
@@ -267,7 +267,7 @@ class HomeMetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return HomeSurface(
       keySeed: 'metric-${label.toLowerCase().replaceAll(' ', '-')}',
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -294,14 +294,15 @@ class HomeMetricTile extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             supportingText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            overflow: TextOverflow.visible,
             key: ValueKey(
               'home-metric-supporting-${label.toLowerCase().replaceAll(' ', '-')}',
             ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: supportingColor,
               fontWeight: FontWeight.w900,
+              height: 1.15,
             ),
           ),
         ],
@@ -353,7 +354,7 @@ class HomeActionRow extends StatelessWidget {
           key: ValueKey('home-action-$keySeed'),
           width: double.infinity,
           constraints: const BoxConstraints(minHeight: 84),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: enabled
                 ? HomeTokens.surfaceRaised
@@ -364,8 +365,8 @@ class HomeActionRow extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: effectiveIconColor.withValues(
                     alpha: enabled ? .18 : .10,
@@ -374,7 +375,7 @@ class HomeActionRow extends StatelessWidget {
                 ),
                 child: Icon(icon, color: effectiveIconColor, size: 24),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,8 +383,8 @@ class HomeActionRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: titleColor,
                         fontWeight: FontWeight.w900,
@@ -393,8 +394,8 @@ class HomeActionRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 3,
+                      overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: subtitleColor,
                         fontWeight: FontWeight.w600,
@@ -404,12 +405,12 @@ class HomeActionRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Icon(
                 Icons.chevron_right_rounded,
                 key: ValueKey('home-action-$keySeed-chevron'),
                 color: enabled ? const Color(0xFF8BC7FF) : HomeTokens.textMuted,
-                size: 28,
+                size: 26,
               ),
             ],
           ),
