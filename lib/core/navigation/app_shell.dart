@@ -263,10 +263,20 @@ class _AppShellState extends ConsumerState<AppShell>
           key: const ValueKey('app-shell'),
           extendBody: true,
           backgroundColor: shellBackground,
-          body: _buildActiveDestination(selectedDestination),
-          bottomNavigationBar: hideBottomNavigation
-              ? null
-              : _buildBottomNavigationBar(selectedIndex),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: _buildActiveDestination(selectedDestination),
+              ),
+              if (!hideBottomNavigation)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildBottomNavigationBar(selectedIndex),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -287,8 +297,20 @@ class _AppShellState extends ConsumerState<AppShell>
       stateKey: 'entry-error',
       child: Scaffold(
         key: const ValueKey('app-shell'),
-        body: PackLoxBootstrapSurface.recoverableError(onRetry: onRetry),
-        bottomNavigationBar: _buildBottomNavigationBar(selectedIndex),
+        extendBody: true,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: PackLoxBootstrapSurface.recoverableError(onRetry: onRetry),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildBottomNavigationBar(selectedIndex),
+            ),
+          ],
+        ),
       ),
     );
   }

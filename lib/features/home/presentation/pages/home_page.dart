@@ -264,6 +264,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         child: Scaffold(
           backgroundColor: HomeTokens.background,
           body: SafeArea(
+            bottom: false,
             child: HomeStateContainer(
               controller: _scrollController,
               bottomClearance: GlassBottomNavBar.scrollContentClearance(
