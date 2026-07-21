@@ -152,6 +152,7 @@ void main() {
     );
 
     expect(find.text('Home State Preview'), findsNothing);
+    expect(find.text('Portfolio State Preview'), findsNothing);
   });
 
   testWidgets('Home State Preview opens selector from SIT developer surfaces', (
@@ -179,6 +180,37 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets(
+    'Portfolio State Preview opens selector from SIT developer surfaces',
+    (tester) async {
+      await tester.pumpSettings(
+        environmentConfig: const EnvironmentConfig(
+          environment: AppEnvironment.sit,
+        ),
+      );
+
+      await tester.revealText('Portfolio State Preview');
+      expect(find.text('Portfolio State Preview'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-portfolio-state-preview')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Portfolio State Preview'), findsWidgets);
+      expect(find.text('Default'), findsOneWidget);
+      expect(find.text('Partial'), findsOneWidget);
+      await tester.revealText('Filtered empty');
+      expect(find.text('Filtered empty'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey('home-section-portfolio-preview-scenario-picker'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 extension on WidgetTester {

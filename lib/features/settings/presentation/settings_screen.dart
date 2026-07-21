@@ -24,6 +24,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -1549,6 +1550,17 @@ class _DeveloperToolsSection extends StatelessWidget {
               trailing: 'Open',
               onTap: () =>
                   Navigator.of(context).push(HomeStatePreviewScreen.route()),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _SettingsRow(
+              key: const ValueKey('settings-portfolio-state-preview'),
+              icon: Icons.inventory_2_outlined,
+              title: 'Portfolio State Preview',
+              subtitle: 'Design QA states use mocked local data only.',
+              trailing: 'Open',
+              onTap: () => Navigator.of(
+                context,
+              ).push(PortfolioStatePreviewScreen.route()),
             ),
             const SizedBox(height: AppSpacing.lg),
             Theme(

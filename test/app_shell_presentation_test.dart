@@ -237,6 +237,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Settings Portfolio preview selection returns to Portfolio with nav visible',
+    (tester) async {
+      await tester.pumpShell(
+        environmentConfig: const EnvironmentConfig(
+          environment: AppEnvironment.sit,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('nav-settings')));
+      await tester.pumpTabSwitch();
+      await tester.revealText('Portfolio State Preview');
+      await tester.tap(
+        find.byKey(const ValueKey('settings-portfolio-state-preview')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Portfolio State Preview'), findsWidgets);
+
+      await tester.tap(
+        find.byKey(const ValueKey('home-action-portfolio-preview-partial')),
+      );
+      await tester.pumpAndSettle();
+
+      final navigation = tester.widget<GlassBottomNavBar>(
+        find.byKey(const ValueKey('bottom-navigation')),
+      );
+      expect(navigation.currentIndex, AppShellTabController.portfolioTab);
+      expect(
+        find.byKey(const ValueKey('shell-destination-portfolio')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+      await tester.revealText('Needs value');
+      expect(find.text('Needs value'), findsOneWidget);
+      expect(find.byType(DropdownButton), findsNothing);
+    },
+  );
   testWidgets('light and dark shell navigation render without overflow', (
     tester,
   ) async {

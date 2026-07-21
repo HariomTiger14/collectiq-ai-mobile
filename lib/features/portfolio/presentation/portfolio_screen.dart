@@ -1,14 +1,11 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
-import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
+import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
-import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
-import 'package:collectiq_ai/core/widgets/gradient_header.dart';
-import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
-import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -16,14 +13,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum _PortfolioSortMode {
-  valueHigh(label: 'Value (High -> Low)'),
-  valueLow(label: 'Value (Low -> High)'),
+  newest(label: 'Recently Added'),
+  valueHigh(label: 'Value (High to Low)'),
+  valueLow(label: 'Value (Low to High)'),
   confidence(label: 'Confidence'),
-  trend(label: 'Trend'),
-  category(label: 'Category'),
-  newest(label: 'Recently Added');
+  category(label: 'Category');
 
   const _PortfolioSortMode({required this.label});
+
+  final String label;
+}
+
+enum _PortfolioCategoryFilter {
+  all(label: 'All'),
+  cards(label: 'Cards'),
+  coins(label: 'Coins'),
+  comics(label: 'Comics'),
+  memorabilia(label: 'Memorabilia'),
+  other(label: 'Other');
+
+  const _PortfolioCategoryFilter({required this.label});
 
   final String label;
 }
@@ -49,23 +58,139 @@ enum _PortfolioTrendFilter {
   final String label;
 }
 
-enum _PortfolioCategoryFilter {
-  all(label: 'All'),
-  cards(label: 'Cards'),
-  coins(label: 'Coins'),
-  comics(label: 'Comics'),
-  memorabilia(label: 'Memorabilia'),
-  other(label: 'Other');
+enum PortfolioPreviewScenario {
+  defaultData(
+    label: 'Default',
+    subtitle: 'Saved items with values and pending work.',
+  ),
+  empty(
+    label: 'Empty',
+    subtitle: 'No saved collectibles and one clear scan path.',
+  ),
+  loading(
+    label: 'Loading',
+    subtitle: 'Structured skeleton for portfolio refresh.',
+  ),
+  error(label: 'Error', subtitle: 'Retry state for a failed portfolio load.'),
+  partial(
+    label: 'Partial',
+    subtitle: 'Confirmed values plus pending valuations in amber.',
+  ),
+  filteredEmpty(
+    label: 'Filtered empty',
+    subtitle: 'Saved items exist, but search/filter returns no results.',
+  );
 
-  const _PortfolioCategoryFilter({required this.label});
+  const PortfolioPreviewScenario({required this.label, required this.subtitle});
 
   final String label;
+  final String subtitle;
+}
+
+final portfolioPreviewScenarioProvider =
+    NotifierProvider<
+      PortfolioPreviewScenarioController,
+      PortfolioPreviewScenario?
+    >(PortfolioPreviewScenarioController.new);
+
+class PortfolioPreviewScenarioController
+    extends Notifier<PortfolioPreviewScenario?> {
+  @override
+  PortfolioPreviewScenario? build() => null;
+
+  void select(PortfolioPreviewScenario? scenario) {
+    state = scenario;
+  }
+}
+
+class PortfolioStatePreviewScreen extends ConsumerWidget {
+  const PortfolioStatePreviewScreen({super.key});
+
+  static Route<void> route() {
+    return MaterialPageRoute<void>(
+      builder: (_) => const PortfolioStatePreviewScreen(),
+      settings: const RouteSettings(name: '/settings/portfolio-preview'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Theme(
+      data: AppTheme.dark,
+      child: Scaffold(
+        backgroundColor: HomeTokens.background,
+        appBar: AppBar(
+          title: const Text('Portfolio State Preview'),
+          backgroundColor: HomeTokens.background,
+          foregroundColor: HomeTokens.textPrimary,
+        ),
+        body: HomeStateContainer(
+          sections: [
+            const HomeSection(child: HomeBrandLockup()),
+            HomeSection(
+              child: HomeSectionSurface(
+                keySeed: 'portfolio-preview-scenario-picker',
+                title: 'Portfolio states',
+                child: Column(
+                  children: [
+                    for (final scenario in PortfolioPreviewScenario.values) ...[
+                      HomeActionRow(
+                        keySeed: 'portfolio-preview-${scenario.name}',
+                        icon: _previewIcon(scenario),
+                        title: scenario.label,
+                        subtitle: scenario.subtitle,
+                        onTap: () => _selectScenario(context, ref, scenario),
+                      ),
+                      if (scenario != PortfolioPreviewScenario.values.last)
+                        const SizedBox(height: AppSpacing.sm),
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    HomeActionRow(
+                      keySeed: 'portfolio-preview-clear',
+                      icon: Icons.layers_clear_outlined,
+                      title: 'Clear preview',
+                      subtitle: 'Return Portfolio to live local data.',
+                      onTap: () => _selectScenario(context, ref, null),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static IconData _previewIcon(PortfolioPreviewScenario scenario) {
+    return switch (scenario) {
+      PortfolioPreviewScenario.defaultData => Icons.inventory_2_outlined,
+      PortfolioPreviewScenario.empty => Icons.add_box_outlined,
+      PortfolioPreviewScenario.loading => Icons.blur_on_outlined,
+      PortfolioPreviewScenario.error => Icons.error_outline,
+      PortfolioPreviewScenario.partial => Icons.pending_actions_outlined,
+      PortfolioPreviewScenario.filteredEmpty => Icons.filter_alt_off_outlined,
+    };
+  }
+
+  void _selectScenario(
+    BuildContext context,
+    WidgetRef ref,
+    PortfolioPreviewScenario? scenario,
+  ) {
+    ref.read(portfolioPreviewScenarioProvider.notifier).select(scenario);
+    ref
+        .read(appShellTabControllerProvider.notifier)
+        .selectTab(AppShellTabController.portfolioTab);
+    Navigator.of(context).pop();
+  }
 }
 
 class PortfolioScreen extends ConsumerStatefulWidget {
-  const PortfolioScreen({this.onScanPressed, super.key});
+  const PortfolioScreen({this.onScanPressed, this.previewScenario, super.key});
 
   final VoidCallback? onScanPressed;
+  final PortfolioPreviewScenario? previewScenario;
 
   @override
   ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
@@ -76,6 +201,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     keepScrollOffset: false,
   );
   String _searchQuery = '';
+  bool _filteredPreviewCleared = false;
   _PortfolioSortMode _sortMode = _PortfolioSortMode.newest;
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
   _PortfolioConfidenceFilter _confidenceFilter = _PortfolioConfidenceFilter.all;
@@ -100,1644 +226,371 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final portfolioState = ref.watch(portfolioControllerProvider);
+    final previewScenario =
+        widget.previewScenario ?? ref.watch(portfolioPreviewScenarioProvider);
+    final isPreview = previewScenario != null;
+    final portfolioState = isPreview
+        ? _previewStateFor(previewScenario)
+        : ref.watch(portfolioControllerProvider);
     final portfolioController = ref.read(portfolioControllerProvider.notifier);
-    final orderedItems = portfolioState.orderedItems;
-    final visibleItems = _visibleItems(orderedItems);
-    final wishlistStatusByItemId = portfolioState.items.isEmpty
-        ? const <String, WishlistStatus>{}
-        : ref
-              .watch(wishlistEntriesProvider)
-              .maybeWhen<Map<String, WishlistStatus>>(
-                data: (entries) => {
-                  for (final entry in entries) entry.itemId: entry.status,
-                },
-                orElse: () => const {},
-              );
+    final effectiveSearchQuery = _effectiveSearchQuery(previewScenario);
+    final orderedItems = _orderedItems(portfolioState.items);
+    final visibleItems = _visibleItems(orderedItems, effectiveSearchQuery);
+    final hasItems = portfolioState.items.isNotEmpty;
+    final isFilteredEmpty = hasItems && visibleItems.isEmpty;
+    final showLoading =
+        portfolioState.isLoading && portfolioState.items.isEmpty;
+    final showError =
+        portfolioState.errorMessage != null && portfolioState.items.isEmpty;
 
-    return Scaffold(
-      key: const ValueKey('portfolio-screen-scaffold'),
-      backgroundColor: PackLoxTokens.background,
-      body: SafeArea(
-        bottom: false,
-        child: ColoredBox(
-          key: const ValueKey('portfolio-screen-surface'),
-          color: PackLoxTokens.background,
-          child: LayoutBuilder(
-            builder: (context, viewport) {
-              final horizontalPadding = viewport.maxWidth <= 360
-                  ? AppSpacing.md
-                  : AppSpacing.lg;
-
-              return CustomScrollView(
-                key: const ValueKey('portfolio-scroll-view'),
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _PortfolioFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      child: const PackLoxHeader(
-                        firstName: '',
-                        fallbackName: 'My Collection',
-                        greetingText: 'Portfolio',
-                        onNotifications: null,
+    return Theme(
+      data: AppTheme.dark,
+      child: Scaffold(
+        key: const ValueKey('portfolio-screen-scaffold'),
+        backgroundColor: HomeTokens.background,
+        body: SafeArea(
+          bottom: false,
+          child: ColoredBox(
+            key: const ValueKey('portfolio-screen-surface'),
+            color: HomeTokens.background,
+            child: HomeStateContainer(
+              controller: _scrollController,
+              bottomClearance: 140,
+              sections: [
+                const HomeSection(child: HomeBrandLockup()),
+                const HomeSection(child: _PortfolioTitleBlock()),
+                if (!showError)
+                  HomeSection(
+                    child: HomeAuthorityHero(
+                      eyebrow: 'Portfolio overview',
+                      title: _heroTitle(
+                        state: portfolioState,
+                        showLoading: showLoading,
+                        isFilteredEmpty: isFilteredEmpty,
                       ),
+                      body: _heroBody(
+                        state: portfolioState,
+                        showLoading: showLoading,
+                        isFilteredEmpty: isFilteredEmpty,
+                      ),
+                      ctaLabel: _heroCtaLabel(
+                        hasItems: hasItems,
+                        showLoading: showLoading,
+                        isFilteredEmpty: isFilteredEmpty,
+                      ),
+                      icon: isFilteredEmpty
+                          ? Icons.filter_alt_off_outlined
+                          : hasItems
+                          ? Icons.inventory_2_outlined
+                          : Icons.add_a_photo_outlined,
+                      onPressed: showLoading
+                          ? null
+                          : isFilteredEmpty
+                          ? _clearFilters
+                          : widget.onScanPressed,
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _PortfolioFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      child: _PortfolioControls(
-                        searchQuery: _searchQuery,
-                        categoryFilter: _categoryFilter,
+                if (showError)
+                  HomeSection(
+                    child: _PortfolioErrorPanel(
+                      errorMessage: portfolioState.errorMessage,
+                      onRetry: isPreview
+                          ? () {}
+                          : portfolioController.loadItems,
+                    ),
+                  )
+                else if (showLoading)
+                  const HomeSection(child: _PortfolioLoadingSkeleton())
+                else ...[
+                  if (hasItems)
+                    HomeSection(
+                      child: _PortfolioToolbar(
+                        searchQuery: effectiveSearchQuery,
                         onSearchChanged: (value) {
                           setState(() {
                             _searchQuery = value;
+                            _filteredPreviewCleared = true;
                           });
                         },
-                        onSearchCleared: () {
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                        onCategoryFilterChanged: (value) {
-                          setState(() {
-                            _categoryFilter = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _PortfolioFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      child: _CollectionOverview(
-                        totalValue: portfolioState.totalValue,
-                        itemCount: portfolioState.itemCount,
-                        valuedItemCount: _valuedItemCount(orderedItems),
-                        unvaluedItemCount: _unvaluedItemCount(orderedItems),
-                        categoryCount: _categoryCount(orderedItems),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _PortfolioFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.sm,
-                      bottomPadding: AppSpacing.md,
-                      child: _PortfolioCommandBar(
+                        onSearchCleared: _clearSearch,
                         onSort: () => _showSortSheet(context),
                         onFilter: () => _showFilterSheet(context),
-                        onAddItem: widget.onScanPressed,
                         activeFilterCount: _activeFilterCount,
                         sortLabel: _sortMode.label,
                       ),
                     ),
-                  ),
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPadding,
-                      0,
-                      horizontalPadding,
-                      176,
+                  if (hasItems)
+                    HomeSection(
+                      child: _PortfolioMetrics(
+                        totalValue: _displayTotalValue(portfolioState.items),
+                        itemCount: portfolioState.items.length,
+                        valuedItemCount: _valuedItemCount(portfolioState.items),
+                        pendingItemCount: _pendingItemCount(
+                          portfolioState.items,
+                        ),
+                        filteredCount: isFilteredEmpty
+                            ? visibleItems.length
+                            : null,
+                      ),
                     ),
-                    sliver: SliverLayoutBuilder(
-                      builder: (context, constraints) {
-                        if (portfolioState.isLoading &&
-                            portfolioState.items.isEmpty) {
-                          return const SliverToBoxAdapter(
-                            child: _PortfolioSliverBox(
-                              child: Center(child: CircularProgressIndicator()),
-                            ),
-                          );
-                        }
-
-                        if (portfolioState.errorMessage != null) {
-                          return SliverToBoxAdapter(
-                            child: _PortfolioSliverBox(
-                              child: PortfolioErrorState(
-                                message: portfolioState.errorMessage!,
-                              ),
-                            ),
-                          );
-                        }
-
-                        if (portfolioState.items.isEmpty) {
-                          return SliverToBoxAdapter(
-                            child: _PortfolioSliverBox(
-                              child: PortfolioEmptyState(
-                                onScanPressed: widget.onScanPressed,
-                              ),
-                            ),
-                          );
-                        }
-
-                        if (visibleItems.isEmpty) {
-                          return SliverToBoxAdapter(
-                            child: _PortfolioSliverBox(
-                              child: PortfolioNoSearchResultsState(
-                                onResetFilters: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                    _categoryFilter =
-                                        _PortfolioCategoryFilter.all;
-                                    _confidenceFilter =
-                                        _PortfolioConfidenceFilter.all;
-                                    _trendFilter = _PortfolioTrendFilter.all;
-                                    _sortMode = _PortfolioSortMode.newest;
-                                  });
-                                },
-                              ),
-                            ),
-                          );
-                        }
-
-                        final crossAxisCount = constraints.crossAxisExtent < 360
-                            ? 1
-                            : constraints.crossAxisExtent >= 720
-                            ? 3
-                            : 2;
-                        final childAspectRatio = switch (crossAxisCount) {
-                          1 => 0.64,
-                          2 => 0.56,
-                          _ => 0.62,
-                        };
-
-                        return SliverMainAxisGroup(
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 960,
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: AppSpacing.sm,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            'Collection Items',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w900,
-                                                ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: AppSpacing.sm),
-                                        Text(
-                                          '${visibleItems.length} item${visibleItems.length == 1 ? '' : 's'}',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelMedium
-                                              ?.copyWith(
-                                                color: colorScheme
-                                                    .onSurfaceVariant,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SliverGrid(
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    mainAxisSpacing: AppSpacing.xl,
-                                    crossAxisSpacing: AppSpacing.md,
-                                    childAspectRatio: childAspectRatio,
-                                  ),
-                              delegate: SliverChildBuilderDelegate((
-                                context,
-                                index,
-                              ) {
-                                final item = visibleItems[index];
-
-                                return MotionReveal(
-                                  key: ValueKey(
-                                    'portfolio-grid-motion-${item.id}',
-                                  ),
-                                  offset: 12,
-                                  delay: Duration(milliseconds: index * 40),
-                                  curve: Curves.easeOutCubic,
-                                  child: PortfolioGridTile(
-                                    key: ValueKey(
-                                      'portfolio-grid-item-${item.id}',
-                                    ),
-                                    item: item,
-                                    wishlistStatusLabel: _wishlistStatusLabel(
-                                      wishlistStatusByItemId[item.id],
-                                    ),
-                                    onTap: () => _openItem(
-                                      context,
-                                      item,
-                                      portfolioController,
-                                    ),
-                                    onViewDetails: () => _openItem(
-                                      context,
-                                      item,
-                                      portfolioController,
-                                    ),
-                                    onEdit: () => _showEditComingSoon(context),
-                                    onDelete: () => _confirmDelete(
-                                      context,
-                                      item.id,
-                                      portfolioController,
-                                    ),
-                                  ),
-                                );
-                              }, childCount: visibleItems.length),
-                            ),
-                          ],
-                        );
-                      },
+                  HomeSection(
+                    bottomPadding: AppSpacing.xl,
+                    child: _PortfolioContent(
+                      allItems: portfolioState.items,
+                      visibleItems: visibleItems,
+                      isFilteredEmpty: isFilteredEmpty,
+                      onScanPressed: widget.onScanPressed,
+                      onClearFilters: _clearFilters,
+                      onItemTap: _openItem,
                     ),
                   ),
                 ],
-              );
-            },
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  List<CollectibleItem> _visibleItems(List<CollectibleItem> items) {
-    final normalizedQuery = _searchQuery.trim().toLowerCase();
-    final queryFilteredItems = normalizedQuery.isEmpty
-        ? [...items]
-        : items.where((item) {
-            return item.title.toLowerCase().contains(normalizedQuery) ||
-                item.category.toLowerCase().contains(normalizedQuery);
-          }).toList();
-    final filteredItems = queryFilteredItems
-        .where((item) => _matchesCategoryFilter(item, _categoryFilter))
-        .where((item) => _matchesConfidenceFilter(item, _confidenceFilter))
-        .where((item) => _matchesTrendFilter(item, _trendFilter))
-        .toList();
+  String _effectiveSearchQuery(PortfolioPreviewScenario? scenario) {
+    if (scenario == PortfolioPreviewScenario.filteredEmpty &&
+        !_filteredPreviewCleared &&
+        _searchQuery.trim().isEmpty) {
+      return 'vintage camera';
+    }
+    return _searchQuery;
+  }
 
-    filteredItems.sort((left, right) {
-      return switch (_sortMode) {
-        _PortfolioSortMode.newest => compareCollectiblesNewestFirst(
-          left,
-          right,
-        ),
-        _PortfolioSortMode.valueHigh => right.estimatedValue.compareTo(
-          left.estimatedValue,
-        ),
-        _PortfolioSortMode.valueLow => left.estimatedValue.compareTo(
-          right.estimatedValue,
-        ),
-        _PortfolioSortMode.confidence => right.confidence.compareTo(
-          left.confidence,
-        ),
-        _PortfolioSortMode.trend => _trendRank(
-          _normalizedTrend(right),
-        ).compareTo(_trendRank(_normalizedTrend(left))),
-        _PortfolioSortMode.category => left.category.toLowerCase().compareTo(
-          right.category.toLowerCase(),
-        ),
-      };
-    });
-    return filteredItems;
+  List<CollectibleItem> _orderedItems(List<CollectibleItem> items) {
+    return switch (_sortMode) {
+      _PortfolioSortMode.newest => collectiblesNewestFirst(items),
+      _PortfolioSortMode.valueHigh => [
+        ...items,
+      ]..sort((a, b) => b.estimatedValue.compareTo(a.estimatedValue)),
+      _PortfolioSortMode.valueLow => [
+        ...items,
+      ]..sort((a, b) => a.estimatedValue.compareTo(b.estimatedValue)),
+      _PortfolioSortMode.confidence => [
+        ...items,
+      ]..sort((a, b) => b.confidence.compareTo(a.confidence)),
+      _PortfolioSortMode.category => [
+        ...items,
+      ]..sort((a, b) => a.category.compareTo(b.category)),
+    };
+  }
+
+  List<CollectibleItem> _visibleItems(
+    List<CollectibleItem> items,
+    String searchQuery,
+  ) {
+    final query = searchQuery.trim().toLowerCase();
+    return items
+        .where((item) {
+          final title = item.title.toLowerCase();
+          final category = item.category.toLowerCase();
+          final condition = item.condition.toLowerCase();
+          final matchesSearch =
+              query.isEmpty ||
+              title.contains(query) ||
+              category.contains(query) ||
+              condition.contains(query);
+          final matchesCategory = switch (_categoryFilter) {
+            _PortfolioCategoryFilter.all => true,
+            _PortfolioCategoryFilter.cards => category.contains('card'),
+            _PortfolioCategoryFilter.coins => category.contains('coin'),
+            _PortfolioCategoryFilter.comics => category.contains('comic'),
+            _PortfolioCategoryFilter.memorabilia =>
+              category.contains('memorabilia') || category.contains('sport'),
+            _PortfolioCategoryFilter.other =>
+              !category.contains('card') &&
+                  !category.contains('coin') &&
+                  !category.contains('comic') &&
+                  !category.contains('memorabilia') &&
+                  !category.contains('sport'),
+          };
+          final matchesConfidence = switch (_confidenceFilter) {
+            _PortfolioConfidenceFilter.all => true,
+            _PortfolioConfidenceFilter.high => item.confidence >= .8,
+            _PortfolioConfidenceFilter.low => item.confidence < .8,
+          };
+          final trend = _trendLabel(item).toLowerCase();
+          final matchesTrend = switch (_trendFilter) {
+            _PortfolioTrendFilter.all => true,
+            _PortfolioTrendFilter.rising => trend.contains('rising'),
+            _PortfolioTrendFilter.stable => trend.contains('stable'),
+            _PortfolioTrendFilter.cooling => trend.contains('cooling'),
+          };
+          return matchesSearch &&
+              matchesCategory &&
+              matchesConfidence &&
+              matchesTrend;
+        })
+        .toList(growable: false);
   }
 
   int get _activeFilterCount {
     var count = 0;
     if (_categoryFilter != _PortfolioCategoryFilter.all) {
-      count++;
+      count += 1;
     }
     if (_confidenceFilter != _PortfolioConfidenceFilter.all) {
-      count++;
+      count += 1;
     }
     if (_trendFilter != _PortfolioTrendFilter.all) {
-      count++;
+      count += 1;
     }
     return count;
   }
 
-  bool _matchesCategoryFilter(
-    CollectibleItem item,
-    _PortfolioCategoryFilter filter,
-  ) {
-    final category = item.category.toLowerCase();
-    final title = item.title.toLowerCase();
-    final haystack = '$category $title';
-
-    return switch (filter) {
-      _PortfolioCategoryFilter.all => true,
-      _PortfolioCategoryFilter.cards =>
-        haystack.contains('card') || haystack.contains('tcg'),
-      _PortfolioCategoryFilter.coins => haystack.contains('coin'),
-      _PortfolioCategoryFilter.comics => haystack.contains('comic'),
-      _PortfolioCategoryFilter.memorabilia =>
-        haystack.contains('memorabilia') ||
-            haystack.contains('sports') ||
-            haystack.contains('autograph') ||
-            haystack.contains('jersey'),
-      _PortfolioCategoryFilter.other =>
-        !_matchesCategoryFilter(item, _PortfolioCategoryFilter.cards) &&
-            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.coins) &&
-            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.comics) &&
-            !_matchesCategoryFilter(item, _PortfolioCategoryFilter.memorabilia),
-    };
+  void _clearSearch() {
+    setState(() {
+      _searchQuery = '';
+      _filteredPreviewCleared = true;
+    });
   }
 
-  bool _matchesConfidenceFilter(
-    CollectibleItem item,
-    _PortfolioConfidenceFilter filter,
-  ) {
-    return switch (filter) {
-      _PortfolioConfidenceFilter.all => true,
-      _PortfolioConfidenceFilter.high => item.confidence >= 0.80,
-      _PortfolioConfidenceFilter.low => item.confidence < 0.80,
-    };
+  void _clearFilters() {
+    setState(() {
+      _searchQuery = '';
+      _filteredPreviewCleared = true;
+      _categoryFilter = _PortfolioCategoryFilter.all;
+      _confidenceFilter = _PortfolioConfidenceFilter.all;
+      _trendFilter = _PortfolioTrendFilter.all;
+      _sortMode = _PortfolioSortMode.newest;
+    });
   }
 
-  bool _matchesTrendFilter(CollectibleItem item, _PortfolioTrendFilter filter) {
-    final trend = _normalizedTrend(item);
-    return switch (filter) {
-      _PortfolioTrendFilter.all => true,
-      _PortfolioTrendFilter.rising => trend == 'Rising',
-      _PortfolioTrendFilter.stable => trend == 'Stable',
-      _PortfolioTrendFilter.cooling => trend == 'Cooling',
-    };
-  }
-
-  int _categoryCount(List<CollectibleItem> items) {
-    return {
-      for (final item in items)
-        if (item.category.trim().isNotEmpty) item.category.trim().toLowerCase(),
-    }.length;
-  }
-
-  int _valuedItemCount(List<CollectibleItem> items) {
-    return items.where(_hasDisplayableValuation).length;
-  }
-
-  int _unvaluedItemCount(List<CollectibleItem> items) {
-    return items.where((item) => !_hasDisplayableValuation(item)).length;
-  }
-
-  Future<bool> _confirmDelete(
-    BuildContext context,
-    String itemId,
-    PortfolioController portfolioController,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete item?'),
-          content: const Text(
-            'This collectible will be removed from your portfolio.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) {
-      return false;
-    }
-
-    await portfolioController.removeItem(itemId);
-    return true;
-  }
-
-  void _openItem(
-    BuildContext context,
-    CollectibleItem item,
-    PortfolioController portfolioController,
-  ) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CollectibleDetailPage(
-          item: item,
-          onDelete: (id) async {
-            final deleted = await _confirmDelete(
-              context,
-              id,
-              portfolioController,
-            );
-            if (deleted && context.mounted) {
-              Navigator.of(context).pop();
-            }
-            return deleted;
-          },
-        ),
+  Future<void> _openItem(CollectibleItem item) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CollectibleDetailPage(item: item),
+        settings: RouteSettings(name: '/portfolio/${item.id}'),
       ),
     );
-  }
-
-  void _showEditComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Edit coming soon')));
   }
 
   Future<void> _showSortSheet(BuildContext context) async {
-    final selected = await showModalBottomSheet<_PortfolioSortMode>(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.34),
-      isScrollControlled: true,
-      builder: (context) => _PortfolioPickerSheet<_PortfolioSortMode>(
-        title: 'Sort portfolio',
-        subtitle: 'Choose how your collection is ordered',
-        selectedValue: _sortMode,
-        values: _PortfolioSortMode.values,
-        labelFor: (value) => value.label,
-        iconFor: _sortIcon,
-      ),
+      barrierColor: Colors.black.withValues(alpha: .58),
+      builder: (context) {
+        return _PortfolioBottomSheet(
+          key: const ValueKey('portfolio-premium-sort-sheet-surface'),
+          title: 'Sort portfolio',
+          children: [
+            for (final mode in _PortfolioSortMode.values)
+              _SheetOption(
+                label: mode.label,
+                selected: _sortMode == mode,
+                onTap: () {
+                  setState(() => _sortMode = mode);
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
+        );
+      },
     );
-
-    if (selected == null || !mounted) {
-      return;
-    }
-
-    setState(() => _sortMode = selected);
   }
 
   Future<void> _showFilterSheet(BuildContext context) async {
-    final selected = await showModalBottomSheet<_PortfolioFilterSelection>(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.34),
+      barrierColor: Colors.black.withValues(alpha: .58),
       isScrollControlled: true,
-      builder: (context) => _PortfolioFilterSheet(
-        categoryFilter: _categoryFilter,
-        confidenceFilter: _confidenceFilter,
-        trendFilter: _trendFilter,
-      ),
-    );
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void update(VoidCallback action) {
+              setState(action);
+              setSheetState(() {});
+            }
 
-    if (selected == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _categoryFilter = selected.category;
-      _confidenceFilter = selected.confidence;
-      _trendFilter = selected.trend;
-    });
-  }
-}
-
-String _normalizedTrend(CollectibleItem item) {
-  final raw = item.marketSummary?.trendLabel.trim().toLowerCase() ?? '';
-  if (raw.contains('ris') || raw.contains('up') || raw.contains('gain')) {
-    return 'Rising';
-  }
-  if (raw.contains('cool') || raw.contains('fall') || raw.contains('down')) {
-    return 'Cooling';
-  }
-  return 'Stable';
-}
-
-int _trendRank(String trend) {
-  return switch (trend) {
-    'Rising' => 3,
-    'Stable' => 2,
-    'Cooling' => 1,
-    _ => 0,
-  };
-}
-
-IconData _sortIcon(_PortfolioSortMode mode) {
-  return switch (mode) {
-    _PortfolioSortMode.valueHigh => Icons.south_east_rounded,
-    _PortfolioSortMode.valueLow => Icons.north_east_rounded,
-    _PortfolioSortMode.confidence => Icons.verified_outlined,
-    _PortfolioSortMode.trend => Icons.trending_up_rounded,
-    _PortfolioSortMode.category => Icons.category_outlined,
-    _PortfolioSortMode.newest => Icons.schedule_rounded,
-  };
-}
-
-IconData _categoryFilterIcon(_PortfolioCategoryFilter filter) {
-  return switch (filter) {
-    _PortfolioCategoryFilter.all => Icons.all_inclusive_rounded,
-    _PortfolioCategoryFilter.cards => Icons.style_outlined,
-    _PortfolioCategoryFilter.coins => Icons.monetization_on_outlined,
-    _PortfolioCategoryFilter.comics => Icons.menu_book_outlined,
-    _PortfolioCategoryFilter.memorabilia => Icons.sports_basketball_outlined,
-    _PortfolioCategoryFilter.other => Icons.inventory_2_outlined,
-  };
-}
-
-IconData _trendFilterIcon(_PortfolioTrendFilter filter) {
-  return switch (filter) {
-    _PortfolioTrendFilter.rising => Icons.trending_up_rounded,
-    _PortfolioTrendFilter.cooling => Icons.trending_down_rounded,
-    _PortfolioTrendFilter.stable => Icons.trending_flat_rounded,
-    _PortfolioTrendFilter.all => Icons.query_stats_outlined,
-  };
-}
-
-class _PortfolioFilterSelection {
-  const _PortfolioFilterSelection({
-    required this.category,
-    required this.confidence,
-    required this.trend,
-  });
-
-  final _PortfolioCategoryFilter category;
-  final _PortfolioConfidenceFilter confidence;
-  final _PortfolioTrendFilter trend;
-}
-
-class _PortfolioFilterSheet extends StatefulWidget {
-  const _PortfolioFilterSheet({
-    required this.categoryFilter,
-    required this.confidenceFilter,
-    required this.trendFilter,
-  });
-
-  final _PortfolioCategoryFilter categoryFilter;
-  final _PortfolioConfidenceFilter confidenceFilter;
-  final _PortfolioTrendFilter trendFilter;
-
-  @override
-  State<_PortfolioFilterSheet> createState() => _PortfolioFilterSheetState();
-}
-
-class _PortfolioFilterSheetState extends State<_PortfolioFilterSheet> {
-  late _PortfolioCategoryFilter _category;
-  late _PortfolioConfidenceFilter _confidence;
-  late _PortfolioTrendFilter _trend;
-
-  @override
-  void initState() {
-    super.initState();
-    _category = widget.categoryFilter;
-    _confidence = widget.confidenceFilter;
-    _trend = widget.trendFilter;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _PremiumSheetSurface(
-      key: const ValueKey('portfolio-premium-filter-sheet-surface'),
-      gradientStyle: GradientStyle.tealEmerald,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 360;
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _PremiumSheetHeader(
-                title: 'Filter portfolio',
-                subtitle: 'Refine your collection view',
-                caption: 'Category, confidence, and market movement',
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _PremiumFilterGroup<_PortfolioCategoryFilter>(
-                title: 'Category',
-                values: _PortfolioCategoryFilter.values,
-                selectedValue: _category,
-                labelFor: (value) => value.label,
-                iconFor: _categoryFilterIcon,
-                onChanged: (value) => setState(() => _category = value),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _PremiumConfidenceRangeFilter(
-                selectedValue: _confidence,
-                onChanged: (value) => setState(() => _confidence = value),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _PremiumTrendFilterGroup(
-                selectedValue: _trend,
-                onChanged: (value) => setState(() => _trend = value),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _PremiumSheetActions(
-                primaryLabel: 'Apply filters',
-                secondaryLabel: 'Clear filters',
-                stackVertically: isNarrow,
-                onPrimary: () => Navigator.of(context).pop(
-                  _PortfolioFilterSelection(
-                    category: _category,
-                    confidence: _confidence,
-                    trend: _trend,
-                  ),
-                ),
-                onSecondary: () {
-                  setState(() {
-                    _category = _PortfolioCategoryFilter.all;
-                    _confidence = _PortfolioConfidenceFilter.all;
-                    _trend = _PortfolioTrendFilter.all;
-                  });
-                },
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PremiumFilterGroup<T> extends StatelessWidget {
-  const _PremiumFilterGroup({
-    required this.title,
-    required this.values,
-    required this.selectedValue,
-    required this.labelFor,
-    required this.onChanged,
-    this.iconFor,
-  });
-
-  final String title;
-  final List<T> values;
-  final T selectedValue;
-  final String Function(T value) labelFor;
-  final IconData Function(T value)? iconFor;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionReveal(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: textTheme.titleSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final value in values)
-                _PremiumFilterChip(
-                  key: ValueKey(
-                    'portfolio-premium-filter-chip-${_sheetSlug(labelFor(value))}',
-                  ),
-                  label: labelFor(value),
-                  icon: iconFor?.call(value),
-                  selected: selectedValue == value,
-                  onTap: () => onChanged(value),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumConfidenceRangeFilter extends StatelessWidget {
-  const _PremiumConfidenceRangeFilter({
-    required this.selectedValue,
-    required this.onChanged,
-  });
-
-  final _PortfolioConfidenceFilter selectedValue;
-  final ValueChanged<_PortfolioConfidenceFilter> onChanged;
-
-  RangeValues get _range {
-    return switch (selectedValue) {
-      _PortfolioConfidenceFilter.all => const RangeValues(0, 100),
-      _PortfolioConfidenceFilter.high => const RangeValues(80, 100),
-      _PortfolioConfidenceFilter.low => const RangeValues(0, 79),
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final range = _range;
-
-    return MotionReveal(
-      child: DecoratedBox(
-        key: const ValueKey('portfolio-premium-range-slider'),
-        decoration: BoxDecoration(
-          color: PackLoxTokens.surface.withValues(alpha: 0.78),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: PackLoxTokens.border.withValues(alpha: 0.68),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Confidence',
-                      style: textTheme.titleSmall?.copyWith(
-                        color: PackLoxTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
+            return _PortfolioBottomSheet(
+              key: const ValueKey('portfolio-premium-filter-sheet-surface'),
+              title: 'Filter portfolio',
+              children: [
+                _SheetGroup(
+                  title: 'Category',
+                  children: [
+                    for (final filter in _PortfolioCategoryFilter.values)
+                      _FilterChipOption(
+                        label: filter.label,
+                        selected: _categoryFilter == filter,
+                        onTap: () => update(() => _categoryFilter = filter),
                       ),
-                    ),
-                  ),
-                  Text(
-                    _confidenceRangeLabel(selectedValue),
-                    style: textTheme.labelSmall?.copyWith(
-                      color: PackLoxTokens.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 6,
-                  activeTrackColor: colorScheme.primary,
-                  inactiveTrackColor: colorScheme.surfaceContainerLow,
-                  rangeThumbShape: const RoundRangeSliderThumbShape(
-                    enabledThumbRadius: AppRadius.md,
-                  ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: AppRadius.lg,
-                  ),
-                  rangeTrackShape: const RoundedRectRangeSliderTrackShape(),
+                  ],
                 ),
-                child: RangeSlider(
-                  values: range,
-                  min: 0,
-                  max: 100,
-                  divisions: 100,
-                  labels: RangeLabels(
-                    '${range.start.round()}%',
-                    '${range.end.round()}%',
-                  ),
-                  onChanged: (values) {
-                    final start = values.start;
-                    final end = values.end;
-                    if (start >= 70) {
-                      onChanged(_PortfolioConfidenceFilter.high);
-                    } else if (end <= 80) {
-                      onChanged(_PortfolioConfidenceFilter.low);
-                    } else {
-                      onChanged(_PortfolioConfidenceFilter.all);
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  for (final value in _PortfolioConfidenceFilter.values)
-                    _PremiumFilterChip(
-                      key: ValueKey(
-                        'portfolio-premium-confidence-chip-${value.name}',
+                _SheetGroup(
+                  title: 'Confidence',
+                  children: [
+                    for (final filter in _PortfolioConfidenceFilter.values)
+                      _FilterChipOption(
+                        label: filter.label,
+                        selected: _confidenceFilter == filter,
+                        onTap: () => update(() => _confidenceFilter = filter),
                       ),
-                      label: value.label,
-                      icon: value == _PortfolioConfidenceFilter.all
-                          ? Icons.all_inclusive_rounded
-                          : Icons.verified_outlined,
-                      selected: selectedValue == value,
-                      onTap: () => onChanged(value),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumTrendFilterGroup extends StatelessWidget {
-  const _PremiumTrendFilterGroup({
-    required this.selectedValue,
-    required this.onChanged,
-  });
-
-  final _PortfolioTrendFilter selectedValue;
-  final ValueChanged<_PortfolioTrendFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionReveal(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Trend',
-            style: textTheme.titleSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            key: const ValueKey('portfolio-premium-trend-badges'),
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final value in _PortfolioTrendFilter.values)
-                _PremiumBadgeSelector(
-                  label: value.label,
-                  icon: _trendFilterIcon(value),
-                  selected: selectedValue == value,
-                  onTap: () => onChanged(value),
+                  ],
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumFilterChip extends StatelessWidget {
-  const _PremiumFilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.icon,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionTapScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: PackLoxMotionTheme.fast,
-        curve: PackLoxMotionTheme.tapCurve,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.18)
-              : PackLoxTokens.surface.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: selected
-                ? colorScheme.primary.withValues(alpha: 0.34)
-                : colorScheme.outlineVariant.withValues(alpha: 0.70),
-          ),
-          boxShadow: selected ? AppElevation.level1 : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: colorScheme.primary),
-              const SizedBox(width: AppSpacing.xs),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelMedium?.copyWith(
-                  color: PackLoxTokens.textPrimary,
-                  fontWeight: FontWeight.w600,
+                _SheetGroup(
+                  title: 'Trend',
+                  children: [
+                    for (final filter in _PortfolioTrendFilter.values)
+                      _FilterChipOption(
+                        label: filter.label,
+                        selected: _trendFilter == filter,
+                        onTap: () => update(() => _trendFilter = filter),
+                      ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumBadgeSelector extends StatelessWidget {
-  const _PremiumBadgeSelector({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionTapScale(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: selected
-                ? colorScheme.primary
-                : PackLoxTokens.border.withValues(alpha: 0.68),
-          ),
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.18)
-              : PackLoxTokens.surface.withValues(alpha: 0.78),
-          boxShadow: selected ? AppElevation.accentGlow : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: colorScheme.primary),
-            const SizedBox(width: AppSpacing.xs),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelMedium?.copyWith(
-                  color: PackLoxTokens.textPrimary,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Apply filters'),
+                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumSheetSurface extends StatelessWidget {
-  const _PremiumSheetSurface({
-    required this.child,
-    this.gradientStyle = GradientStyle.blueIndigo,
-    super.key,
-  });
-
-  final Widget child;
-  final GradientStyle gradientStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
-    return MotionElasticSheet(
-      key: const ValueKey('portfolio-premium-elastic-sheet'),
-      child: SafeArea(
-        top: false,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl),
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _portfolioRaisedSurfaceColor(colorScheme),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(AppRadius.xl),
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: _portfolioSurfaceBorderColor(colorScheme),
-                ),
-              ),
-              boxShadow: AppElevation.level2,
-            ),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.lg,
-                bottomInset + AppSpacing.lg,
-              ),
-              child: child,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MotionElasticSheet extends StatelessWidget {
-  const MotionElasticSheet({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (PackLoxMotionTheme.isTestMode) {
-      return child;
-    }
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: PackLoxMotionTheme.navSpringDuration,
-      curve: PackLoxMotionTheme.navSpringCurve,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, 22 * (1 - value)),
-            child: child,
-          ),
+              ],
+            );
+          },
         );
       },
-      child: child,
     );
   }
 }
 
-class _PremiumSheetHeader extends StatelessWidget {
-  const _PremiumSheetHeader({
-    required this.title,
-    required this.subtitle,
-    this.caption,
-  });
-
-  final String title;
-  final String subtitle;
-  final String? caption;
+class _PortfolioTitleBlock extends StatelessWidget {
+  const _PortfolioTitleBlock();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Column(
-      key: const ValueKey('portfolio-premium-sheet-header'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title,
+          'Portfolio',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.titleLarge?.copyWith(
-            color: PackLoxTokens.textPrimary,
+          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+            color: HomeTokens.textPrimary,
             fontWeight: FontWeight.w900,
+            height: 1.05,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 8),
         Text(
-          subtitle,
+          'Track saved collectibles, values, and items that need attention.',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: textTheme.bodyMedium?.copyWith(
-            color: PackLoxTokens.textSecondary,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: HomeTokens.textSecondary,
             fontWeight: FontWeight.w600,
-          ),
-        ),
-        if (caption != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            caption!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(
-              color: PackLoxTokens.textSecondary.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _PremiumSheetActions extends StatelessWidget {
-  const _PremiumSheetActions({
-    required this.primaryLabel,
-    required this.secondaryLabel,
-    required this.onPrimary,
-    required this.onSecondary,
-    required this.stackVertically,
-  });
-
-  final String primaryLabel;
-  final String secondaryLabel;
-  final VoidCallback onPrimary;
-  final VoidCallback onSecondary;
-  final bool stackVertically;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = _PremiumCTA.primary(label: primaryLabel, onTap: onPrimary);
-    final secondary = _PremiumCTA.secondary(
-      label: secondaryLabel,
-      onTap: onSecondary,
-    );
-
-    return MotionReveal(
-      child: stackVertically
-          ? Column(
-              key: const ValueKey('portfolio-premium-cta-stack'),
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                primary,
-                const SizedBox(height: AppSpacing.sm),
-                secondary,
-              ],
-            )
-          : Row(
-              key: const ValueKey('portfolio-premium-cta-row'),
-              children: [
-                Expanded(child: secondary),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(child: primary),
-              ],
-            ),
-    );
-  }
-}
-
-class _PremiumCTA extends StatelessWidget {
-  const _PremiumCTA._({
-    required this.label,
-    required this.onTap,
-    required this.primary,
-  });
-
-  const _PremiumCTA.primary({
-    required String label,
-    required VoidCallback onTap,
-  }) : this._(label: label, onTap: onTap, primary: true);
-
-  const _PremiumCTA.secondary({
-    required String label,
-    required VoidCallback onTap,
-  }) : this._(label: label, onTap: onTap, primary: false);
-
-  final String label;
-  final VoidCallback onTap;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionTapScale(
-      onTap: onTap,
-      child: DecoratedBox(
-        key: ValueKey(
-          primary
-              ? 'portfolio-premium-primary-cta'
-              : 'portfolio-premium-secondary-cta',
-        ),
-        decoration: BoxDecoration(
-          gradient: primary ? AppGradients.primary : null,
-          color: primary ? null : PackLoxTokens.surface.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: primary
-              ? null
-              : Border.all(color: colorScheme.outlineVariant),
-          boxShadow: primary ? AppElevation.level1 : null,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: textTheme.labelLarge?.copyWith(
-              color: primary ? Colors.white : PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-String _confidenceRangeLabel(_PortfolioConfidenceFilter value) {
-  return switch (value) {
-    _PortfolioConfidenceFilter.all => '0%-100%',
-    _PortfolioConfidenceFilter.high => '80%-100%',
-    _PortfolioConfidenceFilter.low => '0%-79%',
-  };
-}
-
-String _sheetSlug(String value) {
-  return value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-      .replaceAll(RegExp(r'^-|-$'), '');
-}
-
-class _PortfolioPickerSheet<T> extends StatelessWidget {
-  const _PortfolioPickerSheet({
-    required this.title,
-    required this.subtitle,
-    required this.selectedValue,
-    required this.values,
-    required this.labelFor,
-    required this.iconFor,
-  });
-
-  final String title;
-  final String subtitle;
-  final T selectedValue;
-  final List<T> values;
-  final String Function(T value) labelFor;
-  final IconData Function(T value) iconFor;
-
-  @override
-  Widget build(BuildContext context) {
-    return _PremiumSheetSurface(
-      key: const ValueKey('portfolio-premium-sort-sheet-surface'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _PremiumSheetHeader(
-            title: title,
-            subtitle: subtitle,
-            caption: 'Premium ordering for collection review',
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          for (var index = 0; index < values.length; index++) ...[
-            _PremiumSortTile<T>(
-              value: values[index],
-              label: labelFor(values[index]),
-              icon: iconFor(values[index]),
-              selected: selectedValue == values[index],
-              delay: Duration(milliseconds: index * 40),
-            ),
-            if (index != values.length - 1)
-              const SizedBox(height: AppSpacing.sm),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumSortTile<T> extends StatelessWidget {
-  const _PremiumSortTile({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.delay,
-  });
-
-  final T value;
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final Duration delay;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return MotionReveal(
-      delay: delay,
-      child: MotionTapScale(
-        onTap: () => Navigator.of(context).pop(value),
-        child: DecoratedBox(
-          key: ValueKey('portfolio-premium-sort-tile-${_sheetSlug(label)}'),
-          decoration: BoxDecoration(
-            color: PackLoxTokens.surface.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(
-              color: selected
-                  ? colorScheme.primary.withValues(alpha: 0.38)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.64),
-            ),
-            boxShadow: selected ? AppElevation.level1 : null,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(icon, size: 22, color: colorScheme.primary),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: PackLoxTokens.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                AnimatedContainer(
-                  duration: PackLoxMotionTheme.fast,
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? colorScheme.primary : Colors.transparent,
-                    border: Border.all(
-                      color: selected
-                          ? colorScheme.primary
-                          : colorScheme.outlineVariant,
-                    ),
-                  ),
-                  child: selected
-                      ? Icon(
-                          Icons.check,
-                          size: 14,
-                          color: colorScheme.onPrimary,
-                        )
-                      : null,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PortfolioFrame extends StatelessWidget {
-  const _PortfolioFrame({
-    required this.horizontalPadding,
-    required this.child,
-    this.topPadding = 0,
-    this.bottomPadding = 0,
-  });
-
-  final double horizontalPadding;
-  final double topPadding;
-  final double bottomPadding;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            topPadding,
-            horizontalPadding,
-            bottomPadding,
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _CollectionOverview extends StatelessWidget {
-  const _CollectionOverview({
-    required this.totalValue,
-    required this.itemCount,
-    required this.valuedItemCount,
-    required this.unvaluedItemCount,
-    required this.categoryCount,
-  });
-
-  final double totalValue;
-  final int itemCount;
-  final int valuedItemCount;
-  final int unvaluedItemCount;
-  final int categoryCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final valueLabel = itemCount == 0
-        ? _formatPortfolioMoney(0)
-        : valuedItemCount == 0
-        ? '-'
-        : _formatPortfolioMoney(totalValue);
-    final valuationLabel = unvaluedItemCount == 0
-        ? 'All valued'
-        : '$unvaluedItemCount unvalued';
-
-    return Semantics(
-      container: true,
-      label:
-          'Portfolio summary. $itemCount items. $valueLabel total estimated value. $valuationLabel.',
-      child: SizedBox(
-        width: double.infinity,
-        child: DecoratedBox(
-          key: const ValueKey('portfolio-compact-snapshot'),
-          decoration: BoxDecoration(
-            color: _portfolioRaisedSurfaceColor(colorScheme),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(
-              color: _portfolioSurfaceBorderColor(colorScheme),
-            ),
-            boxShadow: AppElevation.level1,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final tileWidth = ((constraints.maxWidth - AppSpacing.sm) / 2)
-                    .clamp(126.0, 240.0);
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      key: const ValueKey('portfolio-compact-metrics-grid'),
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        _OverviewMetric(
-                          width: tileWidth,
-                          label: 'Total Items',
-                          value: itemCount.toString(),
-                          icon: Icons.inventory_2_outlined,
-                          emphasized: true,
-                        ),
-                        _OverviewMetric(
-                          width: tileWidth,
-                          label: 'Total Value (Est.)',
-                          value: valueLabel,
-                          icon: Icons.account_balance_wallet_outlined,
-                        ),
-                        _OverviewMetric(
-                          width: tileWidth,
-                          label: 'Valued',
-                          value: valuedItemCount.toString(),
-                          icon: Icons.price_check_outlined,
-                        ),
-                        _OverviewMetric(
-                          width: tileWidth,
-                          label: 'Categories',
-                          value: categoryCount.toString(),
-                          icon: Icons.category_outlined,
-                        ),
-                      ],
-                    ),
-                    if (unvaluedItemCount > 0) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      _PartialValuationNote(count: unvaluedItemCount),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OverviewMetric extends StatelessWidget {
-  const _OverviewMetric({
-    required this.width,
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.emphasized = false,
-  });
-
-  final double width;
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return SizedBox(
-      width: width,
-      child: DecoratedBox(
-        key: ValueKey('portfolio-summary-metric-${label.toLowerCase()}'),
-        decoration: BoxDecoration(
-          color: emphasized
-              ? colorScheme.primary.withValues(alpha: 0.10)
-              : PackLoxTokens.surface.withValues(alpha: 0.78),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: emphasized
-                ? colorScheme.primary.withValues(alpha: 0.28)
-                : colorScheme.outlineVariant,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 18, color: colorScheme.primary),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: PackLoxTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: PackLoxTokens.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PartialValuationNote extends StatelessWidget {
-  const _PartialValuationNote({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(Icons.info_outline, size: 16, color: PackLoxTokens.textSecondary),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: Text(
-            '$count item${count == 1 ? '' : 's'} still need reliable valuation data.',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
+            height: 1.35,
           ),
         ),
       ],
@@ -1745,118 +598,578 @@ class _PartialValuationNote extends StatelessWidget {
   }
 }
 
-class _PortfolioCommandBar extends StatelessWidget {
-  const _PortfolioCommandBar({
+class _PortfolioToolbar extends StatelessWidget {
+  const _PortfolioToolbar({
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.onSearchCleared,
     required this.onSort,
     required this.onFilter,
-    required this.onAddItem,
     required this.activeFilterCount,
     required this.sortLabel,
   });
 
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchCleared;
   final VoidCallback onSort;
   final VoidCallback onFilter;
-  final VoidCallback? onAddItem;
   final int activeFilterCount;
   final String sortLabel;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stack = constraints.maxWidth < 360;
-        final tools = Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            _ToolButton(
-              key: const ValueKey('portfolio-action-sort'),
-              icon: Icons.sort,
-              label: 'Sort',
-              value: sortLabel,
-              onPressed: onSort,
+    return HomeSurface(
+      keySeed: 'toolbar',
+      keyPrefix: 'portfolio',
+      padding: const EdgeInsets.all(14),
+      backgroundColor: HomeTokens.surfaceRaised.withValues(alpha: .94),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            key: ValueKey('portfolio-search-field-$searchQuery'),
+            initialValue: searchQuery,
+            onChanged: onSearchChanged,
+            style: const TextStyle(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w700,
             ),
-            _ToolButton(
-              key: const ValueKey('portfolio-action-filter'),
-              icon: Icons.filter_alt_outlined,
-              label: 'Filter',
-              value: activeFilterCount == 0
-                  ? 'All'
-                  : '$activeFilterCount active',
-              onPressed: onFilter,
+            decoration: InputDecoration(
+              hintText: 'Search saved items',
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF8BC7FF)),
+              suffixIcon: searchQuery.trim().isEmpty
+                  ? null
+                  : IconButton(
+                      key: const ValueKey('portfolio-search-clear'),
+                      onPressed: onSearchCleared,
+                      icon: const Icon(
+                        Icons.close,
+                        color: HomeTokens.textSecondary,
+                      ),
+                    ),
+              filled: true,
+              fillColor: HomeTokens.surface,
+              hintStyle: const TextStyle(color: HomeTokens.textMuted),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: HomeTokens.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: HomeTokens.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: HomeTokens.accent),
+              ),
             ),
-          ],
-        );
-        final addButton = SizedBox(
-          key: const ValueKey('portfolio-action-add-item'),
-          height: 44,
-          child: FilledButton.icon(
-            onPressed: onAddItem,
-            icon: const Icon(Icons.add),
-            label: const Text('Add item'),
           ),
-        );
-
-        if (stack) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          const SizedBox(height: AppSpacing.sm),
+          Row(
             children: [
-              tools,
-              const SizedBox(height: AppSpacing.sm),
-              addButton,
+              Expanded(
+                child: _ToolbarButton(
+                  key: const ValueKey('portfolio-action-sort'),
+                  icon: Icons.swap_vert_outlined,
+                  label: sortLabel,
+                  onPressed: onSort,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _ToolbarButton(
+                  key: const ValueKey('portfolio-action-filter'),
+                  icon: Icons.tune_outlined,
+                  label: activeFilterCount == 0
+                      ? 'Filter'
+                      : 'Filter ($activeFilterCount)',
+                  onPressed: onFilter,
+                ),
+              ),
             ],
-          );
-        }
-
-        return Row(
-          children: [
-            Expanded(child: tools),
-            const SizedBox(width: AppSpacing.md),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 148),
-              child: addButton,
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _ToolButton extends StatelessWidget {
-  const _ToolButton({
+class _ToolbarButton extends StatelessWidget {
+  const _ToolbarButton({
     required this.icon,
     required this.label,
-    required this.value,
     required this.onPressed,
     super.key,
   });
 
   final IconData icon;
   final String label;
-  final String value;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 44,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: HomeTokens.textPrimary,
+          side: const BorderSide(color: HomeTokens.border),
+          backgroundColor: HomeTokens.surfaceInteractive,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+}
 
-    return Tooltip(
-      message: '$label: $value',
-      child: SizedBox(
-        height: 44,
-        child: OutlinedButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18),
-          label: Text('$label: $value', overflow: TextOverflow.ellipsis),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: PackLoxTokens.textPrimary,
-            backgroundColor: _portfolioRaisedSurfaceColor(colorScheme),
-            side: BorderSide(color: _portfolioSurfaceBorderColor(colorScheme)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+class _PortfolioMetrics extends StatelessWidget {
+  const _PortfolioMetrics({
+    required this.totalValue,
+    required this.itemCount,
+    required this.valuedItemCount,
+    required this.pendingItemCount,
+    this.filteredCount,
+  });
+
+  final double totalValue;
+  final int itemCount;
+  final int valuedItemCount;
+  final int pendingItemCount;
+  final int? filteredCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-compact-snapshot'),
+      child: GridView.count(
+        key: const ValueKey('portfolio-metric-grid'),
+        crossAxisCount: 2,
+        mainAxisSpacing: AppSpacing.sm,
+        crossAxisSpacing: AppSpacing.sm,
+        childAspectRatio: .96,
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        children: [
+          HomeMetricTile(
+            label: 'Collection value',
+            value: _formatAud(totalValue),
+            supportingText: pendingItemCount == 0
+                ? 'All values confirmed'
+                : '$pendingItemCount pending',
+            supportingColor: pendingItemCount == 0
+                ? HomeTokens.positive
+                : HomeTokens.warning,
+          ),
+          HomeMetricTile(
+            label: 'Collection items',
+            value: '$itemCount',
+            supportingText: '$valuedItemCount valued',
+          ),
+          HomeMetricTile(
+            label: filteredCount == null
+                ? 'Needs attention'
+                : 'Filtered results',
+            value: filteredCount == null
+                ? '$pendingItemCount'
+                : '$filteredCount',
+            supportingText: filteredCount == null
+                ? (pendingItemCount == 0 ? 'Healthy' : 'Review pending')
+                : 'Clear filters',
+            supportingColor: filteredCount == null && pendingItemCount > 0
+                ? HomeTokens.warning
+                : HomeTokens.positive,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioContent extends StatelessWidget {
+  const _PortfolioContent({
+    required this.allItems,
+    required this.visibleItems,
+    required this.isFilteredEmpty,
+    required this.onScanPressed,
+    required this.onClearFilters,
+    required this.onItemTap,
+  });
+
+  final List<CollectibleItem> allItems;
+  final List<CollectibleItem> visibleItems;
+  final bool isFilteredEmpty;
+  final VoidCallback? onScanPressed;
+  final VoidCallback onClearFilters;
+  final ValueChanged<CollectibleItem> onItemTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (allItems.isEmpty) {
+      return _PortfolioEmptyPanel(onScanPressed: onScanPressed);
+    }
+
+    if (isFilteredEmpty) {
+      return _PortfolioFilteredEmptyPanel(onClearFilters: onClearFilters);
+    }
+
+    return HomeSectionSurface(
+      keySeed: 'saved-items',
+      title: 'Saved collectibles',
+      child: Column(
+        children: [
+          for (var index = 0; index < visibleItems.length; index += 1) ...[
+            _PortfolioItemRow(
+              item: visibleItems[index],
+              onTap: () => onItemTap(visibleItems[index]),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            if (index != visibleItems.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioItemRow extends StatelessWidget {
+  const _PortfolioItemRow({required this.item, required this.onTap});
+
+  final CollectibleItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = _hasDisplayableValuation(item);
+    final pending = _isPendingItem(item);
+    final statusColor = pending ? HomeTokens.warning : HomeTokens.positive;
+    final statusLabel = pending
+        ? item.syncStatus == CloudItemSyncStatus.failed
+              ? 'Sync issue'
+              : 'Needs value'
+        : 'Valued';
+    final valueLabel = hasValue ? _formatAud(item.estimatedValue) : 'Pending';
+
+    return MotionTapScale(
+      onTap: onTap,
+      child: Container(
+        key: ValueKey('portfolio-grid-item-${item.id}'),
+        constraints: const BoxConstraints(minHeight: 104),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceInteractive,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: Row(
+          children: [
+            PortfolioThumbnail(imagePath: item.imagePath, size: 64),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: HomeTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                      height: 1.18,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${item.category} - ${item.condition}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: HomeTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: _StatusPill(
+                          label: statusLabel,
+                          color: statusColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _trendLabel(item),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: HomeTokens.textMuted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 84),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    valueLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: hasValue
+                          ? HomeTokens.textPrimary
+                          : HomeTokens.warning,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF8BC7FF),
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: .42)),
+      ),
+      child: Text(
+        label,
+        key: ValueKey(
+          'portfolio-status-${label.toLowerCase().replaceAll(' ', '-')}',
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioEmptyPanel extends StatelessWidget {
+  const _PortfolioEmptyPanel({required this.onScanPressed});
+
+  final VoidCallback? onScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-empty-state-surface'),
+      child: HomeSectionSurface(
+        keySeed: 'portfolio-empty',
+        title: 'Start with your first item',
+        child: Column(
+          children: [
+            Text(
+              'Your portfolio is waiting for saved collectibles. Scan an item to begin tracking values and condition details.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: HomeTokens.textSecondary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            HomeActionRow(
+              keySeed: 'portfolio-guided-scan',
+              icon: Icons.document_scanner_outlined,
+              title: 'Use guided scan',
+              subtitle: 'Open the existing scanner flow.',
+              onTap: onScanPressed,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioFilteredEmptyPanel extends StatelessWidget {
+  const _PortfolioFilteredEmptyPanel({required this.onClearFilters});
+
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-filtered-empty-state-surface'),
+      child: HomeSectionSurface(
+        keySeed: 'portfolio-filtered-empty',
+        title: 'No matching collectibles',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your portfolio has saved items, but the current search or filters found none.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: HomeTokens.textSecondary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: FilledButton.icon(
+                key: const ValueKey('portfolio-clear-filters'),
+                onPressed: onClearFilters,
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Clear filters'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioErrorPanel extends StatelessWidget {
+  const _PortfolioErrorPanel({
+    required this.errorMessage,
+    required this.onRetry,
+  });
+
+  final String? errorMessage;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-error-state-surface'),
+      child: HomeSectionSurface(
+        keySeed: 'portfolio-error',
+        title: 'Portfolio could not load',
+        borderColor: HomeTokens.warning.withValues(alpha: .44),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We could not refresh your portfolio.',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection and try again.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: HomeTokens.textSecondary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: FilledButton.icon(
+                key: const ValueKey('portfolio-retry'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_outlined),
+                label: const Text('Retry'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioLoadingSkeleton extends StatelessWidget {
+  const _PortfolioLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const KeyedSubtree(
+      key: ValueKey('portfolio-loading-skeleton'),
+      child: HomeSkeletonBlock(),
+    );
+  }
+}
+
+class _PortfolioBottomSheet extends StatelessWidget {
+  const _PortfolioBottomSheet({
+    required this.title,
+    required this.children,
+    super.key,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: HomeTokens.border),
+          boxShadow: AppElevation.level3,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ...children,
+            ],
           ),
         ),
       ),
@@ -1864,29 +1177,255 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
-class _PortfolioSliverBox extends StatelessWidget {
-  const _PortfolioSliverBox({required this.child});
+class _SheetOption extends StatelessWidget {
+  const _SheetOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final Widget child;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960, minHeight: 160),
-        child: SizedBox(width: double.infinity, child: child),
+    return ListTile(
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        selected ? Icons.radio_button_checked : Icons.radio_button_off,
+        color: selected ? HomeTokens.accent : HomeTokens.textSecondary,
+      ),
+      title: Text(
+        label,
+        style: const TextStyle(
+          color: HomeTokens.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 }
 
-String? _wishlistStatusLabel(WishlistStatus? status) {
-  return switch (status) {
-    WishlistStatus.owned => 'Owned',
-    WishlistStatus.wanted => 'Wanted',
-    WishlistStatus.missing => 'Missing',
-    null => null,
+class _SheetGroup extends StatelessWidget {
+  const _SheetGroup({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(spacing: 8, runSpacing: 8, children: children),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChipOption extends StatelessWidget {
+  const _FilterChipOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: HomeTokens.accent.withValues(alpha: .22),
+      backgroundColor: HomeTokens.surfaceInteractive,
+      labelStyle: TextStyle(
+        color: selected ? HomeTokens.textPrimary : HomeTokens.textSecondary,
+        fontWeight: FontWeight.w800,
+      ),
+      side: BorderSide(color: selected ? HomeTokens.accent : HomeTokens.border),
+    );
+  }
+}
+
+String _heroTitle({
+  required PortfolioState state,
+  required bool showLoading,
+  required bool isFilteredEmpty,
+}) {
+  if (showLoading) {
+    return 'Preparing portfolio';
+  }
+  if (isFilteredEmpty) {
+    return 'No matches for these filters';
+  }
+  if (state.items.isEmpty) {
+    return 'Start your portfolio';
+  }
+  return 'Your collection at a glance';
+}
+
+String _heroBody({
+  required PortfolioState state,
+  required bool showLoading,
+  required bool isFilteredEmpty,
+}) {
+  if (showLoading) {
+    return 'Preparing your saved items, values, and filters.';
+  }
+  if (isFilteredEmpty) {
+    return 'Your saved items are still here. Clear filters to return to the full portfolio.';
+  }
+  if (state.items.isEmpty) {
+    return 'Scan your first collectible to start building a saved portfolio.';
+  }
+  return 'Review saved collectibles, values, and items that need attention.';
+}
+
+String _heroCtaLabel({
+  required bool hasItems,
+  required bool showLoading,
+  required bool isFilteredEmpty,
+}) {
+  if (showLoading) {
+    return 'Loading';
+  }
+  if (isFilteredEmpty) {
+    return 'Clear filters';
+  }
+  return hasItems ? 'Scan item' : 'Scan first item';
+}
+
+PortfolioState _previewStateFor(PortfolioPreviewScenario scenario) {
+  return switch (scenario) {
+    PortfolioPreviewScenario.defaultData => PortfolioState(
+      items: _defaultItems(),
+    ),
+    PortfolioPreviewScenario.empty => const PortfolioState(),
+    PortfolioPreviewScenario.loading => const PortfolioState(isLoading: true),
+    PortfolioPreviewScenario.error => const PortfolioState(
+      errorMessage: 'Unable to load portfolio.',
+    ),
+    PortfolioPreviewScenario.partial => PortfolioState(items: _partialItems()),
+    PortfolioPreviewScenario.filteredEmpty => PortfolioState(
+      items: _defaultItems(),
+    ),
   };
+}
+
+List<CollectibleItem> _defaultItems() {
+  return [
+    _previewItem(
+      id: 'preview-charizard',
+      title: 'Base Set Charizard',
+      category: 'Trading Card',
+      value: 1850,
+      condition: 'Near Mint',
+      trendLabel: 'Rising',
+    ),
+    _previewItem(
+      id: 'preview-eagle',
+      title: 'Silver Eagle 2015',
+      category: 'Coin',
+      value: 52,
+      condition: 'Brilliant Uncirculated',
+      trendLabel: 'Stable',
+    ),
+    _previewItem(
+      id: 'preview-hot-wheels',
+      title: 'Hot Wheels 15 Mazda MX-5',
+      category: 'Die-cast',
+      value: 18,
+      condition: 'Carded',
+      trendLabel: 'Stable',
+    ),
+  ];
+}
+
+List<CollectibleItem> _partialItems() {
+  return [
+    _previewItem(
+      id: 'partial-charizard',
+      title: 'Base Set Charizard',
+      category: 'Trading Card',
+      value: 1850,
+      condition: 'Near Mint',
+      trendLabel: 'Rising',
+    ),
+    _previewItem(
+      id: 'partial-comic',
+      title: 'Amazing Spider-Man 361',
+      category: 'Comic',
+      value: 0,
+      condition: 'Fine',
+      status: ValuationStatus.providerNotConfigured,
+      trendLabel: 'Pending',
+    ),
+    _previewItem(
+      id: 'partial-eagle',
+      title: 'Silver Eagle 2015',
+      category: 'Coin',
+      value: 52,
+      condition: 'Brilliant Uncirculated',
+      trendLabel: 'Stable',
+    ),
+  ];
+}
+
+CollectibleItem _previewItem({
+  required String id,
+  required String title,
+  required String category,
+  required double value,
+  required String condition,
+  required String trendLabel,
+  ValuationStatus status = ValuationStatus.marketEstimated,
+}) {
+  return CollectibleItem(
+    id: id,
+    title: title,
+    category: category,
+    estimatedValue: value,
+    confidence: value > 0 ? .91 : .48,
+    condition: condition,
+    recommendation: value > 0
+        ? 'Keep protected and review market movement.'
+        : 'Scan details are saved while valuation finishes.',
+    imagePath: 'sample://$id',
+    createdAt: DateTime.utc(2026, 7, 1),
+    valuationStatus: status,
+    valuationSource: status.wireValue,
+  );
+}
+
+int _valuedItemCount(List<CollectibleItem> items) {
+  return items.where(_hasDisplayableValuation).length;
+}
+
+int _pendingItemCount(List<CollectibleItem> items) {
+  return items.where(_isPendingItem).length;
+}
+
+double _displayTotalValue(List<CollectibleItem> items) {
+  return items
+      .where(_hasDisplayableValuation)
+      .fold<double>(0, (total, item) => total + item.estimatedValue);
 }
 
 bool _hasDisplayableValuation(CollectibleItem item) {
@@ -1895,154 +1434,28 @@ bool _hasDisplayableValuation(CollectibleItem item) {
     ValuationStatus.providerNotConfigured ||
     ValuationStatus.noMarketMatch ||
     ValuationStatus.lookupFailed ||
-    ValuationStatus.unavailable => item.estimatedValue > 0,
+    ValuationStatus.unavailable => false,
   };
 }
 
-String _formatPortfolioMoney(double value) {
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
+bool _isPendingItem(CollectibleItem item) {
+  return !_hasDisplayableValuation(item) ||
+      item.syncStatus == CloudItemSyncStatus.pendingUpload ||
+      item.syncStatus == CloudItemSyncStatus.failed;
+}
+
+String _formatAud(double value) {
+  final rounded = value.round();
+  final formatted = rounded.toString().replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  return '\$$withCommas';
+  return '\$$formatted';
 }
 
-Color _portfolioRaisedSurfaceColor(ColorScheme colorScheme) {
-  return PackLoxTokens.surfaceRaised.withValues(
-    alpha: colorScheme.brightness == Brightness.dark ? 0.94 : 0.90,
-  );
-}
-
-Color _portfolioSurfaceBorderColor(ColorScheme colorScheme) {
-  return PackLoxTokens.border.withValues(
-    alpha: colorScheme.brightness == Brightness.dark ? 0.82 : 0.68,
-  );
-}
-
-class _PortfolioControls extends StatelessWidget {
-  const _PortfolioControls({
-    required this.searchQuery,
-    required this.categoryFilter,
-    required this.onSearchChanged,
-    required this.onSearchCleared,
-    required this.onCategoryFilterChanged,
-  });
-
-  final String searchQuery;
-  final _PortfolioCategoryFilter categoryFilter;
-  final ValueChanged<String> onSearchChanged;
-  final VoidCallback onSearchCleared;
-  final ValueChanged<_PortfolioCategoryFilter> onCategoryFilterChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final colorScheme = Theme.of(context).colorScheme;
-        final searchField = TextFormField(
-          key: ValueKey('portfolio-search-field-$searchQuery'),
-          initialValue: searchQuery,
-          onChanged: onSearchChanged,
-          textInputAction: TextInputAction.search,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: PackLoxTokens.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: searchQuery.trim().isEmpty
-                ? null
-                : IconButton(
-                    key: const ValueKey('portfolio-search-clear'),
-                    tooltip: 'Clear portfolio search',
-                    icon: const Icon(Icons.close),
-                    onPressed: onSearchCleared,
-                  ),
-            hintText: 'Search items',
-            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-            isDense: true,
-            filled: true,
-            fillColor: _portfolioRaisedSurfaceColor(colorScheme),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: BorderSide(
-                color: _portfolioSurfaceBorderColor(colorScheme),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: BorderSide(
-                color: _portfolioSurfaceBorderColor(colorScheme),
-              ),
-            ),
-          ),
-        );
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            searchField,
-            const SizedBox(height: AppSpacing.sm),
-            _PortfolioCategoryFilterChips(
-              selectedFilter: categoryFilter,
-              onChanged: onCategoryFilterChanged,
-            ),
-          ],
-        );
-      },
-    );
+String _trendLabel(CollectibleItem item) {
+  if (!_hasDisplayableValuation(item)) {
+    return 'Pending';
   }
-}
-
-class _PortfolioCategoryFilterChips extends StatelessWidget {
-  const _PortfolioCategoryFilterChips({
-    required this.selectedFilter,
-    required this.onChanged,
-  });
-
-  final _PortfolioCategoryFilter selectedFilter;
-  final ValueChanged<_PortfolioCategoryFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    const visibleFilters = [
-      _PortfolioCategoryFilter.all,
-      _PortfolioCategoryFilter.cards,
-      _PortfolioCategoryFilter.coins,
-      _PortfolioCategoryFilter.comics,
-    ];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final filter in visibleFilters) ...[
-            ChoiceChip(
-              key: ValueKey('portfolio-filter-${filter.name}'),
-              label: Text(filter.label),
-              selected: selectedFilter == filter,
-              onSelected: (_) => onChanged(filter),
-              backgroundColor: _portfolioRaisedSurfaceColor(colorScheme),
-              selectedColor: colorScheme.primary.withValues(alpha: 0.18),
-              side: BorderSide(
-                color: selectedFilter == filter
-                    ? colorScheme.primary.withValues(alpha: 0.52)
-                    : _portfolioSurfaceBorderColor(colorScheme),
-              ),
-              labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: PackLoxTokens.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
-              checkmarkColor: PackLoxTokens.textPrimary,
-            ),
-            if (filter != visibleFilters.last) const SizedBox(width: 6),
-          ],
-        ],
-      ),
-    );
-  }
+  return 'Stable';
 }

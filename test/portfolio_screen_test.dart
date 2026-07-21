@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,41 +15,30 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('approved header search summary and empty order render at top', (
+  testWidgets('empty state has no fake metrics and keeps scan action active', (
     tester,
   ) async {
-    await _pumpPortfolio(tester);
+    var scanTapped = false;
 
+    await _pumpPortfolio(
+      tester,
+      onScanPressed: () {
+        scanTapped = true;
+      },
+    );
+
+    expect(find.text('PackLox'), findsOneWidget);
     expect(find.text('Portfolio'), findsOneWidget);
-    expect(find.text('My Collection'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('portfolio-search-field-')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('portfolio-compact-snapshot')),
-      findsOneWidget,
-    );
-    expect(find.text('Total Items'), findsOneWidget);
-    expect(find.text('Total Value (Est.)'), findsOneWidget);
-    expect(find.text('Your collection is empty'), findsOneWidget);
-    expect(find.text('Scan Your First Item'), findsOneWidget);
+    expect(find.text('Start your portfolio'), findsOneWidget);
+    expect(find.text('Start with your first item'), findsOneWidget);
+    expect(find.byKey(const ValueKey('portfolio-metric-grid')), findsNothing);
 
-    final searchTop = tester
-        .getTopLeft(find.byKey(const ValueKey('portfolio-search-field-')))
-        .dy;
-    final summaryTop = tester
-        .getTopLeft(find.byKey(const ValueKey('portfolio-compact-snapshot')))
-        .dy;
-    final emptyTop = tester
-        .getTopLeft(find.byKey(const ValueKey('portfolio-empty-state-surface')))
-        .dy;
-
-    expect(searchTop, lessThan(summaryTop));
-    expect(summaryTop, lessThan(emptyTop));
+    await tester.tap(find.text('Scan first item'));
+    await tester.pump();
+    expect(scanTapped, isTrue);
   });
 
-  testWidgets('populated summary uses real count value and approved controls', (
+  testWidgets('default state renders real bound values and saved items', (
     tester,
   ) async {
     _seedPortfolio([
@@ -64,21 +54,23 @@ void main() {
 
     await _pumpPortfolio(tester);
 
+    expect(find.text('Your collection at a glance'), findsOneWidget);
+    expect(find.text('Collection value'), findsOneWidget);
+    expect(find.text('\$18'), findsOneWidget);
+    expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
-    expect(find.text('\$18'), findsWidgets);
+    expect(find.text('1 pending'), findsOneWidget);
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-action-filter')),
       findsOneWidget,
     );
+
     await _revealPortfolio(
       tester,
       find.byKey(const ValueKey('portfolio-grid-item-card-1')),
     );
-    expect(
-      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
-      findsOneWidget,
-    );
+    expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
   });
 
   testWidgets('unavailable valuation is distinct from genuine zero', (
@@ -109,12 +101,13 @@ void main() {
       tester,
       find.byKey(const ValueKey('portfolio-grid-item-zero-card')),
     );
+
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-unavailable-card')),
-        matching: find.text('-'),
+        matching: find.text('Pending'),
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.descendant(
@@ -123,6 +116,77 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('loading skeleton renders without placeholder data copy', (
+    tester,
+  ) async {
+    await _pumpPortfolio(
+      tester,
+      previewScenario: PortfolioPreviewScenario.loading,
+    );
+
+    expect(find.text('Preparing portfolio'), findsOneWidget);
+    expect(
+      find.text('Preparing your saved items, values, and filters.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-loading-skeleton')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('placeholder data'), findsNothing);
+  });
+
+  testWidgets('error state exposes one active Retry CTA', (tester) async {
+    await _pumpPortfolio(
+      tester,
+      previewScenario: PortfolioPreviewScenario.error,
+    );
+
+    expect(find.text('Portfolio could not load'), findsOneWidget);
+    expect(find.text('Check your connection and try again.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.byKey(const ValueKey('portfolio-retry')), findsOneWidget);
+  });
+
+  testWidgets('partial state uses amber pending and green confirmed status', (
+    tester,
+  ) async {
+    await _pumpPortfolio(
+      tester,
+      previewScenario: PortfolioPreviewScenario.partial,
+    );
+
+    await _revealPortfolio(tester, find.text('Needs value'));
+    final pendingText = tester.widget<Text>(find.text('Needs value').first);
+    expect(pendingText.style?.color, HomeTokens.warning);
+
+    final valuedText = tester.widget<Text>(find.text('Valued').first);
+    expect(valuedText.style?.color, HomeTokens.positive);
+  });
+
+  testWidgets('filtered empty keeps portfolio context and clears filters', (
+    tester,
+  ) async {
+    await _pumpPortfolio(
+      tester,
+      previewScenario: PortfolioPreviewScenario.filteredEmpty,
+    );
+
+    await _revealPortfolio(tester, find.text('No matching collectibles'));
+    expect(find.text('No matching collectibles'), findsOneWidget);
+    expect(find.text('Your portfolio is waiting'), findsNothing);
+    expect(find.text('Clear filters'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('portfolio-clear-filters')));
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-preview-charizard')),
+    );
+    expect(find.text('Base Set Charizard'), findsOneWidget);
   });
 
   testWidgets('search no-results and clear restore results', (tester) async {
@@ -139,10 +203,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No items found'), findsOneWidget);
-    expect(find.text('Clear filters'), findsOneWidget);
+    await _revealPortfolio(tester, find.text('No matching collectibles'));
+    expect(find.text('No matching collectibles'), findsOneWidget);
+    expect(find.text('Clear filters'), findsWidgets);
 
-    await tester.tap(find.text('Clear filters'));
+    await tester.tap(find.byKey(const ValueKey('portfolio-clear-filters')));
     await tester.pumpAndSettle();
 
     await _revealPortfolio(
@@ -163,12 +228,14 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('portfolio-premium-sort-sheet-surface')),
-      findsOneWidget,
+    final sortSheet = find.byKey(
+      const ValueKey('portfolio-premium-sort-sheet-surface'),
     );
+    expect(sortSheet, findsOneWidget);
     expect(find.text('Sort portfolio'), findsOneWidget);
-    await tester.tap(find.text('Recently Added'));
+    await tester.tap(
+      find.descendant(of: sortSheet, matching: find.text('Recently Added')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
@@ -181,59 +248,21 @@ void main() {
     expect(find.text('Apply filters'), findsOneWidget);
   });
 
-  testWidgets('gallery fallback badge and item card dimensions stay in range', (
-    tester,
-  ) async {
-    _seedPortfolio([
-      _item(
-        'gallery-card',
-        'Gallery Hot Wheels',
-        48,
-        imagePath: '',
-        galleryImages: const [
-          {'path': 'sample://front', 'role': 'front', 'isPrimary': true},
-          {'path': 'sample://back', 'role': 'back', 'isPrimary': false},
-        ],
-      ),
-    ]);
-
+  testWidgets('item rows open existing Detail route', (tester) async {
+    _seedPortfolio([_item('detail-card', 'Detail Charizard', 1850)]);
     await _pumpPortfolio(tester);
 
-    final cardFinder = find.byKey(
-      const ValueKey('portfolio-grid-item-gallery-card'),
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
     );
-    await _revealPortfolio(tester, cardFinder);
-    expect(cardFinder, findsOneWidget);
-    expect(find.text('2 images'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
+    );
+    await tester.pumpAndSettle();
 
-    final rect = tester.getRect(cardFinder);
-    expect(rect.width, inInclusiveRange(150, 210));
-    expect(rect.height / rect.width, inInclusiveRange(1.55, 1.95));
+    expect(find.text('Detail Charizard'), findsWidgets);
   });
-
-  testWidgets(
-    'card opens existing Detail route and first entry starts at top',
-    (tester) async {
-      _seedPortfolio([_item('detail-card', 'Detail Charizard', 1850)]);
-      await _pumpPortfolio(tester);
-
-      final scrollView = tester.widget<CustomScrollView>(
-        find.byKey(const ValueKey('portfolio-scroll-view')),
-      );
-      expect(scrollView.controller?.offset ?? 0, 0);
-
-      await _revealPortfolio(
-        tester,
-        find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Detail Charizard'), findsWidgets);
-    },
-  );
 
   testWidgets(
     'narrow and large text layouts keep Portfolio controls reachable',
@@ -260,12 +289,47 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Portfolio preview screen selects in-memory scenario', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.dark,
+          home: Builder(
+            builder: (context) {
+              return TextButton(
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(PortfolioStatePreviewScreen.route()),
+                child: const Text('Open'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('home-action-portfolio-preview-partial')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Portfolio State Preview'), findsNothing);
+  });
 }
 
 Future<void> _pumpPortfolio(
   WidgetTester tester, {
   Size size = const Size(430, 844),
   TextScaler textScaler = TextScaler.noScaling,
+  PortfolioPreviewScenario? previewScenario,
+  VoidCallback? onScanPressed,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -278,7 +342,12 @@ Future<void> _pumpPortfolio(
         themeMode: ThemeMode.dark,
         home: MediaQuery(
           data: MediaQueryData(size: size, textScaler: textScaler),
-          child: const Scaffold(body: PortfolioScreen()),
+          child: Scaffold(
+            body: PortfolioScreen(
+              previewScenario: previewScenario,
+              onScanPressed: onScanPressed,
+            ),
+          ),
         ),
       ),
     ),
@@ -288,14 +357,14 @@ Future<void> _pumpPortfolio(
 }
 
 Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
-  final scroll = find.byKey(const ValueKey('portfolio-scroll-view'));
+  final scroll = find.byType(CustomScrollView);
   for (var attempt = 0; attempt < 12; attempt += 1) {
     if (finder.evaluate().isNotEmpty) {
       await tester.ensureVisible(finder);
       await tester.pumpAndSettle();
       return;
     }
-    await tester.drag(scroll, const Offset(0, -260));
+    await tester.drag(scroll.first, const Offset(0, -260));
     await tester.pump();
   }
   expect(finder, findsOneWidget);
@@ -314,7 +383,6 @@ Map<String, Object?> _item(
   String category = 'Trading Card',
   String imagePath = 'sample://card',
   String valuationStatus = 'market_estimated',
-  List<Map<String, Object?>> galleryImages = const [],
 }) {
   return {
     'id': id,
@@ -325,7 +393,7 @@ Map<String, Object?> _item(
     'condition': 'Near Mint',
     'recommendation': 'Keep protected.',
     'imagePath': imagePath,
-    'galleryImages': galleryImages,
+    'galleryImages': <Object>[],
     'createdAt': '2026-07-01T00:00:00.000Z',
     'valuationStatus': valuationStatus,
     'valuationSource': valuationStatus,
