@@ -35,6 +35,11 @@ class GlassBottomNavBar extends StatelessWidget {
         bottomBreathingGap;
   }
 
+  static double bodyContentInset(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return heightFor(context) + mediaQuery.padding.bottom + AppSpacing.sm;
+  }
+
   @override
   Widget build(BuildContext context) {
     final navHeight = heightFor(context);

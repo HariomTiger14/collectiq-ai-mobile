@@ -304,7 +304,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       body:
                           'Start with a scan, then let PackLox build value history from real items.',
                       ctaLabel: 'Add first item',
-                      icon: Icons.inventory_2_outlined,
+                      icon: Icons.photo_camera_outlined,
                       onPressed: widget.onScanPressed == null
                           ? null
                           : _handleScanPressed,
@@ -358,7 +358,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       body:
                           'Track collection health, recent scans, and the next useful action.',
                       ctaLabel: 'Scan next item',
-                      icon: Icons.show_chart_rounded,
+                      icon: Icons.photo_camera_outlined,
                       onPressed: widget.onScanPressed == null
                           ? null
                           : _handleScanPressed,

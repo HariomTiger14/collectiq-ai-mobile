@@ -187,7 +187,7 @@ class _QaShellFrame extends StatelessWidget {
         backgroundColor: PackLoxTokens.background,
         body: Padding(
           padding: EdgeInsets.only(
-            bottom: GlassBottomNavBar.bottomBreathingGap,
+            bottom: GlassBottomNavBar.bodyContentInset(context),
           ),
           child: child,
         ),

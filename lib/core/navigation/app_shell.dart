@@ -266,7 +266,7 @@ class _AppShellState extends ConsumerState<AppShell>
             padding: EdgeInsets.only(
               bottom: hideBottomNavigation
                   ? 0
-                  : GlassBottomNavBar.bottomBreathingGap,
+                  : GlassBottomNavBar.bodyContentInset(context),
             ),
             child: _buildActiveDestination(selectedDestination),
           ),

@@ -319,7 +319,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         icon: isFilteredEmpty
                             ? Icons.filter_alt_off_outlined
                             : hasItems
-                            ? Icons.inventory_2_outlined
+                            ? Icons.photo_camera_outlined
                             : Icons.add_a_photo_outlined,
                         onPressed: showLoading
                             ? null
