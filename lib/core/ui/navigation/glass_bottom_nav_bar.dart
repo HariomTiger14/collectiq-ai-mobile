@@ -20,9 +20,9 @@ class GlassBottomNavBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final List<NavBarItem> items;
 
-  static const compactHeight = 68.0;
-  static const largeTextHeight = 78.0;
-  static const bottomBreathingGap = 16.0;
+  static const compactHeight = 60.0;
+  static const largeTextHeight = 68.0;
+  static const bottomBreathingGap = 14.0;
 
   static double heightFor(BuildContext context) {
     final textScale = MediaQuery.of(context).textScaler.scale(1);
@@ -45,7 +45,7 @@ class GlassBottomNavBar extends StatelessWidget {
     return SafeArea(
       key: const ValueKey('bottom-navigation-safe-area-surface'),
       top: false,
-      minimum: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      minimum: const EdgeInsets.fromLTRB(30, 0, 30, 12),
       child: Semantics(
         container: true,
         explicitChildNodes: true,
@@ -53,29 +53,29 @@ class GlassBottomNavBar extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.xl),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
             child: Container(
-              constraints: BoxConstraints(minHeight: navHeight),
+              height: navHeight,
               decoration: BoxDecoration(
-                color: PackLoxTokens.surface.withValues(alpha: 0.72),
+                color: PackLoxTokens.surface.withValues(alpha: 0.56),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: PackLoxTokens.cyan.withValues(alpha: 0.22),
+                  color: PackLoxTokens.cyan.withValues(alpha: 0.16),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.28),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
+                    color: Colors.black.withValues(alpha: 0.22),
+                    blurRadius: 14,
+                    offset: const Offset(0, 7),
                   ),
                   BoxShadow(
-                    color: PackLoxTokens.cyan.withValues(alpha: 0.08),
-                    blurRadius: 18,
-                    offset: const Offset(0, -2),
+                    color: PackLoxTokens.cyan.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(0, -1),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               child: Row(
                 children: [
                   for (var index = 0; index < items.length; index++)
@@ -140,80 +140,56 @@ class NavBarItem extends StatelessWidget {
         ? PackLoxTokens.textPrimary
         : PackLoxTokens.textSecondary;
     final borderColor = isScanAction
-        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.58 : 0.24)
+        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.48 : 0.0)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.38)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.26)
         : Colors.transparent;
     final fillColor = isScanAction
-        ? PackLoxTokens.blue.withValues(alpha: isActive ? 0.72 : 0.12)
+        ? PackLoxTokens.blue.withValues(alpha: isActive ? 0.44 : 0.0)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.12)
+        ? PackLoxTokens.cyan.withValues(alpha: 0.10)
         : Colors.transparent;
     final effectiveIcon = isActive ? selectedIcon ?? icon : icon;
 
     final content = AnimatedContainer(
       duration: duration,
       curve: PackLoxMotionTheme.navStateCurve,
-      constraints: const BoxConstraints(minHeight: 48),
+      constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
       padding: EdgeInsets.symmetric(
-        horizontal: isScanAction ? 8 : 6,
-        vertical: isScanAction ? 7 : 5,
+        horizontal: isScanAction ? 8 : 7,
+        vertical: isScanAction ? 8 : 7,
       ),
       decoration: BoxDecoration(
         color: fillColor,
         borderRadius: BorderRadius.circular(
-          isScanAction ? AppRadius.xl : AppRadius.lg,
+          isScanAction || isActive ? 999 : AppRadius.lg,
         ),
         border: Border.all(color: borderColor),
         boxShadow: isScanAction && isActive
             ? [
                 BoxShadow(
-                  color: PackLoxTokens.blue.withValues(alpha: 0.22),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
+                  color: PackLoxTokens.blue.withValues(alpha: 0.16),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ]
             : null,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ExcludeSemantics(
-            child: iconAsset == null
-                ? Icon(
-                    effectiveIcon,
-                    color: foreground,
-                    size: isScanAction ? 23 : 21,
-                  )
-                : SvgPicture.asset(
-                    iconAsset!,
-                    width: isScanAction ? 23 : 21,
-                    height: isScanAction ? 23 : 21,
-                    colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
-                  ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                softWrap: false,
-                style: TextStyle(
+      child: Center(
+        child: ExcludeSemantics(
+          child: iconAsset == null
+              ? Icon(
+                  effectiveIcon,
                   color: foreground,
-                  fontSize: isScanAction ? 12.5 : 12,
-                  height: 1.08,
-                  fontWeight: isScanAction || isActive
-                      ? FontWeight.w800
-                      : FontWeight.w700,
-                  letterSpacing: 0,
+                  size: isScanAction ? 24 : 22,
+                )
+              : SvgPicture.asset(
+                  iconAsset!,
+                  width: isScanAction ? 24 : 22,
+                  height: isScanAction ? 24 : 22,
+                  colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
                 ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
 

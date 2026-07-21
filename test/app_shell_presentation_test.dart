@@ -201,7 +201,9 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('nav-settings')));
       await tester.pumpTabSwitch();
-      await tester.revealText('Home State Preview');
+      await tester.revealFinder(
+        find.byKey(const ValueKey('settings-home-state-preview')),
+      );
       await tester.tap(
         find.byKey(const ValueKey('settings-home-state-preview')),
       );
@@ -248,7 +250,9 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('nav-settings')));
       await tester.pumpTabSwitch();
-      await tester.revealText('Portfolio State Preview');
+      await tester.revealFinder(
+        find.byKey(const ValueKey('settings-portfolio-state-preview')),
+      );
       await tester.tap(
         find.byKey(const ValueKey('settings-portfolio-state-preview')),
       );
@@ -368,17 +372,34 @@ extension _ShellPump on WidgetTester {
   }
 
   Future<void> revealText(String text) async {
-    final scrollable = find.byType(Scrollable).first;
+    await revealFinder(find.text(text), description: text);
+  }
+
+  Future<void> revealFinder(Finder finder, {String? description}) async {
     for (var attempt = 0; attempt < 24; attempt += 1) {
-      if (find.text(text).evaluate().isNotEmpty) {
-        await ensureVisible(find.text(text).first);
+      if (finder.evaluate().isNotEmpty) {
+        await ensureVisible(finder.first);
         await pump();
         return;
       }
-      await drag(scrollable, const Offset(0, -320));
-      await pump();
+      for (final element in find.byType(Scrollable).evaluate()) {
+        if (element is! StatefulElement || element.state is! ScrollableState) {
+          continue;
+        }
+        final position = (element.state as ScrollableState).position;
+        if (!position.hasPixels || position.maxScrollExtent <= 0) {
+          continue;
+        }
+        position.jumpTo(
+          (position.pixels + 420).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          ),
+        );
+      }
+      await pumpAndSettle();
     }
-    fail('Could not reveal "$text" in AppShell.');
+    fail('Could not reveal "${description ?? finder}" in AppShell.');
   }
 
   Future<void> pumpNavigationOnly({
