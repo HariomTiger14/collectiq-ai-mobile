@@ -303,10 +303,7 @@ void main() {
     await tester.pumpShell(viewPadding: const EdgeInsets.only(bottom: 32));
 
     final safeArea = tester.widget<SafeArea>(
-      find.descendant(
-        of: find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
-        matching: find.byType(SafeArea),
-      ),
+      find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
     );
     expect(safeArea.top, isFalse);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -44,56 +46,66 @@ class GlassBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final navHeight = heightFor(context);
 
-    return ColoredBox(
+    return SafeArea(
       key: const ValueKey('bottom-navigation-safe-area-surface'),
-      color: PackLoxTokens.background,
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
-        child: Semantics(
-          container: true,
-          explicitChildNodes: true,
-          label: 'Primary navigation',
-          child: Container(
-            constraints: BoxConstraints(minHeight: navHeight),
-            decoration: BoxDecoration(
-              color: PackLoxTokens.surface.withValues(alpha: 0.98),
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(color: PackLoxTokens.border),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x4D000000),
-                  blurRadius: 22,
-                  offset: Offset(0, -10),
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: 'Primary navigation',
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Container(
+              constraints: BoxConstraints(minHeight: navHeight),
+              decoration: BoxDecoration(
+                color: PackLoxTokens.surface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: PackLoxTokens.cyan.withValues(alpha: 0.28),
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Row(
-              children: [
-                for (var index = 0; index < items.length; index++)
-                  Expanded(
-                    child: NavBarItem(
-                      key:
-                          items[index].key ??
-                          ValueKey(
-                            '${items[index].label}-${currentIndex == index}',
-                          ),
-                      icon: items[index].icon,
-                      selectedIcon: items[index].selectedIcon,
-                      iconAsset: items[index].iconAsset,
-                      label: items[index].label,
-                      isActive: currentIndex == index,
-                      gradientStyle: items[index].gradientStyle,
-                      onTap: () => onTap(index),
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.34),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
-              ],
+                  BoxShadow(
+                    color: PackLoxTokens.blue.withValues(alpha: 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
+                children: [
+                  for (var index = 0; index < items.length; index++)
+                    Expanded(
+                      child: NavBarItem(
+                        key:
+                            items[index].key ??
+                            ValueKey(
+                              '${items[index].label}-${currentIndex == index}',
+                            ),
+                        icon: items[index].icon,
+                        selectedIcon: items[index].selectedIcon,
+                        iconAsset: items[index].iconAsset,
+                        label: items[index].label,
+                        isActive: currentIndex == index,
+                        gradientStyle: items[index].gradientStyle,
+                        onTap: () => onTap(index),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

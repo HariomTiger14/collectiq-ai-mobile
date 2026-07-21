@@ -261,15 +261,9 @@ class _AppShellState extends ConsumerState<AppShell>
         value: overlayStyle,
         child: Scaffold(
           key: const ValueKey('app-shell'),
+          extendBody: true,
           backgroundColor: shellBackground,
-          body: Padding(
-            padding: EdgeInsets.only(
-              bottom: hideBottomNavigation
-                  ? 0
-                  : GlassBottomNavBar.bodyContentInset(context),
-            ),
-            child: _buildActiveDestination(selectedDestination),
-          ),
+          body: _buildActiveDestination(selectedDestination),
           bottomNavigationBar: hideBottomNavigation
               ? null
               : _buildBottomNavigationBar(selectedIndex),
