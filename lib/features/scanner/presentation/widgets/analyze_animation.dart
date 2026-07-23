@@ -5,9 +5,14 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
 class AnalyzeAnimationOverlay extends StatefulWidget {
-  const AnalyzeAnimationOverlay({required this.imagePath, super.key});
+  const AnalyzeAnimationOverlay({
+    required this.imagePath,
+    this.qaProgress,
+    super.key,
+  });
 
   final String imagePath;
+  final double? qaProgress;
 
   @override
   State<AnalyzeAnimationOverlay> createState() =>
@@ -26,7 +31,13 @@ class _AnalyzeAnimationOverlayState extends State<AnalyzeAnimationOverlay>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..forward();
+    );
+    final qaProgress = widget.qaProgress;
+    if (qaProgress == null) {
+      _controller.forward();
+    } else {
+      _controller.value = qaProgress.clamp(0, 1).toDouble();
+    }
     _scale = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0, 0.125, curve: Curves.easeOut),
@@ -73,13 +84,67 @@ class _AnalyzeAnimationOverlayState extends State<AnalyzeAnimationOverlay>
                   AnimatedBuilder(
                     animation: _progress,
                     builder: (context, _) {
-                      return CustomPaint(
-                        key: const ValueKey('analyze-progress-ring'),
-                        size: const Size.square(252),
-                        painter: _AnalyzeRingPainter(
-                          progress: _progress.value,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      final colorScheme = Theme.of(context).colorScheme;
+                      final percent = (_progress.value * 100).round();
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CustomPaint(
+                            key: const ValueKey('analyze-progress-ring'),
+                            size: const Size.square(252),
+                            painter: _AnalyzeRingPainter(
+                              progress: _progress.value,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          DecoratedBox(
+                            key: const ValueKey('analyze-progress-center'),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.56),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.20),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$percent%',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0,
+                                        ),
+                                  ),
+                                  Text(
+                                    'Analyzing',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.78,
+                                          ),
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),

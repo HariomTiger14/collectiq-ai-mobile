@@ -119,7 +119,9 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
         _errorMessage = null;
       });
     } catch (_) {
-      _setError('Unable to open the camera on this device.');
+      _setError(
+        'The camera could not start on this device. You can try again or choose a photo from your gallery.',
+      );
     }
   }
 
@@ -130,8 +132,8 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
     setState(() {
       _isPermissionPermanentlyDenied = status.isPermanentlyDenied;
       _errorMessage = status.isPermanentlyDenied
-          ? 'Camera permission is turned off. Enable it in Settings to capture scans.'
-          : 'Camera permission is required to capture scans.';
+          ? 'Camera access is off for PackLox. Enable it in Settings, then return to scan.'
+          : 'PackLox needs camera access to capture a collectible scan.';
       _isInitializing = false;
     });
   }
@@ -170,7 +172,9 @@ class _CameraCapturePageState extends ConsumerState<CameraCapturePage>
         _isCapturing = false;
       });
     } catch (_) {
-      _setError('Unable to capture image. Please try again.');
+      _setError(
+        'The photo was not captured. Try again when the item is framed.',
+      );
     }
   }
 
@@ -403,6 +407,7 @@ class _CameraLiveView extends StatelessWidget {
                   isPermissionPermanentlyDenied: isPermissionPermanentlyDenied,
                   onRetryPermission: onRetryPermission,
                   onOpenSettings: onOpenSettings,
+                  onGallery: onGallery,
                 ),
               ),
             ),
@@ -536,6 +541,7 @@ class _CameraPreviewBody extends StatelessWidget {
     required this.isPermissionPermanentlyDenied,
     required this.onRetryPermission,
     required this.onOpenSettings,
+    required this.onGallery,
   });
 
   final CameraController? controller;
@@ -544,6 +550,7 @@ class _CameraPreviewBody extends StatelessWidget {
   final bool isPermissionPermanentlyDenied;
   final VoidCallback onRetryPermission;
   final Future<bool> Function()? onOpenSettings;
+  final VoidCallback onGallery;
 
   @override
   Widget build(BuildContext context) {
@@ -561,35 +568,80 @@ class _CameraPreviewBody extends StatelessWidget {
       );
     }
 
+    final title = isPermissionPermanentlyDenied
+        ? 'Camera access is off'
+        : (errorMessage ?? '').toLowerCase().contains('access')
+        ? 'Camera access needed'
+        : 'Camera unavailable';
+    final body =
+        errorMessage ??
+        'The camera could not start on this device. You can try again or choose a photo from your gallery.';
+    final primaryLabel = isPermissionPermanentlyDenied
+        ? 'Open Settings'
+        : title == 'Camera access needed'
+        ? 'Allow Camera'
+        : 'Try Again';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.photo_camera_outlined,
-              color: Colors.white,
-              size: 42,
+        child: DecoratedBox(
+          key: const ValueKey('camera-error-card'),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.photo_camera_outlined,
+                  color: Colors.white,
+                  size: 42,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  key: const ValueKey('camera-error-title'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  key: const ValueKey('camera-error-body'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                    height: 1.35,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  key: const ValueKey('camera-error-primary'),
+                  onPressed: isPermissionPermanentlyDenied
+                      ? () => onOpenSettings?.call()
+                      : onRetryPermission,
+                  child: Text(primaryLabel),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('camera-error-secondary'),
+                  onPressed: onGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Choose from Gallery'),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              errorMessage ?? 'Camera is unavailable.',
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: isPermissionPermanentlyDenied
-                  ? () => onOpenSettings?.call()
-                  : onRetryPermission,
-              child: Text(
-                isPermissionPermanentlyDenied ? 'Open Settings' : 'Try Again',
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

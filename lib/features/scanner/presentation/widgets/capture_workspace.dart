@@ -104,8 +104,12 @@ class CaptureWorkspace extends StatelessWidget {
             activeRoleId ?? recommendedRole?.id ?? ScanCaptureRole.front.id,
           )
         : ScanCaptureRole.fromId(activeSlot.role);
+    final hasAnalysisFailure =
+        selectedItemStatus?.toLowerCase().contains('failed') ?? false;
     final primaryLabel = analyzeReady
-        ? 'Analyze ${captureImages.length} photo${captureImages.length == 1 ? '' : 's'}'
+        ? hasAnalysisFailure
+              ? 'Retry analysis'
+              : 'Analyze ${captureImages.length} photo${captureImages.length == 1 ? '' : 's'}'
         : 'Capture Next Best Photo';
     final primaryIcon = analyzeReady
         ? Icons.auto_awesome_outlined
@@ -137,6 +141,7 @@ class CaptureWorkspace extends StatelessWidget {
                 child: Text(
                   'Scan Workspace',
                   style: textTheme.titleMedium?.copyWith(
+                    color: ScannerVisualTheme.textPrimary,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -151,9 +156,57 @@ class CaptureWorkspace extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _CompactCaptureGuidance(
+          _WorkspaceReadinessCard(
             imageCount: captureImages.length,
             guidance: smartGuidance,
+            hasAnalysisFailure: hasAnalysisFailure,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (activeSlot != null) ...[
+            _ActiveCapturePreview(
+              slot: activeSlot,
+              activeRole: activeRole,
+              roleCount: roleCounts[activeRole.id] ?? 0,
+              onOpenReview: () => _openPhotoReview(
+                context,
+                initialSlot: activeSlot,
+                photos: captureImages,
+                onSelect: onPreview,
+                onRetake: (slot) => onCamera(slot.role),
+                onDelete: (slot) => onDelete(slot.path),
+                onUseAsPrimary: onUseAsPrimary,
+                onEnhance: onEnhance,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          _WorkspaceRoleChecklist(
+            roles: roles,
+            requiredRoles: plan.requiredRoles,
+            slots: slots,
+            roleCounts: roleCounts,
+            recommendedRoleId: recommendedRole?.id,
+            isBusy: isBusy,
+            onCapture: onCamera,
+            onGallery: onGallery,
+            onSelectRole: onSelectRole,
+            onPreview: (role) {
+              final slot = _latestSlotForRole(captureImages, role);
+              if (slot != null) {
+                _openPhotoReview(
+                  context,
+                  initialSlot: slot,
+                  photos: captureImages,
+                  onSelect: onPreview,
+                  onRetake: (slot) => onCamera(slot.role),
+                  onDelete: (slot) => onDelete(slot.path),
+                  onUseAsPrimary: onUseAsPrimary,
+                  onEnhance: onEnhance,
+                );
+              } else {
+                onSelectRole(role);
+              }
+            },
           ),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
@@ -178,52 +231,9 @@ class CaptureWorkspace extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (activeSlot != null) ...[
-            _ActiveCapturePreview(
-              slot: activeSlot,
-              activeRole: activeRole,
-              roleCount: roleCounts[activeRole.id] ?? 0,
-              onOpenReview: () => _openPhotoReview(
-                context,
-                initialSlot: activeSlot,
-                photos: captureImages,
-                onSelect: onPreview,
-                onRetake: (slot) => onCamera(slot.role),
-                onDelete: (slot) => onDelete(slot.path),
-                onUseAsPrimary: onUseAsPrimary,
-                onEnhance: onEnhance,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
           KeyedSubtree(
             key: const ValueKey('workspace-filmstrip'),
-            child: ScanImageFilmstrip(
-              roles: roles,
-              recommendedRoleId: recommendedRole?.id,
-              slots: slots,
-              captureImages: captureImages,
-              roleCounts: roleCounts,
-              selectedPath: selectedPath ?? activeSlot?.path,
-              selectedRoleId: activeSlot == null ? activeRole.id : null,
-              canAddPhoto: recommendedRole != null,
-              isBusy: isBusy,
-              onTapImage: (slot) => _openPhotoReview(
-                context,
-                initialSlot: slot,
-                photos: captureImages,
-                onSelect: onPreview,
-                onRetake: (slot) => onCamera(slot.role),
-                onDelete: (slot) => onDelete(slot.path),
-                onUseAsPrimary: onUseAsPrimary,
-                onEnhance: onEnhance,
-              ),
-              onSelectRole: onSelectRole,
-              onCaptureRole: onCamera,
-              onRetake: (slot) => onCamera(slot.role),
-              onDelete: (slot) => onDelete(slot.path),
-              onAddPhoto: isBusy ? null : onPrimaryCapture,
-            ),
+            child: const SizedBox.shrink(),
           ),
           const SizedBox(height: AppSpacing.sm),
           _CaptureProgress(
@@ -232,6 +242,7 @@ class CaptureWorkspace extends StatelessWidget {
             optionalCount: optionalCount < 0 ? 0 : optionalCount,
             analyzeReady: analyzeReady,
             recommendedRole: recommendedRole,
+            hasAnalysisFailure: hasAnalysisFailure,
           ),
           if (captureImages.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -536,10 +547,11 @@ class _ActiveCapturePreview extends StatelessWidget {
                     child: Text(
                       capturedSlot == null
                           ? 'Start with a clear front photo'
-                          : '${capturedSlot.label} · $roleCount photo${roleCount == 1 ? '' : 's'}',
+                          : '${_shortRoleLabel(activeRole)} · $roleCount photo${roleCount == 1 ? '' : 's'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelLarge?.copyWith(
+                        color: ScannerVisualTheme.textPrimary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -549,8 +561,8 @@ class _ActiveCapturePreview extends StatelessWidget {
                     Text(
                       'camera',
                       style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
+                        color: ScannerVisualTheme.textSecondary,
+                        fontWeight: FontWeight.w800,
                       ),
                     )
                   else
@@ -559,7 +571,7 @@ class _ActiveCapturePreview extends StatelessWidget {
                           ? capturedSlot.enhancementPreset.label
                           : 'review',
                       style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                        color: ScannerVisualTheme.textSecondary,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1005,6 +1017,7 @@ class CaptureRoleCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.labelLarge?.copyWith(
+                          color: ScannerVisualTheme.textPrimary,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1023,8 +1036,8 @@ class CaptureRoleCard extends StatelessWidget {
                   style: textTheme.bodySmall?.copyWith(
                     color: warning
                         ? colorScheme.tertiary
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
+                        : ScannerVisualTheme.textSecondary,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 if (!compact) ...[
@@ -1034,7 +1047,8 @@ class CaptureRoleCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                      color: ScannerVisualTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -1117,89 +1131,278 @@ class _EmptyActivePreview extends StatelessWidget {
   }
 }
 
-class _CompactCaptureGuidance extends StatelessWidget {
-  const _CompactCaptureGuidance({
+class _WorkspaceReadinessCard extends StatelessWidget {
+  const _WorkspaceReadinessCard({
     required this.imageCount,
     required this.guidance,
+    required this.hasAnalysisFailure,
   });
 
   final int imageCount;
   final SmartScanGuidance guidance;
+  final bool hasAnalysisFailure;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final title = hasAnalysisFailure
+        ? 'Analysis needs another try'
+        : guidance.canAnalyze
+        ? guidance.headline
+        : 'Start with a front photo';
+    final copy = hasAnalysisFailure
+        ? 'Your photos are still saved here. Retry analysis or add another photo.'
+        : guidance.canAnalyze
+        ? guidance.guidance
+        : 'Capture the item clearly in frame to unlock analysis.';
     return Container(
-      key: const ValueKey('scan-workspace-compact-guidance'),
+      key: const ValueKey('scan-workspace-readiness-card'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: ScannerVisualTheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: ScannerVisualTheme.border.withValues(alpha: 0.78),
+          color: hasAnalysisFailure
+              ? colorScheme.error.withValues(alpha: 0.55)
+              : ScannerVisualTheme.border.withValues(alpha: 0.86),
         ),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            guidance.canAnalyze
-                ? Icons.check_circle_outline
-                : Icons.photo_camera,
-            color: guidance.canAnalyze
-                ? colorScheme.primary
-                : colorScheme.secondary,
-            size: 20,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  guidance.headline,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  guidance.guidance,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.25,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$imageCount photo${imageCount == 1 ? '' : 's'} ready',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: hasAnalysisFailure
+                        ? colorScheme.error
+                        : ScannerVisualTheme.cyan,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (guidance.softWarning != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    guidance.softWarning!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.tertiary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+              _RoleBadge(
+                label: hasAnalysisFailure
+                    ? 'Retry'
+                    : guidance.canAnalyze
+                    ? 'Ready'
+                    : 'Needed',
+                emphasized: !hasAnalysisFailure,
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            '$imageCount photo${imageCount == 1 ? '' : 's'}',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: colorScheme.primary,
+            title,
+            style: textTheme.titleSmall?.copyWith(
+              color: ScannerVisualTheme.textPrimary,
               fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            copy,
+            style: textTheme.bodySmall?.copyWith(
+              color: ScannerVisualTheme.textSecondary,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceRoleChecklist extends StatelessWidget {
+  const _WorkspaceRoleChecklist({
+    required this.roles,
+    required this.requiredRoles,
+    required this.slots,
+    required this.roleCounts,
+    required this.recommendedRoleId,
+    required this.isBusy,
+    required this.onCapture,
+    required this.onGallery,
+    required this.onSelectRole,
+    required this.onPreview,
+  });
+
+  final List<ScanCaptureRole> roles;
+  final List<ScanCaptureRole> requiredRoles;
+  final Map<String, ScannerPhotoSlot> slots;
+  final Map<String, int> roleCounts;
+  final String? recommendedRoleId;
+  final bool isBusy;
+  final Future<void> Function(String role) onCapture;
+  final Future<void> Function(String role) onGallery;
+  final void Function(String role) onSelectRole;
+  final void Function(String role) onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final compactRoles = _workspaceRoles(roles);
+    return Column(
+      key: const ValueKey('workspace-role-checklist'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Photos for valuation',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: ScannerVisualTheme.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final role in compactRoles)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+            child: _WorkspaceRoleCard(
+              role: role,
+              requiredRole: requiredRoles.contains(role),
+              capturedCount: roleCounts[role.id] ?? 0,
+              recommended: recommendedRoleId == role.id,
+              isBusy: isBusy,
+              onCapture: () => onCapture(role.id),
+              onGallery: () => onGallery(role.id),
+              onPreview: () => onPreview(role.id),
+              onSelect: () => onSelectRole(role.id),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _WorkspaceRoleCard extends StatelessWidget {
+  const _WorkspaceRoleCard({
+    required this.role,
+    required this.requiredRole,
+    required this.capturedCount,
+    required this.recommended,
+    required this.isBusy,
+    required this.onCapture,
+    required this.onGallery,
+    required this.onPreview,
+    required this.onSelect,
+  });
+
+  final ScanCaptureRole role;
+  final bool requiredRole;
+  final int capturedCount;
+  final bool recommended;
+  final bool isBusy;
+  final VoidCallback onCapture;
+  final VoidCallback onGallery;
+  final VoidCallback onPreview;
+  final VoidCallback onSelect;
+
+  bool get captured => capturedCount > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final borderColor = captured
+        ? ScannerVisualTheme.cyan.withValues(alpha: 0.7)
+        : recommended
+        ? colorScheme.primary.withValues(alpha: 0.72)
+        : ScannerVisualTheme.border.withValues(alpha: 0.78);
+    final iconColor = captured
+        ? ScannerVisualTheme.success
+        : recommended
+        ? colorScheme.primary
+        : ScannerVisualTheme.textSecondary;
+    final description = captured
+        ? 'Captured${capturedCount > 1 ? ' · $capturedCount photos' : ''}'
+        : recommended
+        ? 'Recommended'
+        : requiredRole
+        ? 'Required'
+        : _optionalRoleDescription(role);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('workspace-role-card-${role.id}'),
+        onTap: isBusy ? null : (captured ? onPreview : onSelect),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: captured
+                ? ScannerVisualTheme.cyan.withValues(alpha: 0.08)
+                : ScannerVisualTheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: iconColor.withValues(alpha: 0.5)),
+                ),
+                child: Icon(
+                  captured ? Icons.check : Icons.add,
+                  size: 20,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _shortRoleLabel(role),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: ScannerVisualTheme.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: captured || recommended
+                            ? ScannerVisualTheme.cyan
+                            : ScannerVisualTheme.textSecondary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              TextButton(
+                key: ValueKey('workspace-role-action-${role.id}'),
+                onPressed: isBusy ? null : (captured ? onPreview : onCapture),
+                child: Text(captured ? 'View' : 'Add'),
+              ),
+              IconButton(
+                tooltip: 'Choose ${_shortRoleLabel(role)} from gallery',
+                onPressed: isBusy ? null : onGallery,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 34,
+                ),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1332,6 +1535,7 @@ class _CaptureProgress extends StatelessWidget {
     required this.optionalCount,
     required this.analyzeReady,
     required this.recommendedRole,
+    required this.hasAnalysisFailure,
   });
 
   final int requiredCompleted;
@@ -1339,10 +1543,10 @@ class _CaptureProgress extends StatelessWidget {
   final int optionalCount;
   final bool analyzeReady;
   final ScanCaptureRole? recommendedRole;
+  final bool hasAnalysisFailure;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1351,7 +1555,11 @@ class _CaptureProgress extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                analyzeReady ? 'Ready when you are' : 'Recommended next photo',
+                hasAnalysisFailure
+                    ? 'Ready to retry'
+                    : analyzeReady
+                    ? 'Ready when you are'
+                    : 'Recommended next photo',
                 style: textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -1366,21 +1574,26 @@ class _CaptureProgress extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          analyzeReady
+          hasAnalysisFailure
+              ? 'Analysis failed, but your photos are kept. Retry or add another angle before analyzing again.'
+              : analyzeReady
               ? 'Analyze is available. More photos are optional and can improve confidence.'
               : 'Start with a front/package photo to unlock analysis.',
           style: textTheme.bodySmall?.copyWith(
-            color: analyzeReady
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
+            color: hasAnalysisFailure
+                ? Theme.of(context).colorScheme.error
+                : analyzeReady
+                ? ScannerVisualTheme.cyan
+                : ScannerVisualTheme.textSecondary,
+            fontWeight: FontWeight.w800,
           ),
         ),
         if (optionalCount > 0)
           Text(
             '$optionalCount optional photo${optionalCount == 1 ? '' : 's'} added',
             style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+              color: ScannerVisualTheme.textSecondary,
+              fontWeight: FontWeight.w700,
             ),
           ),
       ],
@@ -1423,8 +1636,8 @@ class _SelectedImageSummary extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.end,
             style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
+              color: ScannerVisualTheme.textSecondary,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
@@ -1524,6 +1737,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.labelSmall?.copyWith(
+                      color: ScannerVisualTheme.textPrimary,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1538,7 +1752,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
                           style: textTheme.labelSmall?.copyWith(
                             color: warning
                                 ? colorScheme.tertiary
-                                : colorScheme.primary,
+                                : ScannerVisualTheme.cyan,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -1631,6 +1845,7 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.labelSmall?.copyWith(
+                    color: ScannerVisualTheme.textPrimary,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -1642,8 +1857,8 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
                         recommended ? 'Recommended' : 'Optional',
                         style: textTheme.labelSmall?.copyWith(
                           color: recommended
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
+                              ? ScannerVisualTheme.cyan
+                              : ScannerVisualTheme.textSecondary,
                           fontWeight: recommended
                               ? FontWeight.w900
                               : FontWeight.w600,
@@ -1788,6 +2003,56 @@ String _shortRoleLabel(ScanCaptureRole role) {
   };
 }
 
+String _optionalRoleDescription(ScanCaptureRole role) {
+  return switch (role) {
+    ScanCaptureRole.closeUp => 'Helpful for marks',
+    ScanCaptureRole.edge => 'Optional angle',
+    ScanCaptureRole.side ||
+    ScanCaptureRole.leftSide ||
+    ScanCaptureRole.rightSide => 'Optional side view',
+    ScanCaptureRole.top => 'Optional top view',
+    ScanCaptureRole.bottom ||
+    ScanCaptureRole.baseUnderside => 'Optional underside',
+    ScanCaptureRole.barcode => 'Helpful for lookup',
+    ScanCaptureRole.cornerCondition => 'Shows condition',
+    ScanCaptureRole.surfaceGlare => 'Avoids glare',
+    ScanCaptureRole.dateMint => 'Shows date or mint',
+    ScanCaptureRole.serialOrMark => 'Shows serial/mark',
+    ScanCaptureRole.damageDetail => 'Shows damage',
+    ScanCaptureRole.angledReflective => 'Reflective angle',
+    ScanCaptureRole.front || ScanCaptureRole.back => 'Recommended',
+  };
+}
+
+List<ScanCaptureRole> _workspaceRoles(List<ScanCaptureRole> roles) {
+  final byId = {for (final role in roles) role.id: role};
+  final ordered = <ScanCaptureRole>[];
+  const priority = [
+    ScanCaptureRole.front,
+    ScanCaptureRole.back,
+    ScanCaptureRole.leftSide,
+    ScanCaptureRole.rightSide,
+    ScanCaptureRole.closeUp,
+  ];
+
+  for (final role in priority) {
+    final availableRole = byId[role.id];
+    if (availableRole != null) {
+      ordered.add(availableRole);
+    }
+  }
+  for (final role in roles) {
+    if (ordered.any((orderedRole) => orderedRole.id == role.id)) {
+      continue;
+    }
+    ordered.add(role);
+    if (ordered.length >= 5) {
+      break;
+    }
+  }
+  return ordered;
+}
+
 bool _hasWarning(Map<String, Object?> qualityMetadata) {
   return qualityMetadata['severity'] == 'WARNING';
 }
@@ -1818,7 +2083,7 @@ ScannerPhotoSlot? _latestSlotForRole(
   String role,
 ) {
   for (final slot in slots.reversed) {
-    if (slot.role == role) {
+    if (ScanCaptureRole.fromId(slot.role).id == role) {
       return slot;
     }
   }
@@ -1828,7 +2093,8 @@ ScannerPhotoSlot? _latestSlotForRole(
 Map<String, int> _roleCounts(List<ScannerPhotoSlot> slots) {
   final counts = <String, int>{};
   for (final slot in slots) {
-    counts[slot.role] = (counts[slot.role] ?? 0) + 1;
+    final roleId = ScanCaptureRole.fromId(slot.role).id;
+    counts[roleId] = (counts[roleId] ?? 0) + 1;
   }
   return counts;
 }

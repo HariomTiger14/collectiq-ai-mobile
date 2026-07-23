@@ -204,11 +204,41 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    expect(find.byKey(const ValueKey('camera-error-card')), findsOneWidget);
+    expect(find.text('Camera access needed'), findsOneWidget);
     expect(
-      find.text('Camera permission is required to capture scans.'),
+      find.text('PackLox needs camera access to capture a collectible scan.'),
+      findsOneWidget,
+    );
+    expect(find.text('Allow Camera'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+  });
+
+  testWidgets('camera unavailable UI offers retry and gallery fallback', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          cameraServiceProvider.overrideWithValue(_UnavailableCameraService()),
+        ],
+        child: const MaterialApp(home: CameraCapturePage(imageRole: 'front')),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('camera-error-card')), findsOneWidget);
+    expect(find.text('Camera unavailable'), findsOneWidget);
+    expect(
+      find.text(
+        'The camera could not start on this device. You can try again or choose a photo from your gallery.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Try Again'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
   });
 }
 
@@ -216,6 +246,18 @@ class _DeniedCameraService extends CameraService {
   @override
   Future<PermissionStatus> requestPermissionStatus() async {
     return PermissionStatus.denied;
+  }
+}
+
+class _UnavailableCameraService extends CameraService {
+  @override
+  Future<PermissionStatus> requestPermissionStatus() async {
+    return PermissionStatus.granted;
+  }
+
+  @override
+  Future<void> initializeCamera() async {
+    throw PlatformException(code: 'camera_unavailable');
   }
 }
 

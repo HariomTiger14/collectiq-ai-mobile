@@ -11,6 +11,7 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/camera_overlay.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_suggestions.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
@@ -280,7 +281,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                   ),
                   if (scannerState.errorMessage != null) ...[
                     const SizedBox(height: AppSpacing.md),
-                    _ScannerWorkspaceError(message: scannerState.errorMessage!),
+                    _ScannerWorkspaceError(
+                      message: scannerState.errorMessage!,
+                      onPrimary: scannerController.analyzeWithAi,
+                      onSecondary: scannerController.resetScan,
+                    ),
                   ],
                 ],
               ),
@@ -449,35 +454,75 @@ String _workspaceCategoryForPhotos(List<ScannerPhotoSlot> photos) {
 }
 
 class _ScannerWorkspaceError extends StatelessWidget {
-  const _ScannerWorkspaceError({required this.message});
+  const _ScannerWorkspaceError({
+    required this.message,
+    required this.onPrimary,
+    required this.onSecondary,
+  });
 
   final String message;
+  final VoidCallback onPrimary;
+  final VoidCallback onSecondary;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final copy = _scannerErrorCopyFor(message);
     return Semantics(
       liveRegion: true,
       child: DecoratedBox(
+        key: const ValueKey('scanner-error-card'),
         decoration: BoxDecoration(
-          color: colorScheme.errorContainer,
+          color: Colors.black.withValues(alpha: 0.74),
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.error.withValues(alpha: 0.32)),
+          border: Border.all(color: Colors.white24),
         ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: colorScheme.onErrorContainer,
-                    fontWeight: FontWeight.w700,
+              Row(
+                children: [
+                  Icon(copy.icon, color: Colors.white),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      copy.title,
+                      key: const ValueKey('scanner-error-title'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                copy.body,
+                key: const ValueKey('scanner-error-body'),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
                 ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  FilledButton(
+                    key: const ValueKey('scanner-error-primary'),
+                    onPressed: onPrimary,
+                    child: Text(copy.primaryLabel),
+                  ),
+                  TextButton(
+                    key: const ValueKey('scanner-error-secondary'),
+                    onPressed: onSecondary,
+                    child: Text(copy.secondaryLabel),
+                  ),
+                ],
               ),
             ],
           ),
@@ -485,6 +530,94 @@ class _ScannerWorkspaceError extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ScannerErrorCopy {
+  const _ScannerErrorCopy({
+    required this.title,
+    required this.body,
+    required this.primaryLabel,
+    required this.secondaryLabel,
+    required this.icon,
+  });
+
+  final String title;
+  final String body;
+  final String primaryLabel;
+  final String secondaryLabel;
+  final IconData icon;
+}
+
+_ScannerErrorCopy _scannerErrorCopyFor(String rawMessage) {
+  final message = rawMessage.toLowerCase();
+  if (message.contains('permission') || message.contains('camera access')) {
+    return const _ScannerErrorCopy(
+      title: 'Camera access needed',
+      body:
+          'PackLox needs camera access to capture a fresh scan. You can allow camera access or choose a saved photo.',
+      primaryLabel: 'Try Camera Again',
+      secondaryLabel: 'Choose Photo',
+      icon: Icons.photo_camera_outlined,
+    );
+  }
+  if (message.contains('camera') &&
+      (message.contains('unavailable') ||
+          message.contains('open') ||
+          message.contains('start'))) {
+    return const _ScannerErrorCopy(
+      title: 'Camera unavailable',
+      body:
+          'The camera could not start on this device. Try again, or continue with a clear gallery photo.',
+      primaryLabel: 'Try Again',
+      secondaryLabel: 'Choose Photo',
+      icon: Icons.videocam_off_outlined,
+    );
+  }
+  if (message.contains('quality') ||
+      message.contains('image data') ||
+      message.contains('usable') ||
+      message.contains('decode')) {
+    return const _ScannerErrorCopy(
+      title: 'Photo needs a clearer view',
+      body:
+          'PackLox could not read enough usable image detail. Retake with the item fully in frame and avoid glare.',
+      primaryLabel: 'Retake Photo',
+      secondaryLabel: 'Choose Photo',
+      icon: Icons.center_focus_strong_outlined,
+    );
+  }
+  if (message.contains('recover') ||
+      message.contains('lost picker') ||
+      message.contains('selected image')) {
+    return const _ScannerErrorCopy(
+      title: 'Photo recovery stopped',
+      body:
+          'PackLox could not recover the photo returned by the picker. Choose it again or start a fresh capture.',
+      primaryLabel: 'Choose Again',
+      secondaryLabel: 'New Scan',
+      icon: Icons.restore_outlined,
+    );
+  }
+  if (message.contains('limit') ||
+      message.contains('scan allowance') ||
+      message.contains('subscription')) {
+    return const _ScannerErrorCopy(
+      title: 'Scan limit reached',
+      body:
+          'This account has used its available AI scans for now. You can keep the photos here or start a new scan later.',
+      primaryLabel: 'Try Again',
+      secondaryLabel: 'New Scan',
+      icon: Icons.lock_clock_outlined,
+    );
+  }
+  return const _ScannerErrorCopy(
+    title: 'Scan interrupted',
+    body:
+        'PackLox could not complete analysis. Check the photo and try again, or add another angle before analyzing.',
+    primaryLabel: 'Try Analysis Again',
+    secondaryLabel: 'Add Photo',
+    icon: Icons.error_outline,
+  );
 }
 
 class _SnapchatScanSurface extends StatefulWidget {
@@ -715,16 +848,68 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
               left: AppSpacing.md,
               right: AppSpacing.md,
               bottom: 124,
-              child: _ScanErrorToast(message: widget.errorMessage!),
+              child: _ScanErrorToast(
+                message: widget.errorMessage!,
+                onPrimary: widget.canAnalyze
+                    ? widget.onAnalyze
+                    : widget.onCapture,
+                onSecondary: widget.onGallery,
+              ),
             ),
           if (widget.isBusy)
-            const Positioned.fill(
+            Positioned.fill(
               key: ValueKey('scan-busy-overlay'),
-              child: ColoredBox(
-                color: Color(0x66000000),
-                child: Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  AnalyzeAnimationOverlay(
+                    imagePath: widget.activeSlot?.path ?? 'sample://scan',
+                  ),
+                  Positioned(
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    bottom: 202,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.64),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Analyzing collectible',
+                              key: const ValueKey('scan-analyzing-title'),
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0,
+                                  ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              'Matching photos, condition, and market signals.',
+                              key: const ValueKey('scan-analyzing-body'),
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.3,
+                                    letterSpacing: 0,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           Positioned.fill(child: CaptureFlashOverlay(visible: _showFlash)),
@@ -1040,27 +1225,78 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 class _ScanErrorToast extends StatelessWidget {
-  const _ScanErrorToast({required this.message});
+  const _ScanErrorToast({
+    required this.message,
+    required this.onPrimary,
+    required this.onSecondary,
+  });
 
   final String message;
+  final VoidCallback onPrimary;
+  final VoidCallback onSecondary;
 
   @override
   Widget build(BuildContext context) {
+    final copy = _scannerErrorCopyFor(message);
     return DecoratedBox(
+      key: const ValueKey('scan-error-toast'),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
+        color: Colors.black.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: Colors.white24),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              copy.title,
+              key: const ValueKey('scan-error-title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              copy.body,
+              key: const ValueKey('scan-error-body'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('scan-error-primary'),
+                    onPressed: onPrimary,
+                    child: Text(copy.primaryLabel),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: OutlinedButton(
+                    key: const ValueKey('scan-error-secondary'),
+                    onPressed: onSecondary,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    child: Text(copy.secondaryLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

@@ -297,6 +297,7 @@ class _ImageEnhancementPreviewSurfaceState
         ),
         _TopBar(
           title: widget.title,
+          subtitle: widget.subtitle,
           selectedPreset: _selectedPreset,
           onCancel: widget.onCancel,
         ),
@@ -334,6 +335,8 @@ class _ImageEnhancementPreviewSurfaceState
                   ],
                 ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              _ReviewReadinessPill(assessment: _assessment),
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
@@ -370,11 +373,13 @@ class _ImageEnhancementPreviewSurfaceState
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.title,
+    required this.subtitle,
     required this.selectedPreset,
     required this.onCancel,
   });
 
   final String title;
+  final String subtitle;
   final ImageEnhancementPreset selectedPreset;
   final VoidCallback onCancel;
 
@@ -393,15 +398,33 @@ class _TopBar extends StatelessWidget {
             icon: const Icon(Icons.close),
           ),
           Expanded(
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  key: const ValueKey('enhancement-preview-subtitle'),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
             ),
           ),
           SizedBox(
@@ -430,6 +453,48 @@ class _TopBar extends StatelessWidget {
                 : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReviewReadinessPill extends StatelessWidget {
+  const _ReviewReadinessPill({required this.assessment});
+
+  final ImageQualityAssessment? assessment;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = assessment?.readinessScore;
+    return DecoratedBox(
+      key: const ValueKey('enhancement-preview-readiness-pill'),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.44),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 7,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.verified_outlined, color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              score == null
+                  ? 'Checking photo readiness'
+                  : 'Photo readiness $score%',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

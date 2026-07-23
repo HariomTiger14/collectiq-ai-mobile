@@ -32,6 +32,7 @@ class ScanResultScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final imagePath = activeSlot?.path ?? result.thumbnail;
     final isEnhanced = activeSlot?.isEnhanced == true;
+    final bottomPadding = isSaved ? 220.0 : 104.0;
     return ScannerFocusTheme(
       child: Scaffold(
         key: ValueKey('scan-result-${result.id}'),
@@ -49,24 +50,15 @@ class ScanResultScreen extends StatelessWidget {
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.md,
               AppSpacing.lg,
-              AppSpacing.xl,
+              bottomPadding,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (isSaved) ...[
-                  const ScannerStatusCard(
-                    title: 'Saved to Portfolio',
-                    body: 'Your item has been added successfully.',
-                    icon: Icons.check_circle_outline,
-                    success: true,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
                 _ResultHeroImage(path: imagePath, isEnhanced: isEnhanced),
                 const SizedBox(height: AppSpacing.md),
                 _FadeInMetadata(
@@ -117,37 +109,108 @@ class ScanResultScreen extends StatelessWidget {
                     source: _valueSourceLabel(result),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                _SlideInAction(
-                  child: FilledButton.icon(
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: _ResultActionBar(
+          isSaved: isSaved,
+          isSaving: isSaving,
+          onSave: onSave,
+          onScanAnother: onScanAnother,
+          onViewPortfolio: onViewPortfolio,
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultActionBar extends StatelessWidget {
+  const _ResultActionBar({
+    required this.isSaved,
+    required this.isSaving,
+    required this.onSave,
+    required this.onScanAnother,
+    required this.onViewPortfolio,
+  });
+
+  final bool isSaved;
+  final bool isSaving;
+  final Future<void> Function() onSave;
+  final VoidCallback onScanAnother;
+  final VoidCallback? onViewPortfolio;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ScannerVisualTheme.background.withValues(alpha: 0.96),
+        border: Border(
+          top: BorderSide(
+            color: ScannerVisualTheme.border.withValues(alpha: 0.7),
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.md,
+          ),
+          child: _SlideInAction(
+            child: isSaved && onViewPortfolio != null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: ScannerVisualTheme.success,
+                            size: 22,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Saved to Portfolio',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: ScannerVisualTheme.textPrimary,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      FilledButton.icon(
+                        key: const ValueKey('result-primary-add-to-portfolio'),
+                        onPressed: onViewPortfolio,
+                        icon: const Icon(Icons.inventory_2_outlined),
+                        label: const Text('View Portfolio'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      OutlinedButton.icon(
+                        onPressed: onScanAnother,
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: const Text('Scan another'),
+                      ),
+                    ],
+                  )
+                : FilledButton.icon(
                     key: const ValueKey('result-primary-add-to-portfolio'),
-                    onPressed: isSaved || isSaving ? null : onSave,
+                    onPressed: isSaving ? null : onSave,
                     icon: Icon(
                       isSaving
                           ? Icons.hourglass_top_outlined
-                          : isSaved
-                          ? Icons.check_circle_outline
                           : Icons.bookmark_add_outlined,
                     ),
-                    label: Text(
-                      isSaving
-                          ? 'Saving...'
-                          : isSaved
-                          ? 'Saved to Portfolio'
-                          : 'Add to Portfolio',
-                    ),
+                    label: Text(isSaving ? 'Saving...' : 'Add to Portfolio'),
                   ),
-                ),
-                if (isSaved && onViewPortfolio != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  OutlinedButton.icon(
-                    onPressed: onViewPortfolio,
-                    icon: const Icon(Icons.inventory_2_outlined),
-                    label: const Text('View Portfolio'),
-                  ),
-                ],
-              ],
-            ),
           ),
         ),
       ),
@@ -217,7 +280,7 @@ class _ConfidenceMeter extends StatelessWidget {
                   child: Text(
                     'Confidence',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                      color: ScannerVisualTheme.textSecondary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -226,6 +289,7 @@ class _ConfidenceMeter extends StatelessWidget {
                   '${(clamped * 100).round()}%',
                   key: const ValueKey('result-confidence-value'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: ScannerVisualTheme.textPrimary,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -261,15 +325,15 @@ class _ValueCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-            const Color(0xFF14B8A6).withValues(alpha: 0.10),
+            ScannerVisualTheme.surfaceElevated,
+            ScannerVisualTheme.surface.withValues(alpha: 0.96),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+          color: ScannerVisualTheme.cyan.withValues(alpha: 0.32),
         ),
         boxShadow: AppElevation.level1,
       ),
@@ -281,7 +345,7 @@ class _ValueCard extends StatelessWidget {
             Text(
               'Estimated value',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: ScannerVisualTheme.textSecondary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -289,16 +353,18 @@ class _ValueCard extends StatelessWidget {
             Text(
               value,
               key: const ValueKey('result-estimated-value'),
-              style: Theme.of(
-                context,
-              ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                color: ScannerVisualTheme.textPrimary,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               source,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
+                color: ScannerVisualTheme.textSecondary,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],

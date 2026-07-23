@@ -26,6 +26,13 @@ class PackLoxAssets {
   static const notificationBell =
       'assets/packlox/icons/actions/packlox_icon_notification_bell_v1.svg';
 
+  static const portfolioDetailValuedItem =
+      'assets/packlox/portfolio/portfolio_detail_valued_item.png';
+  static const portfolioDetailPendingValuation =
+      'assets/packlox/portfolio/portfolio_detail_pending_valuation.png';
+  static const portfolioDetailMissingImage =
+      'assets/packlox/portfolio/portfolio_detail_missing_image.png';
+
   static const all = [
     emblem,
     brandV2Emblem,
@@ -38,5 +45,8 @@ class PackLoxAssets {
     categoryFigures,
     categoryMore,
     notificationBell,
+    portfolioDetailValuedItem,
+    portfolioDetailPendingValuation,
+    portfolioDetailMissingImage,
   ];
 }

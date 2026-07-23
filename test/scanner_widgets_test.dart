@@ -1,19 +1,24 @@
 import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_role_guide.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_goal_card.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scanner_widgets.dart';
+import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   testWidgets('scanner goal and role guide widgets render', (
@@ -43,6 +48,81 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('scan-goal-identifyValue')));
     expect(tapped, isTrue);
+  });
+
+  testWidgets('review and analyzing surfaces expose scanner polish states', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ImageEnhancementPreviewSurface(
+            image: XFile('sample://front'),
+            initialPreset: ImageEnhancementPreset.original,
+            title: 'Review photo',
+            subtitle: 'Choose the clearest version for analysis.',
+            onCancel: () {},
+            onRetake: () {},
+            onUsePhoto: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('enhancement-preview-subtitle')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('enhancement-preview-readiness-pill')),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AnalyzeAnimationOverlay(imagePath: 'sample://front'),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('analyze-blur-overlay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('analyze-progress-ring')), findsOneWidget);
+  });
+
+  testWidgets('scanner QA error routes expose recovery actions', (
+    WidgetTester tester,
+  ) async {
+    const cases = {
+      'scanner_permission_denied': 'Camera access needed',
+      'scanner_camera_unavailable': 'Camera unavailable',
+      'scanner_analysis_failure': 'Scan interrupted',
+      'scanner_quality_gate_failure': 'Photo needs a clearer view',
+      'scanner_lost_picker_recovery': 'Photo recovery stopped',
+      'scanner_usage_limit': 'Scan limit reached',
+    };
+
+    for (final entry in cases.entries) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PackLoxQaCaptureScreen(screen: entry.key, scroll: ''),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(entry.value), findsOneWidget);
+      if (entry.key == 'scanner_analysis_failure') {
+        expect(find.byKey(const ValueKey('scanner-status-card')), findsWidgets);
+      } else {
+        expect(
+          find.byKey(const ValueKey('qa-scanner-error-primary')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('qa-scanner-error-secondary')),
+          findsOneWidget,
+        );
+      }
+    }
   });
 
   testWidgets('ScanImageFilmstrip renders placeholders and captured images', (
@@ -347,9 +427,7 @@ void main() {
       ),
     );
 
-    final frontPhoto = find.byKey(
-      const ValueKey('filmstrip-photo-front-sample://front-1'),
-    );
+    final frontPhoto = find.byKey(const ValueKey('workspace-role-card-front'));
     await tester.ensureVisible(frontPhoto);
     await tester.tap(frontPhoto);
     await tester.pumpAndSettle();
@@ -387,9 +465,7 @@ void main() {
         ),
       ),
     );
-    final frontPhoto = find.byKey(
-      const ValueKey('filmstrip-photo-front-sample://front-1'),
-    );
+    final frontPhoto = find.byKey(const ValueKey('workspace-role-card-front'));
     await tester.ensureVisible(frontPhoto);
     await tester.tap(frontPhoto);
     await tester.pumpAndSettle();
@@ -433,7 +509,7 @@ void main() {
       ),
     );
     final frontPhoto = find.byKey(
-      const ValueKey('filmstrip-photo-front-sample://front-1'),
+      const ValueKey('scan-active-capture-preview'),
     );
     await tester.ensureVisible(frontPhoto);
     await tester.tap(frontPhoto);

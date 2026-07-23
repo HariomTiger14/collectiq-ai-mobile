@@ -174,12 +174,17 @@ void main() {
       previewScenario: PortfolioPreviewScenario.filteredEmpty,
     );
 
-    await _revealPortfolio(tester, find.text('No matching collectibles'));
-    expect(find.text('No matching collectibles'), findsOneWidget);
+    await _revealPortfolio(tester, find.text('No matches found'));
+    expect(find.text('No matches found'), findsWidgets);
     expect(find.text('Your portfolio is waiting'), findsNothing);
-    expect(find.text('Clear filters'), findsWidgets);
+    expect(find.text('Clear search'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('portfolio-clear-filters')));
+    final previewClearSearch = find.byKey(
+      const ValueKey('portfolio-clear-search'),
+    );
+    await tester.ensureVisible(previewClearSearch);
+    await tester.pumpAndSettle();
+    await tester.tap(previewClearSearch);
     await tester.pumpAndSettle();
 
     await _revealPortfolio(
@@ -189,7 +194,77 @@ void main() {
     expect(find.text('Base Set Charizard'), findsOneWidget);
   });
 
-  testWidgets('search no-results and clear restore results', (tester) async {
+  testWidgets('entering a search query shows matching results', (tester) async {
+    _seedPortfolio([
+      _item('search-card', 'Pokemon Charizard', 1850),
+      _item('search-coin', 'Silver Eagle', 52, category: 'Coin'),
+    ]);
+
+    await _pumpPortfolio(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field-')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-search-card')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-search-card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-search-coin')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-search-clear')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('clearing a search query restores current result list', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item('search-card', 'Pokemon Charizard', 1850),
+      _item('search-coin', 'Silver Eagle', 52, category: 'Coin'),
+    ]);
+
+    await _pumpPortfolio(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field-')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('portfolio-search-clear')));
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-search-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-search-coin')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-search-card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-search-coin')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('search with no results shows polished empty state', (
+    tester,
+  ) async {
     _seedPortfolio([
       _item('search-card', 'Pokemon Charizard', 1850),
       _item('search-coin', 'Silver Eagle', 52, category: 'Coin'),
@@ -203,13 +278,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _revealPortfolio(tester, find.text('No matching collectibles'));
-    expect(find.text('No matching collectibles'), findsOneWidget);
-    expect(find.text('Clear filters'), findsWidgets);
+    await _revealPortfolio(tester, find.text('No matches found'));
+    expect(find.text('No matches found'), findsWidgets);
+    expect(find.text('Clear search'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('portfolio-clear-search')),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.byKey(const ValueKey('portfolio-clear-filters')));
+    final clearSearch = find.byKey(const ValueKey('portfolio-clear-search'));
+    await tester.ensureVisible(clearSearch);
     await tester.pumpAndSettle();
-
+    await tester.tap(clearSearch);
+    await tester.pumpAndSettle();
     await _revealPortfolio(
       tester,
       find.byKey(const ValueKey('portfolio-grid-item-search-card')),
@@ -220,32 +301,237 @@ void main() {
     );
   });
 
-  testWidgets('filter and sort sheets keep dark approved surfaces', (
-    tester,
-  ) async {
+  testWidgets('opens combined filter and sort bottom sheet', (tester) async {
     _seedPortfolio([_item('sort-card', 'Pokemon Charizard', 1850)]);
     await _pumpPortfolio(tester);
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
     await tester.pumpAndSettle();
-    final sortSheet = find.byKey(
-      const ValueKey('portfolio-premium-sort-sheet-surface'),
+
+    expect(_portfolioSheet, findsOneWidget);
+    expect(find.text('Sort and filter'), findsOneWidget);
+    expect(find.text('Recently added'), findsOneWidget);
+    expect(find.text('Value: high to low'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-sort-option-status')),
+      findsOneWidget,
     );
-    expect(sortSheet, findsOneWidget);
-    expect(find.text('Sort portfolio'), findsOneWidget);
+    expect(find.text('Valued'), findsOneWidget);
+    await _revealSheetControl(tester, const ValueKey('portfolio-filter-reset'));
+    await _revealSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+  });
+
+  testWidgets('selecting a sort option is staged until Apply', (tester) async {
+    _seedPortfolio([
+      _item('low-card', 'Low Value Card', 12),
+      _item('high-card', 'High Value Card', 240),
+    ]);
+    await _pumpPortfolio(tester);
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-card')),
+    );
+    expect(
+      _itemTop(tester, 'low-card'),
+      lessThan(_itemTop(tester, 'high-card')),
+    );
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
+    await tester.pumpAndSettle();
+
     await tester.tap(
-      find.descendant(of: sortSheet, matching: find.text('Recently Added')),
+      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
     );
     await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(12, 12));
+    await tester.pumpAndSettle();
+    expect(
+      _itemTop(tester, 'low-card'),
+      lessThan(_itemTop(tester, 'high-card')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    );
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+    await tester.pumpAndSettle();
+
+    expect(
+      _itemTop(tester, 'high-card'),
+      lessThan(_itemTop(tester, 'low-card')),
+    );
+    expect(find.text('High value'), findsOneWidget);
+  });
+
+  testWidgets('selecting a filter option applies to Portfolio results', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item('valued-card', 'Valued Charizard', 1850),
+      _item(
+        'pending-coin',
+        'Pending Silver Eagle',
+        0,
+        category: 'Coin',
+        valuationStatus: 'provider_not_configured',
+      ),
+    ]);
+    await _pumpPortfolio(tester);
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-status-filter-pending')),
+    );
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-pending-coin')),
+    );
     expect(
-      find.byKey(const ValueKey('portfolio-premium-filter-sheet-surface')),
+      find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
+      findsNothing,
+    );
+    expect(find.text('Filter (1)'), findsOneWidget);
+  });
+
+  testWidgets('reset restores sheet selections before Apply', (tester) async {
+    _seedPortfolio([
+      _item('valued-card', 'Valued Charizard', 1850),
+      _item(
+        'pending-coin',
+        'Pending Silver Eagle',
+        0,
+        category: 'Coin',
+        valuationStatus: 'provider_not_configured',
+      ),
+    ]);
+    await _pumpPortfolio(tester);
+
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-status-filter-pending')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    );
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-reset'));
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-pending-coin')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
+    );
+    expect(find.text('Filter'), findsOneWidget);
+    expect(find.text('Recent'), findsOneWidget);
+  });
+
+  testWidgets('apply can drive the filtered-empty Portfolio state', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item('valued-card', 'Valued Charizard', 1850),
+      _item('valued-coin', 'Valued Silver Eagle', 52, category: 'Coin'),
+    ]);
+    await _pumpPortfolio(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field-')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    );
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(tester, find.text('No matches found'));
+    expect(
+      find.byKey(const ValueKey('portfolio-filtered-empty-state-surface')),
       findsOneWidget,
     );
-    expect(find.text('Filter portfolio'), findsOneWidget);
-    expect(find.text('Apply filters'), findsOneWidget);
+    expect(find.text('No matches found'), findsWidgets);
+    expect(find.text('Clear search'), findsWidgets);
+    expect(find.text('Reset filters'), findsOneWidget);
+  });
+
+  testWidgets('search clear preserves applied filter and sort state', (
+    tester,
+  ) async {
+    _seedPortfolio([
+      _item('valued-card', 'Valued Charizard', 1850),
+      _item('low-coin', 'Low Silver Eagle', 52, category: 'Coin'),
+      _item('high-coin', 'High Silver Eagle', 250, category: 'Coin'),
+    ]);
+    await _pumpPortfolio(tester);
+
+    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    );
+    await tester.pumpAndSettle();
+    await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field-')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+    await _revealPortfolio(tester, find.text('No matches found'));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field-charizard')),
+      '',
+    );
+    await tester.pumpAndSettle();
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-coin')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-coin')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
+      findsNothing,
+    );
+    expect(find.text('Filter (1)'), findsOneWidget);
+    expect(find.text('High value'), findsOneWidget);
+    expect(
+      _itemTop(tester, 'high-coin'),
+      lessThan(_itemTop(tester, 'low-coin')),
+    );
   });
 
   testWidgets('item rows open existing Detail route', (tester) async {
@@ -263,6 +549,30 @@ void main() {
 
     expect(find.text('Detail Charizard'), findsWidgets);
   });
+
+  testWidgets(
+    'Portfolio delete confirm removes item and can show empty state',
+    (tester) async {
+      _seedPortfolio([_item('remove-card', 'Remove Charizard', 1850)]);
+      await _pumpPortfolio(tester);
+
+      await _openDetailActions(tester, 'remove-card');
+      await tester.tap(
+        find.byKey(const ValueKey('collectible-detail-delete-action')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('collectible-delete-confirm-action')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-remove-card')),
+        findsNothing,
+      );
+      expect(find.text('Start with your first item'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'narrow and large text layouts keep Portfolio controls reachable',
@@ -368,6 +678,46 @@ Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
     await tester.pump();
   }
   expect(finder, findsOneWidget);
+}
+
+Future<void> _openDetailActions(WidgetTester tester, String id) async {
+  await _revealPortfolio(
+    tester,
+    find.byKey(ValueKey('portfolio-grid-item-$id')),
+  );
+  await tester.tap(find.byKey(ValueKey('portfolio-grid-item-$id')));
+  await tester.pumpAndSettle();
+  await _revealPortfolio(tester, find.text('Actions Menu'));
+}
+
+Future<void> _revealSheetControl(
+  WidgetTester tester,
+  ValueKey<String> key,
+) async {
+  final finder = find.byKey(key);
+  for (var attempt = 0; attempt < 8; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(_portfolioSheet, const Offset(0, -180));
+    await tester.pumpAndSettle();
+  }
+  expect(finder, findsOneWidget);
+}
+
+Future<void> _tapSheetControl(WidgetTester tester, ValueKey<String> key) async {
+  await _revealSheetControl(tester, key);
+  await tester.tap(find.byKey(key));
+}
+
+Finder get _portfolioSheet {
+  return find.byKey(const ValueKey('portfolio-premium-filter-sheet-surface'));
+}
+
+double _itemTop(WidgetTester tester, String id) {
+  return tester.getTopLeft(find.byKey(ValueKey('portfolio-grid-item-$id'))).dy;
 }
 
 void _seedPortfolio(List<Map<String, Object?>> items) {

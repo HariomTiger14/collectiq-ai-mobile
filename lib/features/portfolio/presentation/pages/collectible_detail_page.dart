@@ -1,5 +1,8 @@
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
@@ -15,19 +18,36 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends ConsumerStatefulWidget {
   /// Creates a collectible detail page.
-  const CollectibleDetailPage({required this.item, this.onDelete, super.key});
+  const CollectibleDetailPage({
+    required this.item,
+    this.onDelete,
+    this.qaInitialScrollOffset = 0,
+    this.qaShowDeleteConfirmation = false,
+    this.qaShowEditSheet = false,
+    super.key,
+  });
 
   /// Item displayed on the detail page.
   final CollectibleItem item;
 
   /// Called when the user asks to delete the item.
   final Future<bool> Function(String itemId)? onDelete;
+
+  /// Initial scroll offset used by visual QA capture routes.
+  final double qaInitialScrollOffset;
+
+  /// Opens the delete confirmation after first layout for visual QA.
+  final bool qaShowDeleteConfirmation;
+
+  /// Opens the edit sheet after first layout for visual QA.
+  final bool qaShowEditSheet;
 
   @override
   ConsumerState<CollectibleDetailPage> createState() =>
@@ -38,12 +58,33 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
   bool _isFavorited = false;
   String? _selectedGalleryPath;
-  _DetailAuthoritySection _selectedSection = _DetailAuthoritySection.overview;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.qaInitialScrollOffset,
+      keepScrollOffset: false,
+    );
+    if (widget.qaShowDeleteConfirmation && widget.onDelete != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _confirmDetailDelete(context, widget.item, widget.onDelete!);
+      });
+    } else if (widget.qaShowEditSheet) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _showEditCollectibleDialog(
+          context: context,
+          ref: ref,
+          item: widget.item,
+        );
+      });
+    }
   }
 
   @override
@@ -64,126 +105,128 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     final selectedImage = _selectedImageFor(currentItem, _selectedGalleryPath);
     _selectedGalleryPath ??= selectedImage?.path;
 
-    return Scaffold(
-      backgroundColor: PackLoxTokens.background,
-      body: SafeArea(
-        child: CustomScrollView(
-          key: const ValueKey('collectible-detail-scroll-view'),
-          controller: _scrollController,
-          slivers: [
-            SliverPadding(
-              padding: EdgeInsets.symmetric(
-                horizontal: _responsiveDetailPadding(context),
-                vertical: AppSpacing.sm,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _DetailAuthorityHeader(
-                          item: currentItem,
-                          isFavorited: _isFavorited,
-                          onBack: () => Navigator.of(context).maybePop(),
-                          onEdit: () => _showEditCollectibleDialog(
-                            context: context,
-                            ref: ref,
-                            item: currentItem,
-                          ),
-                          onShare: () => _shareItem(context, currentItem),
-                          onFavorite: () {
-                            setState(() => _isFavorited = !_isFavorited);
-                            _showDetailSnackBar(
-                              context,
-                              _isFavorited
-                                  ? 'Added to favorites'
-                                  : 'Removed from favorites',
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        _DetailAuthorityOverview(
-                          item: currentItem,
-                          selectedImage: selectedImage,
-                          isFavorited: _isFavorited,
-                          onImageSelected: (image) {
-                            setState(() => _selectedGalleryPath = image.path);
-                          },
-                          onImageTap: selectedImage == null
-                              ? null
-                              : () => _showImageViewer(
-                                  context,
-                                  item: currentItem,
-                                  initialImage: selectedImage,
-                                  onUseAsPrimary: _setPrimaryImage,
-                                  onDelete: _deleteGalleryImage,
-                                  onEdit: _editGalleryImage,
-                                ),
-                        ),
-                        if (currentItem.confidence < 0.70) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          const _LowConfidenceBanner(),
-                        ],
-                        const SizedBox(height: AppSpacing.sm),
-                        _DetailAuthorityTabs(
-                          selected: _selectedSection,
-                          onSelected: (section) {
-                            setState(() => _selectedSection = section);
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        _DetailAuthoritySectionBody(
-                          section: _selectedSection,
-                          item: currentItem,
-                          galleryImages: galleryImages,
-                          isFavorited: _isFavorited,
-                          selectedImage: selectedImage,
-                          onImageSelected: (image) {
-                            setState(() => _selectedGalleryPath = image.path);
-                          },
-                          onImageTap: selectedImage == null
-                              ? null
-                              : () => _showImageViewer(
-                                  context,
-                                  item: currentItem,
-                                  initialImage: selectedImage,
-                                  onUseAsPrimary: _setPrimaryImage,
-                                  onDelete: _deleteGalleryImage,
-                                  onEdit: _editGalleryImage,
-                                ),
-                          onEdit: () => _showEditCollectibleDialog(
-                            context: context,
-                            ref: ref,
-                            item: currentItem,
-                          ),
-                          onShare: () => _shareItem(context, currentItem),
-                          onFavorite: () {
-                            setState(() => _isFavorited = !_isFavorited);
-                            _showDetailSnackBar(
-                              context,
-                              _isFavorited
-                                  ? 'Added to favorites'
-                                  : 'Removed from favorites',
-                            );
-                          },
-                          onDelete: widget.onDelete == null
-                              ? null
-                              : () => _confirmDetailDelete(
-                                  context,
-                                  currentItem,
-                                  widget.onDelete!,
-                                ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxl),
-                      ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: HomeTokens.background,
+        systemNavigationBarDividerColor: HomeTokens.background,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Theme(
+        data: AppTheme.dark,
+        child: Scaffold(
+          backgroundColor: HomeTokens.background,
+          body: SafeArea(
+            bottom: false,
+            child: ColoredBox(
+              key: const ValueKey('collectible-detail-packlox-surface'),
+              color: HomeTokens.background,
+              child: HomeStateContainer(
+                key: const ValueKey('collectible-detail-scroll-view'),
+                controller: _scrollController,
+                sections: [
+                  const HomeSection(child: HomeBrandLockup()),
+                  HomeSection(
+                    child: _DetailTitleBlock(
+                      item: currentItem,
+                      valuationStateLabel: _detailValueStatusLabel(currentItem),
                     ),
                   ),
-                ),
+                  HomeSection(
+                    child: _DetailAuthorityHeader(
+                      item: currentItem,
+                      isFavorited: _isFavorited,
+                      onBack: () => Navigator.of(context).maybePop(),
+                      onEdit: () => _showEditCollectibleDialog(
+                        context: context,
+                        ref: ref,
+                        item: currentItem,
+                      ),
+                      onShare: () => _shareItem(context, currentItem),
+                      onFavorite: () {
+                        setState(() => _isFavorited = !_isFavorited);
+                        _showDetailSnackBar(
+                          context,
+                          _isFavorited
+                              ? 'Added to favorites'
+                              : 'Removed from favorites',
+                        );
+                      },
+                    ),
+                  ),
+                  HomeSection(
+                    child: _DetailAuthorityOverview(
+                      item: currentItem,
+                      selectedImage: selectedImage,
+                      isFavorited: _isFavorited,
+                      onImageSelected: (image) {
+                        setState(() => _selectedGalleryPath = image.path);
+                      },
+                      onImageTap: selectedImage == null
+                          ? null
+                          : () => _showImageViewer(
+                              context,
+                              item: currentItem,
+                              initialImage: selectedImage,
+                              onUseAsPrimary: _setPrimaryImage,
+                              onDelete: _deleteGalleryImage,
+                              onEdit: _editGalleryImage,
+                            ),
+                    ),
+                  ),
+                  if (currentItem.confidence < 0.70)
+                    const HomeSection(child: _LowConfidenceBanner()),
+                  HomeSection(
+                    bottomPadding: AppSpacing.xl,
+                    child: _DetailInlineContent(
+                      item: currentItem,
+                      galleryImages: galleryImages,
+                      isFavorited: _isFavorited,
+                      onImageSelected: (image) {
+                        setState(() => _selectedGalleryPath = image.path);
+                      },
+                      selectedImage: selectedImage,
+                      onImageTap: selectedImage == null
+                          ? null
+                          : () => _showImageViewer(
+                              context,
+                              item: currentItem,
+                              initialImage: selectedImage,
+                              onUseAsPrimary: _setPrimaryImage,
+                              onDelete: _deleteGalleryImage,
+                              onEdit: _editGalleryImage,
+                            ),
+                      onEdit: () => _showEditCollectibleDialog(
+                        context: context,
+                        ref: ref,
+                        item: currentItem,
+                      ),
+                      onShare: () => _shareItem(context, currentItem),
+                      onFavorite: () {
+                        setState(() => _isFavorited = !_isFavorited);
+                        _showDetailSnackBar(
+                          context,
+                          _isFavorited
+                              ? 'Added to favorites'
+                              : 'Removed from favorites',
+                        );
+                      },
+                      onDelete: widget.onDelete == null
+                          ? null
+                          : () => _confirmDetailDelete(
+                              context,
+                              currentItem,
+                              widget.onDelete!,
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -332,22 +375,151 @@ Future<void> _confirmDetailDelete(
   CollectibleItem item,
   Future<bool> Function(String itemId) onDelete,
 ) async {
-  final confirmed = await showDialog<bool>(
+  final confirmed = await showModalBottomSheet<bool>(
     context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Delete collectible?'),
-        content: Text('${item.title} will be removed from your portfolio.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: .62),
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+      const destructiveColor = Color(0xFFFF5A66);
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+          child: DecoratedBox(
+            key: const ValueKey('collectible-delete-confirmation-sheet'),
+            decoration: BoxDecoration(
+              color: HomeTokens.surfaceRaised,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: destructiveColor.withValues(alpha: .42),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .34),
+                  blurRadius: 26,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: HomeTokens.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: destructiveColor.withValues(alpha: .14),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: destructiveColor.withValues(alpha: .42),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: destructiveColor,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Remove collectible?',
+                          style: Theme.of(sheetContext).textTheme.titleMedium
+                              ?.copyWith(
+                                color: HomeTokens.textPrimary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    item.title,
+                    key: const ValueKey('collectible-delete-item-name'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(sheetContext).textTheme.titleSmall
+                        ?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This removes the saved item from your Portfolio. Dismissing this sheet will keep it saved.',
+                    style: Theme.of(sheetContext).textTheme.bodyMedium
+                        ?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          key: const ValueKey(
+                            'collectible-delete-cancel-action',
+                          ),
+                          onPressed: () =>
+                              Navigator.of(sheetContext).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: HomeTokens.textPrimary,
+                            side: const BorderSide(color: HomeTokens.border),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                            minimumSize: const Size.fromHeight(46),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: FilledButton.icon(
+                          key: const ValueKey(
+                            'collectible-delete-confirm-action',
+                          ),
+                          onPressed: () => Navigator.of(sheetContext).pop(true),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: const Text('Remove'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: destructiveColor,
+                            foregroundColor: Colors.white,
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                            minimumSize: const Size.fromHeight(46),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
+        ),
       );
     },
   );
@@ -463,30 +635,46 @@ void _showImageViewer(
   );
 }
 
-double _responsiveDetailPadding(BuildContext context) {
-  final width = MediaQuery.sizeOf(context).width;
-  if (width < 360) {
-    return AppSpacing.md;
+class _DetailTitleBlock extends StatelessWidget {
+  const _DetailTitleBlock({
+    required this.item,
+    required this.valuationStateLabel,
+  });
+
+  final CollectibleItem item;
+  final String valuationStateLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Portfolio Detail',
+          key: const ValueKey('collectible-detail-packlox-title'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+            color: HomeTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${_fallback(item.category)} / $valuationStateLabel',
+          key: const ValueKey('collectible-detail-packlox-subtitle'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: HomeTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
   }
-  if (width < 600) {
-    return AppSpacing.lg;
-  }
-  return 20;
-}
-
-enum _DetailAuthoritySection {
-  overview('Overview', Icons.dashboard_outlined),
-  gallery('Gallery', Icons.photo_library_outlined),
-  details('Details', Icons.tune_outlined),
-  market('Market', Icons.query_stats_outlined),
-  insights('Insights', Icons.psychology_alt_outlined),
-  notes('Notes', Icons.edit_note_outlined),
-  actions('Actions', Icons.more_horiz);
-
-  const _DetailAuthoritySection(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
 }
 
 class _DetailAuthorityHeader extends StatelessWidget {
@@ -512,61 +700,74 @@ class _DetailAuthorityHeader extends StatelessWidget {
     return Semantics(
       container: true,
       label: 'Collectible Details. ${item.title}.',
-      child: SizedBox(
+      child: Container(
         key: const ValueKey('collectible-detail-authority-header'),
-        height: 56,
-        child: Row(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceRaised.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(HomeTokens.cardRadius),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: Column(
           children: [
-            _DetailIconButton(
-              tooltip: 'Back',
-              icon: Icons.arrow_back,
-              onPressed: onBack,
+            Row(
+              children: [
+                _DetailIconButton(
+                  key: const ValueKey('collectible-detail-back'),
+                  tooltip: 'Back',
+                  icon: Icons.arrow_back,
+                  onPressed: onBack,
+                ),
+                const Spacer(),
+                _DetailIconButton(
+                  key: const ValueKey('collectible-detail-favorite-action'),
+                  tooltip: isFavorited ? 'Favorited' : 'Favorite',
+                  icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+                  selected: isFavorited,
+                  onPressed: onFavorite,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                _DetailIconButton(
+                  key: const ValueKey('collectible-detail-share-action'),
+                  tooltip: 'Share',
+                  icon: Icons.ios_share_outlined,
+                  onPressed: onShare,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                _DetailIconButton(
+                  key: const ValueKey('collectible-detail-edit-button'),
+                  tooltip: 'Edit collectible',
+                  icon: Icons.edit_outlined,
+                  onPressed: onEdit,
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Item Overview',
+                    'Saved collectible',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.labelMedium?.copyWith(
-                      color: PackLoxTokens.textSecondary,
+                      color: HomeTokens.textSecondary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
                     item.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.titleMedium?.copyWith(
-                      color: PackLoxTokens.textPrimary,
+                      color: HomeTokens.textPrimary,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
               ),
-            ),
-            _DetailIconButton(
-              key: const ValueKey('collectible-detail-favorite-action'),
-              tooltip: isFavorited ? 'Favorited' : 'Favorite',
-              icon: isFavorited ? Icons.favorite : Icons.favorite_border,
-              selected: isFavorited,
-              onPressed: onFavorite,
-            ),
-            _DetailIconButton(
-              key: const ValueKey('collectible-detail-share-action'),
-              tooltip: 'Share',
-              icon: Icons.ios_share_outlined,
-              onPressed: onShare,
-            ),
-            _DetailIconButton(
-              key: const ValueKey('collectible-detail-edit-button'),
-              tooltip: 'Edit collectible',
-              icon: Icons.edit_outlined,
-              onPressed: onEdit,
             ),
           ],
         ),
@@ -602,17 +803,17 @@ class _DetailIconButton extends StatelessWidget {
           style: IconButton.styleFrom(
             foregroundColor: selected
                 ? colorScheme.primary
-                : PackLoxTokens.textPrimary,
+                : HomeTokens.textPrimary,
             backgroundColor: selected
                 ? colorScheme.primary.withValues(alpha: 0.16)
-                : PackLoxTokens.surfaceRaised.withValues(alpha: 0.82),
+                : HomeTokens.surfaceRaised.withValues(alpha: 0.94),
             side: BorderSide(
               color: selected
                   ? colorScheme.primary.withValues(alpha: 0.62)
-                  : PackLoxTokens.border.withValues(alpha: 0.72),
+                  : HomeTokens.border.withValues(alpha: 0.92),
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
             ),
           ),
         ),
@@ -647,103 +848,41 @@ class _DetailAuthorityOverview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Semantics(
-                  button: selectedImage != null,
-                  label:
-                      'Open image preview. ${selectedImage == null ? 'No image available' : _galleryRoleLabel(selectedImage!)}.',
-                  child: InkWell(
-                    key: const ValueKey('collectible-detail-image-preview'),
-                    onTap: onImageTap,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    child: AspectRatio(
-                      aspectRatio: 1.05,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            _DetailImageSurface(
-                              key: ValueKey(
-                                'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
-                              ),
-                              item: item,
-                              image: selectedImage,
-                            ),
-                            Positioned(
-                              left: AppSpacing.xs,
-                              top: AppSpacing.xs,
-                              child: _ReviewPill(
-                                label: images.isEmpty
-                                    ? 'No image'
-                                    : '${images.indexWhere((image) => image.path == selectedImage?.path) + 1}/${images.length}',
-                              ),
-                            ),
-                            if (selectedImage?.isPrimary ?? false)
-                              const Positioned(
-                                right: AppSpacing.xs,
-                                top: AppSpacing.xs,
-                                child: _PrimaryImageBadge(compact: true),
-                              ),
-                            if (_isAiEnhanced(selectedImage))
-                              const Positioned(
-                                right: AppSpacing.xs,
-                                bottom: AppSpacing.xs,
-                                child: _AiEnhancedDetailBadge(compact: true),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                flex: 4,
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final useSingleColumn = constraints.maxWidth < 520;
+              final imagePreview = _DetailOverviewImagePreview(
+                item: item,
+                selectedImage: selectedImage,
+                images: images,
+                onImageTap: onImageTap,
+              );
+              final summary = _DetailOverviewSummary(
+                item: item,
+                isFavorited: isFavorited,
+                textTheme: textTheme,
+              );
+
+              if (useSingleColumn) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.title,
-                      key: const ValueKey('collectible-detail-title'),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleLarge?.copyWith(
-                        color: PackLoxTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                        height: 1.08,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      children: [
-                        _DetailAuthorityBadge(
-                          icon: Icons.category_outlined,
-                          label: _fallback(item.category),
-                        ),
-                        _DetailAuthorityBadge(
-                          icon: isFavorited
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          label: isFavorited ? 'Favorited' : 'Saved',
-                        ),
-                      ],
-                    ),
+                    imagePreview,
                     const SizedBox(height: AppSpacing.sm),
-                    _DetailAuthorityValueBlock(item: item),
-                    const SizedBox(height: AppSpacing.sm),
-                    _DetailAuthorityConditionMini(item: item),
+                    summary,
                   ],
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 5, child: imagePreview),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(flex: 4, child: summary),
+                ],
+              );
+            },
           ),
           if (images.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -759,59 +898,128 @@ class _DetailAuthorityOverview extends StatelessWidget {
   }
 }
 
-class _DetailAuthorityTabs extends StatelessWidget {
-  const _DetailAuthorityTabs({
-    required this.selected,
-    required this.onSelected,
+class _DetailOverviewImagePreview extends StatelessWidget {
+  const _DetailOverviewImagePreview({
+    required this.item,
+    required this.selectedImage,
+    required this.images,
+    required this.onImageTap,
   });
 
-  final _DetailAuthoritySection selected;
-  final ValueChanged<_DetailAuthoritySection> onSelected;
+  final CollectibleItem item;
+  final CollectibleImage? selectedImage;
+  final List<CollectibleImage> images;
+  final VoidCallback? onImageTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      key: const ValueKey('collectible-detail-authority-tabs'),
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _DetailAuthoritySection.values.length,
-        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
-        itemBuilder: (context, index) {
-          final section = _DetailAuthoritySection.values[index];
-          final isSelected = selected == section;
-          return ChoiceChip(
-            key: ValueKey('collectible-detail-tab-${section.name}'),
-            selected: isSelected,
-            avatar: Icon(section.icon, size: 16),
-            label: Text(section.label),
-            onSelected: (_) => onSelected(section),
-            backgroundColor: PackLoxTokens.surfaceRaised.withValues(
-              alpha: 0.74,
+    return Semantics(
+      button: selectedImage != null,
+      label:
+          'Open image preview. ${selectedImage == null ? 'State artwork shown' : _galleryRoleLabel(selectedImage!)}.',
+      child: InkWell(
+        key: const ValueKey('collectible-detail-image-preview'),
+        onTap: onImageTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: AspectRatio(
+          aspectRatio: 1.28,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _DetailImageSurface(
+                  key: ValueKey(
+                    'collectible-detail-hero-${selectedImage?.path ?? item.imagePath}',
+                  ),
+                  item: item,
+                  image: selectedImage,
+                ),
+                if (images.isNotEmpty)
+                  Positioned(
+                    left: AppSpacing.xs,
+                    top: AppSpacing.xs,
+                    child: _ReviewPill(
+                      label:
+                          '${images.indexWhere((image) => image.path == selectedImage?.path) + 1}/${images.length}',
+                    ),
+                  ),
+                if (selectedImage?.isPrimary ?? false)
+                  const Positioned(
+                    right: AppSpacing.xs,
+                    top: AppSpacing.xs,
+                    child: _PrimaryImageBadge(compact: true),
+                  ),
+                if (_isAiEnhanced(selectedImage))
+                  const Positioned(
+                    right: AppSpacing.xs,
+                    bottom: AppSpacing.xs,
+                    child: _AiEnhancedDetailBadge(compact: true),
+                  ),
+              ],
             ),
-            selectedColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.20),
-            side: BorderSide(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : PackLoxTokens.border.withValues(alpha: 0.70),
-            ),
-            labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-class _DetailAuthoritySectionBody extends StatelessWidget {
-  const _DetailAuthoritySectionBody({
-    required this.section,
+class _DetailOverviewSummary extends StatelessWidget {
+  const _DetailOverviewSummary({
+    required this.item,
+    required this.isFavorited,
+    required this.textTheme,
+  });
+
+  final CollectibleItem item;
+  final bool isFavorited;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.title,
+          key: const ValueKey('collectible-detail-title'),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.headlineSmall?.copyWith(
+            color: HomeTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+            height: 1.08,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            _DetailAuthorityBadge(
+              icon: Icons.category_outlined,
+              label: _fallback(item.category),
+            ),
+            _DetailAuthorityBadge(
+              icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+              label: isFavorited ? 'Favorited' : 'Saved',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailAuthorityValueBlock(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailValuationStatePanel(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailAuthorityConditionMini(item: item),
+      ],
+    );
+  }
+}
+
+class _DetailInlineContent extends StatelessWidget {
+  const _DetailInlineContent({
     required this.item,
     required this.galleryImages,
     required this.isFavorited,
@@ -824,7 +1032,6 @@ class _DetailAuthoritySectionBody extends StatelessWidget {
     required this.onDelete,
   });
 
-  final _DetailAuthoritySection section;
   final CollectibleItem item;
   final List<CollectibleImage> galleryImages;
   final bool isFavorited;
@@ -838,39 +1045,38 @@ class _DetailAuthoritySectionBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 120),
-      child: KeyedSubtree(
-        key: ValueKey('collectible-detail-section-${section.name}'),
-        child: switch (section) {
-          _DetailAuthoritySection.overview => _DetailOverviewSection(
-            item: item,
-          ),
-          _DetailAuthoritySection.gallery => _DetailGallerySection(
+    return Column(
+      key: const ValueKey('collectible-detail-inline-content'),
+      children: [
+        _DetailOverviewSection(item: item),
+        if (galleryImages.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _DetailGallerySection(
             item: item,
             galleryImages: galleryImages,
             selectedImage: selectedImage,
             onImageSelected: onImageSelected,
             onImageTap: onImageTap,
           ),
-          _DetailAuthoritySection.details => _DetailInfoSection(item: item),
-          _DetailAuthoritySection.market => _DetailMarketSection(item: item),
-          _DetailAuthoritySection.insights => _DetailInsightsSection(
-            item: item,
-          ),
-          _DetailAuthoritySection.notes => _DetailNotesAndStatusSection(
-            item: item,
-          ),
-          _DetailAuthoritySection.actions => _DetailActionsMenuSection(
-            item: item,
-            isFavorited: isFavorited,
-            onEdit: onEdit,
-            onShare: onShare,
-            onFavorite: onFavorite,
-            onDelete: onDelete,
-          ),
-        },
-      ),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        _DetailInfoSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailMarketSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailInsightsSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailNotesAndStatusSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailActionsMenuSection(
+          item: item,
+          isFavorited: isFavorited,
+          onEdit: onEdit,
+          onShare: onShare,
+          onFavorite: onFavorite,
+          onDelete: onDelete,
+        ),
+      ],
     );
   }
 }
@@ -887,14 +1093,11 @@ class _DetailAuthorityPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return HomeSurface(
       padding: padding,
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surfaceRaised.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.76)),
-      ),
+      radius: HomeTokens.cardRadius,
+      backgroundColor: HomeTokens.surfaceRaised.withValues(alpha: 0.94),
+      borderColor: HomeTokens.border,
       child: child,
     );
   }
@@ -910,9 +1113,9 @@ class _DetailAuthorityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: PackLoxTokens.surface.withValues(alpha: 0.82),
+        color: HomeTokens.surface.withValues(alpha: 0.86),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.72)),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: 0.78)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -927,7 +1130,7 @@ class _DetailAuthorityBadge extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: PackLoxTokens.textPrimary,
+                  color: HomeTokens.textPrimary,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -947,16 +1150,18 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final isPending = _isValuationPending(item);
+    final accentColor = isPending
+        ? const Color(0xFFF59E0B)
+        : Theme.of(context).colorScheme.primary;
     return Container(
       key: const ValueKey('collectible-detail-value-card'),
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+        color: accentColor.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.32),
-        ),
+        border: Border.all(color: accentColor.withValues(alpha: 0.34)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -975,7 +1180,7 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: textTheme.titleLarge?.copyWith(
-              color: PackLoxTokens.textPrimary,
+              color: HomeTokens.textPrimary,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -985,8 +1190,91 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: textTheme.labelSmall?.copyWith(
-              color: PackLoxTokens.textSecondary,
+              color: HomeTokens.textSecondary,
               fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailValuationStatePanel extends StatelessWidget {
+  const _DetailValuationStatePanel({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final confirmed = _hasConfirmedValuation(item);
+    final pending = _isValuationPending(item);
+    final color = confirmed
+        ? HomeTokens.positive
+        : pending
+        ? HomeTokens.warning
+        : HomeTokens.accent;
+    final icon = confirmed
+        ? Icons.verified_outlined
+        : pending
+        ? Icons.pending_actions_outlined
+        : Icons.add_photo_alternate_outlined;
+    final title = confirmed
+        ? 'Valuation ready'
+        : pending
+        ? 'Valuation pending'
+        : 'No valuation saved';
+    final body = confirmed
+        ? _detailValueStatusLabel(item)
+        : pending
+        ? 'Market pricing is not confirmed yet. Keep the item saved while PackLox waits for a usable comp.'
+        : 'Add a portfolio photo or richer details when you are ready to estimate this item.';
+
+    return Container(
+      key: ValueKey(
+        confirmed
+            ? 'collectible-detail-valued-state'
+            : pending
+            ? 'collectible-detail-pending-valuation-state'
+            : 'collectible-detail-unvalued-state',
+      ),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  body,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.22,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1032,9 +1320,9 @@ class _DetailMiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: PackLoxTokens.surface.withValues(alpha: 0.76),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.64)),
+        color: HomeTokens.surface.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: 0.78)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xs),
@@ -1046,7 +1334,7 @@ class _DetailMiniStat extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: PackLoxTokens.textSecondary,
+                color: HomeTokens.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1055,7 +1343,7 @@ class _DetailMiniStat extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: PackLoxTokens.textPrimary,
+                color: HomeTokens.textPrimary,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1635,14 +1923,7 @@ _DetailInfoRowData? _detailRow(String label, String? value) {
 }
 
 String _detailValueLabel(BuildContext context, CollectibleItem item) {
-  final shouldShowValue = switch (item.valuationStatus) {
-    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
-    ValuationStatus.providerNotConfigured ||
-    ValuationStatus.noMarketMatch ||
-    ValuationStatus.lookupFailed ||
-    ValuationStatus.unavailable => item.estimatedValue > 0,
-  };
-  if (!shouldShowValue) {
+  if (!_shouldShowDetailValue(item)) {
     return 'Value unavailable';
   }
   if (item.estimatedValue == 0) {
@@ -1660,6 +1941,76 @@ String _detailValueStatusLabel(CollectibleItem item) {
     ValuationStatus.lookupFailed => 'Pricing lookup unavailable',
     ValuationStatus.unavailable => 'No valuation saved',
   };
+}
+
+bool _shouldShowDetailValue(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => item.estimatedValue > 0,
+  };
+}
+
+bool _hasConfirmedValuation(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => false,
+  };
+}
+
+bool _isValuationPending(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed => !_shouldShowDetailValue(item),
+    ValuationStatus.marketEstimated ||
+    ValuationStatus.aiEstimated ||
+    ValuationStatus.unavailable => false,
+  };
+}
+
+String _detailFallbackAssetFor(CollectibleItem item) {
+  if (_isValuationPending(item)) {
+    return PackLoxAssets.portfolioDetailPendingValuation;
+  }
+  if (_hasConfirmedValuation(item)) {
+    return PackLoxAssets.portfolioDetailValuedItem;
+  }
+  return PackLoxAssets.portfolioDetailMissingImage;
+}
+
+String _detailFallbackTitleFor(CollectibleItem item, CollectibleImage? image) {
+  if (image != null) {
+    return _galleryRoleLabel(image);
+  }
+  if (_isValuationPending(item)) {
+    return 'Valuation pending';
+  }
+  if (_hasConfirmedValuation(item)) {
+    return 'Valuation ready';
+  }
+  return 'Image needed';
+}
+
+String _detailFallbackSubtitleFor(
+  CollectibleItem item,
+  CollectibleImage? image,
+) {
+  if (image != null) {
+    return 'Preview unavailable';
+  }
+  if (_isValuationPending(item)) {
+    return 'Waiting for a usable market comp';
+  }
+  if (_hasConfirmedValuation(item)) {
+    return _detailValueStatusLabel(item);
+  }
+  return _fallback(item.category, fallback: 'Add a portfolio photo');
 }
 
 String _syncStatusLabel(CloudItemSyncStatus status) {
@@ -1718,38 +2069,103 @@ class _DetailImagePlaceholder extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
+    return LayoutBuilder(
+      key: const ValueKey('collectible-detail-missing-image-fallback'),
+      builder: (context, constraints) {
+        final compact =
+            constraints.maxHeight < 120 || constraints.maxWidth < 140;
+        final stateAsset = _detailFallbackAssetFor(item);
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                stateAsset,
+                key: ValueKey('collectible-detail-state-art-$stateAsset'),
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: compact ? 0.12 : 0.04),
+                      Colors.black.withValues(alpha: compact ? 0.44 : 0.32),
+                    ],
+                  ),
+                ),
+              ),
+              if (!compact)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: _DetailImageFallbackCaption(
+                      title: _detailFallbackTitleFor(item, image),
+                      subtitle: _detailFallbackSubtitleFor(item, image),
+                      textTheme: textTheme,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DetailImageFallbackCaption extends StatelessWidget {
+  const _DetailImageFallbackCaption({
+    required this.title,
+    required this.subtitle,
+    required this.textTheme,
+  });
+
+  final String title;
+  final String subtitle;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primary.withValues(alpha: 0.28),
-            colorScheme.tertiary.withValues(alpha: 0.18),
-            colorScheme.surfaceContainerHighest,
-          ],
-        ),
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
-      child: Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.image_outlined,
-              color: colorScheme.primary,
-              size: AppIconSizes.xl,
-            ),
-            const SizedBox(height: AppSpacing.sm),
             Text(
-              image == null
-                  ? _fallback(item.category, fallback: 'Collectible image')
-                  : _galleryRoleLabel(image!),
-              maxLines: 1,
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w800,
+              style: textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -2469,8 +2885,11 @@ Future<void> _showEditCollectibleDialog({
   required WidgetRef ref,
   required CollectibleItem item,
 }) async {
-  final editedItem = await showDialog<CollectibleItem>(
+  final editedItem = await showModalBottomSheet<CollectibleItem>(
     context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: .62),
+    isScrollControlled: true,
     builder: (_) => _EditCollectibleDialog(item: item),
   );
   if (editedItem == null) {
@@ -2542,86 +2961,233 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Edit collectible'),
-      content: SizedBox(
-        width: 560,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-title-field'),
-                  controller: _titleController,
-                  label: 'Title',
-                  validator: _requiredText,
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-category-field'),
-                  controller: _categoryController,
-                  label: 'Category',
-                  validator: _requiredText,
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-manufacturer-field'),
-                  controller: _manufacturerController,
-                  label: 'Manufacturer',
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-series-field'),
-                  controller: _seriesController,
-                  label: 'Series',
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-year-field'),
-                  controller: _yearController,
-                  label: 'Year',
-                  keyboardType: TextInputType.number,
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-country-field'),
-                  controller: _countryController,
-                  label: 'Country',
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-low-value-field'),
-                  controller: _lowValueController,
-                  label: 'Estimated value low',
-                  keyboardType: TextInputType.number,
-                  validator: _requiredMoney,
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-high-value-field'),
-                  controller: _highValueController,
-                  label: 'Estimated value high',
-                  keyboardType: TextInputType.number,
-                  validator: _requiredMoney,
-                ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-notes-field'),
-                  controller: _notesController,
-                  label: 'Notes',
-                  maxLines: 3,
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottomInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .9,
+          ),
+          child: DecoratedBox(
+            key: const ValueKey('edit-collectible-sheet'),
+            decoration: BoxDecoration(
+              color: HomeTokens.surfaceRaised,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFF8BE7FF).withValues(alpha: .36),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .34),
+                  blurRadius: 26,
+                  offset: const Offset(0, 18),
                 ),
               ],
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 42,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: HomeTokens.border,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF0EA5E9,
+                                  ).withValues(alpha: .16),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF8BE7FF,
+                                    ).withValues(alpha: .38),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.edit_outlined,
+                                  color: Color(0xFF8BE7FF),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Edit item details',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: HomeTokens.textPrimary,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.item.title,
+                            key: const ValueKey('edit-collectible-item-name'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: HomeTokens.textPrimary,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.2,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Update saved local details for this Portfolio item.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: HomeTokens.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.35,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-title-field',
+                            ),
+                            controller: _titleController,
+                            label: 'Title',
+                            validator: _requiredText,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-category-field',
+                            ),
+                            controller: _categoryController,
+                            label: 'Category',
+                            validator: _requiredText,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-manufacturer-field',
+                            ),
+                            controller: _manufacturerController,
+                            label: 'Manufacturer',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-series-field',
+                            ),
+                            controller: _seriesController,
+                            label: 'Series',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-year-field',
+                            ),
+                            controller: _yearController,
+                            label: 'Year',
+                            keyboardType: TextInputType.number,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-country-field',
+                            ),
+                            controller: _countryController,
+                            label: 'Country',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-low-value-field',
+                            ),
+                            controller: _lowValueController,
+                            label: 'Estimated value low',
+                            keyboardType: TextInputType.number,
+                            validator: _requiredMoney,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-high-value-field',
+                            ),
+                            controller: _highValueController,
+                            label: 'Estimated value high',
+                            keyboardType: TextInputType.number,
+                            validator: _requiredMoney,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-notes-field',
+                            ),
+                            controller: _notesController,
+                            label: 'Notes',
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            key: const ValueKey(
+                              'edit-collectible-cancel-button',
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: HomeTokens.textPrimary,
+                              side: const BorderSide(color: HomeTokens.border),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                              minimumSize: const Size.fromHeight(46),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: FilledButton.icon(
+                            key: const ValueKey('edit-collectible-save-button'),
+                            onPressed: _save,
+                            icon: const Icon(Icons.save_outlined, size: 18),
+                            label: const Text('Save'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: HomeTokens.accentStrong,
+                              foregroundColor: HomeTokens.textPrimary,
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                              minimumSize: const Size.fromHeight(46),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          key: const ValueKey('edit-collectible-save-button'),
-          onPressed: _save,
-          icon: const Icon(Icons.save_outlined),
-          label: const Text('Save'),
-        ),
-      ],
     );
   }
 
@@ -2676,14 +3242,15 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
 
 class _EditTextField extends StatelessWidget {
   const _EditTextField({
+    required this.fieldKey,
     required this.controller,
     required this.label,
     this.keyboardType,
     this.validator,
     this.maxLines = 1,
-    super.key,
   });
 
+  final Key fieldKey;
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
@@ -2695,11 +3262,39 @@ class _EditTextField extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: TextFormField(
+        key: fieldKey,
         controller: controller,
         keyboardType: keyboardType,
         validator: validator,
         maxLines: maxLines,
-        decoration: InputDecoration(labelText: label),
+        cursorColor: const Color(0xFF8BE7FF),
+        style: const TextStyle(
+          color: HomeTokens.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: HomeTokens.textSecondary),
+          errorMaxLines: 2,
+          filled: true,
+          fillColor: HomeTokens.surface,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: HomeTokens.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF8BE7FF), width: 1.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFFF5A66)),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFFF5A66), width: 1.5),
+          ),
+        ),
       ),
     );
   }

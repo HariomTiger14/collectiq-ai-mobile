@@ -78,6 +78,7 @@ flutter:
   assets:
     - assets/packlox/
     - assets/packlox/brand/
+    - assets/packlox/portfolio/
     - assets/packlox/icons/actions/
     - assets/packlox/icons/categories/
     - assets/packlox/icons/navigation/
