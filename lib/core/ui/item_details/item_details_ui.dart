@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -169,12 +170,13 @@ class _HeroTextOverlay extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'PackLox',
+              PackLoxWordmark(
                 style: textTheme.labelLarge?.copyWith(
                   color: colorScheme.onPrimary.withValues(alpha: 0.78),
                   fontWeight: FontWeight.w800,
                 ),
+                packColor: colorScheme.onPrimary.withValues(alpha: 0.78),
+                loxColor: colorScheme.primary,
               ),
               if ((title ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 4),

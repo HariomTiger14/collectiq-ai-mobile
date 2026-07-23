@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:flutter/material.dart';
 
@@ -241,10 +242,8 @@ class AboutAppIconCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            Text(
-              'PackLox',
+            PackLoxWordmark(
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w900,

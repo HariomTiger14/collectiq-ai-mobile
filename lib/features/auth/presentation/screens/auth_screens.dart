@@ -274,7 +274,7 @@ class _AuthWelcomeBrandLockup extends StatelessWidget {
                 ),
                 TextSpan(
                   text: 'Lox',
-                  style: TextStyle(color: Color(0xFF6FD3FF)),
+                  style: TextStyle(color: Color(0xFF0087FF)),
                 ),
               ],
             ),
@@ -2863,7 +2863,7 @@ class _AuthCompactBrandLockup extends StatelessWidget {
                     ),
                     TextSpan(
                       text: 'Lox',
-                      style: TextStyle(color: Color(0xFF6FD3FF)),
+                      style: TextStyle(color: Color(0xFF0087FF)),
                     ),
                   ],
                 ),

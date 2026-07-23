@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -59,11 +60,10 @@ class HomeBrandLockup extends StatelessWidget {
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Text(
-            'PackLox',
+          child: PackLoxWordmark(
             key: const ValueKey('home-brand-wordmark'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            packColor: HomeTokens.textPrimary,
+            loxColor: HomeTokens.accent,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: HomeTokens.textPrimary,
               fontWeight: FontWeight.w900,
@@ -157,90 +157,70 @@ class HomeAuthorityHero extends StatelessWidget {
       radius: 24,
       backgroundColor: HomeTokens.surfaceRaised.withValues(alpha: .92),
       borderColor: HomeTokens.border,
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: 8,
-            top: 28,
-            child: ExcludeSemantics(
-              child: Container(
-                width: 76,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: HomeTokens.accent.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(icon, color: const Color(0xFF8BC7FF), size: 34),
-              ),
+          Text(
+            eyebrow,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: const Color(0xFF67B6FF),
+              fontWeight: FontWeight.w900,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 92),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  eyebrow,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFF67B6FF),
-                    fontWeight: FontWeight.w900,
-                  ),
+          const SizedBox(height: 20),
+          Text(
+            title,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1.12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            body,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w600,
+              height: 1.32,
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            key: const ValueKey('home-primary-scan'),
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: enabled ? onPressed : null,
+              icon: Icon(icon, size: 19),
+              label: Text(
+                ctaLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: HomeTokens.accentStrong,
+                disabledBackgroundColor: HomeTokens.accentStrong.withValues(
+                  alpha: .38,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: HomeTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    height: 1.12,
-                  ),
+                foregroundColor: HomeTokens.textPrimary,
+                disabledForegroundColor: HomeTokens.textPrimary.withValues(
+                  alpha: .68,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  body,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: HomeTokens.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    height: 1.32,
-                  ),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  key: const ValueKey('home-primary-scan'),
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton.icon(
-                    onPressed: enabled ? onPressed : null,
-                    icon: Icon(icon, size: 19),
-                    label: Text(
-                      ctaLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: HomeTokens.accentStrong,
-                      disabledBackgroundColor: HomeTokens.accentStrong
-                          .withValues(alpha: .38),
-                      foregroundColor: HomeTokens.textPrimary,
-                      disabledForegroundColor: HomeTokens.textPrimary
-                          .withValues(alpha: .68),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -255,6 +235,7 @@ class HomeMetricTile extends StatelessWidget {
     required this.value,
     required this.supportingText,
     this.supportingColor = HomeTokens.positive,
+    this.compact = false,
     super.key,
   });
 
@@ -262,12 +243,13 @@ class HomeMetricTile extends StatelessWidget {
   final String value;
   final String supportingText;
   final Color supportingColor;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return HomeSurface(
       keySeed: 'metric-${label.toLowerCase().replaceAll(' ', '-')}',
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(compact ? 14 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -280,7 +262,7 @@ class HomeMetricTile extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: compact ? 12 : 18),
           Text(
             value,
             maxLines: 1,
@@ -291,7 +273,7 @@ class HomeMetricTile extends StatelessWidget {
               height: 1,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: compact ? 8 : 10),
           Text(
             supportingText,
             maxLines: 2,

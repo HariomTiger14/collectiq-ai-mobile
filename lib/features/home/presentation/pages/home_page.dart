@@ -453,30 +453,32 @@ class _MetricGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = <Widget>[
-      if (data.hasValuedItems)
-        HomeMetricTile(
-          label: 'Collection value',
-          value: _formatCurrency(data.totalValuedAmount),
-          supportingText: data.hasPartialValuation
-              ? 'Partial valuation'
-              : 'Estimated trend',
-          supportingColor: data.hasPartialValuation
-              ? HomeTokens.warning
-              : HomeTokens.positive,
-        ),
-      HomeMetricTile(
-        label: 'Collection items',
-        value: '${data.itemCount}',
-        supportingText: data.hasPartialValuation
-            ? '${data.valuedItemCount} valued'
-            : 'Verified items',
-      ),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 360 ? 2 : 1;
+        final columns = constraints.maxWidth >= 300 ? 2 : 1;
+        final compact = columns > 1;
+        final metrics = <Widget>[
+          if (data.hasValuedItems)
+            HomeMetricTile(
+              label: 'Collection value',
+              value: _formatCurrency(data.totalValuedAmount),
+              supportingText: data.hasPartialValuation
+                  ? 'Partial valuation'
+                  : 'Estimated trend',
+              supportingColor: data.hasPartialValuation
+                  ? HomeTokens.warning
+                  : HomeTokens.positive,
+              compact: compact,
+            ),
+          HomeMetricTile(
+            label: 'Collection items',
+            value: '${data.itemCount}',
+            supportingText: data.hasPartialValuation
+                ? '${data.valuedItemCount} valued'
+                : 'Verified items',
+            compact: compact,
+          ),
+        ];
         final width = columns == 1
             ? constraints.maxWidth
             : (constraints.maxWidth - HomeTokens.cardGap) / 2;

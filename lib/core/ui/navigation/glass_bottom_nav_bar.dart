@@ -57,21 +57,26 @@ class GlassBottomNavBar extends StatelessWidget {
             child: Container(
               height: navHeight,
               decoration: BoxDecoration(
-                color: PackLoxTokens.surface.withValues(alpha: 0.56),
+                color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: PackLoxTokens.cyan.withValues(alpha: 0.16),
+                  color: const Color(0xFF334155).withValues(alpha: 0.86),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 7),
+                    color: Colors.black.withValues(alpha: 0.34),
+                    blurRadius: 22,
+                    offset: const Offset(0, 12),
                   ),
                   BoxShadow(
-                    color: PackLoxTokens.cyan.withValues(alpha: 0.06),
-                    blurRadius: 14,
+                    color: PackLoxTokens.textPrimary.withValues(alpha: 0.06),
+                    blurRadius: 8,
                     offset: const Offset(0, -1),
+                  ),
+                  BoxShadow(
+                    color: const Color(0xFF0A84FF).withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 0),
                   ),
                 ],
               ),
@@ -132,22 +137,18 @@ class NavBarItem extends StatelessWidget {
         mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
     final duration = reduceMotion ? Duration.zero : PackLoxMotionTheme.fast;
     final isScanAction = label == 'Scan';
-    final foreground = isScanAction
-        ? isActive
-              ? PackLoxTokens.textPrimary
-              : PackLoxTokens.cyan
-        : isActive
+    final foreground = isActive
         ? PackLoxTokens.textPrimary
-        : PackLoxTokens.textSecondary;
+        : const Color(0xFF94A3B8);
     final borderColor = isScanAction
-        ? PackLoxTokens.cyan.withValues(alpha: isActive ? 0.48 : 0.0)
+        ? const Color(0xFF63B3FF).withValues(alpha: isActive ? 0.42 : 0.0)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.26)
+        ? const Color(0xFF63B3FF).withValues(alpha: 0.34)
         : Colors.transparent;
     final fillColor = isScanAction
-        ? PackLoxTokens.blue.withValues(alpha: isActive ? 0.44 : 0.0)
+        ? const Color(0xFF0A84FF).withValues(alpha: isActive ? 1.0 : 0.0)
         : isActive
-        ? PackLoxTokens.cyan.withValues(alpha: 0.10)
+        ? const Color(0xFF0A84FF)
         : Colors.transparent;
     final effectiveIcon = isActive ? selectedIcon ?? icon : icon;
 
@@ -168,8 +169,8 @@ class NavBarItem extends StatelessWidget {
         boxShadow: isScanAction && isActive
             ? [
                 BoxShadow(
-                  color: PackLoxTokens.blue.withValues(alpha: 0.16),
-                  blurRadius: 12,
+                  color: const Color(0xFF0A84FF).withValues(alpha: 0.24),
+                  blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
               ]

@@ -28,7 +28,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.byKey(const ValueKey('home-brand-emblem')), findsOneWidget);
-    expect(find.text('PackLox'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-brand-wordmark')), findsOneWidget);
     expect(find.text('Pack  Lox'), findsNothing);
     expect(find.text('Home'), findsOneWidget);
     expect(
@@ -290,7 +290,7 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.text('PackLox'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-brand-wordmark')), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
     expect(find.byKey(const ValueKey('nav-home')), findsNothing);

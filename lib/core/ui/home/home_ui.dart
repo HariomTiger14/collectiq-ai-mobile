@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:flutter/material.dart';
 
 class HomeHeroHeader extends StatelessWidget {
@@ -146,12 +147,13 @@ class HomeHeroHeader extends StatelessWidget {
                                     color: Colors.white.withValues(alpha: 0.20),
                                   ),
                                 ),
-                                child: Text(
-                                  'PackLox',
+                                child: PackLoxWordmark(
                                   style: AppTextStyles.caption.copyWith(
                                     color: colorScheme.onPrimary,
                                     fontWeight: FontWeight.w800,
                                   ),
+                                  packColor: colorScheme.onPrimary,
+                                  loxColor: colorScheme.primary,
                                 ),
                               ),
                             ],
