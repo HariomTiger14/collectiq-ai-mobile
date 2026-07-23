@@ -1,15 +1,12 @@
 import 'dart:async';
 
-import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/network/api_client.dart' as network;
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
-import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
-import 'package:collectiq_ai/core/widgets/glass_card.dart';
 import 'package:collectiq_ai/core/widgets/modern_settings_row.dart';
 import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
@@ -19,16 +16,15 @@ import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart'
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
-import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
-import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,7 +34,10 @@ const _showDeveloperSurfaces = bool.fromEnvironment(
 
 /// Settings screen for account, app preferences, and supported local/cloud state.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.qaInitialScrollOffset = 0});
+
+  /// Initial scroll offset used only by direct visual QA capture routes.
+  final double qaInitialScrollOffset;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -46,8 +45,26 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scrollController = ScrollController();
-  bool _isManualCloudSyncing = false;
   bool _isUpdatingDemoData = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.qaInitialScrollOffset > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) {
+          return;
+        }
+        final position = _scrollController.position;
+        _scrollController.jumpTo(
+          widget.qaInitialScrollOffset.clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          ),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -88,17 +105,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     final isSitEnvironment =
         cloudRegistry.config.environment == AppEnvironment.sit;
-    final showDeveloperTools = _showDeveloperSurfaces || isSitEnvironment;
+    final showDeveloperTools = _showDeveloperSurfaces;
     final now = DateTime.now();
-    final colorScheme = Theme.of(context).colorScheme;
     Widget framed(Widget child, {EdgeInsetsGeometry? padding}) {
       return Padding(
         padding:
-            padding ?? const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            padding ??
+            const EdgeInsets.symmetric(horizontal: HomeTokens.pageGutter),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: child,
+            constraints: const BoxConstraints(
+              maxWidth: HomeTokens.maxContentWidth,
+            ),
+            child: SizedBox(width: double.infinity, child: child),
           ),
         ),
       );
@@ -109,194 +128,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     List<Widget> sectionSlivers(
-      String title,
       List<Widget> children, {
-      double topSpacing = AppSpacing.xl,
+      double topSpacing = 18,
     }) {
       return [
         sliverBox(
-          SettingsSectionHeader(title),
+          SettingsCardGroup(children: children),
           padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+            HomeTokens.pageGutter,
             topSpacing,
-            AppSpacing.lg,
-            AppSpacing.md,
+            HomeTokens.pageGutter,
+            0,
           ),
         ),
-        sliverBox(SettingsCardGroup(children: children)),
       ];
     }
 
-    final accountTiles = [
-      IdentityBlock(authState: authState),
+    final primaryTiles = [
       _SettingsRow(
         icon: Icons.account_circle_outlined,
-        title: authState.isSignedIn ? 'Manage Account' : 'Account & Profile',
+        title: 'Account',
         subtitle: authState.isSignedIn
-            ? 'Cloud account details are read from the active session.'
-            : 'Guest access keeps scanning and Portfolio available locally.',
-        trailing: authState.isSignedIn ? 'Session' : 'Guest',
-      ),
-      _SettingsRow(
-        icon: Icons.alternate_email_outlined,
-        title: 'Email',
-        subtitle:
-            authState.user?.email ??
-            'No cloud account email is linked on this device.',
-        trailing: authState.isSignedIn ? 'Current' : 'Not set',
-      ),
-      _SettingsRow(
-        icon: authState.isSignedIn ? Icons.verified_user_outlined : Icons.login,
-        title: authState.isSignedIn ? 'Account status' : 'Sign In',
-        subtitle: authState.isSignedIn
-            ? 'Signed in through the existing authentication controller.'
-            : 'Open the separate Authentication screen.',
-        trailing: authState.isSignedIn ? 'Signed in' : 'Open',
+            ? authState.user?.email ?? 'Signed in'
+            : 'Sign in to enable cloud backup.',
+        trailing: authState.isSignedIn ? 'Signed in' : 'Sign in',
         onTap: authState.isSignedIn
             ? null
             : () => Navigator.of(context).push(AuthWelcomeScreen.route()),
       ),
       _SettingsRow(
-        icon: Icons.logout_outlined,
-        title: 'Sign Out',
-        subtitle: authState.isSignedIn
-            ? 'Sign out of cloud auth. Local collection data remains on this device.'
-            : 'You are currently using local-first guest access.',
-        trailing: authState.isSignedIn ? 'Available' : 'Guest',
-        onTap: authState.isSignedIn
-            ? () => ref.read(authControllerProvider.notifier).signOut()
-            : null,
-      ),
-    ];
-
-    final preferencesTiles = [
-      const _SettingsRow(
-        icon: Icons.language_outlined,
-        title: 'App language',
-        subtitle: 'PackLox currently follows the device language.',
-        trailing: 'System',
-      ),
-      const _SettingsRow(
-        icon: Icons.straighten_outlined,
-        title: 'Measurement units',
-        subtitle: 'Package measurements use the current app defaults.',
-        trailing: 'Default',
-      ),
-      const _SettingsRow(
-        icon: Icons.document_scanner_outlined,
-        title: 'Default scan mode',
-        subtitle: 'Scanner opens through the frozen Scan tab workflow.',
-        trailing: 'Scan',
-      ),
-      const _SettingsRow(
-        icon: Icons.hdr_auto_outlined,
-        title: 'Auto Enhance',
-        subtitle: 'Enhancement remains owned by the Scanner review flow.',
-        trailing: 'Review',
-      ),
-      _SettingsRow(
-        icon: Icons.palette_outlined,
-        title: 'Theme',
-        subtitle: 'PackLox follows the system light or dark theme.',
-        trailing: 'System',
-        message: 'Theme is owned by the app theme and follows the device.',
-      ),
-    ];
-
-    final notificationTiles = [
-      _SettingsRow(
-        icon: Icons.notifications_none_outlined,
-        title: 'Price alerts',
-        subtitle: notificationState.settingsSubtitle,
-        trailing: notificationState.settingsStatusLabel,
-      ),
-      _SettingsRow(
-        icon: Icons.admin_panel_settings_outlined,
-        title: 'Notification permission',
-        subtitle: 'Only the supported price-alert permission is available.',
-        trailing: notificationState.permissionStatus.label,
-      ),
-      _NotificationActionsPanel(
-        state: notificationState,
-        onToggleEnabled: (enabled) => ref
-            .read(priceAlertNotificationControllerProvider.notifier)
-            .setEnabled(enabled),
-        onRequestPermission: () => ref
-            .read(priceAlertNotificationControllerProvider.notifier)
-            .requestPermission(),
-      ),
-      const _SettingsRow(
-        icon: Icons.campaign_outlined,
-        title: 'Marketing notifications',
-        subtitle: 'No marketing notification delivery is implemented.',
-        trailing: 'Unavailable',
-      ),
-    ];
-
-    final privacyTiles = [
-      const _SettingsRow(
-        icon: Icons.visibility_outlined,
-        title: 'Profile visibility',
-        subtitle: 'No public profile visibility service is implemented.',
-        trailing: 'Private',
-      ),
-      const _SettingsRow(
-        icon: Icons.lock_outline,
-        title: 'Biometric lock',
-        subtitle: 'Device biometric app lock is not implemented in this build.',
-        trailing: 'Unavailable',
-      ),
-      const _SettingsRow(
-        icon: Icons.download_outlined,
-        title: 'Download my data',
-        subtitle: 'Data export needs separate product and backend approval.',
-        trailing: 'Deferred',
-      ),
-    ];
-
-    final syncTiles = [
-      _SettingsRow(
-        icon: Icons.cloud_sync_outlined,
-        title: 'Backup & Sync',
+        icon: Icons.inventory_2_outlined,
+        title: 'Collection & Backup',
         subtitle: canRunCloudSync
             ? syncState.errorMessage ?? syncState.status.message
-            : authState.isSignedIn
-            ? 'Cloud services are not configured for backup in this build.'
-            : 'Signed out. Your collection remains local on this device.',
+            : 'Your collection is local on this device.',
         trailing: canRunCloudSync ? syncState.status.statusLabel : 'Local only',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
         ),
       ),
       _SettingsRow(
-        icon: Icons.cloud_done_outlined,
-        title: 'Cloud account',
-        subtitle: canRunCloudSync
-            ? 'Cloud portfolio sync is available for the current session.'
-            : 'Sign in and configure cloud services before syncing.',
-        trailing: canRunCloudSync ? 'Available' : 'Required',
+        icon: Icons.notifications_none_outlined,
+        title: 'Price Alerts',
+        subtitle: notificationState.settingsSubtitle,
+        trailing: notificationState.settingsStatusLabel,
       ),
       _SettingsRow(
-        icon: Icons.backup_outlined,
-        title: 'Backup status',
-        subtitle: canRunCloudSync
-            ? 'Use Sync Now to ask the configured service for real status.'
-            : 'No cloud backup success or last-sync time is available.',
-        trailing: syncState.status.isCloudBackupEnabled ? 'On' : 'Off',
-      ),
-      _SettingsRow(
-        icon: Icons.pending_actions_outlined,
-        title: 'Pending uploads',
-        subtitle: 'Local images remain usable while backup work is queued.',
-        trailing: imageSyncState.snapshot.readyToSyncCount.toString(),
-      ),
-      _CloudSyncActionPanel(
-        canRunCloudSync: canRunCloudSync,
-        isSyncing:
-            _isManualCloudSyncing ||
-            syncState.isLoading ||
-            imageSyncState.isUploading,
-        onSync: () => _manualCloudSync(ref, cloudRegistry),
+        icon: Icons.palette_outlined,
+        title: 'Appearance',
+        subtitle: 'PackLox follows your device theme.',
+        trailing: 'System',
+        message: 'Theme follows your device setting.',
       ),
     ];
 
@@ -315,31 +197,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
-    final supportTiles = [
+    final infoTiles = [
       const _SettingsRow(
-        icon: Icons.help_outline_rounded,
-        title: 'Help Center',
-        subtitle: 'Help articles are not linked in this local build.',
-        trailing: 'Soon',
-        message: 'Help Center links are not configured for this build.',
+        icon: Icons.lock_outline,
+        title: 'Privacy',
+        subtitle: 'Images stay local unless cloud is configured.',
+        trailing: 'Local',
       ),
-      const _SettingsRow(
-        icon: Icons.bug_report_outlined,
-        title: 'Report an Issue',
-        subtitle: 'Issue reporting destination is not configured yet.',
-        trailing: 'Soon',
-        message: 'Issue reporting is coming soon.',
-      ),
-      const _SettingsRow(
-        icon: Icons.feedback_outlined,
-        title: 'Feedback',
-        subtitle: 'Feedback destination is not configured yet.',
-        trailing: 'Soon',
-        message: 'Feedback is coming soon.',
-      ),
-    ];
-
-    final aboutTiles = [
       _SettingsRow(
         icon: Icons.info_outline_rounded,
         title: 'About PackLox',
@@ -350,43 +214,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen())),
       ),
       const _SettingsRow(
-        icon: Icons.inventory_2_outlined,
-        title: 'Storage',
-        subtitle: 'Collection data starts in local device storage.',
-        trailing: 'Local',
-      ),
-      const _SettingsRow(
-        icon: Icons.cloud_done_outlined,
-        title: 'Backup',
-        subtitle: 'Optional account backup when cloud services are configured.',
-        trailing: 'Optional',
-      ),
-    ];
-
-    final legalTiles = [
-      const _SettingsRow(
-        icon: Icons.description_outlined,
-        title: 'Terms of Service',
-        subtitle: 'Terms destination is not configured yet.',
+        icon: Icons.help_outline_rounded,
+        title: 'Help & Feedback',
+        subtitle: 'Support channels are not connected yet.',
         trailing: 'Soon',
-        message: 'Terms of Service is coming soon.',
-      ),
-      const _SettingsRow(
-        icon: Icons.privacy_tip_outlined,
-        title: 'Privacy Policy',
-        subtitle: 'Images stay local unless cloud services are configured.',
-        trailing: 'Local',
-      ),
-      const _SettingsRow(
-        icon: Icons.workspace_premium_outlined,
-        title: 'Open Source Licenses',
-        subtitle: 'Flutter license details remain available from the platform.',
-        trailing: 'App',
+        message: 'Help and feedback are coming soon.',
       ),
     ];
 
     final dangerTiles = [
-      _DangerNotice(),
       _SettingsRow(
         icon: Icons.restart_alt_outlined,
         title: 'Reset Onboarding',
@@ -415,49 +251,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           action: _clearLocalCollection,
         ),
       ),
-      const _SettingsRow(
-        icon: Icons.delete_forever_outlined,
-        title: 'Delete Account',
-        subtitle:
-            'Account deletion requires separate product and security approval.',
-        trailing: 'Unavailable',
-      ),
+      if (authState.isSignedIn)
+        _SettingsRow(
+          icon: Icons.logout_outlined,
+          title: 'Sign Out',
+          subtitle: 'Sign out of cloud auth. Local data stays on device.',
+          trailing: 'Account',
+          onTap: () => ref.read(authControllerProvider.notifier).signOut(),
+        ),
     ];
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: HomeTokens.background,
       body: SafeArea(
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(
               child: framed(
-                AnimatedBuilder(
-                  animation: _scrollController,
-                  builder: (context, child) {
-                    final compact = MediaQuery.sizeOf(context).width < 360;
-                    return MotionElasticHero(
-                      baseHeight: compact ? 176 : 160,
-                      scrollOffset: _scrollController.hasClients
-                          ? _scrollController.offset
-                          : 0,
-                      child: const SettingsHeroHeader(),
-                    );
-                  },
-                ),
+                IdentityBlock(authState: authState),
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.lg,
+                  HomeTokens.pageGutter,
+                  HomeTokens.pageGutter,
+                  HomeTokens.pageGutter,
                   0,
                 ),
               ),
             ),
-            ...sectionSlivers(
-              'Account & Profile',
-              accountTiles,
-              topSpacing: AppSpacing.xl,
-            ),
+            if (!authState.isSignedIn)
+              sliverBox(
+                _AccountPromptCard(
+                  onTap: () =>
+                      Navigator.of(context).push(AuthWelcomeScreen.route()),
+                ),
+                padding: const EdgeInsets.fromLTRB(
+                  HomeTokens.pageGutter,
+                  18,
+                  HomeTokens.pageGutter,
+                  0,
+                ),
+              ),
             if (showDeveloperTools)
               sliverBox(
                 _SettingsCompatibilityLabels(
@@ -471,11 +304,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   apiConfig: apiConfig,
                 ),
               ),
-            ...sectionSlivers('Preferences', preferencesTiles),
-            ...sectionSlivers('Notifications', notificationTiles),
-            ...sectionSlivers('Privacy & Security', privacyTiles),
-            ...sectionSlivers('Backup & Sync', syncTiles),
-            if (demoSeedEnabled) ...sectionSlivers('Demo Data', demoDataTiles),
+            ...sectionSlivers(primaryTiles),
+            if (demoSeedEnabled) ...sectionSlivers(demoDataTiles),
             if (showDeveloperTools) ...[
               sliverBox(
                 SettingsSectionHeader('Developer Tools'),
@@ -504,10 +334,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
-            ...sectionSlivers('Support & Help', supportTiles),
-            ...sectionSlivers('About PackLox', aboutTiles),
-            ...sectionSlivers('Legal', legalTiles),
-            ...sectionSlivers('Danger Zone', dangerTiles),
+            ...sectionSlivers(infoTiles, topSpacing: 14),
+            ...sectionSlivers(dangerTiles, topSpacing: 14),
             const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
@@ -520,76 +348,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return registry.config.allowsCloudServices &&
         flags.useCloudPortfolioSync &&
         flags.useCloudImageStorage;
-  }
-
-  Future<void> _manualCloudSync(
-    WidgetRef ref,
-    CloudServiceRegistry registry,
-  ) async {
-    if (!_cloudSyncAvailable(registry) || _isManualCloudSyncing) {
-      return;
-    }
-
-    setState(() => _isManualCloudSyncing = true);
-    await registry.analyticsService.trackEvent('manual_sync_clicked');
-    await registry.analyticsService.trackEvent('portfolio_sync_started');
-
-    try {
-      final syncStatus = await registry.cloudPortfolioSyncService
-          .getSyncStatus();
-      if (!syncStatus.enabled) {
-        await ref.read(syncControllerProvider.notifier).loadStatus();
-        if (mounted) {
-          _showSettingsSnackBar(syncStatus.message);
-        }
-        return;
-      }
-      final portfolioRepository = ref.read(portfolioRepositoryProvider);
-      final mergedCount = await CloudPortfolioSyncCoordinator(
-        registry: registry,
-        portfolioRepository: portfolioRepository,
-      ).syncNow();
-      final failedCount = (await portfolioRepository.getItems())
-          .where((item) => item.syncStatus == CloudItemSyncStatus.failed)
-          .length;
-      await ref.read(portfolioControllerProvider.notifier).loadItems();
-      await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
-      await ref.read(syncControllerProvider.notifier).loadStatus();
-      if (failedCount > 0) {
-        await registry.analyticsService.trackEvent(
-          'portfolio_sync_failed',
-          properties: {'failed_count': failedCount},
-        );
-        if (mounted) {
-          _showSettingsSnackBar(
-            '$failedCount item${failedCount == 1 ? '' : 's'} could not sync. Local portfolio is still available.',
-          );
-        }
-      } else {
-        await registry.analyticsService.trackEvent('portfolio_sync_success');
-        if (mounted) {
-          _showSettingsSnackBar(
-            mergedCount > 0
-                ? 'Cloud sync complete. $mergedCount cloud item${mergedCount == 1 ? '' : 's'} merged.'
-                : 'Cloud sync complete',
-          );
-        }
-      }
-    } on Object catch (error) {
-      await registry.analyticsService.trackEvent(
-        'portfolio_sync_failed',
-        properties: {'error': error.runtimeType.toString()},
-      );
-      if (mounted) {
-        _showSettingsSnackBar(
-          'Cloud sync failed. Local portfolio is still available.',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isManualCloudSyncing = false);
-      }
-    }
   }
 
   Future<void> _seedDemoPortfolio() async {
@@ -644,23 +402,98 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String confirmLabel,
     required FutureOr<void> Function() action,
   }) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final colorScheme = Theme.of(sheetContext).colorScheme;
+        final textTheme = Theme.of(sheetContext).textTheme;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.34),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.34),
+                    blurRadius: 32,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: colorScheme.error.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                        ),
+                        child: Icon(
+                          Icons.warning_amber_rounded,
+                          color: colorScheme.error,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    message,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () =>
+                              Navigator.of(sheetContext).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: FilledButton(
+                          key: const ValueKey('settings-danger-confirm-button'),
+                          onPressed: () => Navigator.of(sheetContext).pop(true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colorScheme.error,
+                            foregroundColor: colorScheme.onError,
+                          ),
+                          child: Text(confirmLabel),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            FilledButton(
-              key: const ValueKey('settings-danger-confirm-button'),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(confirmLabel),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -730,129 +563,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _DangerNotice extends StatelessWidget {
-  const _DangerNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      key: const ValueKey('settings-danger-zone-notice'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.error.withValues(alpha: 0.44)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: colorScheme.error),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Caution',
-                  style: textTheme.titleSmall?.copyWith(
-                    color: colorScheme.error,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'These actions need confirmation. Unsupported account deletion is not exposed as an active action.',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NotificationActionsPanel extends StatelessWidget {
-  const _NotificationActionsPanel({
-    required this.state,
-    required this.onToggleEnabled,
-    required this.onRequestPermission,
-  });
-
-  final PriceAlertNotificationState state;
-  final ValueChanged<bool> onToggleEnabled;
-  final VoidCallback onRequestPermission;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final canRequestPermission =
-        state.permissionStatus !=
-            PriceAlertNotificationPermissionStatus.granted &&
-        state.permissionStatus !=
-            PriceAlertNotificationPermissionStatus.notSupported;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          key: const ValueKey('settings-price-alert-notifications-switch'),
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Enable price alert notifications',
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Alerts stay local on this device. Backend push is not enabled yet.',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Switch(
-              value: state.enabled,
-              onChanged: state.isLoading ? null : onToggleEnabled,
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            key: const ValueKey('settings-request-notification-permission'),
-            onPressed: state.isLoading || !canRequestPermission
-                ? null
-                : onRequestPermission,
-            icon: const Icon(Icons.notifications_active_outlined),
-            label: Text(
-              state.isLoading
-                  ? 'Checking...'
-                  : 'Request Notification Permission',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _DemoDataSeedPanel extends StatelessWidget {
   const _DemoDataSeedPanel({
     required this.isBusy,
@@ -866,7 +576,6 @@ class _DemoDataSeedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Column(
@@ -874,9 +583,7 @@ class _DemoDataSeedPanel extends StatelessWidget {
       children: [
         Text(
           'Enabled only by PACKLOX_DEMO_SEED. Demo records use fallback thumbnails and never call external services.',
-          style: textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+          style: textTheme.bodySmall?.copyWith(color: HomeTokens.textSecondary),
         ),
         const SizedBox(height: AppSpacing.md),
         SizedBox(
@@ -886,6 +593,12 @@ class _DemoDataSeedPanel extends StatelessWidget {
             onPressed: isBusy ? null : onSeed,
             icon: const Icon(Icons.dataset_outlined),
             label: Text(isBusy ? 'Updating Demo Data...' : 'Seed Demo Data'),
+            style: FilledButton.styleFrom(
+              backgroundColor: HomeTokens.accentStrong,
+              foregroundColor: HomeTokens.textPrimary,
+              disabledBackgroundColor: HomeTokens.surfaceInteractive,
+              disabledForegroundColor: HomeTokens.textMuted,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -896,178 +609,14 @@ class _DemoDataSeedPanel extends StatelessWidget {
             onPressed: isBusy ? null : onClear,
             icon: const Icon(Icons.cleaning_services_outlined),
             label: const Text('Clear Demo Data'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CloudSyncActionPanel extends StatelessWidget {
-  const _CloudSyncActionPanel({
-    required this.canRunCloudSync,
-    required this.isSyncing,
-    required this.onSync,
-  });
-
-  final bool canRunCloudSync;
-  final bool isSyncing;
-  final VoidCallback onSync;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: 1,
-          child: Text(
-            canRunCloudSync
-                ? 'Sync portfolio images and metadata with your configured cloud project.'
-                : 'Cloud sync needs a signed-in account and configured cloud services.',
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary.withValues(
-                    alpha: canRunCloudSync ? 1 : 0.16,
-                  ),
-                  colorScheme.tertiary.withValues(
-                    alpha: canRunCloudSync ? 0.82 : 0.12,
-                  ),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: FilledButton.icon(
-              onPressed: !canRunCloudSync || isSyncing ? null : onSync,
-              icon: const Icon(Icons.sync_outlined),
-              label: Text(isSyncing ? 'Syncing...' : 'Sync Now'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                backgroundColor: Colors.transparent,
-                disabledBackgroundColor: colorScheme.onSurface.withValues(
-                  alpha: 0.08,
-                ),
-                shadowColor: Colors.transparent,
-                foregroundColor: colorScheme.onPrimary,
-                textStyle: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: HomeTokens.textPrimary,
+              disabledForegroundColor: HomeTokens.textMuted,
+              side: const BorderSide(color: HomeTokens.border),
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class SettingsHeroHeader extends StatelessWidget {
-  const SettingsHeroHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final compact = MediaQuery.sizeOf(context).width < 360;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.xl),
-      child: MotionAmbientGradient(
-        gradientBuilder: PackLoxMotionTheme.ambientBlueIndigo,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: AppGradients.premium,
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(
-                  alpha: isDark ? 0.20 : 0.26,
-                ),
-                blurRadius: AppSpacing.xxl,
-                offset: const Offset(0, AppSpacing.lg),
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: isDark ? 0.05 : 0.18),
-                        Colors.transparent,
-                        colorScheme.secondary.withValues(alpha: 0.18),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: -AppSpacing.xxl,
-                top: -AppSpacing.xl,
-                child: Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.10),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  compact ? AppSpacing.lg : AppSpacing.xl,
-                  compact ? AppSpacing.lg : AppSpacing.xl,
-                  compact ? AppSpacing.lg : AppSpacing.xl,
-                  compact ? AppSpacing.md : AppSpacing.lg,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Settings',
-                      style: (compact ? AppTextStyles.h2 : AppTextStyles.h1)
-                          .copyWith(color: colorScheme.onPrimary),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Account, sync, scanning, and app details in one polished control center.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body.copyWith(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.84),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1079,23 +628,26 @@ class SettingsSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return MotionReveal(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: AppTextStyles.h2.copyWith(color: colorScheme.onSurface),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontSize: 23,
+              fontWeight: FontWeight.w900,
+              height: 1.1,
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 6),
           Container(
-            width: 48,
+            width: 36,
             height: 2,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              color: colorScheme.primary.withValues(alpha: 0.22),
+              color: HomeTokens.accent.withValues(alpha: 0.58),
             ),
           ),
         ],
@@ -1111,16 +663,110 @@ class SettingsCardGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MotionStagger(
-      children: [
-        for (var index = 0; index < children.length; index++)
-          Padding(
-            padding: EdgeInsets.only(
-              bottom: index == children.length - 1 ? 0 : AppSpacing.md,
+    return _SettingsSurface(
+      child: MotionStagger(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            children[index],
+            if (index != children.length - 1)
+              const Padding(
+                padding: EdgeInsets.only(left: 50, top: 8, bottom: 8),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: HomeTokens.border,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountPromptCard extends StatelessWidget {
+  const _AccountPromptCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: HomeTokens.positive.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: HomeTokens.positive.withValues(alpha: 0.38),
+                ),
+              ),
+              child: const Icon(
+                Icons.verified_user_outlined,
+                color: HomeTokens.positive,
+                size: 24,
+              ),
             ),
-            child: GlassCard(child: children[index]),
-          ),
-      ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontSize: 16,
+                    height: 1.28,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  children: const [
+                    TextSpan(
+                      text: 'Add an account to back up your collection. ',
+                    ),
+                    TextSpan(
+                      text: 'Sign in',
+                      style: TextStyle(color: HomeTokens.positive),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.close, color: HomeTokens.textMuted, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsSurface extends StatelessWidget {
+  const _SettingsSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: child,
     );
   }
 }
@@ -1132,99 +778,88 @@ class IdentityBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isSignedIn = authState.isSignedIn;
     final email = authState.user?.email ?? authState.user?.displayName;
+    final headline = isSignedIn ? email ?? 'Collector' : 'Guest Collector';
     final initial = (email?.trim().isNotEmpty ?? false)
         ? email!.trim().substring(0, 1).toUpperCase()
-        : 'C';
+        : 'P';
+    final statusColor = isSignedIn ? HomeTokens.positive : HomeTokens.accent;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary,
-                  colorScheme.tertiary.withValues(alpha: 0.82),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: textTheme.titleLarge?.copyWith(
-                  color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isSignedIn ? email ?? 'Signed in' : 'Guest mode',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isSignedIn
-                      ? 'Your collection can sync when cloud is configured'
-                      : 'Sign in to sync your collection',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
+    return Column(
+      key: const ValueKey('settings-account-overview-card'),
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Align(alignment: Alignment.centerLeft, child: HomeBrandLockup()),
+        const SizedBox(height: 26),
+        Container(
+          width: 112,
+          height: 112,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                HomeTokens.accentStrong.withValues(alpha: 0.95),
+                HomeTokens.accent.withValues(alpha: 0.70),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: (isSignedIn ? Colors.green : colorScheme.primary)
-                  .withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: (isSignedIn ? Colors.green : colorScheme.primary)
-                    .withValues(alpha: 0.26),
+            boxShadow: [
+              BoxShadow(
+                color: HomeTokens.accent.withValues(alpha: 0.24),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
               ),
-            ),
+            ],
+          ),
+          child: Center(
             child: Text(
-              isSignedIn ? 'Signed in' : 'Guest',
-              style: textTheme.labelSmall?.copyWith(
-                color: isSignedIn ? Colors.green.shade700 : colorScheme.primary,
-                fontWeight: FontWeight.w700,
+              initial,
+              style: textTheme.displaySmall?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                headline,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: textTheme.headlineMedium?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              isSignedIn ? Icons.check_circle : Icons.radio_button_checked,
+              color: statusColor,
+              size: 18,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isSignedIn
+              ? 'Cloud identity connected'
+              : 'Local-first access is active',
+          style: textTheme.bodyMedium?.copyWith(
+            color: HomeTokens.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

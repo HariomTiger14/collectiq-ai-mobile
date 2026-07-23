@@ -11,19 +11,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Phase 6B Settings uses approved section order', (tester) async {
+  testWidgets('Settings uses streamlined PackLox groups', (tester) async {
     await tester.pumpSettings();
 
     for (final label in const [
-      'Account & Profile',
-      'Preferences',
-      'Notifications',
-      'Privacy & Security',
-      'Backup & Sync',
-      'Support & Help',
+      'Guest Collector',
+      'Account',
+      'Collection & Backup',
+      'Price Alerts',
+      'Appearance',
+      'Privacy',
       'About PackLox',
-      'Legal',
-      'Danger Zone',
+      'Help & Feedback',
     ]) {
       await tester.revealText(label);
       expect(find.text(label), findsWidgets);
@@ -43,10 +42,10 @@ void main() {
       find.byKey(const ValueKey('settings-auth-password-field')),
       findsNothing,
     );
-    expect(find.text('Guest mode'), findsOneWidget);
+    expect(find.text('Guest Collector'), findsOneWidget);
 
-    await tester.revealText('Sign In');
-    await tester.tap(find.text('Sign In').first);
+    await tester.revealText('Account');
+    await tester.tap(find.text('Account').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
@@ -82,21 +81,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.signOutCalls, 1);
-    expect(find.text('Guest mode'), findsOneWidget);
   });
 
-  testWidgets('backup and notification states do not fabricate support', (
+  testWidgets('backup and notification states stay real and local-first', (
     tester,
   ) async {
     await tester.pumpSettings();
 
-    await tester.revealText('Marketing notifications');
-    expect(find.text('Marketing notifications'), findsOneWidget);
-    expect(find.text('Unavailable'), findsWidgets);
+    await tester.revealText('Price Alerts');
+    expect(find.text('Price Alerts'), findsOneWidget);
 
-    await tester.revealText('Backup & Sync');
+    await tester.revealText('Collection & Backup');
     expect(
-      find.text('Signed out. Your collection remains local on this device.'),
+      find.text('Your collection is local on this device.'),
       findsOneWidget,
     );
     expect(find.textContaining('Last synced'), findsNothing);
@@ -108,9 +105,8 @@ void main() {
   ) async {
     await tester.pumpSettings();
 
-    await tester.revealText('Delete Account');
-    expect(find.text('Delete Account'), findsOneWidget);
-    expect(find.text('Unavailable'), findsWidgets);
+    await tester.revealText('Clear Local Collection');
+    expect(find.text('Clear Local Collection'), findsOneWidget);
 
     await tester.tap(find.text('Reset Onboarding'));
     await tester.pumpAndSettle();
@@ -137,7 +133,7 @@ void main() {
           textScaler: TextScaler.linear(1.3),
         ),
       );
-      expect(find.text('Settings'), findsWidgets);
+      expect(find.text('Guest Collector'), findsWidgets);
       expect(tester.takeException(), isNull);
     }
   });
@@ -155,7 +151,7 @@ void main() {
     expect(find.text('Portfolio State Preview'), findsNothing);
   });
 
-  testWidgets('Home State Preview opens selector from SIT developer surfaces', (
+  testWidgets('Developer previews stay hidden from normal SIT settings', (
     tester,
   ) async {
     await tester.pumpSettings(
@@ -164,53 +160,10 @@ void main() {
       ),
     );
 
-    await tester.revealText('Home State Preview');
-    expect(find.text('Home State Preview'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('settings-home-state-preview')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Home State Preview'), findsWidgets);
-    expect(find.text('Empty/new collector'), findsOneWidget);
-    expect(find.text('Default/signed-in'), findsOneWidget);
-    await tester.revealText('Clear preview / return to real data');
-    expect(find.text('Clear preview / return to real data'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('home-preview-scenario-picker')),
-      findsNothing,
-    );
+    expect(find.text('Developer Tools'), findsNothing);
+    expect(find.text('Home State Preview'), findsNothing);
+    expect(find.text('Portfolio State Preview'), findsNothing);
   });
-
-  testWidgets(
-    'Portfolio State Preview opens selector from SIT developer surfaces',
-    (tester) async {
-      await tester.pumpSettings(
-        environmentConfig: const EnvironmentConfig(
-          environment: AppEnvironment.sit,
-        ),
-      );
-
-      await tester.revealText('Portfolio State Preview');
-      expect(find.text('Portfolio State Preview'), findsOneWidget);
-
-      await tester.tap(
-        find.byKey(const ValueKey('settings-portfolio-state-preview')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Portfolio State Preview'), findsWidgets);
-      expect(find.text('Default'), findsOneWidget);
-      expect(find.text('Partial'), findsOneWidget);
-      await tester.revealText('Filtered empty');
-      expect(find.text('Filtered empty'), findsOneWidget);
-      expect(
-        find.byKey(
-          const ValueKey('home-section-portfolio-preview-scenario-picker'),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
 }
 
 extension on WidgetTester {

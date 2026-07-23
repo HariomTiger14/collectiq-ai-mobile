@@ -5,6 +5,10 @@ import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
@@ -21,11 +25,13 @@ import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.
 import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
+import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 const _qaCaptureRequested = bool.fromEnvironment('PACKLOX_QA_CAPTURE');
@@ -41,13 +47,14 @@ class PackLoxQaCaptureApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final app = MaterialApp(
       title: 'PackLox QA Capture',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: PackLoxQaCaptureScreen(screen: _qaScreen, scroll: _qaScroll),
     );
+    return app;
   }
 }
 
@@ -99,6 +106,13 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       'app_shell_search_nav' => const _QaShellFrame(
         selectedIndex: AppShellTabController.searchTab,
         child: SearchScreen(),
+      ),
+      'app_shell_settings_nav' => _QaSettingsAuthScope(
+        user: null,
+        child: const _QaShellFrame(
+          selectedIndex: AppShellTabController.settingsTab,
+          child: SettingsScreen(),
+        ),
       ),
       'auth_welcome' => const AuthWelcomeScreen(),
       'auth_sign_in' => const AuthSignInScreen(
@@ -160,6 +174,22 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       ),
       'search_empty' => const SearchScreen(
         previewState: SearchPreviewState.empty,
+      ),
+      'settings_signed_out' => _QaSettingsScreen(
+        scrollOffset: _scrollOffset,
+        user: null,
+      ),
+      'settings_signed_in' => _QaSettingsScreen(
+        scrollOffset: _scrollOffset,
+        user: _qaSettingsUser,
+      ),
+      'settings_cloud_disabled' => _QaSettingsScreen(
+        scrollOffset: _scrollOffset,
+        user: _qaSettingsUser,
+      ),
+      'settings_danger_zone' => _QaSettingsScreen(
+        scrollOffset: 6200,
+        user: null,
       ),
       'portfolio_default' => PortfolioScreen(
         onScanPressed: _noop,
@@ -365,6 +395,171 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       );
     }
     return qaScreen;
+  }
+}
+
+const _qaSettingsUser = AppUser(
+  id: 'qa-cloud-user',
+  displayName: 'collector@example.com',
+  email: 'collector@example.com',
+  provider: AuthProviderType.emailPassword,
+);
+
+class _QaSettingsScreen extends StatelessWidget {
+  const _QaSettingsScreen({required this.scrollOffset, required this.user});
+
+  final double scrollOffset;
+  final AppUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    return _QaSettingsAuthScope(
+      user: user,
+      child: SettingsScreen(qaInitialScrollOffset: scrollOffset),
+    );
+  }
+}
+
+class _QaSettingsAuthScope extends StatelessWidget {
+  const _QaSettingsAuthScope({required this.user, required this.child});
+
+  final AppUser? user;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(
+          _QaSettingsAuthRepository(initialUser: user),
+        ),
+        authControllerProvider.overrideWith(
+          () => _QaSettingsAuthController(user),
+        ),
+      ],
+      child: child,
+    );
+  }
+}
+
+class _QaSettingsAuthController extends AuthController {
+  _QaSettingsAuthController(this.user);
+
+  final AppUser? user;
+
+  @override
+  AuthState build() {
+    return AuthState(
+      user: user,
+      status: user != null ? AuthFlowStatus.signedIn : AuthFlowStatus.signedOut,
+    );
+  }
+}
+
+class _QaInitialScrollable extends StatefulWidget {
+  const _QaInitialScrollable({
+    required this.initialOffset,
+    required this.child,
+  });
+
+  final double initialOffset;
+  final Widget child;
+
+  @override
+  State<_QaInitialScrollable> createState() => _QaInitialScrollableState();
+}
+
+class _QaInitialScrollableState extends State<_QaInitialScrollable> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.initialOffset <= 0) {
+        return;
+      }
+      final scrollable = Scrollable.maybeOf(context);
+      final position = scrollable?.position;
+      if (position == null || !position.hasPixels) {
+        return;
+      }
+      position.jumpTo(
+        widget.initialOffset.clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class _QaSettingsAuthRepository implements AuthRepository {
+  _QaSettingsAuthRepository({AppUser? initialUser}) : _user = initialUser;
+
+  AppUser? _user;
+
+  @override
+  Future<AppUser?> currentUser() async => _user;
+
+  @override
+  Future<AppUser> signIn() => signInAnonymously();
+
+  @override
+  Future<AppUser> signInAnonymously() async {
+    _user = const AppUser(
+      id: 'qa-local-user',
+      displayName: 'Local Collector',
+      email: null,
+      isAnonymous: true,
+      isLocalOnly: true,
+      provider: AuthProviderType.localAnonymous,
+    );
+    return _user!;
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    _user = AppUser(
+      id: 'qa-cloud-user',
+      displayName: email,
+      email: email,
+      provider: AuthProviderType.emailPassword,
+    );
+    return _user!;
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) {
+    throw const AuthException('Sign up is not used in QA capture.');
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {}
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is not enabled.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is not enabled.');
+  }
+
+  @override
+  Future<void> signOut() async {
+    _user = null;
   }
 }
 

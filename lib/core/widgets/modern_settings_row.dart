@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:flutter/material.dart';
 
 /// Modern, divider-free settings row with soft micro-interactions.
@@ -76,13 +77,12 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final width = MediaQuery.sizeOf(context).width;
     final dense = width < 360;
-    final iconSize = dense ? 46.0 : 52.0;
-    final rowPadding = dense ? AppSpacing.xs : AppSpacing.sm;
-    final contentGap = dense ? AppSpacing.md : AppSpacing.lg;
+    final iconSize = dense ? 30.0 : 32.0;
+    final rowPadding = dense ? 4.0 : 6.0;
+    final contentGap = dense ? 9.0 : 10.0;
     final trailing = widget.trailing ?? _buildTrailingText(context);
 
     return TweenAnimationBuilder<double>(
@@ -120,11 +120,12 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                 padding: EdgeInsets.all(rowPadding),
                 decoration: BoxDecoration(
                   color: _hovered
-                      ? colorScheme.primary.withValues(alpha: 0.08)
+                      ? HomeTokens.surfaceInteractive.withValues(alpha: 0.82)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     AnimatedBuilder(
                       animation: _pulseController,
@@ -134,28 +135,17 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                           width: iconSize,
                           height: iconSize,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primaryContainer.withValues(
-                                  alpha: 0.38 + pulse * 0.12,
-                                ),
-                                colorScheme.secondaryContainer.withValues(
-                                  alpha: _pressed ? 0.48 : 0.22,
-                                ),
-                              ],
-                              begin: Alignment(-1 + pulse * 0.8, -1),
-                              end: const Alignment(1, 1),
-                            ),
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                            color: HomeTokens.surfaceInteractive,
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(
-                                alpha: 0.22,
+                              color: HomeTokens.border.withValues(
+                                alpha: 0.78 + pulse * 0.18,
                               ),
                             ),
                             boxShadow: [
                               if (_pressed || pulse > 0)
                                 BoxShadow(
-                                  color: colorScheme.primary.withValues(
+                                  color: HomeTokens.accent.withValues(
                                     alpha: _pressed ? 0.14 : pulse * 0.10,
                                   ),
                                   blurRadius: 16,
@@ -165,8 +155,8 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                           ),
                           child: Icon(
                             widget.icon,
-                            color: colorScheme.primary,
-                            size: AppIconSizes.md,
+                            color: HomeTokens.accent,
+                            size: dense ? 16 : 18,
                           ),
                         );
                       },
@@ -178,19 +168,24 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                         children: [
                           Text(
                             widget.title,
-                            maxLines: dense ? 2 : 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                              color: HomeTokens.textPrimary,
+                              fontSize: dense ? 14.5 : 15.5,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.xs),
+                          const SizedBox(height: 3),
                           Text(
                             widget.subtitle,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                              color: HomeTokens.textSecondary,
+                              fontSize: dense ? 11 : 12,
+                              height: 1.22,
                             ),
                           ),
                         ],
@@ -198,7 +193,13 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                     ),
                     if (trailing != null) ...[
                       SizedBox(width: dense ? AppSpacing.sm : AppSpacing.md),
-                      Flexible(child: trailing),
+                      SizedBox(
+                        width: dense ? 78 : 104,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: trailing,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -215,22 +216,17 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
     if (text == null) {
       return null;
     }
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.sizeOf(context).width < 360 ? 86 : 118,
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.end,
-        style: textTheme.labelLarge?.copyWith(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w700,
-        ),
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.end,
+      style: textTheme.labelMedium?.copyWith(
+        color: HomeTokens.accent,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
