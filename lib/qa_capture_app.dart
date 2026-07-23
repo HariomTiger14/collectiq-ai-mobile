@@ -20,6 +20,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_scr
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
+import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/foundation.dart';
@@ -95,6 +96,10 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
           qaInitialScrollOffset: _scrollOffset,
         ),
       ),
+      'app_shell_search_nav' => const _QaShellFrame(
+        selectedIndex: AppShellTabController.searchTab,
+        child: SearchScreen(),
+      ),
       'auth_welcome' => const AuthWelcomeScreen(),
       'auth_sign_in' => const AuthSignInScreen(
         initialEmail: 'collector@example.com',
@@ -145,6 +150,16 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.partial,
         qaInitialScrollOffset: _scrollOffset,
+      ),
+      'search_default' => const SearchScreen(),
+      'search_active' => const SearchScreen(
+        previewState: SearchPreviewState.active,
+      ),
+      'search_results' => const SearchScreen(
+        previewState: SearchPreviewState.results,
+      ),
+      'search_empty' => const SearchScreen(
+        previewState: SearchPreviewState.empty,
       ),
       'portfolio_default' => PortfolioScreen(
         onScanPressed: _noop,

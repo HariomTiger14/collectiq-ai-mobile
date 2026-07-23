@@ -100,7 +100,11 @@ void main() {
         find.byKey(const ValueKey('shell-destination-search')),
         findsOneWidget,
       );
-      expect(find.text('Search is being prepared.'), findsOneWidget);
+      expect(find.text('Discover'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('discover-search-field')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const ValueKey('nav-settings')));
       await tester.pumpTabSwitch();
