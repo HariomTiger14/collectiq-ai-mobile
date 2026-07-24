@@ -507,6 +507,9 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             scanRecommendations=self._parse_string_list(
                 payload.get("scanRecommendations")
             ),
+            faceValue=self._optional_int(payload, "faceValue"),
+            askingPriceWarning=self._optional_string(payload, "askingPriceWarning"),
+            valuationConfidence=self._optional_int(payload, "valuationConfidence"),
         )
 
     def _optional_string(self, payload: dict[str, Any], field: str) -> str | None:
@@ -519,6 +522,17 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             )
         normalized = value.strip()
         return normalized or None
+
+    def _optional_int(self, payload: dict[str, Any], field: str) -> int | None:
+        value = payload.get(field)
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise OpenAIInvalidResponseError(
+                f"OpenAI structured output field '{field}' must be an integer or null."
+            ) from exc
 
     def _parse_alternative_matches(
         self,

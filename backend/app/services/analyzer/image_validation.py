@@ -16,6 +16,7 @@ class NormalizedImageMetadata:
     local_file_path: str
     base64_image: str | None = None
     base64_preview: str | None = None
+    image_role: str | None = None
 
     def to_api_payload(self) -> dict:
         return {
@@ -26,6 +27,7 @@ class NormalizedImageMetadata:
             "localFilePath": self.local_file_path,
             **({"base64Image": self.base64_image} if self.base64_image else {}),
             **({"base64Preview": self.base64_preview} if self.base64_preview else {}),
+            **({"imageRole": self.image_role} if self.image_role else {}),
         }
 
 
@@ -38,6 +40,7 @@ class AnalyzerImageValidator:
         local_file_path = str(image_payload.get("localFilePath") or "").strip()
         base64_image = _optional_string(image_payload.get("base64Image"))
         base64_preview = _optional_string(image_payload.get("base64Preview"))
+        image_role = _optional_string(image_payload.get("imageRole"))
 
         self._validate_type(file_name=file_name, mime_type=mime_type)
         self._validate_size(size_bytes)
@@ -59,6 +62,7 @@ class AnalyzerImageValidator:
             local_file_path=local_file_path,
             base64_image=base64_image,
             base64_preview=base64_preview,
+            image_role=image_role,
         )
 
     def validate_bytes(

@@ -5,6 +5,7 @@ from app.services.ai.base_recognition_service import RecognitionResult
 from app.services.ai.gemini_recognition_provider import GeminiRecognitionProvider
 from app.services.ai.mock_recognition_service import MockRecognitionProvider
 from app.services.ai.openai_recognition_provider import OpenAIRecognitionProvider
+from app.services.analyzer.errors import AnalyzerPipelineError
 
 
 class BackendAnalyzerProvider(Protocol):
@@ -129,6 +130,8 @@ class AutoAnalyzerProvider:
                     "confidenceThreshold": self._confidence_threshold,
                 }
                 return result
+            except AnalyzerPipelineError:
+                raise
             except Exception as exc:
                 provider_errors.append(
                     f"{provider.provider_name}:{exc.__class__.__name__}: {exc}"
@@ -163,8 +166,6 @@ class AutoAnalyzerProvider:
                 + [mock.provider_name],
             }
             return result
-
-        from app.services.analyzer.errors import AnalyzerPipelineError
 
         raise AnalyzerPipelineError(
             status_code=503,

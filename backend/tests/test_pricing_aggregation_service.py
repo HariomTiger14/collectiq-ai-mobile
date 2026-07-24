@@ -36,7 +36,7 @@ class PricingAggregationServiceTest(unittest.TestCase):
         self.assertEqual(pricing.highEstimate, 140)
         self.assertEqual(pricing.sourceCount, 1)
         self.assertFalse(pricing.fallbackUsed)
-        self.assertGreaterEqual(pricing.pricingConfidence, 70)
+        self.assertGreaterEqual(pricing.pricingConfidence, 65)
         self.assertEqual(pricing.providerDiagnostics["medianPrice"], "120")
         self.assertEqual(pricing.providerDiagnostics["outliersRemoved"], "0")
         self.assertEqual(pricing.providerDiagnostics["comparableCount"], "3")

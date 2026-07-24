@@ -7,17 +7,11 @@ WEB_ROOT = PROJECT_ROOT / "web"
 
 
 class AdminDashboardStaticTest(unittest.TestCase):
-    def test_root_dashboard_has_live_data_targets(self) -> None:
+    def test_root_site_links_to_admin_dashboard(self) -> None:
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
-        self.assertIn("PackLox Administration", html)
-        self.assertIn('data-service-status="api"', html)
-        self.assertIn('data-service-status="supabase"', html)
-        self.assertIn('data-service-status="analyzer"', html)
-        self.assertIn('data-service-status="cloudflare"', html)
-        self.assertIn('data-env-field="commit"', html)
-        self.assertIn('admin/config.js', html)
-        self.assertIn('admin/dashboard.js', html)
+        self.assertIn("PackLox | AI Collectible Scanner", html)
+        self.assertIn('href="/admin/"', html)
 
     def test_password_reset_route_is_preserved(self) -> None:
         self.assertTrue((WEB_ROOT / "auth" / "reset-password" / "index.html").exists())
@@ -38,7 +32,10 @@ class AdminDashboardStaticTest(unittest.TestCase):
         self.assertIn('"Unavailable"', script)
         self.assertIn("services.supabase ? \"Healthy\" : \"Offline\"", script)
         self.assertIn("services.analyzer ? \"Healthy\" : \"Unavailable\"", script)
-        self.assertIn("window.setInterval(refreshHealth, config.refreshIntervalMs)", script)
+        self.assertIn(
+            "window.setInterval(() => refreshHealth(client), config.refreshIntervalMs)",
+            script,
+        )
 
     def test_dashboard_config_points_to_sit_backend(self) -> None:
         config = (WEB_ROOT / "admin" / "config.js").read_text(encoding="utf-8")

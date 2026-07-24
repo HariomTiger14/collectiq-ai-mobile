@@ -220,12 +220,9 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("notes", payload)
         self.assertIn("pricing", payload)
         pricing = payload["pricing"]
-        self.assertEqual(payload["estimatedValue"], pricing["estimatedMarketValue"])
-        self.assertGreater(pricing["lowEstimate"], 0)
-        self.assertGreaterEqual(
-            pricing["highEstimate"],
-            pricing["estimatedMarketValue"],
-        )
+        self.assertEqual(pricing["estimatedMarketValue"], 0)
+        self.assertEqual(pricing["lowEstimate"], 0)
+        self.assertEqual(pricing["highEstimate"], 0)
         self.assertEqual(payload["estimated_value_low"], pricing["lowEstimate"])
         self.assertEqual(payload["estimated_value_high"], pricing["highEstimate"])
         self.assertEqual(pricing["currency"], "AUD")

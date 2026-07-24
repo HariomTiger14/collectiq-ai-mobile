@@ -329,7 +329,7 @@ class PricingConfidenceEngine:
         except (TypeError, ValueError):
             return None
         now = datetime.now(timezone.utc)
-        return max(0, (now - parsed.astimezone(UTC)).days)
+        return max(0, (now - parsed.astimezone(timezone.utc)).days)
 
     def _quality_label(self, score: int) -> str:
         if score >= 80:

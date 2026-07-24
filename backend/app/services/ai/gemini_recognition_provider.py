@@ -14,6 +14,7 @@ from app.services.ai.openai_recognition_provider import (
     OpenAIRecognitionProvider,
     OpenAITimeoutError,
 )
+from app.services.analyzer.errors import AnalyzerPipelineError
 
 logger = logging.getLogger("collectiq.ai.gemini")
 
@@ -139,7 +140,10 @@ class GeminiRecognitionProvider(OpenAIRecognitionProvider):
                 self._model,
                 processing_time_ms,
             )
-        return self._to_recognition_result(result_payload, processing_time_ms)
+        return self._to_recognition_result(
+            _gemini_payload_with_safe_defaults(result_payload),
+            processing_time_ms,
+        )
 
     def _build_gemini_payload(
         self,
@@ -226,7 +230,18 @@ class GeminiRecognitionProvider(OpenAIRecognitionProvider):
         for payload in payloads:
             if not isinstance(payload, dict):
                 continue
-            image_data_url = self._image_data_url_from_api_payload(payload)
+            try:
+                image_data_url = self._image_data_url_from_api_payload(payload)
+            except OpenAIProviderError as exc:
+                raise AnalyzerPipelineError(
+                    status_code=422,
+                    code="INVALID_IMAGE_PAYLOAD",
+                    message=(
+                        "Gemini analysis requires backend-readable image bytes. "
+                        "Provide a stored file path or base64Image in the backend payload."
+                    ),
+                    retryable=False,
+                ) from exc
             mime_type, image_base64 = self._split_data_url(image_data_url)
             parts.append(
                 {
@@ -237,3 +252,111 @@ class GeminiRecognitionProvider(OpenAIRecognitionProvider):
                 }
             )
         return parts
+
+
+def _gemini_payload_with_safe_defaults(payload: dict[str, Any]) -> dict[str, Any]:
+    title = _text(payload.get("title"), "Unknown collectible")
+    category = _text(payload.get("category"), "Other")
+    confidence = _int(payload.get("confidence"), 0)
+    return {
+        "title": title,
+        "category": category,
+        "confidence": confidence,
+        "estimatedValue": _int(payload.get("estimatedValue"), 0),
+        "condition": _text(payload.get("condition"), "Unknown"),
+        "recommendation": _text(payload.get("recommendation"), "Review before saving."),
+        "description": _text(payload.get("description"), title),
+        "detectedObjects": _string_list(payload.get("detectedObjects")) or [category],
+        "primaryMatch": _text(payload.get("primaryMatch"), title),
+        "alternativeMatches": _alternative_matches(payload, title, category, confidence),
+        "confidenceExplanation": _text(
+            payload.get("confidenceExplanation"),
+            "Gemini returned partial collectible details.",
+        ),
+        "detectionQuality": _text(payload.get("detectionQuality"), "Unknown"),
+        "aiReasoning": _text(payload.get("aiReasoning"), "Partial Gemini output normalized safely."),
+        "fieldConfidence": payload.get("fieldConfidence") if isinstance(payload.get("fieldConfidence"), dict) else {},
+        "confidenceLevel": _text(payload.get("confidenceLevel"), _confidence_level(confidence)),
+        "lowConfidenceReasons": _string_list(payload.get("lowConfidenceReasons")),
+        "imageQualityIssues": _string_list(payload.get("imageQualityIssues")),
+        "scanRecommendations": _string_list(payload.get("scanRecommendations")),
+        **{
+            key: payload.get(key)
+            for key in [
+                "year",
+                "brand",
+                "setName",
+                "series",
+                "cardNumber",
+                "playerOrCharacter",
+                "rarity",
+                "estimatedGrade",
+                "language",
+                "edition",
+                "country",
+                "mint",
+                "material",
+                "notes",
+                "faceValue",
+                "askingPriceWarning",
+                "valuationConfidence",
+            ]
+            if key in payload
+        },
+    }
+
+
+def _text(value, fallback: str) -> str:
+    return value.strip() if isinstance(value, str) and value.strip() else fallback
+
+
+def _int(value, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _string_list(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _alternative_matches(
+    payload: dict[str, Any],
+    title: str,
+    category: str,
+    confidence: int,
+) -> list[dict[str, object]]:
+    matches = payload.get("alternativeMatches")
+    if isinstance(matches, list) and len(matches) == 3:
+        return matches
+    return [
+        {
+            "title": title,
+            "category": category,
+            "confidence": max(0, confidence - 10),
+            "reason": "Fallback match generated from partial Gemini output.",
+        },
+        {
+            "title": f"{category} collectible",
+            "category": category,
+            "confidence": max(0, confidence - 20),
+            "reason": "Category-level fallback match.",
+        },
+        {
+            "title": "Unknown collectible",
+            "category": "Other",
+            "confidence": max(0, confidence - 30),
+            "reason": "Low-confidence fallback match.",
+        },
+    ]
+
+
+def _confidence_level(confidence: int) -> str:
+    if confidence >= 90:
+        return "High"
+    if confidence >= 70:
+        return "Medium"
+    return "Low"

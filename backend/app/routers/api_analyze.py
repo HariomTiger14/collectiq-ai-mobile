@@ -628,7 +628,7 @@ def _price_recognition(recognition, *, trace_id: str):
         result = _valuation_placeholder(
             recognition,
             status="provider_not_configured",
-            source=provider_name,
+            source="not_configured" if provider_name in {"auto", "real"} else provider_name,
             reason=str(exc),
         )
     except EmptyMarketDataError as exc:
@@ -859,12 +859,14 @@ def _diagnostics_response(
     confidence_level: str,
     total_processing_time_ms: int,
 ) -> ApiAnalyzeDiagnosticsResponse:
+    provider_selection = getattr(provider, "selection_diagnostics", {}) or {}
+    selected_ai_provider = provider_selection.get("selectedProvider") or getattr(
+        provider,
+        "provider_name",
+        getattr(recognition, "aiProvider", "unknown"),
+    )
     return ApiAnalyzeDiagnosticsResponse(
-        aiProvider=getattr(
-            provider,
-            "provider_name",
-            getattr(recognition, "aiProvider", "unknown"),
-        ),
+        aiProvider=selected_ai_provider,
         aiModel=getattr(provider, "_model", "mock"),
         aiLatencyMs=_parse_int(
             getattr(recognition, "processingTimeMs", total_processing_time_ms),

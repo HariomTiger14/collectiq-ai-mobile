@@ -120,7 +120,7 @@ class BackendAnalyzerService:
                     return AutoAnalyzerProvider(
                         providers=_configured_real_providers(),
                         requested_provider="auto",
-                        confidence_threshold=settings.ai_fallback_confidence_threshold,
+                        confidence_threshold=_fallback_confidence_threshold(),
                         allow_mock_fallback=False,
                     )
                 from app.services.analyzer.errors import AnalyzerPipelineError
@@ -139,14 +139,14 @@ class BackendAnalyzerService:
             return AutoAnalyzerProvider(
                 providers=[GeminiAnalyzerProvider(), MockAnalyzerProvider()],
                 requested_provider="gemini",
-                confidence_threshold=settings.ai_fallback_confidence_threshold,
+                confidence_threshold=_fallback_confidence_threshold(),
                 allow_mock_fallback=getattr(settings, "allow_mock_analyzer", False),
             )
         if selected_provider in {"auto", "gemini_openai", "gemini+openai"}:
             return AutoAnalyzerProvider(
                 providers=_configured_real_providers(),
                 requested_provider=selected_provider,
-                confidence_threshold=settings.ai_fallback_confidence_threshold,
+                confidence_threshold=_fallback_confidence_threshold(),
                 allow_mock_fallback=getattr(settings, "allow_mock_analyzer", False),
             )
 
@@ -163,6 +163,10 @@ def _optional_string(value) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
     return value.strip()
+
+
+def _fallback_confidence_threshold() -> int:
+    return int(getattr(settings, "ai_fallback_confidence_threshold", 0) or 0)
 
 
 def _configured_real_providers() -> list[BackendAnalyzerProvider]:
