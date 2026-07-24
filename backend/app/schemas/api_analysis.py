@@ -19,6 +19,9 @@ class ApiImagePayload(BaseModel):
     imageSource: str
     localFilePath: str
     imageRole: str | None = None
+    slotType: str | None = None
+    systemTag: str | None = None
+    capturedAt: str | None = None
     base64Image: str | None = None
     base64Preview: str | None = None
 

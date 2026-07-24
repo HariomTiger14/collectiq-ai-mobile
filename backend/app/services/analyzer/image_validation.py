@@ -17,6 +17,9 @@ class NormalizedImageMetadata:
     base64_image: str | None = None
     base64_preview: str | None = None
     image_role: str | None = None
+    slot_type: str | None = None
+    system_tag: str | None = None
+    captured_at: str | None = None
 
     def to_api_payload(self) -> dict:
         return {
@@ -28,6 +31,9 @@ class NormalizedImageMetadata:
             **({"base64Image": self.base64_image} if self.base64_image else {}),
             **({"base64Preview": self.base64_preview} if self.base64_preview else {}),
             **({"imageRole": self.image_role} if self.image_role else {}),
+            **({"slotType": self.slot_type} if self.slot_type else {}),
+            **({"systemTag": self.system_tag} if self.system_tag else {}),
+            **({"capturedAt": self.captured_at} if self.captured_at else {}),
         }
 
 
@@ -41,6 +47,9 @@ class AnalyzerImageValidator:
         base64_image = _optional_string(image_payload.get("base64Image"))
         base64_preview = _optional_string(image_payload.get("base64Preview"))
         image_role = _optional_string(image_payload.get("imageRole"))
+        slot_type = _optional_string(image_payload.get("slotType"))
+        system_tag = _optional_string(image_payload.get("systemTag"))
+        captured_at = _optional_string(image_payload.get("capturedAt"))
 
         self._validate_type(file_name=file_name, mime_type=mime_type)
         self._validate_size(size_bytes)
@@ -63,6 +72,9 @@ class AnalyzerImageValidator:
             base64_image=base64_image,
             base64_preview=base64_preview,
             image_role=image_role,
+            slot_type=slot_type,
+            system_tag=system_tag,
+            captured_at=captured_at,
         )
 
     def validate_bytes(

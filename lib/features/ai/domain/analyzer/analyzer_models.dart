@@ -185,12 +185,18 @@ class AnalyzerImageInput {
     required this.role,
     this.image,
     this.source,
+    this.slotType,
+    this.systemTag,
+    this.capturedAt,
   });
 
   final String path;
   final String role;
   final XFile? image;
   final String? source;
+  final String? slotType;
+  final String? systemTag;
+  final DateTime? capturedAt;
 }
 
 /// Upload/progress event emitted during analysis.

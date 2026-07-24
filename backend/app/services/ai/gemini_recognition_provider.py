@@ -94,6 +94,7 @@ class GeminiRecognitionProvider(OpenAIRecognitionProvider):
                 "fileName": image_payload.get("fileName") or "unknown",
                 "mimeType": image_payload.get("mimeType") or "application/octet-stream",
                 "appVersion": request_metadata.get("appVersion") or "unknown",
+                "imageEvidence": _image_evidence_summary(image_payload),
             },
         )
         return self._recognize_with_gemini_payload(payload, time.perf_counter())
@@ -245,6 +246,16 @@ class GeminiRecognitionProvider(OpenAIRecognitionProvider):
             mime_type, image_base64 = self._split_data_url(image_data_url)
             parts.append(
                 {
+                    "text": (
+                        "Next image evidence: "
+                        f"role={payload.get('imageRole') or 'unknown'}, "
+                        f"slotType={payload.get('slotType') or 'unknown'}, "
+                        f"systemTag={payload.get('systemTag') or 'unknown'}."
+                    )
+                }
+            )
+            parts.append(
+                {
                     "inline_data": {
                         "mime_type": mime_type,
                         "data": image_base64,
@@ -360,3 +371,19 @@ def _confidence_level(confidence: int) -> str:
     if confidence >= 70:
         return "Medium"
     return "Low"
+
+
+def _image_evidence_summary(image_payload: dict[str, Any]) -> str:
+    raw_images = image_payload.get("images")
+    images = raw_images if isinstance(raw_images, list) and raw_images else [image_payload]
+    summaries: list[str] = []
+    for index, payload in enumerate(images, start=1):
+        if not isinstance(payload, dict):
+            continue
+        summaries.append(
+            "image"
+            f"{index}(role={payload.get('imageRole') or 'unknown'}, "
+            f"slotType={payload.get('slotType') or 'unknown'}, "
+            f"systemTag={payload.get('systemTag') or 'unknown'})"
+        )
+    return "; ".join(summaries) or "none"

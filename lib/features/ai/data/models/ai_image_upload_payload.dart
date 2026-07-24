@@ -14,6 +14,9 @@ class AiImageUploadPayload {
     required this.imageSource,
     required this.localFilePath,
     this.imageRole = 'front',
+    this.slotType,
+    this.systemTag,
+    this.capturedAt,
     this.base64Image,
     this.base64Preview,
   });
@@ -36,6 +39,15 @@ class AiImageUploadPayload {
   /// Role for multi-photo analysis, such as front, back, closeup, packaging.
   final String imageRole;
 
+  /// Generic capture slot such as front, back, label, detail, or condition.
+  final String? slotType;
+
+  /// Category-aware system hint such as size_tag, barcode, or set_number.
+  final String? systemTag;
+
+  /// Time the user captured or selected the photo.
+  final DateTime? capturedAt;
+
   /// Full image bytes encoded for the backend analyzer contract.
   final String? base64Image;
 
@@ -51,6 +63,9 @@ class AiImageUploadPayload {
       'imageSource': imageSource,
       'localFilePath': localFilePath,
       'imageRole': imageRole,
+      if (slotType != null) 'slotType': slotType,
+      if (systemTag != null) 'systemTag': systemTag,
+      if (capturedAt != null) 'capturedAt': capturedAt!.toIso8601String(),
       if (base64Image != null) 'base64Image': base64Image,
       if (base64Preview != null) 'base64Preview': base64Preview,
     };
@@ -88,6 +103,9 @@ class AiImagePayloadPreparer {
     required String localFilePath,
     required String imageSource,
     String imageRole = 'front',
+    String? slotType,
+    String? systemTag,
+    DateTime? capturedAt,
   }) async {
     final normalizedPath = localFilePath.trim();
     if (normalizedPath.isEmpty) {
@@ -130,6 +148,9 @@ class AiImagePayloadPreparer {
       imageSource: imageSource.trim().isEmpty ? 'unknown' : imageSource.trim(),
       localFilePath: normalizedPath,
       imageRole: _normalizeRole(imageRole),
+      slotType: _optionalNormalized(slotType),
+      systemTag: _optionalNormalized(systemTag),
+      capturedAt: capturedAt,
       base64Image: base64Encode(await file.readAsBytes()),
       base64Preview: includeBase64Preview
           ? base64Encode(await file.openRead(0, sizeBytes.clamp(0, 128)).first)
@@ -139,18 +160,15 @@ class AiImagePayloadPreparer {
 
   String _normalizeRole(String value) {
     final normalized = value.trim().toLowerCase();
-    return switch (normalized) {
-      'obverse' || 'front' => 'front',
-      'reverse' || 'back' => 'back',
-      'close-up' ||
-      'closeup' ||
-      'detail' ||
-      'serial' ||
-      'signature' ||
-      'damage' => 'closeup',
-      'packaging' || 'package' => 'packaging',
-      _ => 'other',
-    };
+    return normalized.isEmpty ? 'front' : normalized;
+  }
+
+  String? _optionalNormalized(String? value) {
+    final normalized = value?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
   }
 
   String _fileNameFor(String path) {

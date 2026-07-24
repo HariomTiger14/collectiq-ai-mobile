@@ -43,8 +43,8 @@ enum ScanCaptureRole {
 
   String get title {
     return switch (this) {
-      ScanCaptureRole.front => 'Front / Obverse',
-      ScanCaptureRole.back => 'Back / Reverse',
+      ScanCaptureRole.front => 'Front / main',
+      ScanCaptureRole.back => 'Back / reverse',
       ScanCaptureRole.leftSide => 'Left side',
       ScanCaptureRole.rightSide => 'Right side',
       ScanCaptureRole.closeUp => 'Close-up / detail',
@@ -53,13 +53,57 @@ enum ScanCaptureRole {
       ScanCaptureRole.top => 'Top',
       ScanCaptureRole.bottom => 'Bottom',
       ScanCaptureRole.baseUnderside => 'Base / underside',
-      ScanCaptureRole.barcode => 'Logo / barcode',
+      ScanCaptureRole.barcode => 'Label / barcode',
       ScanCaptureRole.cornerCondition => 'Corner condition',
       ScanCaptureRole.surfaceGlare => 'Surface glare',
       ScanCaptureRole.dateMint => 'Date / mint close-up',
-      ScanCaptureRole.serialOrMark => 'Serial',
+      ScanCaptureRole.serialOrMark => 'Serial / mark',
       ScanCaptureRole.damageDetail => 'Damage Detail',
       ScanCaptureRole.angledReflective => 'Angled Reflective',
+    };
+  }
+
+  String get slotType {
+    return switch (this) {
+      ScanCaptureRole.front => 'front',
+      ScanCaptureRole.back => 'back',
+      ScanCaptureRole.barcode ||
+      ScanCaptureRole.dateMint ||
+      ScanCaptureRole.serialOrMark => 'label',
+      ScanCaptureRole.cornerCondition ||
+      ScanCaptureRole.surfaceGlare ||
+      ScanCaptureRole.damageDetail ||
+      ScanCaptureRole.angledReflective => 'condition',
+      ScanCaptureRole.closeUp ||
+      ScanCaptureRole.edge ||
+      ScanCaptureRole.side ||
+      ScanCaptureRole.leftSide ||
+      ScanCaptureRole.rightSide ||
+      ScanCaptureRole.top ||
+      ScanCaptureRole.bottom ||
+      ScanCaptureRole.baseUnderside => 'detail',
+    };
+  }
+
+  String get systemTag {
+    return switch (this) {
+      ScanCaptureRole.front => 'main',
+      ScanCaptureRole.back => 'back',
+      ScanCaptureRole.leftSide => 'left_profile',
+      ScanCaptureRole.rightSide => 'right_profile',
+      ScanCaptureRole.closeUp => 'detail',
+      ScanCaptureRole.edge => 'edge',
+      ScanCaptureRole.side => 'side_profile',
+      ScanCaptureRole.top => 'top',
+      ScanCaptureRole.bottom => 'bottom',
+      ScanCaptureRole.baseUnderside => 'base_underside',
+      ScanCaptureRole.barcode => 'barcode_or_label',
+      ScanCaptureRole.cornerCondition => 'corner_condition',
+      ScanCaptureRole.surfaceGlare => 'surface_glare',
+      ScanCaptureRole.dateMint => 'date_mint_mark',
+      ScanCaptureRole.serialOrMark => 'serial_or_maker_mark',
+      ScanCaptureRole.damageDetail => 'damage_detail',
+      ScanCaptureRole.angledReflective => 'reflective_detail',
     };
   }
 

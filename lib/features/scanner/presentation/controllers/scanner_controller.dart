@@ -1374,6 +1374,9 @@ class ScannerController extends Notifier<ScannerState> {
                   role: slot.role,
                   image: slot.image,
                   source: slot.source,
+                  slotType: ScanCaptureRole.fromId(slot.role).slotType,
+                  systemTag: ScanCaptureRole.fromId(slot.role).systemTag,
+                  capturedAt: slot.capturedAt,
                 ),
           ],
           metadata: {
@@ -1382,6 +1385,12 @@ class ScannerController extends Notifier<ScannerState> {
             'imageCount': state.captureImages.length,
             'imageRoles': state.captureImages
                 .map((slot) => slot.role)
+                .join(','),
+            'imageSlotTypes': state.captureImages
+                .map((slot) => ScanCaptureRole.fromId(slot.role).slotType)
+                .join(','),
+            'imageSystemTags': state.captureImages
+                .map((slot) => ScanCaptureRole.fromId(slot.role).systemTag)
                 .join(','),
             'captureCategory': state.captureCategory.id,
             'captureCategorySelected': state.hasManualCaptureCategory,

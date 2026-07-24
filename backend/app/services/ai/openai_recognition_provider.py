@@ -165,6 +165,7 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             "fileName": image_payload.get("fileName") or "unknown",
             "mimeType": image_payload.get("mimeType") or "application/octet-stream",
             "appVersion": request_metadata.get("appVersion") or "unknown",
+            "imageEvidence": _image_evidence_summary(image_payload),
         }
         return self._build_payload_for_data_url(
             image_data_url=image_data_url,
@@ -364,7 +365,12 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             f"requestedCategory={context.get('requestedCategory')}; "
             f"fileName={context.get('fileName')}; "
             f"mimeType={context.get('mimeType')}; "
-            f"appVersion={context.get('appVersion')}."
+            f"appVersion={context.get('appVersion')}; "
+            f"imageEvidence={context.get('imageEvidence')}. "
+            "Use the imageEvidence roles as ground truth for what each photo "
+            "is meant to show. If a barcode, size tag, serial, set number, "
+            "or condition detail is missing, say so in scanRecommendations "
+            "instead of guessing."
         )
 
     def _image_data_url_from_api_payload(self, image_payload: dict) -> str:
@@ -633,6 +639,22 @@ def _estimate_tokens(text: str) -> int:
     if not normalized:
         return 0
     return max(1, len(normalized) // 4)
+
+
+def _image_evidence_summary(image_payload: dict[str, Any]) -> str:
+    raw_images = image_payload.get("images")
+    images = raw_images if isinstance(raw_images, list) and raw_images else [image_payload]
+    summaries: list[str] = []
+    for index, payload in enumerate(images, start=1):
+        if not isinstance(payload, dict):
+            continue
+        summaries.append(
+            "image"
+            f"{index}(role={payload.get('imageRole') or 'unknown'}, "
+            f"slotType={payload.get('slotType') or 'unknown'}, "
+            f"systemTag={payload.get('systemTag') or 'unknown'})"
+        )
+    return "; ".join(summaries) or "none"
 
 
 # Product-facing provider alias used by the backend analyze endpoint roadmap.

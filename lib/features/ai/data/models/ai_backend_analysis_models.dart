@@ -58,17 +58,26 @@ class AiBackendAnalysisImage {
     required this.imagePath,
     required this.imageSource,
     required this.imageRole,
+    this.slotType,
+    this.systemTag,
+    this.capturedAt,
   });
 
   final String imagePath;
   final String imageSource;
   final String imageRole;
+  final String? slotType;
+  final String? systemTag;
+  final DateTime? capturedAt;
 
   Map<String, dynamic> toJson() {
     return {
       'imagePath': imagePath,
       'imageSource': imageSource,
       'imageRole': imageRole,
+      if (slotType != null) 'slotType': slotType,
+      if (systemTag != null) 'systemTag': systemTag,
+      if (capturedAt != null) 'capturedAt': capturedAt!.toIso8601String(),
     };
   }
 }

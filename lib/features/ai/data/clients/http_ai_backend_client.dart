@@ -41,9 +41,11 @@ class HttpAiBackendClient implements AiBackendClient {
 
     try {
       String? primaryRole;
+      AiBackendAnalysisImage? primaryRequestImage;
       for (final image in request.images) {
         if (image.imagePath == request.imagePath) {
           primaryRole = image.imageRole;
+          primaryRequestImage = image;
           break;
         }
       }
@@ -51,6 +53,9 @@ class HttpAiBackendClient implements AiBackendClient {
         localFilePath: request.imagePath,
         imageSource: request.imageSource,
         imageRole: primaryRole ?? 'front',
+        slotType: primaryRequestImage?.slotType,
+        systemTag: primaryRequestImage?.systemTag,
+        capturedAt: primaryRequestImage?.capturedAt,
       );
       final imagePayloads = <AiImageUploadPayload>[];
       for (final image in request.images) {
@@ -59,6 +64,9 @@ class HttpAiBackendClient implements AiBackendClient {
             localFilePath: image.imagePath,
             imageSource: image.imageSource,
             imageRole: image.imageRole,
+            slotType: image.slotType,
+            systemTag: image.systemTag,
+            capturedAt: image.capturedAt,
           ),
         );
       }
