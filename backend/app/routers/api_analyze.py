@@ -32,6 +32,7 @@ from app.services.pricing.base_pricing_provider import (
     PricingProviderTimeoutError,
     PricingProviderUnavailableError,
 )
+from app.services.pricing.cache_policy import pricing_cache_policy
 from app.services.pricing.provider_factory import get_pricing_provider
 
 
@@ -270,6 +271,10 @@ async def _analyze_collectible(
         if market_estimated_value and diagnostics.pricingProvider
         else None
     )
+    cache_policy = pricing_cache_policy(
+        category=recognition.category,
+        valuation_status=pricing.valuationStatus,
+    )
 
     return ApiAnalyzeResponse(
         id=f"backend-{uuid4()}",
@@ -295,6 +300,11 @@ async def _analyze_collectible(
             "reasonCode": reason_code,
             "valuationStrategy": valuation_strategy,
             "displayString": display_string,
+            "cachePolicy": {
+                "ttlSeconds": cache_policy.ttl_seconds,
+                "expiresAt": None,
+                "reason": cache_policy.reason,
+            },
             "pricingSource": {
                 "name": diagnostics.pricingProvider,
                 "attributionText": attribution_text,

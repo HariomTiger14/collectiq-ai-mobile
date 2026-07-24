@@ -50,6 +50,9 @@ class PricingInfo {
     this.exchangeRateDate,
     this.lowEstimateAud,
     this.highEstimateAud,
+    this.cacheTtlSeconds,
+    this.cacheExpiresAt,
+    this.cachePolicyReason,
   });
 
   final double estimatedMarketValue;
@@ -73,6 +76,9 @@ class PricingInfo {
   final DateTime? exchangeRateDate;
   final double? lowEstimateAud;
   final double? highEstimateAud;
+  final int? cacheTtlSeconds;
+  final DateTime? cacheExpiresAt;
+  final String? cachePolicyReason;
 
   /// Creates pricing information from backend or local JSON.
   factory PricingInfo.fromJson(Map<String, dynamic> json) {
@@ -109,6 +115,9 @@ class PricingInfo {
       exchangeRateDate: _dateTimeOrNull(json['exchangeRateDate']),
       lowEstimateAud: parseNullableDouble(json['lowEstimateAud']),
       highEstimateAud: parseNullableDouble(json['highEstimateAud']),
+      cacheTtlSeconds: parseNullableDouble(json['cacheTtlSeconds'])?.toInt(),
+      cacheExpiresAt: _dateTimeOrNull(json['cacheExpiresAt']),
+      cachePolicyReason: _emptyStringAsNull(json['cachePolicyReason']),
     );
   }
 
@@ -159,6 +168,9 @@ class PricingInfo {
       'exchangeRateDate': exchangeRateDate?.toIso8601String(),
       'lowEstimateAud': lowEstimateAud,
       'highEstimateAud': highEstimateAud,
+      'cacheTtlSeconds': cacheTtlSeconds,
+      'cacheExpiresAt': cacheExpiresAt?.toIso8601String(),
+      'cachePolicyReason': cachePolicyReason,
     };
   }
 }

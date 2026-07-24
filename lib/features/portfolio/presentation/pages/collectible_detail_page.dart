@@ -4528,6 +4528,9 @@ PricingInfo _updatedPricing(
     exchangeRateDate: pricing?.exchangeRateDate,
     lowEstimateAud: pricing?.lowEstimateAud,
     highEstimateAud: pricing?.highEstimateAud,
+    cacheTtlSeconds: pricing?.cacheTtlSeconds,
+    cacheExpiresAt: pricing?.cacheExpiresAt,
+    cachePolicyReason: pricing?.cachePolicyReason,
   );
 }
 

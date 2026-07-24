@@ -106,6 +106,9 @@ class ScanResultEnrichmentService {
             exchangeRateDate: result.pricing.exchangeRateDate,
             lowEstimateAud: result.pricing.lowEstimateAud,
             highEstimateAud: result.pricing.highEstimateAud,
+            cacheTtlSeconds: result.pricing.cacheTtlSeconds,
+            cacheExpiresAt: result.pricing.cacheExpiresAt,
+            cachePolicyReason: result.pricing.cachePolicyReason,
           ),
           marketSummary: result.marketSummary,
         ),
@@ -141,6 +144,10 @@ class ScanResultEnrichmentService {
       exchangeRateDate: enriched.exchangeRateDate ?? existing.exchangeRateDate,
       lowEstimateAud: enriched.lowEstimateAud ?? existing.lowEstimateAud,
       highEstimateAud: enriched.highEstimateAud ?? existing.highEstimateAud,
+      cacheTtlSeconds: enriched.cacheTtlSeconds ?? existing.cacheTtlSeconds,
+      cacheExpiresAt: enriched.cacheExpiresAt ?? existing.cacheExpiresAt,
+      cachePolicyReason:
+          enriched.cachePolicyReason ?? existing.cachePolicyReason,
     );
   }
 

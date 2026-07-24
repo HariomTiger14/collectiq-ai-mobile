@@ -107,6 +107,10 @@ class MarketPricingResult {
           : null,
       lowEstimateAud: currency == 'AUD' ? lowEstimate : null,
       highEstimateAud: currency == 'AUD' ? highEstimate : null,
+      cacheTtlSeconds: _cacheTtlSecondsFor(
+        sourceLabel: sourceLabel,
+        estimatedValue: estimatedValue,
+      ),
     );
   }
 
@@ -125,6 +129,20 @@ class MarketPricingResult {
       comps: comparableSales,
     );
   }
+}
+
+int? _cacheTtlSecondsFor({
+  required String sourceLabel,
+  required double estimatedValue,
+}) {
+  if (estimatedValue <= 0) {
+    return 7 * 24 * 60 * 60;
+  }
+  final normalized = sourceLabel.toLowerCase();
+  if (normalized.contains('card') || normalized.contains('sneaker')) {
+    return 24 * 60 * 60;
+  }
+  return 48 * 60 * 60;
 }
 
 double _normalizeConfidence(Object? value) {

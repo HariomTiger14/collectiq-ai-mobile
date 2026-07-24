@@ -308,6 +308,7 @@ class AiBackendAnalysisResponse {
       rawProviderPayload['originalMarket'],
     );
     final matchMetadata = parseJsonMap(rawProviderPayload['matchMetadata']);
+    final cachePolicy = parseJsonMap(rawProviderPayload['cachePolicy']);
     final resolvedEstimatedMarketValue =
         estimatedMarketValue ??
         parseNullableDouble(marketSource['estimatedValue']) ??
@@ -348,6 +349,9 @@ class AiBackendAnalysisResponse {
       ),
       lowEstimateAud: parseNullableDouble(matchMetadata['lowEstimateAud']),
       highEstimateAud: parseNullableDouble(matchMetadata['highEstimateAud']),
+      cacheTtlSeconds: parseNullableDouble(cachePolicy['ttlSeconds'])?.toInt(),
+      cacheExpiresAt: parseNullableDateTime(cachePolicy['expiresAt']),
+      cachePolicyReason: _optionalString(cachePolicy['reason']),
     );
 
     return ScanResult(

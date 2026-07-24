@@ -1263,6 +1263,11 @@ void main() {
             'exchangeRateDate': '2026-07-24T22:06:00Z',
           },
           'matchMetadata': {'lowEstimateAud': 320, 'highEstimateAud': 560},
+          'cachePolicy': {
+            'ttlSeconds': 86400,
+            'expiresAt': '2026-07-25T22:06:00Z',
+            'reason': 'Fast-moving collectibles refresh every 24 hours.',
+          },
         },
         'recommendation': 'Save with condition notes.',
       });
@@ -1305,6 +1310,11 @@ void main() {
       expect(result.pricing.exchangeRateUsed, 1.5);
       expect(result.pricing.lowEstimateAud, 320);
       expect(result.pricing.highEstimateAud, 560);
+      expect(result.pricing.cacheTtlSeconds, 86400);
+      expect(
+        result.pricing.cachePolicyReason,
+        'Fast-moving collectibles refresh every 24 hours.',
+      );
       expect(result.marketSummary?.sources, ['eBay Sold', 'TCGplayer']);
     });
 
