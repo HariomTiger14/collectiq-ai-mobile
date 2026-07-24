@@ -95,6 +95,17 @@ class ScanResultEnrichmentService {
             valuationStatus: result.valuationStatus,
             valuationSource: result.valuationSource,
             aiEstimatedValue: result.aiEstimatedValue,
+            pricingExplanation: result.pricing.pricingExplanation,
+            reasonCode: result.pricing.reasonCode,
+            valuationStrategy: result.pricing.valuationStrategy,
+            attributionText: result.pricing.attributionText,
+            displayString: result.pricing.displayString,
+            originalPrice: result.pricing.originalPrice,
+            originalCurrency: result.pricing.originalCurrency,
+            exchangeRateUsed: result.pricing.exchangeRateUsed,
+            exchangeRateDate: result.pricing.exchangeRateDate,
+            lowEstimateAud: result.pricing.lowEstimateAud,
+            highEstimateAud: result.pricing.highEstimateAud,
           ),
           marketSummary: result.marketSummary,
         ),
@@ -117,6 +128,19 @@ class ScanResultEnrichmentService {
       valuationStatus: enriched.valuationStatus,
       valuationSource: enriched.valuationSource,
       aiEstimatedValue: existing.aiEstimatedValue,
+      pricingExplanation:
+          enriched.pricingExplanation ?? existing.pricingExplanation,
+      reasonCode: enriched.reasonCode ?? existing.reasonCode,
+      valuationStrategy:
+          enriched.valuationStrategy ?? existing.valuationStrategy,
+      attributionText: enriched.attributionText ?? existing.attributionText,
+      displayString: enriched.displayString ?? existing.displayString,
+      originalPrice: enriched.originalPrice ?? existing.originalPrice,
+      originalCurrency: enriched.originalCurrency ?? existing.originalCurrency,
+      exchangeRateUsed: enriched.exchangeRateUsed ?? existing.exchangeRateUsed,
+      exchangeRateDate: enriched.exchangeRateDate ?? existing.exchangeRateDate,
+      lowEstimateAud: enriched.lowEstimateAud ?? existing.lowEstimateAud,
+      highEstimateAud: enriched.highEstimateAud ?? existing.highEstimateAud,
     );
   }
 

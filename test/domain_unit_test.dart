@@ -1245,6 +1245,25 @@ void main() {
           'salesCount': 5,
           'sources': ['eBay Sold', 'TCGplayer'],
         },
+        'diagnostics': {
+          'pricingExplanation': 'Matched five recent comparable sales.',
+        },
+        'rawProviderPayload': {
+          'reasonCode': null,
+          'valuationStrategy': 'sold_completed',
+          'displayString': r'$420.00 AUD',
+          'pricingSource': {
+            'name': 'PriceCharting',
+            'attributionText': 'Pricing data powered by PriceCharting',
+          },
+          'originalMarket': {
+            'price': 280,
+            'currency': 'USD',
+            'exchangeRateUsed': 1.5,
+            'exchangeRateDate': '2026-07-24T22:06:00Z',
+          },
+          'matchMetadata': {'lowEstimateAud': 320, 'highEstimateAud': 560},
+        },
         'recommendation': 'Save with condition notes.',
       });
       final result = response.toScanResult(thumbnail: 'sample://sports-card');
@@ -1271,6 +1290,21 @@ void main() {
       expect(result.pricing.pricingSource, 'eBay Sold + TCGplayer');
       expect(result.pricing.pricingConfidence, 0.78);
       expect(result.pricing.valuationStatus, ValuationStatus.marketEstimated);
+      expect(
+        result.pricing.pricingExplanation,
+        'Matched five recent comparable sales.',
+      );
+      expect(result.pricing.valuationStrategy, 'sold_completed');
+      expect(
+        result.pricing.attributionText,
+        'Pricing data powered by PriceCharting',
+      );
+      expect(result.pricing.displayString, r'$420.00 AUD');
+      expect(result.pricing.originalPrice, 280);
+      expect(result.pricing.originalCurrency, 'USD');
+      expect(result.pricing.exchangeRateUsed, 1.5);
+      expect(result.pricing.lowEstimateAud, 320);
+      expect(result.pricing.highEstimateAud, 560);
       expect(result.marketSummary?.sources, ['eBay Sold', 'TCGplayer']);
     });
 

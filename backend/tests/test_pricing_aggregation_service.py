@@ -85,8 +85,8 @@ class PricingAggregationServiceTest(unittest.TestCase):
         with self.assertRaises(EmptyMarketDataError):
             PricingAggregationService([provider]).price(self.recognition)
 
-    def test_future_provider_factory_reports_missing_market_data(self) -> None:
-        with self.assertRaises(EmptyMarketDataError):
+    def test_future_provider_factory_reports_missing_provider_configuration(self) -> None:
+        with self.assertRaises(PricingProviderUnavailableError):
             get_pricing_provider("pricecharting").price(self.recognition)
 
 

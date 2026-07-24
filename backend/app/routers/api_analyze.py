@@ -251,6 +251,25 @@ async def _analyze_collectible(
     display_value = market_estimated_value or ai_estimated_value or 0
     low_estimate = pricing.lowEstimate if market_estimated_value else 0
     high_estimate = pricing.highEstimate if market_estimated_value else 0
+    valuation_strategy = (
+        "sold_completed" if market_estimated_value else "unavailable"
+    )
+    reason_code = (
+        None
+        if market_estimated_value
+        else (
+            diagnostics.pricingFallbackReason
+            or pricing.valuationStatus.upper()
+        )
+    )
+    display_string = (
+        f"${display_value:,.2f} {pricing.currency}" if display_value else None
+    )
+    attribution_text = (
+        f"Pricing data powered by {diagnostics.pricingProvider}"
+        if market_estimated_value and diagnostics.pricingProvider
+        else None
+    )
 
     return ApiAnalyzeResponse(
         id=f"backend-{uuid4()}",
@@ -270,6 +289,28 @@ async def _analyze_collectible(
         images=[],
         rawProviderPayload={
             "provider": diagnostics.aiProvider,
+            "pricingProvider": diagnostics.pricingProvider,
+            "pricingExplanation": diagnostics.pricingExplanation,
+            "pricingFallbackReason": diagnostics.pricingFallbackReason,
+            "reasonCode": reason_code,
+            "valuationStrategy": valuation_strategy,
+            "displayString": display_string,
+            "pricingSource": {
+                "name": diagnostics.pricingProvider,
+                "attributionText": attribution_text,
+                "lastChecked": pricing.lastUpdated,
+            },
+            "originalMarket": {
+                "price": display_value,
+                "currency": pricing.currency,
+                "exchangeRateUsed": 1,
+                "exchangeRateDate": pricing.lastUpdated,
+            },
+            "matchMetadata": {
+                "reason": diagnostics.pricingExplanation,
+                "lowEstimateAud": low_estimate,
+                "highEstimateAud": high_estimate,
+            },
             "pipelineStages": pipeline_result.stages,
             "photosUsed": len(pipeline_result.image_payloads),
             "photoRoles": [

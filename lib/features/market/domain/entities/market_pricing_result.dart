@@ -88,6 +88,25 @@ class MarketPricingResult {
           ? ValuationStatus.marketEstimated
           : ValuationStatus.noMarketMatch,
       valuationSource: sourceLabel,
+      pricingExplanation: estimatedValue > 0
+          ? 'Matched using trusted market data from $sourceLabel.'
+          : 'No trusted market match found from $sourceLabel.',
+      reasonCode: estimatedValue > 0 ? null : 'NO_MARKET_MATCH',
+      valuationStrategy: estimatedValue > 0 ? 'sold_completed' : 'unavailable',
+      attributionText: estimatedValue > 0
+          ? 'Pricing data powered by $sourceLabel'
+          : null,
+      displayString: estimatedValue > 0
+          ? '\$${estimatedValue.toStringAsFixed(2)} $currency'
+          : null,
+      originalPrice: estimatedValue > 0 ? estimatedValue : null,
+      originalCurrency: estimatedValue > 0 ? currency : null,
+      exchangeRateUsed: currency == 'AUD' && estimatedValue > 0 ? 1 : null,
+      exchangeRateDate: currency == 'AUD' && estimatedValue > 0
+          ? lastUpdated
+          : null,
+      lowEstimateAud: currency == 'AUD' ? lowEstimate : null,
+      highEstimateAud: currency == 'AUD' ? highEstimate : null,
     );
   }
 

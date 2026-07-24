@@ -4514,6 +4514,20 @@ PricingInfo _updatedPricing(
     pricingSource: pricing?.pricingSource ?? 'Local edit',
     pricingConfidence: pricing?.pricingConfidence ?? 0,
     lastUpdated: pricing?.lastUpdated,
+    valuationStatus: pricing?.valuationStatus ?? item.valuationStatus,
+    valuationSource: pricing?.valuationSource ?? item.valuationSource,
+    aiEstimatedValue: pricing?.aiEstimatedValue ?? item.aiEstimatedValue,
+    pricingExplanation: pricing?.pricingExplanation,
+    reasonCode: pricing?.reasonCode,
+    valuationStrategy: pricing?.valuationStrategy,
+    attributionText: pricing?.attributionText,
+    displayString: pricing?.displayString,
+    originalPrice: pricing?.originalPrice,
+    originalCurrency: pricing?.originalCurrency,
+    exchangeRateUsed: pricing?.exchangeRateUsed,
+    exchangeRateDate: pricing?.exchangeRateDate,
+    lowEstimateAud: pricing?.lowEstimateAud,
+    highEstimateAud: pricing?.highEstimateAud,
   );
 }
 

@@ -286,6 +286,8 @@ class AiBackendAnalysisResponse {
           'backendResponseSource': _optionalString(
             json['backendResponseSource'],
           ),
+        if (parseJsonMap(json['diagnostics']).isNotEmpty)
+          'diagnostics': parseJsonMap(json['diagnostics']),
       },
     );
   }
@@ -294,6 +296,18 @@ class AiBackendAnalysisResponse {
     final resultDate = scanDate ?? timestamp ?? DateTime.now();
     final resolvedMarketSummary = marketSummary ?? _fallbackMarketSummary();
     final marketSource = parseJsonMap(rawProviderPayload['marketSource']);
+    final diagnostics = parseJsonMap(rawProviderPayload['diagnostics']);
+    final pricingExplanation =
+        _optionalString(rawProviderPayload['pricingExplanation']) ??
+        _optionalString(diagnostics['pricingExplanation']) ??
+        _optionalString(marketSource['pricingExplanation']);
+    final pricingSourcePayload = parseJsonMap(
+      rawProviderPayload['pricingSource'],
+    );
+    final originalMarketPayload = parseJsonMap(
+      rawProviderPayload['originalMarket'],
+    );
+    final matchMetadata = parseJsonMap(rawProviderPayload['matchMetadata']);
     final resolvedEstimatedMarketValue =
         estimatedMarketValue ??
         parseNullableDouble(marketSource['estimatedValue']) ??
@@ -315,6 +329,25 @@ class AiBackendAnalysisResponse {
       valuationStatus: valuationStatus,
       valuationSource: valuationSource,
       aiEstimatedValue: aiEstimatedValue,
+      pricingExplanation: pricingExplanation,
+      reasonCode:
+          _optionalString(rawProviderPayload['reasonCode']) ??
+          _optionalString(diagnostics['pricingFallbackReason']),
+      valuationStrategy: _optionalString(
+        rawProviderPayload['valuationStrategy'],
+      ),
+      attributionText: _optionalString(pricingSourcePayload['attributionText']),
+      displayString: _optionalString(rawProviderPayload['displayString']),
+      originalPrice: parseNullableDouble(originalMarketPayload['price']),
+      originalCurrency: _optionalString(originalMarketPayload['currency']),
+      exchangeRateUsed: parseNullableDouble(
+        originalMarketPayload['exchangeRateUsed'],
+      ),
+      exchangeRateDate: parseNullableDateTime(
+        originalMarketPayload['exchangeRateDate'],
+      ),
+      lowEstimateAud: parseNullableDouble(matchMetadata['lowEstimateAud']),
+      highEstimateAud: parseNullableDouble(matchMetadata['highEstimateAud']),
     );
 
     return ScanResult(

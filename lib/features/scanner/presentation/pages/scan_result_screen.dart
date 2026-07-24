@@ -351,6 +351,7 @@ class _MarketEvidence extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pricing = result.pricing;
+    final explanation = pricing.pricingExplanation?.trim();
     return Column(
       children: [
         _ResultRow(
@@ -374,8 +375,10 @@ class _MarketEvidence extends StatelessWidget {
         _ResultRow(
           label: 'Last checked',
           value: _formatShortDate(pricing.lastUpdated),
-          isLast: true,
+          isLast: explanation == null || explanation.isEmpty,
         ),
+        if (explanation != null && explanation.isNotEmpty)
+          _ResultRow(label: 'Pricing note', value: explanation, isLast: true),
       ],
     );
   }

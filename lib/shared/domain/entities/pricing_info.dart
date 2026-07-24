@@ -39,6 +39,17 @@ class PricingInfo {
     this.valuationStatus = ValuationStatus.unavailable,
     this.valuationSource = 'unknown',
     this.aiEstimatedValue,
+    this.pricingExplanation,
+    this.reasonCode,
+    this.valuationStrategy,
+    this.attributionText,
+    this.displayString,
+    this.originalPrice,
+    this.originalCurrency,
+    this.exchangeRateUsed,
+    this.exchangeRateDate,
+    this.lowEstimateAud,
+    this.highEstimateAud,
   });
 
   final double estimatedMarketValue;
@@ -51,6 +62,17 @@ class PricingInfo {
   final ValuationStatus valuationStatus;
   final String valuationSource;
   final double? aiEstimatedValue;
+  final String? pricingExplanation;
+  final String? reasonCode;
+  final String? valuationStrategy;
+  final String? attributionText;
+  final String? displayString;
+  final double? originalPrice;
+  final String? originalCurrency;
+  final double? exchangeRateUsed;
+  final DateTime? exchangeRateDate;
+  final double? lowEstimateAud;
+  final double? highEstimateAud;
 
   /// Creates pricing information from backend or local JSON.
   factory PricingInfo.fromJson(Map<String, dynamic> json) {
@@ -74,6 +96,19 @@ class PricingInfo {
         fallback: parseString(json['pricingSource'], fallback: 'unknown'),
       ),
       aiEstimatedValue: parseNullableDouble(json['aiEstimatedValue']),
+      pricingExplanation: parseString(json['pricingExplanation']).trim().isEmpty
+          ? null
+          : parseString(json['pricingExplanation']),
+      reasonCode: _emptyStringAsNull(json['reasonCode']),
+      valuationStrategy: _emptyStringAsNull(json['valuationStrategy']),
+      attributionText: _emptyStringAsNull(json['attributionText']),
+      displayString: _emptyStringAsNull(json['displayString']),
+      originalPrice: parseNullableDouble(json['originalPrice']),
+      originalCurrency: _emptyStringAsNull(json['originalCurrency']),
+      exchangeRateUsed: parseNullableDouble(json['exchangeRateUsed']),
+      exchangeRateDate: _dateTimeOrNull(json['exchangeRateDate']),
+      lowEstimateAud: parseNullableDouble(json['lowEstimateAud']),
+      highEstimateAud: parseNullableDouble(json['highEstimateAud']),
     );
   }
 
@@ -92,6 +127,11 @@ class PricingInfo {
           : ValuationStatus.unavailable,
       valuationSource: 'legacy_ai_estimate',
       aiEstimatedValue: estimatedValue > 0 ? estimatedValue : null,
+      pricingExplanation: estimatedValue > 0
+          ? 'Legacy AI estimate; no market source was used.'
+          : null,
+      reasonCode: estimatedValue > 0 ? 'LEGACY_AI_ESTIMATE' : null,
+      valuationStrategy: estimatedValue > 0 ? 'ai_estimate' : null,
     );
   }
 
@@ -108,8 +148,24 @@ class PricingInfo {
       'valuationStatus': valuationStatus.wireValue,
       'valuationSource': valuationSource,
       'aiEstimatedValue': aiEstimatedValue,
+      'pricingExplanation': pricingExplanation,
+      'reasonCode': reasonCode,
+      'valuationStrategy': valuationStrategy,
+      'attributionText': attributionText,
+      'displayString': displayString,
+      'originalPrice': originalPrice,
+      'originalCurrency': originalCurrency,
+      'exchangeRateUsed': exchangeRateUsed,
+      'exchangeRateDate': exchangeRateDate?.toIso8601String(),
+      'lowEstimateAud': lowEstimateAud,
+      'highEstimateAud': highEstimateAud,
     };
   }
+}
+
+String? _emptyStringAsNull(Object? value) {
+  final parsed = parseString(value).trim();
+  return parsed.isEmpty ? null : parsed;
 }
 
 DateTime? _dateTimeOrNull(Object? value) {
