@@ -88,6 +88,16 @@ on public.pricing_cache_entries(category, normalized_identity, condition_label);
 create index if not exists pricing_cache_entries_expires_idx
 on public.pricing_cache_entries(expires_at);
 
+create or replace function public.increment_pricing_cache_hit(cache_key_arg text)
+returns void
+language sql
+security definer set search_path = public
+as $$
+  update public.pricing_cache_entries
+  set hit_count = hit_count + 1
+  where cache_key = cache_key_arg;
+$$;
+
 drop trigger if exists set_pricing_cache_entries_updated_at
 on public.pricing_cache_entries;
 create trigger set_pricing_cache_entries_updated_at

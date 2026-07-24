@@ -34,11 +34,17 @@ from app.services.pricing.base_pricing_provider import (
 )
 from app.services.pricing.cache_policy import pricing_cache_policy
 from app.services.pricing.provider_factory import get_pricing_provider
+from app.services.pricing.shared_cache_repository import (
+    SharedPricingCacheError,
+    SharedPricingCacheRepository,
+    with_shared_cache_status,
+)
 
 
 router = APIRouter(prefix="/api", tags=["Analyze API"])
 root_router = APIRouter(tags=["Analyzer API"])
 logger = logging.getLogger("collectiq.api.analyze")
+_shared_pricing_cache = SharedPricingCacheRepository()
 
 SUPPORTED_CATEGORIES = {
     "pokemon",
@@ -599,6 +605,24 @@ def _price_recognition(recognition, *, trace_id: str):
         return result
 
     try:
+        cached_result = _shared_pricing_cache.get(recognition)
+    except SharedPricingCacheError as exc:
+        logger.warning(
+            "pricing shared cache read failed traceId=%s error=%s",
+            trace_id,
+            exc,
+        )
+        cached_result = None
+    if cached_result is not None:
+        logger.info(
+            "pricing shared cache hit traceId=%s itemName=%s cacheStatus=%s",
+            trace_id,
+            recognition.title,
+            cached_result.cacheStatus,
+        )
+        return cached_result
+
+    try:
         result = get_pricing_provider().price(recognition)
     except PricingProviderUnavailableError as exc:
         result = _valuation_placeholder(
@@ -625,6 +649,15 @@ def _price_recognition(recognition, *, trace_id: str):
             status="lookup_failed",
             source=provider_name,
             reason=str(exc),
+        )
+    try:
+        _shared_pricing_cache.set(recognition, result)
+        result = with_shared_cache_status(result, "shared_miss")
+    except SharedPricingCacheError as exc:
+        logger.warning(
+            "pricing shared cache write failed traceId=%s error=%s",
+            trace_id,
+            exc,
         )
     logger.info(
         "pricing result traceId=%s status=%s provider=%s source=%s "
