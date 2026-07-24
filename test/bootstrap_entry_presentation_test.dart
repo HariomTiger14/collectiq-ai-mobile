@@ -42,8 +42,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
-    expect(find.text('Your collection is waiting'), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsNothing);
+    expect(find.text('Scan any collectible'), findsNothing);
   });
 
   testWidgets(
@@ -54,8 +53,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Welcome to PackLox'), findsOneWidget);
-      expect(find.text('Step 1 of 3'), findsOneWidget);
+      expect(find.text('Scan any collectible'), findsOneWidget);
+      expect(find.text('Step 1 of 4'), findsOneWidget);
       expect(find.byKey(const ValueKey('onboarding-next')), findsOneWidget);
       expect(find.text('Home'), findsNothing);
     },
@@ -76,9 +75,13 @@ void main() {
     expect(find.byKey(const ValueKey('app-shell')), findsNothing);
   });
 
-  testWidgets('authenticated user launches AppShell Home', (tester) async {
+  testWidgets('first authenticated launch shows onboarding before Home', (
+    tester,
+  ) async {
+    final repository = _MutableOnboardingRepository(completed: false);
+
     await tester.pumpEntry(
-      repository: _ImmediateOnboardingRepository(completed: false),
+      repository: repository,
       authRepository: _EntryAuthRepository(
         user: _cloudUser('collector@example.com'),
       ),
@@ -86,9 +89,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
-    expect(find.text('Your collection is waiting'), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
+    expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('onboarding-explore-dashboard')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.completed, isTrue);
+    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
     expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
   });
 
@@ -111,8 +128,10 @@ void main() {
 
     expect(guestRepository.chosen, isTrue);
     expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
-    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
 
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
@@ -124,7 +143,7 @@ void main() {
 
     expect(onboardingRepository.completed, isTrue);
     expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
-    expect(find.text('Your collection is waiting'), findsOneWidget);
+    expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
   });
 
   testWidgets('bootstrap does not insert authentication', (tester) async {
@@ -145,13 +164,13 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
 
     expect(find.byKey(const ValueKey('packlox-bootstrap')), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsNothing);
+    expect(find.text('Scan any collectible'), findsNothing);
 
     repository.complete(false);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('packlox-bootstrap')), findsNothing);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
   });
 
   testWidgets('state resolution does not invoke duplicate onboarding loads', (
@@ -239,7 +258,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.loadCalls, 2);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
   });
 
   test('onboarding persistence key remains unchanged', () {

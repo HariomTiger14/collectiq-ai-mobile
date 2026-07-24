@@ -23,8 +23,8 @@ void main() {
     await tester.pumpOnboarding();
 
     expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
     expect(find.byKey(const ValueKey('onboarding-next')), findsOneWidget);
     expect(find.byKey(const ValueKey('onboarding-back')), findsNothing);
     expect(find.text('Skip'), findsNothing);
@@ -42,16 +42,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pumpAndSettle();
 
-    expect(find.text('A simple collecting loop'), findsOneWidget);
-    expect(find.text('Step 2 of 3'), findsOneWidget);
+    expect(find.text('Check the AI result before saving'), findsOneWidget);
+    expect(find.text('Step 2 of 4'), findsOneWidget);
     expect(find.byKey(const ValueKey('onboarding-back')), findsOneWidget);
     expect(completions, 0);
 
     await tester.tap(find.byKey(const ValueKey('onboarding-back')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
     expect(completions, 0);
   });
 
@@ -107,8 +107,8 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(repository.writeCalls, 1);
-    expect(find.text('Your collection is waiting'), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsNothing);
+    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsNothing);
   });
 
   testWidgets('persistence key remains unchanged', (tester) async {
@@ -125,8 +125,8 @@ void main() {
 
     await tester.pump(const Duration(seconds: 3));
 
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
   });
 
   testWidgets('reduced motion path advances immediately', (tester) async {
@@ -135,19 +135,19 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pump();
 
-    expect(find.text('A simple collecting loop'), findsOneWidget);
-    expect(find.text('Step 2 of 3'), findsOneWidget);
+    expect(find.text('Check the AI result before saving'), findsOneWidget);
+    expect(find.text('Step 2 of 4'), findsOneWidget);
   });
 
   testWidgets('supports light and dark themes without overflow', (
     tester,
   ) async {
     await tester.pumpOnboarding(themeMode: ThemeMode.light);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.pumpOnboarding(themeMode: ThemeMode.dark);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -157,7 +157,7 @@ void main() {
 
     await tester.pumpOnboarding(textScale: 2);
 
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -168,13 +168,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pumpAndSettle();
-    expect(find.text('Step 2 of 3'), findsOneWidget);
+    expect(find.text('Step 2 of 4'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Step 1 of 3'), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
   });
 }
 
@@ -204,7 +204,9 @@ extension _OnboardingPump on WidgetTester {
     await pumpAndSettle();
     await tap(find.byKey(const ValueKey('onboarding-next')));
     await pumpAndSettle();
-    expect(find.text('Step 3 of 3'), findsOneWidget);
+    await tap(find.byKey(const ValueKey('onboarding-next')));
+    await pumpAndSettle();
+    expect(find.text('Step 4 of 4'), findsOneWidget);
   }
 }
 

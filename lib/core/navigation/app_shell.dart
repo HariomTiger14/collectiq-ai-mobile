@@ -390,14 +390,7 @@ class _AppShellState extends ConsumerState<AppShell>
           return _buildLoadingEntry();
         }
 
-        if (authState.isSignedIn) {
-          return _buildShellEntry(
-            selectedIndex: selectedIndex,
-            hideBottomNavigation: hideBottomNavigation,
-          );
-        }
-
-        if (!guestModeChosen) {
+        if (!authState.isSignedIn && !guestModeChosen) {
           return PackLoxEntryTransition(
             stateKey: 'entry-auth-welcome',
             child: AuthWelcomeScreen(onExploreAsGuest: _chooseGuestMode),

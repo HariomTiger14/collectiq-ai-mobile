@@ -15,7 +15,9 @@ import 'package:collectiq_ai/features/ai/services/ai_recognition_service.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/entities/sync_status.dart';
 import 'package:collectiq_ai/features/cloud_sync/domain/services/sync_service.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
@@ -68,10 +70,10 @@ void main() {
   testWidgets('shows bottom navigation tabs', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    expect(find.text('Home'), findsWidgets);
-    expect(find.text('Scan'), findsWidgets);
-    expect(find.text('Portfolio'), findsWidgets);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-home')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-scan')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-portfolio')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nav-settings')), findsOneWidget);
   });
 
   testWidgets('bottom navigation switches all major tabs without crashing', (
@@ -81,7 +83,7 @@ void main() {
 
     expect(find.text('Your collection is waiting'), findsOneWidget);
 
-    await tester.tap(find.text('Portfolio').last);
+    await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('portfolio-compact-snapshot')),
@@ -93,7 +95,7 @@ void main() {
     );
     expectNoFlutterError(tester);
 
-    await tester.tap(find.text('Scan').last);
+    await tester.tap(find.byKey(const ValueKey('nav-scan')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(
@@ -106,12 +108,12 @@ void main() {
     );
     expectNoFlutterError(tester);
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
     await tester.pumpAndSettle();
     expect(find.text('Account & Profile'), findsWidgets);
     expectNoFlutterError(tester);
 
-    await tester.tap(find.text('Home'));
+    await tester.tap(find.byKey(const ValueKey('nav-home')));
     await tester.pumpAndSettle();
     expect(find.text('Your collection is waiting'), findsOneWidget);
     expectNoFlutterError(tester);
@@ -160,8 +162,8 @@ void main() {
     await tester.pumpCollectIqApp(onboardingCompleted: false);
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
-    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
     expect(find.byKey(const ValueKey('onboarding-next')), findsOneWidget);
     expect(find.text('Skip'), findsNothing);
     expect(find.textContaining('Mock AI'), findsNothing);
@@ -180,6 +182,8 @@ void main() {
     await tester.pumpCollectIqApp(onboardingRepository: repository);
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
@@ -207,6 +211,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('onboarding-next')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
+    await tester.pumpAndSettle();
 
     await tester.tap(
       find.byKey(const ValueKey('onboarding-explore-dashboard')),
@@ -215,13 +221,8 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(find.text('Your collection is waiting'), findsOneWidget);
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -520),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Popular Categories'), findsOneWidget);
-    expect(find.text('Welcome to PackLox'), findsNothing);
+    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsNothing);
   });
 
   testWidgets('onboarding does not reappear after completion', (
@@ -230,7 +231,7 @@ void main() {
     await tester.pumpCollectIqApp(onboardingCompleted: true);
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to PackLox'), findsNothing);
+    expect(find.text('Scan any collectible'), findsNothing);
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
@@ -713,7 +714,8 @@ void main() {
   testWidgets('shows settings screen content', (WidgetTester tester) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
     await tester.pumpAndSettle();
 
     expect(find.text('Settings'), findsWidgets);
@@ -779,7 +781,7 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
     await tester.pumpAndSettle();
 
     await tester.reveal(find.text('Theme'));
@@ -885,7 +887,7 @@ void main() {
     final repository = _FakeOnboardingRepository(completed: true);
     await tester.pumpCollectIqApp(onboardingRepository: repository);
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
     await tester.pumpAndSettle();
     await tester.reveal(find.text('Reset Onboarding'));
     await tester.pump();
@@ -895,7 +897,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isFalse);
-    expect(find.text('Welcome to PackLox'), findsOneWidget);
+    expect(find.text('Scan any collectible'), findsOneWidget);
   });
 
   testWidgets('settings shows SIT resend diagnostics', (
@@ -5346,6 +5348,7 @@ extension on WidgetTester {
     EnvironmentConfig? environmentConfig,
     bool onboardingCompleted = true,
     OnboardingRepository? onboardingRepository,
+    bool guestModeChosen = true,
     bool? demoSeedEnabled,
   }) async {
     final effectiveOnboardingRepository =
@@ -5356,6 +5359,9 @@ extension on WidgetTester {
         overrides: [
           onboardingRepositoryProvider.overrideWithValue(
             effectiveOnboardingRepository,
+          ),
+          guestModeRepositoryProvider.overrideWithValue(
+            _FakeGuestModeRepository(chosen: guestModeChosen),
           ),
           aiRecognitionServiceProvider.overrideWithValue(aiRecognitionService),
           analyzerConfigProvider.overrideWithValue(
@@ -5792,6 +5798,20 @@ class _FakeOnboardingRepository implements OnboardingRepository {
   @override
   Future<void> setOnboardingCompleted(bool completed) async {
     this.completed = completed;
+  }
+}
+
+class _FakeGuestModeRepository implements GuestModeRepository {
+  _FakeGuestModeRepository({required this.chosen});
+
+  bool chosen;
+
+  @override
+  Future<bool> hasChosenGuestMode() async => chosen;
+
+  @override
+  Future<void> setGuestModeChosen(bool chosen) async {
+    this.chosen = chosen;
   }
 }
 

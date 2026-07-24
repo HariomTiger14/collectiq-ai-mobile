@@ -23,7 +23,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  static const _stageCount = 3;
+  static const _stageCount = 4;
 
   late final PageController _pageController;
   var _stageIndex = 0;
@@ -111,9 +111,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     }
                   },
                   children: const [
-                    _WelcomeStage(),
-                    _FlowStage(),
-                    _LocalFirstStage(),
+                    _ScanStage(),
+                    _ReviewStage(),
+                    _PortfolioStage(),
+                    _ControlStage(),
                   ],
                 ),
               ),
@@ -138,8 +139,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-class _WelcomeStage extends StatelessWidget {
-  const _WelcomeStage();
+class _ScanStage extends StatelessWidget {
+  const _ScanStage();
 
   @override
   Widget build(BuildContext context) {
@@ -149,27 +150,27 @@ class _WelcomeStage extends StatelessWidget {
         children: [
           PackLoxHero(
             variant: PackLoxHeroVariant.standard,
-            eyebrow: 'First launch',
-            title: 'Welcome to PackLox',
+            eyebrow: 'PackLox',
+            title: 'Scan any collectible',
             subtitle:
-                'Scan collectibles, estimate value, save them to your portfolio, and track what matters over time.',
+                'Use camera or gallery photos to identify cards, figures, sneakers, comics, watches, and the pieces you care about.',
             icon: Icons.document_scanner_outlined,
             semanticLabel:
-                'Welcome to PackLox. Scan collectibles, estimate value, save them, and track what matters.',
+                'PackLox scans collectibles from camera or gallery photos.',
           ),
           SizedBox(height: AppSpacing.xl),
           _OnboardingSignalCard(
-            icon: Icons.lock_outline,
-            title: 'Guest access stays open',
+            icon: Icons.photo_camera_outlined,
+            title: 'Camera and gallery ready',
             body:
-                'You can start collecting without signing in, creating an account, or waiting for cloud setup.',
+                'Take a new photo or choose one from your phone when the item is already pictured.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
-            icon: Icons.offline_bolt_outlined,
-            title: 'Local-first by default',
+            icon: Icons.filter_center_focus_outlined,
+            title: 'Multiple angles help',
             body:
-                'Your first-launch setup is stored on this device with the existing PackLox onboarding preference.',
+                'Add front, back, label, serial, or condition photos when a collectible needs more context.',
           ),
         ],
       ),
@@ -177,43 +178,75 @@ class _WelcomeStage extends StatelessWidget {
   }
 }
 
-class _FlowStage extends StatelessWidget {
-  const _FlowStage();
+class _ReviewStage extends StatelessWidget {
+  const _ReviewStage();
 
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'How PackLox works',
-      title: 'A simple collecting loop',
+      eyebrow: 'Review',
+      title: 'Check the AI result before saving',
       subtitle:
-          'Move from photo to saved item without leaving the app or crossing an account gate.',
+          'PackLox shows what it detected, how confident it is, and what details are available from analysis.',
       child: Column(
         children: [
           _OnboardingStepCard(
-            icon: Icons.photo_camera_outlined,
-            title: 'Scan',
-            body: 'Use Camera or Gallery to add a collectible photo.',
+            icon: Icons.badge_outlined,
+            title: 'Identity',
+            body:
+                'Review title, category, brand, year, set, edition, and match confidence.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
-            icon: Icons.auto_awesome_outlined,
-            title: 'Analyze',
+            icon: Icons.fact_check_outlined,
+            title: 'Condition and notes',
             body:
-                'Review an item match, estimated value, and confidence notes before you save.',
+                'Use condition, grading cues, identifiers, and AI reasoning to decide what to keep.',
           ),
           SizedBox(height: AppSpacing.md),
+          _OnboardingStepCard(
+            icon: Icons.payments_outlined,
+            title: 'Market value when available',
+            body:
+                'Estimated value appears only when PackLox has enough reliable market evidence.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioStage extends StatelessWidget {
+  const _PortfolioStage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _OnboardingStageFrame(
+      eyebrow: 'Portfolio',
+      title: 'Build a collection you can manage',
+      subtitle:
+          'Saved items become portfolio records with photos, valuation context, ownership details, and notes.',
+      child: Column(
+        children: [
           _OnboardingStepCard(
             icon: Icons.inventory_2_outlined,
-            title: 'Save',
+            title: 'Save the final result',
             body:
-                'Add the result to your local-first portfolio when you are happy with it.',
+                'Keep the item after review, then open it later with all captured details.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
             icon: Icons.query_stats_outlined,
-            title: 'Track',
+            title: 'Track value and status',
             body:
-                'Follow insights, alerts, wishlist status, and collection goals from the dashboard.',
+                'Use portfolio detail, wishlist status, alerts, and goals as your collection grows.',
+          ),
+          SizedBox(height: AppSpacing.md),
+          _OnboardingStepCard(
+            icon: Icons.dashboard_customize_outlined,
+            title: 'See the bigger picture',
+            body:
+                'The dashboard gives a quick view of collection activity and next actions.',
           ),
         ],
       ),
@@ -221,36 +254,37 @@ class _FlowStage extends StatelessWidget {
   }
 }
 
-class _LocalFirstStage extends StatelessWidget {
-  const _LocalFirstStage();
+class _ControlStage extends StatelessWidget {
+  const _ControlStage();
 
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'Local-first by default',
-      title: 'Start privately. Sync later if you want.',
+      eyebrow: 'Your choice',
+      title: 'Start local. Sync when signed in.',
       subtitle:
-          'Camera, gallery, estimates, portfolio saves, alerts, wishlist, and goals all work locally on this device.',
+          'PackLox is designed so you can try the app as a guest or back up your portfolio with an account.',
       child: Column(
         children: [
           _OnboardingSignalCard(
-            icon: Icons.cloud_done_outlined,
-            title: 'Cloud sync is optional',
+            icon: Icons.offline_bolt_outlined,
+            title: 'Guest mode stays useful',
             body:
-                'Sign in when you want backup and restore. You can start collecting right away.',
+                'You can scan and save on this device without an account gate in the way.',
+          ),
+          SizedBox(height: AppSpacing.md),
+          _OnboardingSignalCard(
+            icon: Icons.cloud_done_outlined,
+            title: 'Signed-in backup',
+            body:
+                'When you sign in, PackLox can upload pending local items and keep cloud sync ready.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
             icon: Icons.verified_user_outlined,
-            title: 'Privacy conscious',
-            body: 'Your photos and collection details stay private by default.',
-          ),
-          SizedBox(height: AppSpacing.md),
-          _OnboardingSignalCard(
-            icon: Icons.dashboard_customize_outlined,
-            title: 'Choose your landing spot',
+            title: 'Private by default',
             body:
-                'Finish onboarding by opening the scanner or exploring the dashboard.',
+                'Your collection is yours. Photos and notes stay local unless you choose cloud sync.',
           ),
         ],
       ),
