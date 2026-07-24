@@ -78,7 +78,6 @@ class CaptureWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final roleCounts = _roleCounts(captureImages);
     final requiredCompleted = plan.requiredRoles
@@ -135,7 +134,10 @@ class CaptureWorkspace extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome_outlined, color: colorScheme.primary),
+              const Icon(
+                Icons.auto_awesome_outlined,
+                color: ScannerVisualTheme.cyan,
+              ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -149,7 +151,7 @@ class CaptureWorkspace extends StatelessWidget {
               Text(
                 _photoCountLabel(captureImages.length, analyzeReady),
                 style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.primary,
+                  color: ScannerVisualTheme.cyan,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -491,7 +493,6 @@ class _ActiveCapturePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final capturedSlot = slot;
     return InkWell(
@@ -540,7 +541,7 @@ class _ActiveCapturePreview extends StatelessWidget {
                         ? Icons.photo_camera_outlined
                         : Icons.fullscreen_outlined,
                     size: 18,
-                    color: colorScheme.primary,
+                    color: ScannerVisualTheme.cyan,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
@@ -650,25 +651,27 @@ class _PhotoSetChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final accentColor = recommended
+        ? ScannerVisualTheme.blue
+        : ScannerVisualTheme.cyan;
     return ActionChip(
       label: Text(label, overflow: TextOverflow.ellipsis),
       onPressed: onTap,
       avatar: selected ? const Icon(Icons.check, size: 16) : null,
       side: BorderSide(
         color: selected || recommended
-            ? colorScheme.primary
-            : colorScheme.outlineVariant,
+            ? accentColor
+            : ScannerVisualTheme.border,
       ),
       backgroundColor: selected
-          ? colorScheme.primaryContainer.withValues(alpha: 0.62)
+          ? ScannerVisualTheme.cyan.withValues(alpha: 0.12)
           : recommended
-          ? colorScheme.primary.withValues(alpha: 0.08)
-          : colorScheme.surface,
+          ? ScannerVisualTheme.blue.withValues(alpha: 0.10)
+          : ScannerVisualTheme.surface,
       labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
         color: selected || recommended
-            ? colorScheme.primary
-            : colorScheme.onSurfaceVariant,
+            ? accentColor
+            : ScannerVisualTheme.textSecondary,
         fontWeight: FontWeight.w900,
       ),
     );
@@ -776,7 +779,6 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final active = _photos[_index];
     return Material(
@@ -839,7 +841,9 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                       child: ColoredBox(
-                        color: colorScheme.surface.withValues(alpha: 0.08),
+                        color: ScannerVisualTheme.surface.withValues(
+                          alpha: 0.34,
+                        ),
                         child: _ReviewPhotoImage(path: _photos[index].path),
                       ),
                     ),
@@ -972,7 +976,6 @@ class CaptureRoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final hasPhoto = slot != null;
     final warning = status == CaptureRoleCardStatus.warning;
@@ -981,10 +984,12 @@ class CaptureRoleCard extends StatelessWidget {
       key: ValueKey('capture-role-card-${role.id}'),
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.72),
+        color: ScannerVisualTheme.surfaceElevated.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: warning ? colorScheme.tertiary : colorScheme.outlineVariant,
+          color: warning
+              ? ScannerVisualTheme.purple.withValues(alpha: 0.76)
+              : ScannerVisualTheme.border.withValues(alpha: 0.78),
         ),
       ),
       child: Row(
@@ -998,8 +1003,8 @@ class CaptureRoleCard extends StatelessWidget {
                 child: hasPhoto
                     ? ScanThumbnail(imagePath: slot!.path)
                     : ColoredBox(
-                        color: colorScheme.primary.withValues(alpha: 0.10),
-                        child: Icon(role.icon, color: colorScheme.primary),
+                        color: ScannerVisualTheme.blue.withValues(alpha: 0.12),
+                        child: Icon(role.icon, color: ScannerVisualTheme.cyan),
                       ),
               ),
             ),
@@ -1035,7 +1040,7 @@ class CaptureRoleCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.bodySmall?.copyWith(
                     color: warning
-                        ? colorScheme.tertiary
+                        ? ScannerVisualTheme.purple
                         : ScannerVisualTheme.textSecondary,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1061,6 +1066,7 @@ class CaptureRoleCard extends StatelessWidget {
                 ? 'Retake ${role.title}'
                 : 'Capture ${role.title}',
             onPressed: isBusy ? null : onCapture,
+            style: _scannerWorkspaceIconButtonStyle(),
             constraints: const BoxConstraints.tightFor(width: 28, height: 28),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
@@ -1072,6 +1078,7 @@ class CaptureRoleCard extends StatelessWidget {
           IconButton(
             tooltip: 'Choose ${role.title} from gallery',
             onPressed: isBusy ? null : onGallery,
+            style: _scannerWorkspaceIconButtonStyle(),
             constraints: const BoxConstraints.tightFor(width: 28, height: 28),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
@@ -1081,6 +1088,9 @@ class CaptureRoleCard extends StatelessWidget {
             IconButton(
               tooltip: 'Delete ${role.title}',
               onPressed: isBusy ? null : onDelete,
+              style: _scannerWorkspaceIconButtonStyle(
+                foregroundColor: ScannerVisualTheme.danger,
+              ),
               constraints: const BoxConstraints.tightFor(width: 28, height: 28),
               padding: EdgeInsets.zero,
               visualDensity: VisualDensity.compact,
@@ -1099,11 +1109,10 @@ class _EmptyActivePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
+        color: ScannerVisualTheme.blue.withValues(alpha: 0.10),
       ),
       child: Center(
         child: Column(
@@ -1111,7 +1120,7 @@ class _EmptyActivePreview extends StatelessWidget {
           children: [
             Icon(
               Icons.photo_camera_outlined,
-              color: colorScheme.primary,
+              color: ScannerVisualTheme.cyan,
               size: 42,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -1144,7 +1153,6 @@ class _WorkspaceReadinessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final title = hasAnalysisFailure
         ? 'Analysis needs another try'
@@ -1165,7 +1173,7 @@ class _WorkspaceReadinessCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: hasAnalysisFailure
-              ? colorScheme.error.withValues(alpha: 0.55)
+              ? ScannerVisualTheme.danger.withValues(alpha: 0.55)
               : ScannerVisualTheme.border.withValues(alpha: 0.86),
         ),
       ),
@@ -1179,7 +1187,7 @@ class _WorkspaceReadinessCard extends StatelessWidget {
                   '$imageCount photo${imageCount == 1 ? '' : 's'} ready',
                   style: textTheme.labelLarge?.copyWith(
                     color: hasAnalysisFailure
-                        ? colorScheme.error
+                        ? ScannerVisualTheme.danger
                         : ScannerVisualTheme.cyan,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1305,17 +1313,16 @@ class _WorkspaceRoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final borderColor = captured
         ? ScannerVisualTheme.cyan.withValues(alpha: 0.7)
         : recommended
-        ? colorScheme.primary.withValues(alpha: 0.72)
+        ? ScannerVisualTheme.blue.withValues(alpha: 0.72)
         : ScannerVisualTheme.border.withValues(alpha: 0.78);
     final iconColor = captured
         ? ScannerVisualTheme.success
         : recommended
-        ? colorScheme.primary
+        ? ScannerVisualTheme.cyan
         : ScannerVisualTheme.textSecondary;
     final description = captured
         ? 'Captured${capturedCount > 1 ? ' · $capturedCount photos' : ''}'
@@ -1393,6 +1400,7 @@ class _WorkspaceRoleCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Choose ${_shortRoleLabel(role)} from gallery',
                 onPressed: isBusy ? null : onGallery,
+                style: _scannerWorkspaceIconButtonStyle(),
                 constraints: const BoxConstraints.tightFor(
                   width: 34,
                   height: 34,
@@ -1488,11 +1496,10 @@ class ScanThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     if (imagePath.startsWith('sample://')) {
       return ColoredBox(
-        color: colorScheme.primaryContainer,
-        child: Icon(Icons.style_outlined, color: colorScheme.primary),
+        color: ScannerVisualTheme.surfaceElevated,
+        child: const Icon(Icons.style_outlined, color: ScannerVisualTheme.cyan),
       );
     }
     if (imagePath.startsWith('assets/')) {
@@ -1505,8 +1512,11 @@ class ScanThumbnail extends StatelessWidget {
       File(imagePath),
       fit: BoxFit.cover,
       errorBuilder: (_, _, _) => ColoredBox(
-        color: colorScheme.surfaceContainerHighest,
-        child: Icon(Icons.broken_image_outlined, color: colorScheme.primary),
+        color: ScannerVisualTheme.surfaceElevated,
+        child: const Icon(
+          Icons.broken_image_outlined,
+          color: ScannerVisualTheme.cyan,
+        ),
       ),
     );
   }
@@ -1614,11 +1624,14 @@ class _SelectedImageSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
-        Icon(Icons.check_circle_outline, size: 18, color: colorScheme.primary),
+        const Icon(
+          Icons.check_circle_outline,
+          size: 18,
+          color: ScannerVisualTheme.success,
+        ),
         const SizedBox(width: AppSpacing.xs),
         Expanded(
           child: Text(
@@ -1668,7 +1681,6 @@ class _FilmstripPhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final warning = _hasWarning(slot.qualityMetadata);
     final status = slot.isEnhanced
@@ -1695,10 +1707,10 @@ class _FilmstripPhotoTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: selected
-                    ? colorScheme.primary
+                    ? ScannerVisualTheme.cyan
                     : warning
-                    ? colorScheme.tertiary
-                    : colorScheme.outlineVariant,
+                    ? ScannerVisualTheme.purple
+                    : ScannerVisualTheme.border,
                 width: selected ? 2 : 1,
               ),
               boxShadow: selected ? AppElevation.level1 : null,
@@ -1751,7 +1763,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: textTheme.labelSmall?.copyWith(
                             color: warning
-                                ? colorScheme.tertiary
+                                ? ScannerVisualTheme.purple
                                 : ScannerVisualTheme.cyan,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1763,6 +1775,7 @@ class _FilmstripPhotoTile extends StatelessWidget {
                           padding: EdgeInsets.zero,
                           tooltip: 'Add another ${role.title}',
                           onPressed: onRetake,
+                          style: _scannerWorkspaceIconButtonStyle(),
                           icon: const Icon(
                             Icons.add_a_photo_outlined,
                             size: 15,
@@ -1775,6 +1788,9 @@ class _FilmstripPhotoTile extends StatelessWidget {
                           padding: EdgeInsets.zero,
                           tooltip: 'Delete photo',
                           onPressed: onDelete,
+                          style: _scannerWorkspaceIconButtonStyle(
+                            foregroundColor: ScannerVisualTheme.danger,
+                          ),
                           icon: const Icon(Icons.close, size: 15),
                         ),
                       ),
@@ -1807,7 +1823,6 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return SizedBox(
       key: ValueKey('filmstrip-${role.id}'),
@@ -1821,8 +1836,8 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: selected || recommended
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
+                  ? ScannerVisualTheme.cyan
+                  : ScannerVisualTheme.border,
               width: selected || recommended ? 2 : 1,
             ),
           ),
@@ -1835,7 +1850,7 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
                   child: Center(
                     child: Icon(
                       role.icon,
-                      color: colorScheme.primary,
+                      color: ScannerVisualTheme.cyan,
                       size: AppIconSizes.lg,
                     ),
                   ),
@@ -1871,6 +1886,7 @@ class _FilmstripEmptyRoleTile extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         tooltip: 'Capture ${role.title}',
                         onPressed: onCapture,
+                        style: _scannerWorkspaceIconButtonStyle(),
                         icon: const Icon(Icons.photo_camera_outlined, size: 16),
                       ),
                     ),
@@ -1966,11 +1982,20 @@ class _GoalHint extends StatelessWidget {
       child: Text(
         'Listing asset generation is coming soon.',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          color: ScannerVisualTheme.textSecondary,
         ),
       ),
     );
   }
+}
+
+ButtonStyle _scannerWorkspaceIconButtonStyle({Color? foregroundColor}) {
+  return IconButton.styleFrom(
+    foregroundColor: foregroundColor ?? ScannerVisualTheme.cyan,
+    disabledForegroundColor: ScannerVisualTheme.textMuted.withValues(
+      alpha: 0.42,
+    ),
+  );
 }
 
 String _statusLabel(CaptureRoleCardStatus status) {

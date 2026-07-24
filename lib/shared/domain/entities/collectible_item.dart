@@ -42,6 +42,8 @@ class CollectibleImage {
     this.enhancementPreset,
     this.qualityMetadata = const {},
     this.isPrimary = false,
+    this.imageStoragePath,
+    this.cloudImageUrl,
   });
 
   final String path;
@@ -51,6 +53,8 @@ class CollectibleImage {
   final String? enhancementPreset;
   final Map<String, Object?> qualityMetadata;
   final bool isPrimary;
+  final String? imageStoragePath;
+  final String? cloudImageUrl;
 
   factory CollectibleImage.fromJson(Map<String, dynamic> json) {
     return CollectibleImage(
@@ -61,6 +65,8 @@ class CollectibleImage {
       enhancementPreset: _optionalString(json['enhancementPreset']),
       qualityMetadata: _mapFromJson(json['qualityMetadata']),
       isPrimary: json['isPrimary'] as bool? ?? false,
+      imageStoragePath: _optionalString(json['imageStoragePath']),
+      cloudImageUrl: _optionalString(json['cloudImageUrl']),
     );
   }
 
@@ -73,7 +79,26 @@ class CollectibleImage {
       'enhancementPreset': enhancementPreset,
       'qualityMetadata': qualityMetadata,
       'isPrimary': isPrimary,
+      'imageStoragePath': imageStoragePath,
+      'cloudImageUrl': cloudImageUrl,
     };
+  }
+
+  CollectibleImage copyWithCloudImage({
+    String? imageStoragePath,
+    String? cloudImageUrl,
+  }) {
+    return CollectibleImage(
+      path: path,
+      role: role,
+      source: source,
+      originalPath: originalPath,
+      enhancementPreset: enhancementPreset,
+      qualityMetadata: qualityMetadata,
+      isPrimary: isPrimary,
+      imageStoragePath: imageStoragePath ?? this.imageStoragePath,
+      cloudImageUrl: cloudImageUrl ?? this.cloudImageUrl,
+    );
   }
 }
 
@@ -427,6 +452,7 @@ class CollectibleItem {
     CloudItemSyncStatus? syncStatus,
     String? imageStoragePath,
     String? cloudImageUrl,
+    List<CollectibleImage>? galleryImages,
     DateTime? lastSyncedAt,
     String? syncError,
     bool clearSyncError = false,
@@ -440,7 +466,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
-      galleryImages: galleryImages,
+      galleryImages: galleryImages ?? this.galleryImages,
       imageStoragePath: imageStoragePath ?? this.imageStoragePath,
       cloudImageUrl: cloudImageUrl ?? this.cloudImageUrl,
       syncStatus: syncStatus ?? this.syncStatus,

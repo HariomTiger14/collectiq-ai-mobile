@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/config/app_environment.dart';
+import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
@@ -30,6 +32,8 @@ enum AnalyzerProviderType {
       'future_openai' => AnalyzerProviderType.futureOpenAI,
       'gemini' ||
       'gemini_vision' ||
+      'auto' ||
+      'gemini_openai' ||
       'future_gemini' => AnalyzerProviderType.futureGemini,
       _ => AnalyzerProviderType.mock,
     };
@@ -77,7 +81,7 @@ class AnalyzerConfig {
   factory AnalyzerConfig.fromEnvironment() {
     const configuredProvider = String.fromEnvironment(
       'AI_ANALYSIS_PROVIDER',
-      defaultValue: 'mock',
+      defaultValue: '',
     );
     const timeoutSeconds = int.fromEnvironment(
       'ANALYZER_TIMEOUT_SECONDS',
@@ -88,8 +92,12 @@ class AnalyzerConfig {
       defaultValue: 2,
     );
 
+    final providerType = configuredProvider.trim().isEmpty
+        ? _defaultAnalyzerProviderFor(EnvironmentConfig.fromEnvironment().environment)
+        : AnalyzerProviderType.fromConfig(configuredProvider);
+
     return AnalyzerConfig(
-      providerType: AnalyzerProviderType.fromConfig(configuredProvider),
+      providerType: providerType,
       timeout: Duration(seconds: timeoutSeconds < 1 ? 30 : timeoutSeconds),
       retryPolicy: AnalyzerRetryPolicy(
         maxAttempts: maxAttempts < 1 ? 1 : maxAttempts,
@@ -100,6 +108,14 @@ class AnalyzerConfig {
   final AnalyzerProviderType providerType;
   final Duration timeout;
   final AnalyzerRetryPolicy retryPolicy;
+}
+
+AnalyzerProviderType _defaultAnalyzerProviderFor(AppEnvironment environment) {
+  if (environment == AppEnvironment.local) {
+    return AnalyzerProviderType.mock;
+  }
+
+  return AnalyzerProviderType.futureGemini;
 }
 
 /// Retry policy applied by AnalyzerService.

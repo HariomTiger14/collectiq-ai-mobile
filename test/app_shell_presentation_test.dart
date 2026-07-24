@@ -14,6 +14,9 @@ import 'package:collectiq_ai/features/auth/presentation/controllers/auth_control
 import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -182,6 +185,22 @@ void main() {
     );
   });
 
+  testWidgets('analysis result hides shell bottom navigation', (tester) async {
+    await tester.pumpShell(
+      scannerController: _ShellResultScannerController.new,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('nav-scan')));
+    await tester.pumpTabSwitch();
+
+    expect(find.text('Analysis Complete'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+  });
+
   testWidgets('selected semantics are announced by shell navigation', (
     tester,
   ) async {
@@ -341,6 +360,7 @@ extension _ShellPump on WidgetTester {
   Future<void> pumpShell({
     ThemeMode themeMode = ThemeMode.light,
     EnvironmentConfig? environmentConfig,
+    ScannerController Function()? scannerController,
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewPadding = EdgeInsets.zero,
@@ -350,6 +370,8 @@ extension _ShellPump on WidgetTester {
         overrides: [
           if (environmentConfig != null)
             environmentConfigProvider.overrideWithValue(environmentConfig),
+          if (scannerController != null)
+            scannerControllerProvider.overrideWith(scannerController),
           onboardingRepositoryProvider.overrideWithValue(
             const _ImmediateOnboardingRepository(completed: true),
           ),
@@ -526,6 +548,46 @@ class _ImmediateGuestModeRepository implements GuestModeRepository {
 
   @override
   Future<void> setGuestModeChosen(bool chosen) async {}
+}
+
+class _ShellResultScannerController extends ScannerController {
+  @override
+  ScannerState build() {
+    final now = DateTime(2026, 7, 24);
+    return ScannerState(
+      selectedImagePath: 'sample://shell-result',
+      scanResult: ScanResult(
+        id: 'shell-result',
+        title: 'Shell Test Collectible',
+        category: 'Trading Card',
+        estimatedValue: 120,
+        confidence: 0.86,
+        condition: 'Good',
+        thumbnail: 'sample://shell-result',
+        scanDate: now,
+        primaryMatch: 'Shell Test Collectible',
+        alternativeMatches: const [],
+        confidenceExplanation: 'Shell test confidence.',
+        detectionQuality: 'Good',
+        aiReasoning: 'Shell test reasoning.',
+        pricing: PricingInfo(
+          estimatedMarketValue: 120,
+          lowEstimate: 100,
+          highEstimate: 140,
+          currency: 'AUD',
+          pricingSource: 'Shell test',
+          pricingConfidence: 0.8,
+          lastUpdated: now,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<void> recoverLostPickerData({String reason = 'startup'}) async {}
+
+  @override
+  void resetAfterSaved() {}
 }
 
 class _ShellAuthRepository implements AuthRepository {

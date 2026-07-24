@@ -129,62 +129,104 @@ class AiBackendAnalysisResponse {
   final Map<String, dynamic> rawProviderPayload;
 
   factory AiBackendAnalysisResponse.fromJson(Map<String, dynamic> json) {
-    final valueRange = parseJsonMap(json['valueRange']);
-    final marketSummaryJson = parseJsonMap(json['marketSummary']);
+    final aiDetected = parseJsonMap(json['aiDetected']);
+    final marketSource = parseJsonMap(json['marketSource']);
+    final valueRange = parseJsonMap(
+      json['valueRange'] ?? marketSource['valueRange'],
+    );
+    final marketSummaryJson = parseJsonMap(
+      json['marketSummary'] ?? marketSource['marketSummary'],
+    );
     final comparableSales = _parseComparableSales(
-      json['comparableSales'] ?? json['comps'] ?? marketSummaryJson['comps'],
+      json['comparableSales'] ??
+          json['comps'] ??
+          marketSource['comparableSales'] ??
+          marketSource['comps'] ??
+          marketSummaryJson['comps'],
     );
 
     final estimatedValue =
         parseNullableDouble(
           json['estimatedValue'] ??
+              marketSource['estimatedValue'] ??
               json['estimatedMarketValue'] ??
+              marketSource['estimatedMarketValue'] ??
               json['marketValue'],
         ) ??
         parseNullableDouble(valueRange['estimated']) ??
         parseNullableDouble(valueRange['mid']) ??
         0;
     final lowEstimate =
-        parseNullableDouble(json['lowEstimate'] ?? valueRange['low']) ??
+        parseNullableDouble(
+          json['lowEstimate'] ??
+              marketSource['lowEstimate'] ??
+              valueRange['low'],
+        ) ??
         estimatedValue;
     final highEstimate =
-        parseNullableDouble(json['highEstimate'] ?? valueRange['high']) ??
+        parseNullableDouble(
+          json['highEstimate'] ??
+              marketSource['highEstimate'] ??
+              valueRange['high'],
+        ) ??
         estimatedValue;
 
     return AiBackendAnalysisResponse(
       id: _optionalString(json['id']),
       itemName: parseString(
-        json['itemName'] ?? json['title'] ?? json['name'],
+        json['itemName'] ??
+            aiDetected['title'] ??
+            aiDetected['itemName'] ??
+            json['title'] ??
+            json['name'],
         fallback: 'Unknown collectible',
       ),
       category: parseString(
-        json['category'] ?? json['type'],
+        json['category'] ?? aiDetected['category'] ?? json['type'],
         fallback: 'Collectible',
       ),
       estimatedValue: estimatedValue,
       lowEstimate: lowEstimate,
       highEstimate: highEstimate,
-      confidence: _normalizeConfidence(json['confidence']),
-      condition: parseString(json['condition'], fallback: 'Unknown'),
+      confidence: _normalizeConfidence(
+        json['confidence'] ?? aiDetected['confidence'],
+      ),
+      condition: parseString(
+        json['condition'] ?? aiDetected['condition'],
+        fallback: 'Unknown',
+      ),
       marketTrend: parseString(
-        json['marketTrend'] ?? json['trendLabel'],
+        json['marketTrend'] ??
+            marketSource['trend'] ??
+            marketSource['trendLabel'] ??
+            json['trendLabel'],
         fallback: 'Stable',
       ),
       keyAttributes: _parseStringMap(
-        json['keyAttributes'] ?? json['attributes'],
+        json['keyAttributes'] ?? json['attributes'] ?? aiDetected,
       ),
       aiReview: AiBackendReview.fromJson(
         parseJsonMap(json['aiReview'] ?? json['review']),
         fallbackPrimaryMatch: parseString(
-          json['primaryMatch'] ?? json['itemName'] ?? json['title'],
+          json['primaryMatch'] ??
+              aiDetected['primaryMatch'] ??
+              aiDetected['title'] ??
+              json['itemName'] ??
+              json['title'],
           fallback: 'Unknown collectible',
         ),
         fallbackReasoning: parseString(
-          json['aiReasoning'] ?? json['description'],
+          json['aiReasoning'] ??
+              aiDetected['aiReasoning'] ??
+              json['description'],
         ),
       ),
       alternatives:
-          _parseList(json['alternatives'] ?? json['alternativeMatches'])
+          _parseList(
+                json['alternatives'] ??
+                    json['alternativeMatches'] ??
+                    aiDetected['alternativeMatches'],
+              )
               .whereType<Map>()
               .map((match) => AiBackendAlternativeMatch.fromJson(match))
               .toList(growable: false),
@@ -202,20 +244,36 @@ class AiBackendAnalysisResponse {
       comparableSales: comparableSales,
       imageUrl: _optionalString(json['imageUrl'] ?? json['image_url']),
       timestamp: parseNullableDateTime(json['timestamp']),
-      faceValue: parseNullableDouble(json['faceValue']),
-      estimatedMarketValue: parseNullableDouble(json['estimatedMarketValue']),
-      aiEstimatedValue: parseNullableDouble(json['aiEstimatedValue']),
-      valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
+      faceValue: parseNullableDouble(
+        json['faceValue'] ?? aiDetected['faceValue'],
+      ),
+      estimatedMarketValue: parseNullableDouble(
+        json['estimatedMarketValue'] ?? marketSource['estimatedValue'],
+      ),
+      aiEstimatedValue: parseNullableDouble(
+        json['aiEstimatedValue'] ?? aiDetected['estimatedValue'],
+      ),
+      valuationStatus: ValuationStatus.fromJson(
+        json['valuationStatus'] ??
+            marketSource['valuationStatus'] ??
+            (marketSource.isEmpty ? null : 'market_estimated'),
+      ),
       valuationSource: parseString(
-        json['valuationSource'],
+        json['valuationSource'] ??
+            marketSource['valuationSource'] ??
+            marketSource['pricingSource'],
         fallback: 'unknown',
       ),
-      askingPriceWarning: _optionalString(json['askingPriceWarning']),
+      askingPriceWarning: _optionalString(
+        json['askingPriceWarning'] ?? marketSource['askingPriceWarning'],
+      ),
       valuationConfidence: _normalizeNullableConfidence(
-        json['valuationConfidence'],
+        json['valuationConfidence'] ?? marketSource['pricingConfidence'],
       ),
       rawProviderPayload: {
         ...parseJsonMap(json['rawProviderPayload']),
+        if (aiDetected.isNotEmpty) 'aiDetected': aiDetected,
+        if (marketSource.isNotEmpty) 'marketSource': marketSource,
         if (_optionalString(json['selectedProvider']) != null)
           'selectedProvider': _optionalString(json['selectedProvider']),
         if (_optionalString(json['requestedProvider']) != null)
@@ -224,6 +282,10 @@ class AiBackendAnalysisResponse {
           'provider': _optionalString(json['provider']),
         if (_optionalString(json['model']) != null)
           'model': _optionalString(json['model']),
+        if (_optionalString(json['backendResponseSource']) != null)
+          'backendResponseSource': _optionalString(
+            json['backendResponseSource'],
+          ),
       },
     );
   }
@@ -231,18 +293,24 @@ class AiBackendAnalysisResponse {
   ScanResult toScanResult({required String thumbnail, DateTime? scanDate}) {
     final resultDate = scanDate ?? timestamp ?? DateTime.now();
     final resolvedMarketSummary = marketSummary ?? _fallbackMarketSummary();
+    final marketSource = parseJsonMap(rawProviderPayload['marketSource']);
+    final resolvedEstimatedMarketValue =
+        estimatedMarketValue ??
+        parseNullableDouble(marketSource['estimatedValue']) ??
+        estimatedValue;
     final pricingSource = valuationSource == 'unknown'
         ? resolvedMarketSummary == null || resolvedMarketSummary.sources.isEmpty
               ? 'Backend AI'
               : resolvedMarketSummary.sources.first
         : valuationSource;
     final pricing = PricingInfo(
-      estimatedMarketValue: estimatedMarketValue ?? 0,
+      estimatedMarketValue: resolvedEstimatedMarketValue,
       lowEstimate: lowEstimate,
       highEstimate: highEstimate,
-      currency: 'AUD',
+      currency: parseString(marketSource['currency'], fallback: 'AUD'),
       pricingSource: pricingSource,
-      pricingConfidence: confidence,
+      pricingConfidence:
+          valuationConfidence ?? resolvedMarketSummary?.confidence ?? 0,
       lastUpdated: resolvedMarketSummary?.lastUpdated,
       valuationStatus: valuationStatus,
       valuationSource: valuationSource,
@@ -288,7 +356,7 @@ class AiBackendAnalysisResponse {
       material: _attribute('material'),
       notes: _attribute('notes'),
       faceValue: faceValue,
-      estimatedMarketValue: estimatedMarketValue,
+      estimatedMarketValue: resolvedEstimatedMarketValue,
       askingPriceWarning: askingPriceWarning,
       valuationConfidence: valuationConfidence,
       valuationStatus: valuationStatus,
@@ -303,17 +371,25 @@ class AiBackendAnalysisResponse {
     if (comparableSales.isEmpty && estimatedValue == 0) {
       return null;
     }
+    final marketSource = parseJsonMap(rawProviderPayload['marketSource']);
+    final sources = _parseStringList(marketSource['sources']);
+    final sourceLabel = parseString(
+      marketSource['pricingSource'],
+      fallback: 'Backend AI',
+    );
 
     return MarketSummary(
       averagePrice: estimatedValue,
       medianPrice: estimatedValue,
       lowPrice: lowEstimate,
       highPrice: highEstimate,
-      salesCount: comparableSales.length,
+      salesCount:
+          parseNullableDouble(marketSource['salesCount'])?.toInt() ??
+          comparableSales.length,
       trendLabel: marketTrend,
-      confidence: confidence,
+      confidence: valuationConfidence ?? confidence,
       lastUpdated: timestamp ?? DateTime.now(),
-      sources: const ['Backend AI'],
+      sources: sources.isEmpty ? [sourceLabel] : sources,
       comps: comparableSales,
     );
   }
@@ -461,6 +537,13 @@ List<MarketComp> _parseComparableSales(Object? value) {
 
 List<dynamic> _parseList(Object? value) {
   return value is List<dynamic> ? value : const [];
+}
+
+List<String> _parseStringList(Object? value) {
+  return [
+    for (final item in _parseList(value))
+      if (item is String && item.trim().isNotEmpty) item.trim(),
+  ];
 }
 
 double _normalizeConfidence(Object? value) {

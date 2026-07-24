@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
@@ -1207,7 +1208,11 @@ class AiResultCard extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height:
+                  AppSpacing.md +
+                  GlassBottomNavBar.scrollContentClearance(context),
+            ),
             _ResultExpansionSection(
               title: 'Valuation evidence',
               icon: Icons.verified_outlined,

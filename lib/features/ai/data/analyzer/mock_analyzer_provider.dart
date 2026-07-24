@@ -76,13 +76,22 @@ class MockAnalyzerProvider implements AnalyzerProvider {
           scanResult: response.toScanResult(thumbnail: request.imagePath),
           recommendation: response.recommendation,
         ),
-        rawProviderPayload: {
-          'provider': id,
-          'analysisPath': 'remote_backend_contract',
-          'contract': 'POST /analyze',
-          ...response.rawProviderPayload,
-        },
-      );
+      rawProviderPayload: {
+        'provider': id,
+        'analysisPath': 'remote_backend_contract',
+        'contract': 'POST /analyze',
+        if (response.rawProviderPayload['selectedProvider'] != null)
+          'selectedProvider': response.rawProviderPayload['selectedProvider'],
+        if (response.rawProviderPayload['requestedProvider'] != null)
+          'requestedProvider': response.rawProviderPayload['requestedProvider'],
+        'backendResponseSource':
+            response.rawProviderPayload['backendResponseSource'] ??
+            response.rawProviderPayload['selectedProvider'] ??
+            response.rawProviderPayload['provider'] ??
+            'backend',
+        ...response.rawProviderPayload,
+      },
+    );
     }
 
     final fallbackReason =

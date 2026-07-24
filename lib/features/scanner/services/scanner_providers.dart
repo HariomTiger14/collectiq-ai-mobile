@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
+import 'package:collectiq_ai/features/ai/domain/providers/ai_analysis_provider.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_provider_factory.dart';
 import 'package:collectiq_ai/features/market/data/providers/market_pricing_provider_factory.dart';
 import 'package:collectiq_ai/features/market/domain/repositories/market_provider.dart';
@@ -11,6 +12,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_draft_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provides the scanner camera service.
@@ -23,6 +25,10 @@ final cameraServiceProvider = Provider<CameraService>((ref) {
 /// Provides the scanner gallery service.
 final galleryServiceProvider = Provider<GalleryService>((ref) {
   return GalleryService();
+});
+
+final scannerDraftRepositoryProvider = Provider<ScannerDraftRepository>((ref) {
+  return const ScannerDraftRepository();
 });
 
 final scanCapturePlanServiceProvider = Provider<ScanCapturePlanService>((ref) {
@@ -58,12 +64,18 @@ final marketProviderProvider = Provider<MarketProvider>((ref) {
 final marketPricingProviderTypeProvider = Provider<MarketPricingProviderType>((
   ref,
 ) {
-  return MarketPricingProviderType.mock;
+  final aiConfig = AiAnalysisProviderConfig.fromEnvironment();
+  if (aiConfig.type.isLocalOnly) {
+    return MarketPricingProviderType.mock;
+  }
+
+  return MarketPricingProviderType.customBackend;
 });
 
 /// Provides the future market-pricing provider.
 ///
-/// This is not wired into scan analysis yet; mock analysis remains unchanged.
+/// Real scan builds rely on the backend analysis contract for market data. The
+/// separate mock pricing provider is kept only for local/QA analysis.
 final marketPricingProviderProvider = Provider<MarketPricingProvider>((ref) {
   return const MarketPricingProviderFactory().create(
     provider: ref.watch(marketPricingProviderTypeProvider),

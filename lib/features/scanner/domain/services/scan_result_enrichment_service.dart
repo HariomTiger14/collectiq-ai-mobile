@@ -65,6 +65,7 @@ class ScanResultEnrichmentService {
         recommendation: analysis.recommendation,
         scanResult: _copyResult(
           result,
+          estimatedValue: pricing.estimatedValue,
           pricing: _mergePricing(
             existing: result.pricing,
             enriched: pricing.toPricingInfo(),
@@ -106,15 +107,15 @@ class ScanResultEnrichmentService {
     required PricingInfo enriched,
   }) {
     return PricingInfo(
-      estimatedMarketValue: existing.estimatedMarketValue,
-      lowEstimate: existing.lowEstimate,
-      highEstimate: existing.highEstimate,
-      currency: existing.currency,
+      estimatedMarketValue: enriched.estimatedMarketValue,
+      lowEstimate: enriched.lowEstimate,
+      highEstimate: enriched.highEstimate,
+      currency: enriched.currency,
       pricingSource: enriched.pricingSource,
       pricingConfidence: enriched.pricingConfidence,
       lastUpdated: enriched.lastUpdated,
-      valuationStatus: existing.valuationStatus,
-      valuationSource: existing.valuationSource,
+      valuationStatus: enriched.valuationStatus,
+      valuationSource: enriched.valuationSource,
       aiEstimatedValue: existing.aiEstimatedValue,
     );
   }
@@ -164,6 +165,7 @@ class ScanResultEnrichmentService {
       aiEstimatedValue: result.aiEstimatedValue,
       photosUsed: result.photosUsed,
       photoRoles: result.photoRoles,
+      galleryImages: result.galleryImages,
     );
   }
 }

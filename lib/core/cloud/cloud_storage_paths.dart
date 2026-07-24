@@ -10,6 +10,19 @@ class CloudStoragePaths {
         '${safePathSegment(itemId)}${normalizedImageExtension(extension)}';
   }
 
+  static String portfolioImageVariant({
+    required String userId,
+    required String itemId,
+    required String role,
+    required int index,
+    String extension = '.jpg',
+  }) {
+    return 'users/${safePathSegment(userId)}/portfolio_images/'
+        '${safePathSegment(itemId)}/'
+        '${index.toString().padLeft(2, '0')}-${safePathSegment(role)}'
+        '${normalizedImageExtension(extension)}';
+  }
+
   static String safePathSegment(String value) {
     return value
         .trim()

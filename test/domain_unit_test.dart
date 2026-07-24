@@ -526,6 +526,14 @@ void main() {
       expect(enriched.recommendation, 'Provider recommendation.');
       expect(enriched.scanResult.title, analysis.scanResult.title);
       expect(
+        enriched.scanResult.estimatedValue,
+        enriched.scanResult.marketSummary?.averagePrice,
+      );
+      expect(
+        enriched.scanResult.pricing.estimatedMarketValue,
+        enriched.scanResult.marketSummary?.averagePrice,
+      );
+      expect(
         enriched.scanResult.pricing.pricingSource,
         contains('Mock pricing blend'),
       );
@@ -1200,6 +1208,70 @@ void main() {
       expect(result.cardNumber, '4/102');
       expect(result.playerOrCharacter, 'Charizard');
       expect(result.rarity, 'Holo Rare');
+    });
+
+    test('mapper supports separated AI detected and market source blocks', () {
+      final response = AiBackendAnalysisResponse.fromJson({
+        'id': 'gemini-card-1',
+        'aiDetected': {
+          'title': '1999 Pokemon Base Set Charizard Holo',
+          'category': 'Trading Card',
+          'condition': 'Very Good',
+          'confidence': 87,
+          'brand': 'Pokemon',
+          'year': '1999',
+          'setName': 'Base Set',
+          'cardNumber': '4/102',
+          'playerOrCharacter': 'Charizard',
+          'rarity': 'Holo Rare',
+          'aiReasoning': 'Detected from artwork and card layout.',
+          'alternativeMatches': [
+            {
+              'title': 'Charizard Base Set 2 Holo',
+              'category': 'Trading Card',
+              'confidence': 62,
+              'reason': 'Similar artwork.',
+            },
+          ],
+        },
+        'marketSource': {
+          'estimatedValue': 420,
+          'lowEstimate': 320,
+          'highEstimate': 560,
+          'currency': 'AUD',
+          'pricingSource': 'eBay Sold + TCGplayer',
+          'pricingConfidence': 78,
+          'trend': 'Stable',
+          'salesCount': 5,
+          'sources': ['eBay Sold', 'TCGplayer'],
+        },
+        'recommendation': 'Save with condition notes.',
+      });
+      final result = response.toScanResult(thumbnail: 'sample://sports-card');
+
+      expect(result.title, '1999 Pokemon Base Set Charizard Holo');
+      expect(result.category, 'Trading Card');
+      expect(result.condition, 'Very Good');
+      expect(result.confidence, 0.87);
+      expect(result.brand, 'Pokemon');
+      expect(result.year, '1999');
+      expect(result.setName, 'Base Set');
+      expect(result.cardNumber, '4/102');
+      expect(result.rarity, 'Holo Rare');
+      expect(result.aiReasoning, 'Detected from artwork and card layout.');
+      expect(
+        result.alternativeMatches.single.title,
+        'Charizard Base Set 2 Holo',
+      );
+      expect(result.estimatedValue, 420);
+      expect(result.estimatedMarketValue, 420);
+      expect(result.pricing.estimatedMarketValue, 420);
+      expect(result.pricing.lowEstimate, 320);
+      expect(result.pricing.highEstimate, 560);
+      expect(result.pricing.pricingSource, 'eBay Sold + TCGplayer');
+      expect(result.pricing.pricingConfidence, 0.78);
+      expect(result.pricing.valuationStatus, ValuationStatus.marketEstimated);
+      expect(result.marketSummary?.sources, ['eBay Sold', 'TCGplayer']);
     });
 
     test('malformed response uses safe defaults', () {
@@ -2000,10 +2072,10 @@ void main() {
       expect(config.type.displayName, 'OpenAI Vision');
       expect(config.type.configValue, 'openai_vision');
       expect(config.hasBackendAnalysisEndpoint, isTrue);
-      expect(config.isSelectedProviderAvailable, isFalse);
-      expect(config.selectedProviderMessage, contains('backend endpoint'));
+      expect(config.isSelectedProviderAvailable, isTrue);
+      expect(config.selectedProviderMessage, contains('PackLox backend'));
       expect(AiAnalysisProviderType.mock.isAvailable, isTrue);
-      expect(AiAnalysisProviderType.geminiVision.statusLabel, 'Coming soon');
+      expect(AiAnalysisProviderType.geminiVision.statusLabel, 'Active');
     });
 
     test('mock provider config requires no backend endpoint or API key', () {
@@ -4351,7 +4423,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'bad-password',
+            password: 'WrongPassword123!',
           );
 
       final state = container.read(authControllerProvider);

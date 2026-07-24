@@ -37,6 +37,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_draft_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -266,6 +267,7 @@ class ScannerController extends Notifier<ScannerState> {
   late final ImageQualityAssessmentService _qualityAssessmentService;
   late final ScanCapturePlanService _capturePlanService;
   late final ScanQualityGateService _qualityGateService;
+  late final ScannerDraftRepository _draftRepository;
   late final AppTelemetryService _telemetry;
   bool _isDisposed = false;
   bool _isPickerActive = false;
@@ -288,11 +290,13 @@ class ScannerController extends Notifier<ScannerState> {
     );
     _capturePlanService = ref.watch(scanCapturePlanServiceProvider);
     _qualityGateService = ref.watch(scanQualityGateServiceProvider);
+    _draftRepository = ref.watch(scannerDraftRepositoryProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     ref.onDispose(() {
       _isDisposed = true;
     });
     logCollectIqScanFlow('scanner controller build');
+    Future.microtask(_restorePendingDraft);
     return const ScannerState();
   }
 
@@ -334,6 +338,78 @@ class ScannerController extends Notifier<ScannerState> {
       stackTrace: stackTrace,
       details: details,
     );
+  }
+
+  Future<void> _restorePendingDraft() async {
+    if (_isDisposed || state.captureImages.isNotEmpty) {
+      return;
+    }
+
+    try {
+      final draftImages = await _draftRepository.loadDraftImages();
+      if (_isDisposed ||
+          draftImages.isEmpty ||
+          state.captureImages.isNotEmpty) {
+        return;
+      }
+
+      final activeSlot = draftImages.last;
+      final capturedImages = [
+        for (final slot in draftImages) _capturedImageFromSlot(slot),
+      ];
+      final restoredSession = _ensureSession().copyWith(
+        capturedImages: capturedImages,
+        capturePlan: _capturePlanService.buildPlan(
+          state.scanSession?.scanGoal ?? ScanGoal.identifyValue,
+          state.captureCategory,
+          capturedImages,
+        ),
+        clearConfidenceAchieved: true,
+        clearEndTime: true,
+      );
+      _setState(
+        state.copyWith(
+          isLoading: false,
+          isPreparingImage: false,
+          selectedImage: XFile(activeSlot.path),
+          selectedImagePath: activeSlot.path,
+          selectedItemTitle: activeSlot.label,
+          selectedItemStatus: 'Ready for AI analysis',
+          photoSlots: _latestSlotsFromImages(draftImages),
+          captureImages: draftImages,
+          activeCaptureRole: activeSlot.role,
+          primaryImagePath: state.primaryImagePath ?? activeSlot.path,
+          scanSession: restoredSession,
+          clearScanResult: true,
+          clearAiRecommendation: true,
+          clearErrorMessage: true,
+          isSavedToPortfolio: false,
+        ),
+        event: 'pending scanner draft restored',
+      );
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] pending draft restore failed: $error');
+      debugPrint('$stackTrace');
+      await _draftRepository.clearDraft();
+    }
+  }
+
+  Future<void> _persistPendingDraft() async {
+    try {
+      await _draftRepository.saveDraftImages(state.captureImages);
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] pending draft save failed: $error');
+      debugPrint('$stackTrace');
+    }
+  }
+
+  Future<void> _clearPendingDraft() async {
+    try {
+      await _draftRepository.clearDraft();
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Scanner] pending draft clear failed: $error');
+      debugPrint('$stackTrace');
+    }
   }
 
   /// Initializes camera state for the scanner screen.
@@ -536,6 +612,7 @@ class ScannerController extends Notifier<ScannerState> {
       ),
       event: 'image enhancement applied',
     );
+    unawaited(_persistPendingDraft());
   }
 
   /// Opens the selected camera.
@@ -1055,6 +1132,7 @@ class ScannerController extends Notifier<ScannerState> {
       ),
       event: 'selected image state emitted',
     );
+    unawaited(_persistPendingDraft());
   }
 
   Map<String, Object?> _persistedEnhancementMetadata(
@@ -1151,6 +1229,7 @@ class ScannerController extends Notifier<ScannerState> {
         ),
         event: 'selected image state emitted',
       );
+      unawaited(_persistPendingDraft());
       _logFlow(
         'lost data recovery completed',
         details: {'reason': reason, 'recovered': true},
@@ -1655,6 +1734,7 @@ class ScannerController extends Notifier<ScannerState> {
         isSavedToPortfolio: true,
         isSavingToPortfolio: false,
       );
+      unawaited(_clearPendingDraft());
       return true;
     } catch (_) {
       state = state.copyWith(isSavingToPortfolio: false);
@@ -1710,6 +1790,7 @@ class ScannerController extends Notifier<ScannerState> {
       clearErrorMessage: true,
       isSavedToPortfolio: false,
     );
+    unawaited(_clearPendingDraft());
     ref.read(scanPipelineStatusProvider.notifier).markReady();
   }
 
@@ -1790,6 +1871,7 @@ class ScannerController extends Notifier<ScannerState> {
       ),
       event: 'role image deleted',
     );
+    unawaited(_persistPendingDraft());
   }
 
   /// Clears completed saved work when the user leaves the scan tab.

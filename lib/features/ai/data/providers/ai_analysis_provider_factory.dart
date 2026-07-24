@@ -25,22 +25,9 @@ class AiAnalysisProviderFactory {
       AiAnalysisProviderType.openAiVision => OpenAiVisionAnalysisProvider(
         backendClient: backendClient,
       ),
-      AiAnalysisProviderType.geminiVision => const _PlaceholderAiProvider(
-        providerName: 'Gemini Vision',
+      AiAnalysisProviderType.geminiVision => OpenAiVisionAnalysisProvider(
+        backendClient: backendClient,
       ),
     };
-  }
-}
-
-class _PlaceholderAiProvider implements AiAnalysisProvider {
-  const _PlaceholderAiProvider({required this.providerName});
-
-  final String providerName;
-
-  @override
-  Future<AiAnalysisResult> analyze(AiAnalysisRequest request) {
-    throw AiAnalysisException(
-      '$providerName analysis is not enabled yet. Switch AI_ANALYSIS_PROVIDER back to mock.',
-    );
   }
 }

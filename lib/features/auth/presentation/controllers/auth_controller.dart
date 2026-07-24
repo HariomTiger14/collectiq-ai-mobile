@@ -393,6 +393,9 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> _loadCurrentUser(int restoreVersion) async {
+    if (restoreVersion != _sessionMutationVersion) {
+      return;
+    }
     state = state.copyWith(
       isLoading: true,
       status: AuthFlowStatus.sessionRestoring,
@@ -437,6 +440,7 @@ class AuthController extends Notifier<AuthState> {
 
   /// Starts an anonymous session or local guest placeholder.
   Future<void> signInAnonymously() async {
+    _sessionMutationVersion++;
     state = state.copyWith(
       isLoading: true,
       status: AuthFlowStatus.signingIn,
@@ -466,6 +470,7 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    _sessionMutationVersion++;
     final validationMessage = _validateEmailPassword(
       email: email,
       password: password,
@@ -523,6 +528,7 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    _sessionMutationVersion++;
     final validationMessage = _validateEmailPassword(
       email: email,
       password: password,

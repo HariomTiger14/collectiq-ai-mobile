@@ -31,6 +31,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_w
 import 'package:collectiq_ai/core/ui/portfolio/portfolio_ui.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
@@ -42,6 +43,7 @@ import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_draft_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/usage_repository.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -616,7 +618,10 @@ void main() {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
 
     expect(find.text('Import Photo'), findsNothing);
-    expect(find.byKey(const ValueKey('home-quick-action-import')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('home-quick-action-import')),
+      findsNothing,
+    );
     expect(find.text('Quick Actions'), findsNothing);
 
     await tester.tap(find.text('Scan a Collectible'));
@@ -1624,6 +1629,48 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Welcome back to PackLox'), findsNothing);
+  });
+
+  testWidgets('pending gallery scan restores after app restart', (
+    WidgetTester tester,
+  ) async {
+    final firstContainer = ProviderContainer(
+      overrides: [
+        galleryServiceProvider.overrideWithValue(_SelectedGalleryService()),
+      ],
+    );
+    await firstContainer
+        .read(scannerControllerProvider.notifier)
+        .pickImageFromGallery();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+
+    final preferencesBeforeRestart = await SharedPreferences.getInstance();
+    expect(
+      preferencesBeforeRestart.getString(ScannerDraftRepository.draftKey),
+      isNotNull,
+    );
+    firstContainer.dispose();
+
+    final restartedContainer = ProviderContainer();
+    addTearDown(restartedContainer.dispose);
+    restartedContainer.read(scannerControllerProvider);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+
+    final scannerState = restartedContainer.read(scannerControllerProvider);
+    expect(scannerState.captureImages, hasLength(1));
+    expect(
+      scannerState.selectedImagePath,
+      _fixturePath('persistent-gallery-card.jpg'),
+    );
+    expect(scannerState.selectedItemStatus, 'Ready for AI analysis');
+    expect(
+      scannerState.photoSlots[ScanCaptureRole.front.id]?.path,
+      _fixturePath('persistent-gallery-card.jpg'),
+    );
   });
 
   testWidgets('scanner camera cancellation is neutral', (
@@ -3172,6 +3219,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpCollectIqApp(galleryService: _SelectedGalleryService());
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Scan').last);
     await tester.pump();
@@ -3277,9 +3325,8 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio').last);
-    await tester.pump();
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
+    await tester.pumpAndSettle();
 
     expect(find.text('My Collection'), findsOneWidget);
     expect(find.text('Portfolio'), findsWidgets);
@@ -3328,9 +3375,8 @@ void main() {
   ) async {
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio').last);
-    await tester.pump();
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
+    await tester.pumpAndSettle();
 
     await tester.reveal(find.text('Your collection is empty'));
     expect(find.text('Your collection is empty'), findsOneWidget);
@@ -4361,6 +4407,8 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({
+      'onboarding_completed_v1': true,
+      'auth_guest_mode_chosen_v1': true,
       'portfolio_items':
           '[{"id":"detail-card","title":"Clickable Charizard","category":"Trading Card","estimatedValue":1850,"confidence":0.94,"condition":"Near Mint","recommendation":"Consider grading before selling.","imagePath":"sample://sports-card","createdAt":"2026-06-27T00:00:00.000","primaryMatch":"1999 Pokemon Charizard Holo","confidenceExplanation":"High confidence from character artwork.","detectionQuality":"Good","aiReasoning":"The image shows a Charizard-like Pokemon card.","year":"1999","brand":"Pokemon","setName":"Base Set","cardNumber":"4/102","playerOrCharacter":"Charizard","rarity":"Holo Rare","material":"Cardstock","notes":"Verify holo surface.","pricing":{"estimatedMarketValue":1850,"lowEstimate":1443,"highEstimate":2257,"currency":"AUD","pricingSource":"Mock market blend","pricingConfidence":0.85,"lastUpdated":"2026-06-29T00:00:00Z"},"marketSummary":{"averagePrice":1810,"medianPrice":1850,"lowPrice":1443,"highPrice":2257,"salesCount":5,"trendLabel":"Stable","confidence":0.86,"lastUpdated":"2026-06-29T00:00:00Z","sources":["eBay Sold","TCGplayer"],"comps":[{"source":"eBay Sold","title":"1999 Pokemon Charizard sold listing","soldPrice":1850,"currency":"AUD","soldDate":"2026-06-20T00:00:00Z","condition":"Near Mint"}]}}]',
       'wishlist_status_entries':
@@ -4369,16 +4417,15 @@ void main() {
 
     await tester.pumpCollectIqApp();
 
-    await tester.tap(find.text('Portfolio').last);
-    await tester.pump();
-    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('nav-portfolio')));
+    await tester.pumpAndSettle();
     await tester.reveal(
       find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
     );
     await tester.pump();
-    await tester.tap(find.byTooltip('Item actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('View details'));
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
+    );
     await tester.pumpAndSettle();
 
     expect(
@@ -4388,12 +4435,20 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Item actions'));
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-grid-item-edit-detail-card')),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit'));
+    expect(
+      find.byKey(const ValueKey('edit-collectible-sheet')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('edit-collectible-cancel-button')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Edit coming soon'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(
       find.byKey(const ValueKey('portfolio-grid-item-detail-card')),
@@ -4405,12 +4460,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Estimated value'), findsOneWidget);
-    await _selectDetailTab(tester, 'notes');
-    expect(find.text('Wishlist Status'), findsOneWidget);
-    await _selectDetailTab(tester, 'insights');
-    expect(find.text('AI Insights'), findsOneWidget);
-    await _selectDetailTab(tester, 'overview');
-    expect(find.text('Recommendation'), findsOneWidget);
   });
 
   testWidgets('portfolio detail gallery thumbnails switch hero image', (

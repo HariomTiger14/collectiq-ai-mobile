@@ -139,10 +139,15 @@ class CloudPortfolioSyncCoordinator {
       if (uploadResult == null || uploadResult.publicUrl == null) {
         throw StateError('Cloud image upload was skipped.');
       }
+      final uploadedGalleryImages = await _uploadGalleryImages(
+        userId: userId,
+        item: item,
+      );
 
       final uploadedItem = pendingItem.copyWithCloudSync(
         imageStoragePath: uploadResult.path,
         cloudImageUrl: uploadResult.publicUrl,
+        galleryImages: uploadedGalleryImages,
         syncStatus: CloudItemSyncStatus.pendingUpload,
         clearSyncError: true,
       );
@@ -160,6 +165,58 @@ class CloudPortfolioSyncCoordinator {
       );
     }
   }
+
+  Future<List<CollectibleImage>> _uploadGalleryImages({
+    required String userId,
+    required CollectibleItem item,
+  }) async {
+    final images = item.effectiveGalleryImages;
+    if (images.isEmpty) {
+      return const [];
+    }
+
+    final uploadedImages = <CollectibleImage>[];
+    for (var index = 0; index < images.length; index += 1) {
+      final image = images[index];
+      final path = image.path.trim();
+      if (path.isEmpty ||
+          path == item.imagePath ||
+          path.startsWith('sample://') ||
+          _isRemotePath(path)) {
+        uploadedImages.add(image);
+        continue;
+      }
+
+      final localImage = File(path);
+      if (!await localImage.exists()) {
+        uploadedImages.add(image);
+        continue;
+      }
+
+      final role = _safePathSegment(image.role ?? 'image-$index');
+      final destinationPath = CloudStoragePaths.portfolioImageVariant(
+        userId: userId,
+        itemId: item.id,
+        role: role,
+        index: index,
+        extension: _extensionFor(path),
+      );
+      final uploadResult = await registry.cloudStorageService.uploadImage(
+        localPath: path,
+        destinationPath: destinationPath,
+      );
+      uploadedImages.add(
+        uploadResult == null || uploadResult.publicUrl == null
+            ? image
+            : image.copyWithCloudImage(
+                imageStoragePath: uploadResult.path,
+                cloudImageUrl: uploadResult.publicUrl,
+              ),
+      );
+    }
+
+    return uploadedImages;
+  }
 }
 
 String _extensionFor(String path) {
@@ -174,4 +231,17 @@ String _extensionFor(String path) {
     return '.jpeg';
   }
   return '.jpg';
+}
+
+bool _isRemotePath(String path) {
+  final normalized = path.toLowerCase();
+  return normalized.startsWith('http://') || normalized.startsWith('https://');
+}
+
+String _safePathSegment(String value) {
+  final normalized = value.trim().toLowerCase().replaceAll(
+    RegExp(r'[^a-z0-9_-]+'),
+    '-',
+  );
+  return normalized.isEmpty ? 'image' : normalized;
 }

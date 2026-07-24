@@ -20,16 +20,31 @@ class FeatureFlags {
   final bool useRealAiProvider;
 
   factory FeatureFlags.fromEnvironment() {
-    return const FeatureFlags(
+    const appEnvironment = String.fromEnvironment('APP_ENV');
+    const legacyEnvironment = String.fromEnvironment(
+      'COLLECTIQ_ENV',
+      defaultValue: 'local',
+    );
+    const supabaseEnabled = bool.fromEnvironment('SUPABASE_ENABLED');
+    const cloudAuthEnabled =
+        bool.fromEnvironment('USE_CLOUD_AUTH') ||
+        bool.fromEnvironment('COLLECTIQ_USE_CLOUD_AUTH');
+    const cloudPortfolioSyncEnabled =
+        bool.fromEnvironment('USE_CLOUD_PORTFOLIO_SYNC') ||
+        bool.fromEnvironment('COLLECTIQ_USE_CLOUD_PORTFOLIO_SYNC');
+    const cloudImageStorageEnabled =
+        bool.fromEnvironment('USE_CLOUD_IMAGE_STORAGE') ||
+        bool.fromEnvironment('COLLECTIQ_USE_CLOUD_IMAGE_STORAGE');
+    final supabaseCloudDefault =
+        supabaseEnabled && !_isLocalEnvironment(appEnvironment, legacyEnvironment);
+
+    return FeatureFlags(
       useCloudAuth:
-          bool.fromEnvironment('USE_CLOUD_AUTH') ||
-          bool.fromEnvironment('COLLECTIQ_USE_CLOUD_AUTH'),
+          cloudAuthEnabled || supabaseCloudDefault,
       useCloudPortfolioSync:
-          bool.fromEnvironment('USE_CLOUD_PORTFOLIO_SYNC') ||
-          bool.fromEnvironment('COLLECTIQ_USE_CLOUD_PORTFOLIO_SYNC'),
+          cloudPortfolioSyncEnabled || supabaseCloudDefault,
       useCloudImageStorage:
-          bool.fromEnvironment('USE_CLOUD_IMAGE_STORAGE') ||
-          bool.fromEnvironment('COLLECTIQ_USE_CLOUD_IMAGE_STORAGE'),
+          cloudImageStorageEnabled || supabaseCloudDefault,
       useCrashReporting:
           bool.fromEnvironment('USE_CRASH_REPORTING') ||
           bool.fromEnvironment('COLLECTIQ_USE_CRASH_REPORTING'),
@@ -88,4 +103,12 @@ class FeatureFlags {
       'useRealAiProvider': useRealAiProvider,
     };
   }
+}
+
+bool _isLocalEnvironment(String appEnvironment, String legacyEnvironment) {
+  final raw = appEnvironment.trim().isNotEmpty
+      ? appEnvironment
+      : legacyEnvironment;
+  final normalized = raw.trim().toLowerCase();
+  return normalized.isEmpty || normalized == 'local';
 }

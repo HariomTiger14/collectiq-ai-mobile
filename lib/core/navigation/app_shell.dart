@@ -10,9 +10,11 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
+import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
@@ -34,6 +36,7 @@ class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   static const _scanTabIndex = AppShellTabController.scanTab;
   final PageStorageBucket _shellPageStorageBucket = PageStorageBucket();
+  String? _lastPostSignInSyncUserId;
 
   @override
   void initState() {
@@ -116,6 +119,50 @@ class _AppShellState extends ConsumerState<AppShell>
     ref
         .read(appShellTabControllerProvider.notifier)
         .selectTab(index, reason: reason);
+  }
+
+  void _handleAuthChanged(AuthState? previous, AuthState next) {
+    if (!next.isSignedIn) {
+      _lastPostSignInSyncUserId = null;
+      return;
+    }
+
+    final userId = next.user?.id;
+    if (userId == null ||
+        userId.isEmpty ||
+        _lastPostSignInSyncUserId == userId) {
+      return;
+    }
+    _lastPostSignInSyncUserId = userId;
+    unawaited(_syncLocalPortfolioAfterSignIn(userId: userId));
+  }
+
+  Future<void> _syncLocalPortfolioAfterSignIn({required String userId}) async {
+    try {
+      await ref.read(portfolioControllerProvider.notifier).loadItems();
+      await ref
+          .read(portfolioControllerProvider.notifier)
+          .syncPendingCloudItems();
+      await ref.read(syncControllerProvider.notifier).loadStatus();
+      unawaited(
+        ref
+            .read(appTelemetryServiceProvider)
+            .trackEvent(
+              'auth_post_sign_in_portfolio_sync',
+              properties: {'user_id_present': userId.isNotEmpty},
+            ),
+      );
+    } on Object catch (error, stackTrace) {
+      unawaited(
+        ref
+            .read(appTelemetryServiceProvider)
+            .recordNonFatalError(
+              error,
+              stackTrace: stackTrace,
+              reason: 'auth_post_sign_in_portfolio_sync_failed',
+            ),
+      );
+    }
   }
 
   List<AppShellDestination> get _destinations => [
@@ -317,6 +364,8 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authControllerProvider, _handleAuthChanged);
+
     final authState = ref.watch(authControllerProvider);
     final guestMode = ref.watch(guestModeControllerProvider);
     final onboardingCompleted = ref.watch(onboardingControllerProvider);
@@ -330,9 +379,7 @@ class _AppShellState extends ConsumerState<AppShell>
         scannerState.isPreparingImage ||
         scannerState.errorMessage != null;
     final hideBottomNavigation =
-        selectedIndex == _scanTabIndex &&
-        hasActiveScannerSession &&
-        scannerState.scanResult == null;
+        selectedIndex == _scanTabIndex && hasActiveScannerSession;
 
     return guestMode.when(
       data: (guestModeChosen) {

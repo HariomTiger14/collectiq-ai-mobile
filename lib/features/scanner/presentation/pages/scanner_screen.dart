@@ -11,6 +11,7 @@ import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_
 import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
+import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/camera_overlay.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_suggestions.dart';
@@ -221,73 +222,82 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         );
       }
       if (workspacePhotos.isNotEmpty) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Scan Workspace'),
-            leading: IconButton(
-              key: const ValueKey('workspace-close'),
-              onPressed: scannerController.resetScan,
-              icon: const Icon(Icons.close),
-              tooltip: 'Close',
-            ),
-          ),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.xl,
+        return ScannerFocusTheme(
+          child: Scaffold(
+            backgroundColor: ScannerVisualTheme.background,
+            appBar: AppBar(
+              title: const Text('Scan Workspace'),
+              leading: IconButton(
+                key: const ValueKey('workspace-close'),
+                onPressed: scannerController.resetScan,
+                icon: const Icon(Icons.close),
+                tooltip: 'Close',
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CaptureWorkspace(
-                    goal: activeGoal,
-                    category: scannerState.captureCategory,
-                    plan: activePlan,
-                    slots: scannerState.photoSlots,
-                    captureImages: workspacePhotos,
-                    isBusy:
-                        scannerState.isLoading || scannerState.isPreparingImage,
-                    hasResult: false,
-                    selectedPath: selectedImagePath,
-                    activeRoleId:
-                        scannerState.activeCaptureRole ?? workspaceRole.id,
-                    selectedItemTitle: scannerState.selectedItemTitle,
-                    selectedItemStatus: scannerState.selectedItemStatus,
-                    categoryLabel: scannerState.captureCategory.title,
-                    hasManualCategory: scannerState.hasManualCaptureCategory,
-                    onPrimaryCapture: () => setState(() {
-                      _showCaptureLoopScan = true;
-                      _captureLoopRoleId = workspaceRole.id;
-                    }),
-                    onAnalyze: scannerController.analyzeWithAi,
-                    onCamera: (role) => scannerController.startCameraScan(
-                      context,
-                      imageRole: role,
-                    ),
-                    onGallery: (role) => scannerController.pickImageFromGallery(
-                      context: context,
-                      imageRole: role,
-                    ),
-                    onSelectRole: scannerController.selectCaptureRole,
-                    onPreview: scannerController.selectCapturedPhoto,
-                    onUseAsPrimary: scannerController.useCapturedPhotoAsPrimary,
-                    onEnhance: scannerController.applyEnhancementToPhoto,
-                    onDelete: scannerController.deleteCapturedImage,
-                    onSample: scannerController.useSampleScan,
-                    onReset: scannerController.resetScan,
+            ),
+            body: ScannerBackground(
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
                   ),
-                  if (scannerState.errorMessage != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    _ScannerWorkspaceError(
-                      message: scannerState.errorMessage!,
-                      onPrimary: scannerController.analyzeWithAi,
-                      onSecondary: scannerController.resetScan,
-                    ),
-                  ],
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CaptureWorkspace(
+                        goal: activeGoal,
+                        category: scannerState.captureCategory,
+                        plan: activePlan,
+                        slots: scannerState.photoSlots,
+                        captureImages: workspacePhotos,
+                        isBusy:
+                            scannerState.isLoading ||
+                            scannerState.isPreparingImage,
+                        hasResult: false,
+                        selectedPath: selectedImagePath,
+                        activeRoleId:
+                            scannerState.activeCaptureRole ?? workspaceRole.id,
+                        selectedItemTitle: scannerState.selectedItemTitle,
+                        selectedItemStatus: scannerState.selectedItemStatus,
+                        categoryLabel: scannerState.captureCategory.title,
+                        hasManualCategory:
+                            scannerState.hasManualCaptureCategory,
+                        onPrimaryCapture: () => setState(() {
+                          _showCaptureLoopScan = true;
+                          _captureLoopRoleId = workspaceRole.id;
+                        }),
+                        onAnalyze: scannerController.analyzeWithAi,
+                        onCamera: (role) => scannerController.startCameraScan(
+                          context,
+                          imageRole: role,
+                        ),
+                        onGallery: (role) =>
+                            scannerController.pickImageFromGallery(
+                              context: context,
+                              imageRole: role,
+                            ),
+                        onSelectRole: scannerController.selectCaptureRole,
+                        onPreview: scannerController.selectCapturedPhoto,
+                        onUseAsPrimary:
+                            scannerController.useCapturedPhotoAsPrimary,
+                        onEnhance: scannerController.applyEnhancementToPhoto,
+                        onDelete: scannerController.deleteCapturedImage,
+                        onSample: scannerController.useSampleScan,
+                        onReset: scannerController.resetScan,
+                      ),
+                      if (scannerState.errorMessage != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        _ScannerWorkspaceError(
+                          message: scannerState.errorMessage!,
+                          onPrimary: scannerController.analyzeWithAi,
+                          onSecondary: scannerController.resetScan,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

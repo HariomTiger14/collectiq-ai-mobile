@@ -25,7 +25,9 @@ class AnalyzerProviderFactory {
       ),
       AnalyzerProviderType.futureVision => const FutureVisionProvider(),
       AnalyzerProviderType.futureOpenAI => const FutureOpenAIProvider(),
-      AnalyzerProviderType.futureGemini => const FutureGeminiProvider(),
+      AnalyzerProviderType.futureGemini => FutureGeminiProvider(
+        backendClient: backendClient,
+      ),
     };
   }
 }

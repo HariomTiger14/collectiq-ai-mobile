@@ -4,13 +4,13 @@ import 'package:image_picker/image_picker.dart';
 
 /// Supported AI analysis provider choices.
 enum AiAnalysisProviderType {
-  /// Current mock/local analysis flow.
+  /// Explicit local/QA analysis flow.
   mock,
 
-  /// Placeholder for a future OpenAI Vision implementation.
+  /// Backend-backed OpenAI Vision implementation.
   openAiVision,
 
-  /// Placeholder for a future Gemini Vision implementation.
+  /// Backend-backed Gemini Vision implementation.
   geminiVision;
 
   /// Parses a provider type from configuration text.
@@ -21,6 +21,8 @@ enum AiAnalysisProviderType {
       'openaivision' => AiAnalysisProviderType.openAiVision,
       'gemini' ||
       'gemini_vision' ||
+      'auto' ||
+      'gemini_openai' ||
       'geminivision' => AiAnalysisProviderType.geminiVision,
       _ => AiAnalysisProviderType.mock,
     };
@@ -45,9 +47,10 @@ enum AiAnalysisProviderType {
   }
 
   /// Whether this provider can run analysis in the current app build.
-  bool get isAvailable {
-    return this == AiAnalysisProviderType.mock;
-  }
+  bool get isAvailable => true;
+
+  /// Whether this provider returns local-only synthetic results.
+  bool get isLocalOnly => this == AiAnalysisProviderType.mock;
 
   /// Short status label for developer settings.
   String get statusLabel {
@@ -67,16 +70,28 @@ class AiAnalysisProviderConfig {
   factory AiAnalysisProviderConfig.fromEnvironment() {
     const configuredProvider = String.fromEnvironment(
       'AI_ANALYSIS_PROVIDER',
-      defaultValue: 'mock',
+      defaultValue: '',
     );
     const backendAnalysisEndpointUrl = String.fromEnvironment(
       'AI_BACKEND_ANALYSIS_ENDPOINT_URL',
     );
     const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+    const appEnvironment = String.fromEnvironment('APP_ENV');
+    const legacyEnvironment = String.fromEnvironment(
+      'COLLECTIQ_ENV',
+      defaultValue: 'local',
+    );
     final networkConfig = EnvironmentConfig.fromEnvironment();
 
+    final provider = configuredProvider.trim().isEmpty
+        ? _defaultProviderFor(
+            appEnvironment: appEnvironment,
+            legacyEnvironment: legacyEnvironment,
+          )
+        : AiAnalysisProviderType.fromConfig(configuredProvider);
+
     return AiAnalysisProviderConfig(
-      type: AiAnalysisProviderType.fromConfig(configuredProvider),
+      type: provider,
       backendAnalysisEndpointUrl: resolveBackendAnalysisEndpointUrl(
         environment: networkConfig.environment,
         backendAnalysisEndpointUrl: backendAnalysisEndpointUrl,
@@ -108,12 +123,32 @@ class AiAnalysisProviderConfig {
         'Mock mode is active. Results are generated locally for development.',
       AiAnalysisProviderType.openAiVision =>
         hasBackendAnalysisEndpoint
-            ? 'OpenAI Vision is configured for a backend endpoint, but the mobile integration is not implemented yet.'
+            ? 'OpenAI Vision is routed through the PackLox backend.'
             : 'OpenAI Vision requires the CollectIQ AI backend endpoint before it can be enabled.',
       AiAnalysisProviderType.geminiVision =>
-        'Gemini Vision is prepared as a future backend-only provider.',
+        hasBackendAnalysisEndpoint
+            ? 'Gemini Vision is routed through the PackLox backend.'
+            : 'Gemini Vision requires the PackLox backend endpoint before it can be enabled.',
     };
   }
+}
+
+AiAnalysisProviderType _defaultProviderFor({
+  required String appEnvironment,
+  required String legacyEnvironment,
+}) {
+  final raw = appEnvironment.trim().isNotEmpty
+      ? appEnvironment
+      : legacyEnvironment;
+  final normalized = raw.trim().toLowerCase();
+  if (normalized.isEmpty ||
+      normalized == 'local' ||
+      normalized == 'development' ||
+      normalized == 'dev') {
+    return AiAnalysisProviderType.mock;
+  }
+
+  return AiAnalysisProviderType.geminiVision;
 }
 
 /// Resolves the backend-only analyzer endpoint for configured environments.

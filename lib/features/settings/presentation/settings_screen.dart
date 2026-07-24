@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
@@ -23,10 +24,13 @@ import 'package:collectiq_ai/features/price_alerts/presentation/controllers/pric
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
@@ -88,6 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     final authState = ref.watch(authControllerProvider);
+    final profileState = ref.watch(profileControllerProvider);
     final syncState = ref.watch(syncControllerProvider);
     final imageSyncState = ref.watch(imageSyncControllerProvider);
     final cloudRegistry = ref.watch(cloudServiceRegistryProvider);
@@ -269,7 +274,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           slivers: [
             SliverToBoxAdapter(
               child: framed(
-                IdentityBlock(authState: authState),
+                IdentityBlock(
+                  authState: authState,
+                  profile: profileState.hasValue
+                      ? profileState.requireValue
+                      : null,
+                  isLoadingProfile: profileState.isLoading,
+                  onEditProfile: () => _showProfileEditor(context),
+                ),
                 padding: const EdgeInsets.fromLTRB(
                   HomeTokens.pageGutter,
                   HomeTokens.pageGutter,
@@ -393,6 +405,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       _showSettingsSnackBar('Local collection cleared on this device.');
     }
+  }
+
+  Future<void> _showProfileEditor(BuildContext context) async {
+    final currentProfile =
+        (ref.read(profileControllerProvider).hasValue
+            ? ref.read(profileControllerProvider).requireValue
+            : null) ??
+        const CollectorProfile(
+          displayName: CollectorProfile.defaultDisplayName,
+        );
+    var isSaving = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> saveName(String displayName) async {
+              if (isSaving) {
+                return;
+              }
+              setSheetState(() => isSaving = true);
+              try {
+                await ref
+                    .read(profileControllerProvider.notifier)
+                    .updateDisplayName(displayName);
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
+                if (mounted) {
+                  _showSettingsSnackBar('Profile updated.');
+                }
+              } finally {
+                if (sheetContext.mounted) {
+                  setSheetState(() => isSaving = false);
+                }
+              }
+            }
+
+            Future<void> pickAvatar() async {
+              if (isSaving) {
+                return;
+              }
+              final image = await ImagePicker().pickImage(
+                source: ImageSource.gallery,
+                maxWidth: 900,
+                maxHeight: 900,
+                imageQuality: 86,
+                requestFullMetadata: false,
+              );
+              if (image == null) {
+                return;
+              }
+              setSheetState(() => isSaving = true);
+              try {
+                await ref
+                    .read(profileControllerProvider.notifier)
+                    .updateAvatar(image.path);
+                if (mounted) {
+                  _showSettingsSnackBar('Profile photo updated.');
+                }
+              } finally {
+                if (sheetContext.mounted) {
+                  setSheetState(() => isSaving = false);
+                }
+              }
+            }
+
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  HomeTokens.pageGutter,
+                  0,
+                  HomeTokens.pageGutter,
+                  bottomInset + HomeTokens.pageGutter,
+                ),
+                child: _ProfileEditSheet(
+                  initialDisplayName: currentProfile.displayName,
+                  isSaving: isSaving,
+                  onPickAvatar: pickAvatar,
+                  onSaveName: saveName,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _confirmDangerAction(
@@ -772,20 +875,41 @@ class _SettingsSurface extends StatelessWidget {
 }
 
 class IdentityBlock extends StatelessWidget {
-  const IdentityBlock({super.key, required this.authState});
+  const IdentityBlock({
+    super.key,
+    required this.authState,
+    required this.onEditProfile,
+    this.profile,
+    this.isLoadingProfile = false,
+  });
 
   final AuthState authState;
+  final CollectorProfile? profile;
+  final bool isLoadingProfile;
+  final VoidCallback onEditProfile;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isSignedIn = authState.isSignedIn;
-    final email = authState.user?.email ?? authState.user?.displayName;
-    final headline = isSignedIn ? email ?? 'Collector' : 'Guest Collector';
-    final initial = (email?.trim().isNotEmpty ?? false)
-        ? email!.trim().substring(0, 1).toUpperCase()
+    final savedName = profile?.displayName.trim();
+    final authName = authState.user?.displayName.trim();
+    final email = authState.user?.email;
+    final headline = savedName?.isNotEmpty == true
+        ? savedName!
+        : isSignedIn
+        ? authName?.isNotEmpty == true
+              ? authName!
+              : email ?? 'Collector'
+        : CollectorProfile.defaultDisplayName;
+    final initial = headline.trim().isNotEmpty
+        ? headline.trim().substring(0, 1).toUpperCase()
         : 'P';
     final statusColor = isSignedIn ? HomeTokens.positive : HomeTokens.accent;
+    final avatarPath = profile?.avatarPath;
+    final avatarFile = avatarPath == null || avatarPath.isEmpty
+        ? null
+        : File(avatarPath);
 
     return Column(
       key: const ValueKey('settings-account-overview-card'),
@@ -793,61 +917,115 @@ class IdentityBlock extends StatelessWidget {
       children: [
         const Align(alignment: Alignment.centerLeft, child: HomeBrandLockup()),
         const SizedBox(height: 26),
-        Container(
-          width: 112,
-          height: 112,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                HomeTokens.accentStrong.withValues(alpha: 0.95),
-                HomeTokens.accent.withValues(alpha: 0.70),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: HomeTokens.accent.withValues(alpha: 0.24),
-                blurRadius: 34,
-                offset: const Offset(0, 16),
+        GestureDetector(
+          onTap: onEditProfile,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 112,
+                height: 112,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      HomeTokens.accentStrong.withValues(alpha: 0.95),
+                      HomeTokens.accent.withValues(alpha: 0.70),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: HomeTokens.accent.withValues(alpha: 0.24),
+                      blurRadius: 34,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: avatarFile != null && avatarFile.existsSync()
+                    ? Image.file(
+                        avatarFile,
+                        key: const ValueKey('settings-profile-avatar-image'),
+                        fit: BoxFit.cover,
+                      )
+                    : Center(
+                        child: isLoadingProfile
+                            ? const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: HomeTokens.textPrimary,
+                                ),
+                              )
+                            : Text(
+                                initial,
+                                key: const ValueKey(
+                                  'settings-profile-avatar-initial',
+                                ),
+                                style: textTheme.displaySmall?.copyWith(
+                                  color: HomeTokens.textPrimary,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                      ),
+              ),
+              Positioned(
+                right: -2,
+                bottom: 4,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: HomeTokens.surfaceRaised,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: HomeTokens.border),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: HomeTokens.textPrimary,
+                    size: 18,
+                  ),
+                ),
               ),
             ],
           ),
-          child: Center(
-            child: Text(
-              initial,
-              style: textTheme.displaySmall?.copyWith(
-                color: HomeTokens.textPrimary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
         ),
         const SizedBox(height: 18),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                headline,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: textTheme.headlineMedium?.copyWith(
-                  color: HomeTokens.textPrimary,
-                  fontWeight: FontWeight.w900,
-                  height: 1.05,
+        GestureDetector(
+          onTap: onEditProfile,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  headline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: textTheme.headlineMedium?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              isSignedIn ? Icons.check_circle : Icons.radio_button_checked,
-              color: statusColor,
-              size: 18,
-            ),
-          ],
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: HomeTokens.textPrimary,
+                size: 26,
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                isSignedIn ? Icons.check_circle : Icons.radio_button_checked,
+                color: statusColor,
+                size: 18,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         Text(
@@ -860,6 +1038,117 @@ class IdentityBlock extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileEditSheet extends StatefulWidget {
+  const _ProfileEditSheet({
+    required this.initialDisplayName,
+    required this.isSaving,
+    required this.onPickAvatar,
+    required this.onSaveName,
+  });
+
+  final String initialDisplayName;
+  final bool isSaving;
+  final VoidCallback onPickAvatar;
+  final ValueChanged<String> onSaveName;
+
+  @override
+  State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+}
+
+class _ProfileEditSheetState extends State<_ProfileEditSheet> {
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.initialDisplayName,
+  );
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _saveName() {
+    widget.onSaveName(_nameController.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Edit profile',
+            style: textTheme.titleLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            key: const ValueKey('settings-profile-photo-button'),
+            onPressed: widget.isSaving ? null : widget.onPickAvatar,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Choose profile photo'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: HomeTokens.textPrimary,
+              side: const BorderSide(color: HomeTokens.border),
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const ValueKey('settings-profile-name-field'),
+            controller: _nameController,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _saveName(),
+            style: const TextStyle(color: HomeTokens.textPrimary),
+            decoration: InputDecoration(
+              labelText: 'Display name',
+              labelStyle: const TextStyle(color: HomeTokens.textSecondary),
+              filled: true,
+              fillColor: HomeTokens.surfaceInteractive,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: HomeTokens.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: HomeTokens.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: HomeTokens.accentStrong),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const ValueKey('settings-profile-save-button'),
+              onPressed: widget.isSaving ? null : _saveName,
+              style: FilledButton.styleFrom(
+                backgroundColor: HomeTokens.accentStrong,
+                foregroundColor: HomeTokens.textPrimary,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: Text(widget.isSaving ? 'Saving...' : 'Save profile'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

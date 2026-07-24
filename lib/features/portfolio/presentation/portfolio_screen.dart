@@ -428,6 +428,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         onClearFilters: _clearFilters,
                         onClearSearch: _clearSearch,
                         onItemTap: _openItem,
+                        onItemEdit: _editItem,
                       ),
                     ),
                   ],
@@ -593,6 +594,24 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
           },
         ),
         settings: RouteSettings(name: '/portfolio/${item.id}'),
+      ),
+    );
+  }
+
+  Future<void> _editItem(CollectibleItem item) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CollectibleDetailPage(
+          item: item,
+          qaShowEditSheet: true,
+          onDelete: (itemId) async {
+            await ref
+                .read(portfolioControllerProvider.notifier)
+                .removeItem(itemId);
+            return true;
+          },
+        ),
+        settings: RouteSettings(name: '/portfolio/${item.id}/edit'),
       ),
     );
   }
@@ -991,6 +1010,7 @@ class _PortfolioContent extends StatelessWidget {
     required this.onClearFilters,
     required this.onClearSearch,
     required this.onItemTap,
+    required this.onItemEdit,
   });
 
   final List<CollectibleItem> allItems;
@@ -1002,6 +1022,7 @@ class _PortfolioContent extends StatelessWidget {
   final VoidCallback onClearFilters;
   final VoidCallback onClearSearch;
   final ValueChanged<CollectibleItem> onItemTap;
+  final ValueChanged<CollectibleItem> onItemEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1027,6 +1048,7 @@ class _PortfolioContent extends StatelessWidget {
             _PortfolioItemRow(
               item: visibleItems[index],
               onTap: () => onItemTap(visibleItems[index]),
+              onEdit: () => onItemEdit(visibleItems[index]),
             ),
             if (index != visibleItems.length - 1) const SizedBox(height: 10),
           ],
@@ -1037,10 +1059,15 @@ class _PortfolioContent extends StatelessWidget {
 }
 
 class _PortfolioItemRow extends StatelessWidget {
-  const _PortfolioItemRow({required this.item, required this.onTap});
+  const _PortfolioItemRow({
+    required this.item,
+    required this.onTap,
+    required this.onEdit,
+  });
 
   final CollectibleItem item;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1123,7 +1150,7 @@ class _PortfolioItemRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 84),
+              constraints: const BoxConstraints(maxWidth: 96),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -1139,11 +1166,30 @@ class _PortfolioItemRow extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: Color(0xFF8BC7FF),
-                    size: 22,
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox.square(
+                        dimension: 34,
+                        child: IconButton(
+                          key: ValueKey('portfolio-grid-item-edit-${item.id}'),
+                          onPressed: onEdit,
+                          tooltip: 'Edit item',
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Color(0xFF8BC7FF),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFF8BC7FF),
+                        size: 22,
+                      ),
+                    ],
                   ),
                 ],
               ),

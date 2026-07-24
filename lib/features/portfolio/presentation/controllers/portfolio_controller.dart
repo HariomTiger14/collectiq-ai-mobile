@@ -240,6 +240,11 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
+  /// Attempts to upload local/pending portfolio items to the signed-in cloud account.
+  Future<void> syncPendingCloudItems() async {
+    await _syncPendingCloudItems();
+  }
+
   Future<void> _syncPendingCloudItems() async {
     try {
       await CloudPortfolioSyncCoordinator(
@@ -248,7 +253,10 @@ class PortfolioController extends Notifier<PortfolioState> {
       ).syncPendingItems();
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
-    } catch (_) {}
+    } catch (_) {
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+    }
   }
 
   Future<void> _syncUpdatedCloudItem(CollectibleItem item) async {
@@ -259,7 +267,10 @@ class PortfolioController extends Notifier<PortfolioState> {
       ).syncUpdatedItem(item);
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
-    } catch (_) {}
+    } catch (_) {
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+    }
   }
 
   Future<void> _deleteCloudItem(String id) async {

@@ -25,6 +25,8 @@ if defined API_BASE_URL set "API_BASE_URL_DEFINE=--dart-define=API_BASE_URL=%API
 set "AI_BACKEND_DEFINE="
 if defined AI_BACKEND_ANALYSIS_ENDPOINT_URL set "AI_BACKEND_DEFINE=--dart-define=AI_BACKEND_ANALYSIS_ENDPOINT_URL=%AI_BACKEND_ANALYSIS_ENDPOINT_URL%"
 
+if not defined AI_ANALYSIS_PROVIDER set "AI_ANALYSIS_PROVIDER=auto"
+
 if not defined SUPABASE_URL echo [CollectIQ SIT] SUPABASE_URL is not set. Cloud services will fall back safely.
 if not defined SUPABASE_ANON_KEY echo [CollectIQ SIT] SUPABASE_ANON_KEY is not set. Cloud services will fall back safely.
 if not defined API_BASE_URL echo [CollectIQ SIT] API_BASE_URL is not set. Backend AI will use https://api-sit.packlox.com.
@@ -36,7 +38,7 @@ call "%FLUTTER_BIN%" run ^
   --dart-define=USE_CLOUD_PORTFOLIO_SYNC=true ^
   --dart-define=USE_CLOUD_IMAGE_STORAGE=true ^
   --dart-define=SUPABASE_ENABLED=true ^
-  --dart-define=AI_ANALYSIS_PROVIDER=mock ^
+  --dart-define=AI_ANALYSIS_PROVIDER=%AI_ANALYSIS_PROVIDER% ^
   %SUPABASE_URL_DEFINE% ^
   %SUPABASE_ANON_KEY_DEFINE% ^
   %API_BASE_URL_DEFINE% ^

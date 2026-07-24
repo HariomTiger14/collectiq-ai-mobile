@@ -32,7 +32,7 @@ class ScanResultScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final imagePath = activeSlot?.path ?? result.thumbnail;
     final isEnhanced = activeSlot?.isEnhanced == true;
-    final bottomPadding = isSaved ? 220.0 : 104.0;
+    final bottomPadding = isSaved ? AppSpacing.xxl * 2 : AppSpacing.xl;
     return ScannerFocusTheme(
       child: Scaffold(
         key: ValueKey('scan-result-${result.id}'),
@@ -109,6 +109,67 @@ class ScanResultScreen extends StatelessWidget {
                     source: _valueSourceLabel(result),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 120),
+                  child: _ResultInsightGrid(result: result),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 150),
+                  child: _ResultSection(
+                    title: 'Market check',
+                    icon: Icons.query_stats_outlined,
+                    child: _MarketEvidence(result: result),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 180),
+                  child: _ResultSection(
+                    title: 'Identification',
+                    icon: Icons.fingerprint_outlined,
+                    child: _IdentificationDetails(result: result),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 210),
+                  child: _ResultSection(
+                    title: 'Condition notes',
+                    icon: Icons.fact_check_outlined,
+                    child: _ConditionNotes(result: result),
+                  ),
+                ),
+                if (result.alternativeMatches.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 240),
+                    child: _ResultSection(
+                      title: 'Possible alternatives',
+                      icon: Icons.compare_arrows_outlined,
+                      child: _AlternativeMatches(
+                        matches: result.alternativeMatches,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
+                  delay: const Duration(milliseconds: 270),
+                  child: _ResultSection(
+                    title: 'Next best action',
+                    icon: Icons.lightbulb_outline,
+                    child: Text(
+                      _recommendationFor(result),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: ScannerVisualTheme.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -123,6 +184,401 @@ class ScanResultScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ResultInsightGrid extends StatelessWidget {
+  const _ResultInsightGrid({required this.result});
+
+  final ScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            SizedBox(
+              width: itemWidth,
+              child: _InsightTile(
+                label: 'Condition',
+                value: _fallback(result.condition, 'Needs review'),
+                icon: Icons.health_and_safety_outlined,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _InsightTile(
+                label: 'Value range',
+                value: _valueRange(result),
+                icon: Icons.show_chart_outlined,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _InsightTile(
+                label: 'Photos used',
+                value: _photosUsedLabel(result),
+                icon: Icons.photo_library_outlined,
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: _InsightTile(
+                label: 'Review status',
+                value: _reviewStatus(result),
+                icon: Icons.verified_user_outlined,
+                accent: _reviewStatusColor(result),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _InsightTile extends StatelessWidget {
+  const _InsightTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.accent,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = accent ?? ScannerVisualTheme.cyan;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ScannerVisualTheme.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: ScannerVisualTheme.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: ScannerVisualTheme.textSecondary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: ScannerVisualTheme.textPrimary,
+                fontWeight: FontWeight.w900,
+                height: 1.12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultSection extends StatelessWidget {
+  const _ResultSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ScannerVisualTheme.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: ScannerVisualTheme.border),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: ScannerVisualTheme.cyan, size: 22),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: ScannerVisualTheme.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketEvidence extends StatelessWidget {
+  const _MarketEvidence({required this.result});
+
+  final ScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final pricing = result.pricing;
+    return Column(
+      children: [
+        _ResultRow(
+          label: 'Estimated market value',
+          value: _formatScanValue(
+            pricing.estimatedMarketValue > 0
+                ? pricing.estimatedMarketValue
+                : result.estimatedValue,
+            result.valuationStatus,
+          ),
+        ),
+        _ResultRow(label: 'Estimated range', value: _valueRange(result)),
+        _ResultRow(
+          label: 'Pricing source',
+          value: _fallback(pricing.pricingSource, _valueSourceLabel(result)),
+        ),
+        _ResultRow(
+          label: 'Pricing confidence',
+          value: '${(pricing.pricingConfidence.clamp(0, 1) * 100).round()}%',
+        ),
+        _ResultRow(
+          label: 'Last checked',
+          value: _formatShortDate(pricing.lastUpdated),
+          isLast: true,
+        ),
+      ],
+    );
+  }
+}
+
+class _IdentificationDetails extends StatelessWidget {
+  const _IdentificationDetails({required this.result});
+
+  final ScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final details = [
+      _Detail('Primary match', result.primaryMatch),
+      _Detail('Category', result.category),
+      _Detail('Year', result.year),
+      _Detail('Brand', result.brand),
+      _Detail('Set', result.setName),
+      _Detail('Series', result.series),
+      _Detail('Card number', result.cardNumber),
+      _Detail('Character', result.playerOrCharacter),
+      _Detail('Rarity', result.rarity),
+      _Detail('Edition', result.edition),
+      _Detail('Language', result.language),
+      _Detail('Material', result.material),
+    ].where((detail) => detail.value.trim().isNotEmpty).take(8).toList();
+
+    if (details.isEmpty) {
+      return Text(
+        'PackLox found the main item identity. Add more angles to improve variant-level details.',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ScannerVisualTheme.textSecondary,
+          height: 1.35,
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (var index = 0; index < details.length; index++)
+          _ResultRow(
+            label: details[index].label,
+            value: details[index].value,
+            isLast: index == details.length - 1,
+          ),
+      ],
+    );
+  }
+}
+
+class _ConditionNotes extends StatelessWidget {
+  const _ConditionNotes({required this.result});
+
+  final ScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final notes = [
+      _fallback(result.confidenceExplanation, ''),
+      if (result.detectionQuality.trim().isNotEmpty)
+        'Detection quality: ${result.detectionQuality}',
+      _fallback(result.aiReasoning, ''),
+      if (result.notes?.trim().isNotEmpty == true) result.notes!.trim(),
+      if (result.askingPriceWarning?.trim().isNotEmpty == true)
+        result.askingPriceWarning!.trim(),
+    ].where((line) => line.trim().isNotEmpty).join('\n\n');
+
+    return Text(
+      notes.isEmpty
+          ? 'Condition is an estimate from the available photos. Add close-ups of corners, surface, and back before final valuation.'
+          : notes,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: ScannerVisualTheme.textPrimary,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
+      ),
+    );
+  }
+}
+
+class _AlternativeMatches extends StatelessWidget {
+  const _AlternativeMatches({required this.matches});
+
+  final List<ScanAlternativeMatch> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var index = 0; index < matches.take(3).length; index++)
+          _AlternativeTile(
+            match: matches[index],
+            isLast: index == matches.take(3).length - 1,
+          ),
+      ],
+    );
+  }
+}
+
+class _AlternativeTile extends StatelessWidget {
+  const _AlternativeTile({required this.match, required this.isLast});
+
+  final ScanAlternativeMatch match;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: ScannerVisualTheme.cyan.withValues(alpha: 0.14),
+            child: Text(
+              '${(match.confidence.clamp(0, 1) * 100).round()}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: ScannerVisualTheme.cyan,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  match.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: ScannerVisualTheme.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${match.category} - ${match.reason}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: ScannerVisualTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultRow extends StatelessWidget {
+  const _ResultRow({
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ScannerVisualTheme.textSecondary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ScannerVisualTheme.textPrimary,
+                fontWeight: FontWeight.w900,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Detail {
+  const _Detail(this.label, String? value) : value = value ?? '';
+
+  final String label;
+  final String value;
 }
 
 class _ResultActionBar extends StatelessWidget {
@@ -154,7 +610,7 @@ class _ResultActionBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.sm,
             AppSpacing.lg,
@@ -234,7 +690,7 @@ class _ResultHeroImage extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.xl),
         child: AspectRatio(
-          aspectRatio: 1,
+          aspectRatio: 1.18,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -563,4 +1019,90 @@ String _valueSourceLabel(ScanResult result) {
   return result.valuationSource == 'unknown'
       ? 'Pricing source pending'
       : result.valuationSource;
+}
+
+String _fallback(String? value, String fallback) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
+}
+
+String _valueRange(ScanResult result) {
+  final low = result.pricing.lowEstimate;
+  final high = result.pricing.highEstimate;
+  if (low > 0 && high > 0 && high >= low) {
+    return '${_formatScanValue(low, result.valuationStatus)} - '
+        '${_formatScanValue(high, result.valuationStatus)}';
+  }
+  if (result.estimatedValue > 0) {
+    final lower = result.estimatedValue * 0.82;
+    final upper = result.estimatedValue * 1.18;
+    return '${_formatScanValue(lower, result.valuationStatus)} - '
+        '${_formatScanValue(upper, result.valuationStatus)}';
+  }
+  return 'Needs market check';
+}
+
+String _photosUsedLabel(ScanResult result) {
+  final count = result.photosUsed ?? result.galleryImages.length;
+  if (count <= 0) {
+    return result.photoRoles.isEmpty
+        ? '1 scan'
+        : '${result.photoRoles.length} angles';
+  }
+  return count == 1 ? '1 photo' : '$count photos';
+}
+
+String _reviewStatus(ScanResult result) {
+  if (result.confidence >= 0.85 && result.estimatedValue > 0) {
+    return 'Ready to save';
+  }
+  if (result.confidence >= 0.70) {
+    return 'Review details';
+  }
+  return 'Needs more photos';
+}
+
+Color _reviewStatusColor(ScanResult result) {
+  if (result.confidence >= 0.85 && result.estimatedValue > 0) {
+    return ScannerVisualTheme.success;
+  }
+  if (result.confidence >= 0.70) {
+    return const Color(0xFFF59E0B);
+  }
+  return ScannerVisualTheme.danger;
+}
+
+String _formatShortDate(DateTime? date) {
+  if (date == null) {
+    return 'Not checked yet';
+  }
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _recommendationFor(ScanResult result) {
+  if (result.estimatedValue <= 0) {
+    return 'Save it as pending, then add clearer photos or connect market pricing before making a sale or insurance decision.';
+  }
+  if (result.confidence < 0.70) {
+    return 'Take another scan with the front, back, and condition close-ups before relying on this value.';
+  }
+  if (result.valuationStatus == ValuationStatus.providerNotConfigured ||
+      result.valuationStatus == ValuationStatus.unavailable) {
+    return 'Save this result, but treat the value as provisional until market pricing is connected and recent comps are checked.';
+  }
+  return 'Save this item with condition notes, then compare recent sold listings before selling, grading, or insuring it.';
 }

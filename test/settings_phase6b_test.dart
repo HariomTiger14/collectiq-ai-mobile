@@ -5,6 +5,9 @@ import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
+import 'package:collectiq_ai/features/profile/domain/repositories/profile_repository.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +30,31 @@ void main() {
       await tester.revealText(label);
       expect(find.text(label), findsWidgets);
     }
+  });
+
+  testWidgets('profile name can be edited from settings header', (
+    tester,
+  ) async {
+    final profileRepository = _SettingsProfileRepository();
+    await tester.pumpSettings(profileRepository: profileRepository);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-profile-avatar-initial')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit profile'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-profile-name-field')),
+      'Hari Om Bhatia',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('settings-profile-save-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.profile.displayName, 'Hari Om Bhatia');
+    expect(find.text('Hari Om Bhatia'), findsOneWidget);
   });
 
   testWidgets('signed-out account entry opens separate auth screen', (
@@ -169,6 +197,7 @@ void main() {
 extension on WidgetTester {
   Future<void> pumpSettings({
     AuthRepository? repository,
+    ProfileRepository? profileRepository,
     EnvironmentConfig? environmentConfig,
     ThemeMode themeMode = ThemeMode.dark,
     MediaQueryData? mediaQueryData,
@@ -183,6 +212,9 @@ extension on WidgetTester {
             environmentConfigProvider.overrideWithValue(environmentConfig),
           authRepositoryProvider.overrideWithValue(
             repository ?? _SettingsAuthRepository(),
+          ),
+          profileRepositoryProvider.overrideWithValue(
+            profileRepository ?? _SettingsProfileRepository(),
           ),
         ],
         child: MaterialApp(
@@ -283,4 +315,29 @@ AppUser _cloudUser(String email) {
     email: email,
     provider: AuthProviderType.emailPassword,
   );
+}
+
+class _SettingsProfileRepository implements ProfileRepository {
+  _SettingsProfileRepository({
+    CollectorProfile initialProfile = const CollectorProfile(
+      displayName: CollectorProfile.defaultDisplayName,
+    ),
+  }) : profile = initialProfile;
+
+  CollectorProfile profile;
+
+  @override
+  Future<CollectorProfile> loadProfile() async => profile;
+
+  @override
+  Future<CollectorProfile> saveAvatarFromPath(String sourcePath) async {
+    profile = profile.copyWith(avatarPath: sourcePath);
+    return profile;
+  }
+
+  @override
+  Future<CollectorProfile> saveProfile(CollectorProfile profile) async {
+    this.profile = profile;
+    return this.profile;
+  }
 }
