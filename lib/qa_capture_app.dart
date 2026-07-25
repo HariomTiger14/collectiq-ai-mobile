@@ -816,10 +816,11 @@ class _QaScannerResult extends StatelessWidget {
       activeSlot: _qaScannerSlots().first,
       isSaved: isSaved,
       isSaving: false,
+      isRefreshingPricing: false,
       onSave: () async {},
       onScanAnother: () {},
       onViewPortfolio: () {},
-      onApplyReviewEdits: (_) {},
+      onApplyReviewEdits: (_) async => true,
       qaInitialScrollOffset: scrollOffset,
     );
   }

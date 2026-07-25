@@ -340,6 +340,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       ),
       isSaved: scannerState.isSavedToPortfolio,
       isSaving: scannerState.isSavingToPortfolio,
+      isRefreshingPricing: scannerState.isRefreshingPricing,
       onSave: () async {
         final didSave = await scannerController.saveScanResultToPortfolio();
         if (!context.mounted || !didSave) {
@@ -352,7 +353,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       onScanAnother: scannerController.resetScan,
       onViewPortfolio: widget.onViewPortfolio,
       onApplyReviewEdits: (edits) {
-        scannerController.applyResultReviewEdits(
+        return scannerController.applyResultReviewEdits(
           title: edits.title,
           category: edits.category,
           condition: edits.condition,

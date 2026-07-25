@@ -2683,10 +2683,11 @@ void main() {
           ),
           isSaved: false,
           isSaving: false,
+          isRefreshingPricing: false,
           onSave: () async {},
           onScanAnother: () {},
           onViewPortfolio: null,
-          onApplyReviewEdits: (_) {},
+          onApplyReviewEdits: (_) async => true,
         ),
       ),
     );
@@ -2752,11 +2753,13 @@ void main() {
           activeSlot: null,
           isSaved: false,
           isSaving: false,
+          isRefreshingPricing: false,
           onSave: () async {},
           onScanAnother: () {},
           onViewPortfolio: null,
-          onApplyReviewEdits: (edits) {
+          onApplyReviewEdits: (edits) async {
             appliedEdits = edits;
+            return true;
           },
         ),
       ),

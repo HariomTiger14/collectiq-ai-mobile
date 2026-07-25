@@ -41,6 +41,7 @@ class ScanResultScreen extends StatelessWidget {
     required this.activeSlot,
     required this.isSaved,
     required this.isSaving,
+    required this.isRefreshingPricing,
     required this.onSave,
     required this.onScanAnother,
     required this.onViewPortfolio,
@@ -53,10 +54,11 @@ class ScanResultScreen extends StatelessWidget {
   final ScannerPhotoSlot? activeSlot;
   final bool isSaved;
   final bool isSaving;
+  final bool isRefreshingPricing;
   final Future<void> Function() onSave;
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
-  final ValueChanged<ScanResultReviewEdits> onApplyReviewEdits;
+  final Future<bool> Function(ScanResultReviewEdits) onApplyReviewEdits;
   final double qaInitialScrollOffset;
 
   @override
@@ -217,6 +219,7 @@ class ScanResultScreen extends StatelessWidget {
           result: result,
           isSaved: isSaved,
           isSaving: isSaving,
+          isRefreshingPricing: isRefreshingPricing,
           onSave: onSave,
           onScanAnother: onScanAnother,
           onViewPortfolio: onViewPortfolio,
@@ -748,6 +751,7 @@ class _ResultActionBar extends StatelessWidget {
     required this.result,
     required this.isSaved,
     required this.isSaving,
+    required this.isRefreshingPricing,
     required this.onSave,
     required this.onScanAnother,
     required this.onViewPortfolio,
@@ -757,10 +761,11 @@ class _ResultActionBar extends StatelessWidget {
   final ScanResult result;
   final bool isSaved;
   final bool isSaving;
+  final bool isRefreshingPricing;
   final Future<void> Function() onSave;
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
-  final ValueChanged<ScanResultReviewEdits> onApplyReviewEdits;
+  final Future<bool> Function(ScanResultReviewEdits) onApplyReviewEdits;
 
   @override
   Widget build(BuildContext context) {
@@ -829,16 +834,26 @@ class _ResultActionBar extends StatelessWidget {
                     children: [
                       OutlinedButton.icon(
                         key: const ValueKey('result-review-details-action'),
-                        onPressed: isSaving
+                        onPressed: isSaving || isRefreshingPricing
                             ? null
                             : () => _openReviewSheet(context),
-                        icon: const Icon(Icons.edit_note_outlined),
-                        label: const Text('Review details'),
+                        icon: Icon(
+                          isRefreshingPricing
+                              ? Icons.sync_outlined
+                              : Icons.edit_note_outlined,
+                        ),
+                        label: Text(
+                          isRefreshingPricing
+                              ? 'Updating pricing...'
+                              : 'Review details',
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       FilledButton.icon(
                         key: const ValueKey('result-primary-add-to-portfolio'),
-                        onPressed: isSaving ? null : onSave,
+                        onPressed: isSaving || isRefreshingPricing
+                            ? null
+                            : onSave,
                         icon: Icon(
                           isSaving
                               ? Icons.hourglass_top_outlined
@@ -867,12 +882,18 @@ class _ResultActionBar extends StatelessWidget {
       },
     );
     if (edits != null) {
-      onApplyReviewEdits(edits);
+      final pricingRefreshed = await onApplyReviewEdits(edits);
       if (context.mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            const SnackBar(content: Text('Review details updated')),
+            SnackBar(
+              content: Text(
+                pricingRefreshed
+                    ? 'Review details updated and pricing refreshed'
+                    : 'Review details updated. Pricing kept as shown.',
+              ),
+            ),
           );
       }
     }

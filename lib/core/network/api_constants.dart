@@ -88,6 +88,9 @@ class ApiConstants {
   /// Production analyzer endpoint.
   static const analyzerPath = '/analyze';
 
+  /// Pricing-only quote endpoint for user-confirmed scan details.
+  static const pricingQuotePath = '/api/pricing/quote';
+
   /// Portfolio endpoint.
   static const portfolioPath = '/portfolio';
 

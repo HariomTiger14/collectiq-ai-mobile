@@ -37,6 +37,7 @@ import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_draft_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
@@ -120,6 +121,7 @@ class ScannerState {
     this.aiRecommendation,
     this.isSavedToPortfolio = false,
     this.isSavingToPortfolio = false,
+    this.isRefreshingPricing = false,
     this.errorMessage,
   });
 
@@ -169,6 +171,9 @@ class ScannerState {
   /// Whether the current result is being saved.
   final bool isSavingToPortfolio;
 
+  /// Whether the current result is refreshing pricing after review edits.
+  final bool isRefreshingPricing;
+
   /// Latest user-safe scanner error message.
   final String? errorMessage;
 
@@ -192,6 +197,7 @@ class ScannerState {
     String? aiRecommendation,
     bool? isSavedToPortfolio,
     bool? isSavingToPortfolio,
+    bool? isRefreshingPricing,
     String? errorMessage,
     bool clearSelectedImage = false,
     bool clearSelectedImagePath = false,
@@ -242,6 +248,7 @@ class ScannerState {
           : aiRecommendation ?? this.aiRecommendation,
       isSavedToPortfolio: isSavedToPortfolio ?? this.isSavedToPortfolio,
       isSavingToPortfolio: isSavingToPortfolio ?? this.isSavingToPortfolio,
+      isRefreshingPricing: isRefreshingPricing ?? this.isRefreshingPricing,
       errorMessage: clearErrorMessage
           ? null
           : errorMessage ?? this.errorMessage,
@@ -1751,8 +1758,8 @@ class ScannerController extends Notifier<ScannerState> {
     }
   }
 
-  /// Applies local-only review edits to the current scan result before saving.
-  void applyResultReviewEdits({
+  /// Applies review edits to the current scan result and refreshes pricing.
+  Future<bool> applyResultReviewEdits({
     required String title,
     required String category,
     required String condition,
@@ -1764,13 +1771,14 @@ class ScannerController extends Notifier<ScannerState> {
     String? rarity,
     String? edition,
     String? notes,
-  }) {
+  }) async {
     final result = state.scanResult;
     if (result == null || state.isSavedToPortfolio) {
-      return;
+      return false;
     }
 
     state = state.copyWith(
+      isRefreshingPricing: true,
       scanResult: result.copyWith(
         title: title.trim().isEmpty ? result.title : title.trim(),
         category: category.trim().isEmpty ? result.category : category.trim(),
@@ -1789,6 +1797,52 @@ class ScannerController extends Notifier<ScannerState> {
         notes: notes?.trim(),
       ),
     );
+    final editedResult = state.scanResult;
+    if (editedResult == null) {
+      state = state.copyWith(isRefreshingPricing: false);
+      return false;
+    }
+
+    try {
+      final quote = await ref
+          .read(scanPricingQuoteServiceProvider)
+          .quote(editedResult);
+      if (state.scanResult?.id != editedResult.id) {
+        return false;
+      }
+      state = state.copyWith(
+        isRefreshingPricing: false,
+        scanResult: editedResult.copyWith(
+          estimatedValue: quote.estimatedValue,
+          pricing: quote.pricing,
+          marketSummary: quote.marketSummary,
+          estimatedMarketValue: quote.estimatedMarketValue,
+          aiEstimatedValue: quote.aiEstimatedValue,
+          valuationStatus: quote.valuationStatus,
+          valuationSource: quote.valuationSource,
+          valuationConfidence: quote.valuationConfidence,
+        ),
+      );
+      _logFlow(
+        'pricing refreshed after review',
+        details: {
+          'scanResultId': editedResult.id,
+          'valuationStatus': quote.valuationStatus.wireValue,
+          'valuationSource': quote.valuationSource,
+        },
+      );
+      return true;
+    } catch (error) {
+      debugPrint('[Scanner] pricing refresh after review failed: $error');
+      _logFlow(
+        'pricing refresh after review failed',
+        details: {'scanResultId': editedResult.id},
+      );
+      if (state.scanResult?.id == editedResult.id) {
+        state = state.copyWith(isRefreshingPricing: false);
+      }
+      return false;
+    }
   }
 
   String? _reviewEditValue(String? nextValue, String? currentValue) {
@@ -1804,6 +1858,7 @@ class ScannerController extends Notifier<ScannerState> {
     state = state.copyWith(
       isLoading: false,
       isPreparingImage: false,
+      isRefreshingPricing: false,
       clearSelectedImage: true,
       clearSelectedImagePath: true,
       clearSelectedItemTitle: true,
