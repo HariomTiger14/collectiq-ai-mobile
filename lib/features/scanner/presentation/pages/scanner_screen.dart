@@ -351,6 +351,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       },
       onScanAnother: scannerController.resetScan,
       onViewPortfolio: widget.onViewPortfolio,
+      onApplyReviewEdits: (edits) {
+        scannerController.applyResultReviewEdits(
+          title: edits.title,
+          category: edits.category,
+          condition: edits.condition,
+          estimatedValue: edits.estimatedValue,
+          brand: edits.brand,
+          setName: edits.setName,
+          series: edits.series,
+          cardNumber: edits.cardNumber,
+          rarity: edits.rarity,
+          edition: edits.edition,
+          notes: edits.notes,
+        );
+      },
     );
   }
 

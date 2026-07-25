@@ -819,6 +819,7 @@ class _QaScannerResult extends StatelessWidget {
       onSave: () async {},
       onScanAnother: () {},
       onViewPortfolio: () {},
+      onApplyReviewEdits: (_) {},
       qaInitialScrollOffset: scrollOffset,
     );
   }

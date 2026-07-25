@@ -7,6 +7,34 @@ import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_c
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 
+class ScanResultReviewEdits {
+  const ScanResultReviewEdits({
+    required this.title,
+    required this.category,
+    required this.condition,
+    required this.estimatedValue,
+    this.brand,
+    this.setName,
+    this.series,
+    this.cardNumber,
+    this.rarity,
+    this.edition,
+    this.notes,
+  });
+
+  final String title;
+  final String category;
+  final String condition;
+  final double estimatedValue;
+  final String? brand;
+  final String? setName;
+  final String? series;
+  final String? cardNumber;
+  final String? rarity;
+  final String? edition;
+  final String? notes;
+}
+
 class ScanResultScreen extends StatelessWidget {
   const ScanResultScreen({
     required this.result,
@@ -16,6 +44,7 @@ class ScanResultScreen extends StatelessWidget {
     required this.onSave,
     required this.onScanAnother,
     required this.onViewPortfolio,
+    required this.onApplyReviewEdits,
     this.qaInitialScrollOffset = 0,
     super.key,
   });
@@ -27,6 +56,7 @@ class ScanResultScreen extends StatelessWidget {
   final Future<void> Function() onSave;
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
+  final ValueChanged<ScanResultReviewEdits> onApplyReviewEdits;
   final double qaInitialScrollOffset;
 
   @override
@@ -184,11 +214,13 @@ class ScanResultScreen extends StatelessWidget {
           ),
         ),
         bottomNavigationBar: _ResultActionBar(
+          result: result,
           isSaved: isSaved,
           isSaving: isSaving,
           onSave: onSave,
           onScanAnother: onScanAnother,
           onViewPortfolio: onViewPortfolio,
+          onApplyReviewEdits: onApplyReviewEdits,
         ),
       ),
     );
@@ -713,18 +745,22 @@ class _Detail {
 
 class _ResultActionBar extends StatelessWidget {
   const _ResultActionBar({
+    required this.result,
     required this.isSaved,
     required this.isSaving,
     required this.onSave,
     required this.onScanAnother,
     required this.onViewPortfolio,
+    required this.onApplyReviewEdits,
   });
 
+  final ScanResult result;
   final bool isSaved;
   final bool isSaving;
   final Future<void> Function() onSave;
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
+  final ValueChanged<ScanResultReviewEdits> onApplyReviewEdits;
 
   @override
   Widget build(BuildContext context) {
@@ -787,16 +823,311 @@ class _ResultActionBar extends StatelessWidget {
                       ),
                     ],
                   )
-                : FilledButton.icon(
-                    key: const ValueKey('result-primary-add-to-portfolio'),
-                    onPressed: isSaving ? null : onSave,
-                    icon: Icon(
-                      isSaving
-                          ? Icons.hourglass_top_outlined
-                          : Icons.bookmark_add_outlined,
-                    ),
-                    label: Text(isSaving ? 'Saving...' : 'Add to Portfolio'),
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('result-review-details-action'),
+                        onPressed: isSaving
+                            ? null
+                            : () => _openReviewSheet(context),
+                        icon: const Icon(Icons.edit_note_outlined),
+                        label: const Text('Review details'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      FilledButton.icon(
+                        key: const ValueKey('result-primary-add-to-portfolio'),
+                        onPressed: isSaving ? null : onSave,
+                        icon: Icon(
+                          isSaving
+                              ? Icons.hourglass_top_outlined
+                              : Icons.bookmark_add_outlined,
+                        ),
+                        label: Text(
+                          isSaving ? 'Saving...' : 'Add to Portfolio',
+                        ),
+                      ),
+                    ],
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReviewSheet(BuildContext context) async {
+    final edits = await showModalBottomSheet<ScanResultReviewEdits>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _ResultReviewSheet(result: result);
+      },
+    );
+    if (edits != null) {
+      onApplyReviewEdits(edits);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Review details updated')),
+          );
+      }
+    }
+  }
+}
+
+class _ResultReviewSheet extends StatefulWidget {
+  const _ResultReviewSheet({required this.result});
+
+  final ScanResult result;
+
+  @override
+  State<_ResultReviewSheet> createState() => _ResultReviewSheetState();
+}
+
+class _ResultReviewSheetState extends State<_ResultReviewSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _conditionController;
+  late final TextEditingController _valueController;
+  late final TextEditingController _brandController;
+  late final TextEditingController _setController;
+  late final TextEditingController _seriesController;
+  late final TextEditingController _cardNumberController;
+  late final TextEditingController _rarityController;
+  late final TextEditingController _editionController;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    final result = widget.result;
+    _titleController = TextEditingController(text: result.title);
+    _categoryController = TextEditingController(text: result.category);
+    _conditionController = TextEditingController(text: result.condition);
+    _valueController = TextEditingController(
+      text: result.estimatedValue > 0
+          ? result.estimatedValue.toStringAsFixed(0)
+          : '',
+    );
+    _brandController = TextEditingController(text: result.brand ?? '');
+    _setController = TextEditingController(text: result.setName ?? '');
+    _seriesController = TextEditingController(text: result.series ?? '');
+    _cardNumberController = TextEditingController(
+      text: result.cardNumber ?? '',
+    );
+    _rarityController = TextEditingController(text: result.rarity ?? '');
+    _editionController = TextEditingController(text: result.edition ?? '');
+    _notesController = TextEditingController(text: result.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _categoryController.dispose();
+    _conditionController.dispose();
+    _valueController.dispose();
+    _brandController.dispose();
+    _setController.dispose();
+    _seriesController.dispose();
+    _cardNumberController.dispose();
+    _rarityController.dispose();
+    _editionController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: ScannerVisualTheme.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.edit_note_outlined,
+                      color: ScannerVisualTheme.cyan,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Review before saving',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: ScannerVisualTheme.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Correct the identifiers that affect matching and portfolio value.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: ScannerVisualTheme.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _ReviewTextField(
+                  controller: _titleController,
+                  label: 'Item name',
+                  icon: Icons.title_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _categoryController,
+                  label: 'Category',
+                  icon: Icons.category_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _brandController,
+                  label: 'Brand',
+                  icon: Icons.business_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _setController,
+                  label: 'Set',
+                  icon: Icons.collections_bookmark_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _seriesController,
+                  label: 'Series',
+                  icon: Icons.view_carousel_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _cardNumberController,
+                  label: 'Card / model number',
+                  icon: Icons.numbers_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _editionController,
+                  label: 'Edition / variant',
+                  icon: Icons.auto_awesome_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _rarityController,
+                  label: 'Rarity',
+                  icon: Icons.diamond_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _conditionController,
+                  label: 'Condition',
+                  icon: Icons.health_and_safety_outlined,
+                ),
+                _ReviewTextField(
+                  controller: _valueController,
+                  label: 'Displayed value',
+                  icon: Icons.paid_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                _ReviewTextField(
+                  controller: _notesController,
+                  label: 'Notes',
+                  icon: Icons.sticky_note_2_outlined,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.icon(
+                  key: const ValueKey('result-review-save-action'),
+                  onPressed: _save,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Apply details'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _save() {
+    Navigator.of(context).pop(
+      ScanResultReviewEdits(
+        title: _titleController.text,
+        category: _categoryController.text,
+        condition: _conditionController.text,
+        estimatedValue:
+            double.tryParse(_valueController.text.replaceAll(',', '').trim()) ??
+            widget.result.estimatedValue,
+        brand: _brandController.text,
+        setName: _setController.text,
+        series: _seriesController.text,
+        cardNumber: _cardNumberController.text,
+        rarity: _rarityController.text,
+        edition: _editionController.text,
+        notes: _notesController.text,
+      ),
+    );
+  }
+}
+
+class _ReviewTextField extends StatelessWidget {
+  const _ReviewTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.keyboardType,
+    this.maxLines = 1,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: ScannerVisualTheme.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          filled: true,
+          fillColor: ScannerVisualTheme.surfaceElevated,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
       ),

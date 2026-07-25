@@ -2686,6 +2686,7 @@ void main() {
           onSave: () async {},
           onScanAnother: () {},
           onViewPortfolio: null,
+          onApplyReviewEdits: (_) {},
         ),
       ),
     );
@@ -2710,6 +2711,79 @@ void main() {
       find.byKey(const ValueKey('result-add-button-slide-animation')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('scan result review sheet applies corrected details', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.parse('2026-07-09T00:00:00Z');
+    ScanResultReviewEdits? appliedEdits;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ScanResultScreen(
+          result: ScanResult(
+            id: 'review-result',
+            title: 'Original collectible',
+            category: 'Trading Card',
+            estimatedValue: 88,
+            confidence: 0.72,
+            condition: 'Good',
+            thumbnail: 'sample://front',
+            scanDate: now,
+            primaryMatch: 'Original collectible',
+            alternativeMatches: const [],
+            confidenceExplanation: 'Needs review.',
+            detectionQuality: 'Good',
+            aiReasoning: 'Visible card front.',
+            brand: 'PackLox',
+            setName: 'Starter Set',
+            cardNumber: '12',
+            pricing: PricingInfo(
+              estimatedMarketValue: 88,
+              lowEstimate: 70,
+              highEstimate: 105,
+              currency: 'AUD',
+              pricingSource: 'Fixture',
+              pricingConfidence: 0.8,
+              lastUpdated: now,
+            ),
+          ),
+          activeSlot: null,
+          isSaved: false,
+          isSaving: false,
+          onSave: () async {},
+          onScanAnother: () {},
+          onViewPortfolio: null,
+          onApplyReviewEdits: (edits) {
+            appliedEdits = edits;
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(
+      find.byKey(const ValueKey('result-review-details-action')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Item name'),
+      'Corrected collectible',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Card / model number'),
+      '34',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('result-review-save-action')),
+    );
+    await tester.tap(find.byKey(const ValueKey('result-review-save-action')));
+    await tester.pumpAndSettle();
+
+    expect(appliedEdits?.title, 'Corrected collectible');
+    expect(appliedEdits?.cardNumber, '34');
   });
 
   testWidgets('scan result missing value shows unavailable state', (

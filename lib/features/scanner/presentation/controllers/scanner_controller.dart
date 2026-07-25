@@ -1757,6 +1757,12 @@ class ScannerController extends Notifier<ScannerState> {
     required String category,
     required String condition,
     required double estimatedValue,
+    String? brand,
+    String? setName,
+    String? series,
+    String? cardNumber,
+    String? rarity,
+    String? edition,
     String? notes,
   }) {
     final result = state.scanResult;
@@ -1774,9 +1780,23 @@ class ScannerController extends Notifier<ScannerState> {
         estimatedValue: estimatedValue < 0
             ? result.estimatedValue
             : estimatedValue,
+        brand: _reviewEditValue(brand, result.brand),
+        setName: _reviewEditValue(setName, result.setName),
+        series: _reviewEditValue(series, result.series),
+        cardNumber: _reviewEditValue(cardNumber, result.cardNumber),
+        rarity: _reviewEditValue(rarity, result.rarity),
+        edition: _reviewEditValue(edition, result.edition),
         notes: notes?.trim(),
       ),
     );
+  }
+
+  String? _reviewEditValue(String? nextValue, String? currentValue) {
+    final trimmed = nextValue?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return currentValue;
+    }
+    return trimmed;
   }
 
   /// Clears the active scan so the user can start over.
