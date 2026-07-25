@@ -80,11 +80,8 @@ void main() {
         scannerVisualTheme,
         contains('onTap: isCapturing ? null : onPressed'),
       );
-      expect(
-        camera,
-        contains('Camera permission is required to capture scans.'),
-      );
-      expect(camera, contains('Camera permission is turned off.'));
+      expect(camera, contains('PackLox needs camera access'));
+      expect(camera, contains('Camera access is off for PackLox.'));
       expect(camera, contains('Open Settings'));
       expect(camera, contains('Try Again'));
 
@@ -93,7 +90,8 @@ void main() {
       expect(review, contains('enhancement-preview-auto_enhance'));
       expect(review, contains('ImageEnhancementPreset.original'));
       expect(review, contains('ImageEnhancementPreset.autoEnhance'));
-      expect(review, isNot(contains('Readiness')));
+      expect(review, contains('_ReviewReadinessPill'));
+      expect(review, contains('Photo readiness'));
       expect(review, isNot(contains('Use Anyway')));
       expect(review, contains("Text('Use Photo')"));
       expect(review, contains("label: 'Original'"));
@@ -109,7 +107,7 @@ void main() {
         final workspace = _read(
           'lib/features/scanner/presentation/widgets/capture_workspace.dart',
         );
-        final legacyWorkspace = _read(
+        final legacyWorkspaceFile = File(
           'lib/features/scanner/presentation/pages/scan_workspace_screen.dart',
         );
 
@@ -138,12 +136,7 @@ void main() {
         expect(workspace, contains('Use as Primary'));
         expect(workspace, isNot(contains('Auto Detect')));
         expect(workspace, isNot(contains('raw confidence')));
-        expect(legacyWorkspace, isNot(contains('Auto Detect')));
-        expect(legacyWorkspace, isNot(contains("label: 'Confidence'")));
-        expect(
-          legacyWorkspace,
-          isNot(contains('workspace-metadata-confidence')),
-        );
+        expect(legacyWorkspaceFile.existsSync(), isFalse);
       },
     );
 
