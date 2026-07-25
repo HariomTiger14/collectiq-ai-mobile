@@ -488,6 +488,24 @@ void main() {
       expect(parsedValidation.isValid, isTrue);
       expect(parsed.toScanResult(thumbnail: '/tmp/card.jpg').estimatedValue, 0);
     });
+
+    test('backend pending-price payload accepts nested pricing status', () {
+      const validator = AiBackendContractValidator();
+      final payload = {
+        'id': 'charizard-nested-pending',
+        'title': 'Charizard LV.76',
+        'category': 'Pokemon Card',
+        'confidence': 55,
+        'pricing': {
+          'valuationStatus': 'no_market_match',
+          'valuationSource': 'pricecharting_catalog',
+        },
+      };
+
+      final payloadValidation = validator.validateResponsePayload(payload);
+
+      expect(payloadValidation.isValid, isTrue);
+    });
   });
 
   group('AnalyzerException', () {

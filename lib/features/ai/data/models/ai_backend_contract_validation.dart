@@ -57,13 +57,7 @@ class AiBackendContractValidator {
       issues.add('category is required.');
     }
     if (!_payloadAllowsUnavailableValue(json) &&
-        !_hasNumericValue(
-          json['estimatedValue'] ??
-              json['estimatedMarketValue'] ??
-              json['marketValue'] ??
-              _valueRange(json)['estimated'] ??
-              _valueRange(json)['mid'],
-        )) {
+        !_hasNumericValue(_payloadEstimatedValue(json))) {
       issues.add('estimatedValue is required.');
     }
     if (!_hasNumericValue(json['confidence'])) {
@@ -111,6 +105,24 @@ class AiBackendContractValidator {
     return value is Map<String, dynamic> ? value : const {};
   }
 
+  Map<String, dynamic> _pricingPayload(Map<String, dynamic> json) {
+    final pricing = json['pricing'];
+    return pricing is Map<String, dynamic> ? pricing : const {};
+  }
+
+  Object? _payloadEstimatedValue(Map<String, dynamic> json) {
+    final valueRange = _valueRange(json);
+    final pricing = _pricingPayload(json);
+    return json['estimatedValue'] ??
+        json['estimatedMarketValue'] ??
+        json['marketValue'] ??
+        valueRange['estimated'] ??
+        valueRange['mid'] ??
+        pricing['estimatedValue'] ??
+        pricing['estimatedMarketValue'] ??
+        pricing['marketValue'];
+  }
+
   bool _isBlank(Object? value) {
     return value is! String || value.trim().isEmpty;
   }
@@ -126,10 +138,15 @@ class AiBackendContractValidator {
   }
 
   bool _payloadAllowsUnavailableValue(Map<String, dynamic> json) {
-    final status = (json['valuationStatus'] ?? json['status'])
-        .toString()
-        .trim()
-        .toLowerCase();
+    final pricing = _pricingPayload(json);
+    final status =
+        (json['valuationStatus'] ??
+                json['status'] ??
+                pricing['valuationStatus'] ??
+                pricing['status'])
+            .toString()
+            .trim()
+            .toLowerCase();
     return status == 'provider_not_configured' ||
         status == 'no_market_match' ||
         status == 'lookup_failed' ||
