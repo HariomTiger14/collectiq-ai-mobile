@@ -364,6 +364,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           cardNumber: edits.cardNumber,
           rarity: edits.rarity,
           edition: edits.edition,
+          language: edits.language,
           notes: edits.notes,
         );
       },

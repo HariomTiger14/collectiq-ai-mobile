@@ -3,6 +3,7 @@ import 'package:collectiq_ai/core/network/api_constants.dart';
 import 'package:collectiq_ai/core/utils/json_parse.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,6 +30,15 @@ class ScanPricingQuoteService {
     return ScanPricingQuote.fromJson(payload);
   }
 
+  Future<ScanPricingQuote> quoteItem(CollectibleItem item) async {
+    final response = await _apiClient.post(
+      ApiConstants.pricingQuotePath,
+      data: _requestForItem(item),
+    );
+    final payload = _unwrapResponse(response.data);
+    return ScanPricingQuote.fromJson(payload);
+  }
+
   Map<String, dynamic> _requestFor(ScanResult result) {
     return {
       'itemName': result.title,
@@ -46,6 +56,26 @@ class ScanPricingQuoteService {
       'edition': result.edition,
       'language': result.language,
       'notes': result.notes,
+    };
+  }
+
+  Map<String, dynamic> _requestForItem(CollectibleItem item) {
+    return {
+      'itemName': item.title,
+      'category': item.category,
+      'condition': item.condition,
+      'estimatedValue': item.aiEstimatedValue ?? item.estimatedValue,
+      'displayCurrency': item.pricing?.currency ?? 'AUD',
+      'year': item.year,
+      'brand': item.brand,
+      'setName': item.setName,
+      'series': item.series,
+      'cardNumber': item.cardNumber,
+      'playerOrCharacter': item.playerOrCharacter,
+      'rarity': item.rarity,
+      'edition': item.edition,
+      'language': item.language,
+      'notes': item.notes,
     };
   }
 

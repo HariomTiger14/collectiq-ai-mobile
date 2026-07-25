@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 
 /// Result of validating a future backend AI contract payload.
 class AiBackendContractValidationResult {
@@ -55,23 +56,18 @@ class AiBackendContractValidator {
     if (_isBlank(json['category'] ?? json['type'])) {
       issues.add('category is required.');
     }
-    if (!_hasNumericValue(
-      json['estimatedValue'] ??
-          json['estimatedMarketValue'] ??
-          json['marketValue'] ??
-          _valueRange(json)['estimated'] ??
-          _valueRange(json)['mid'],
-    )) {
+    if (!_payloadAllowsUnavailableValue(json) &&
+        !_hasNumericValue(
+          json['estimatedValue'] ??
+              json['estimatedMarketValue'] ??
+              json['marketValue'] ??
+              _valueRange(json)['estimated'] ??
+              _valueRange(json)['mid'],
+        )) {
       issues.add('estimatedValue is required.');
     }
     if (!_hasNumericValue(json['confidence'])) {
       issues.add('confidence is required.');
-    }
-    if (_isBlank(json['condition'])) {
-      issues.add('condition is required.');
-    }
-    if (_isBlank(json['recommendation'])) {
-      issues.add('recommendation is required.');
     }
 
     return AiBackendContractValidationResult(issues: issues);
@@ -90,14 +86,21 @@ class AiBackendContractValidator {
         response.category == 'Collectible') {
       issues.add('category is missing or defaulted.');
     }
-    if (response.estimatedValue <= 0) {
+    final allowsUnavailableValue = switch (response.valuationStatus) {
+      ValuationStatus.providerNotConfigured ||
+      ValuationStatus.noMarketMatch ||
+      ValuationStatus.lookupFailed ||
+      ValuationStatus.unavailable => true,
+      ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => false,
+    };
+    if (response.estimatedValue <= 0 && !allowsUnavailableValue) {
       issues.add('estimatedValue must be greater than zero.');
     }
     if (response.confidence <= 0 || response.confidence > 1) {
       issues.add('confidence must be between 0 and 1.');
     }
-    if (response.condition.trim().isEmpty || response.condition == 'Unknown') {
-      issues.add('condition is missing or defaulted.');
+    if (response.condition.trim().isEmpty) {
+      issues.add('condition is missing.');
     }
 
     return AiBackendContractValidationResult(issues: issues);
@@ -120,6 +123,17 @@ class AiBackendContractValidator {
       return double.tryParse(value) != null;
     }
     return false;
+  }
+
+  bool _payloadAllowsUnavailableValue(Map<String, dynamic> json) {
+    final status = (json['valuationStatus'] ?? json['status'])
+        .toString()
+        .trim()
+        .toLowerCase();
+    return status == 'provider_not_configured' ||
+        status == 'no_market_match' ||
+        status == 'lookup_failed' ||
+        status == 'unavailable';
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:collectiq_ai/features/ai/data/analyzer/future_openai_provider.da
 import 'package:collectiq_ai/features/ai/data/analyzer/future_vision_provider.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/mock_analyzer_provider.dart';
 import 'package:collectiq_ai/features/ai/data/models/ai_backend_analysis_models.dart';
+import 'package:collectiq_ai/features/ai/data/models/ai_backend_contract_validation.dart';
 import 'package:collectiq_ai/features/ai/domain/clients/ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_models.dart';
 import 'package:collectiq_ai/features/ai/domain/analyzer/analyzer_provider.dart';
@@ -170,6 +171,36 @@ void main() {
             (error) => error.type,
             'type',
             AnalyzerErrorType.invalidImage,
+          ),
+        ),
+      );
+      expect(provider.calls, 1);
+    });
+
+    test('does not retry provider unavailable errors', () async {
+      final provider = _FlakyAnalyzerProvider(
+        firstError: const AnalyzerException(
+          type: AnalyzerErrorType.providerUnavailable,
+          message: 'Provider unavailable.',
+        ),
+      );
+      final service = AnalyzerService(
+        provider: provider,
+        config: const AnalyzerConfig(
+          retryPolicy: AnalyzerRetryPolicy(
+            maxAttempts: 3,
+            retryDelay: Duration.zero,
+          ),
+        ),
+      );
+
+      await expectLater(
+        service.analyze(const AnalyzerRequest(imagePath: '/tmp/card.jpg')),
+        throwsA(
+          isA<AnalyzerException>().having(
+            (error) => error.type,
+            'type',
+            AnalyzerErrorType.providerUnavailable,
           ),
         ),
       );
@@ -420,7 +451,11 @@ void main() {
       });
 
       final result = backendResponse.toScanResult(thumbnail: '/tmp/coin.jpg');
+      final validation = const AiBackendContractValidator().validateResponse(
+        backendResponse,
+      );
 
+      expect(validation.isValid, isTrue);
       expect(result.faceValue, 2);
       expect(result.estimatedMarketValue, 0);
       expect(result.aiEstimatedValue, isNull);
@@ -432,6 +467,26 @@ void main() {
       expect(result.photosUsed, 1);
       expect(result.photoRoles, ['front']);
       expect(result.estimatedValue, 0);
+    });
+
+    test('backend pending-price payload validates without optional copy', () {
+      const validator = AiBackendContractValidator();
+      final payload = {
+        'id': 'charizard-pending',
+        'title': 'Charizard LV.76',
+        'category': 'Collectible Card',
+        'valuationStatus': 'no_market_match',
+        'valuationSource': 'pricecharting_catalog',
+        'confidence': 55,
+      };
+
+      final payloadValidation = validator.validateResponsePayload(payload);
+      final parsed = AiBackendAnalysisResponse.fromJson(payload);
+      final parsedValidation = validator.validateResponse(parsed);
+
+      expect(payloadValidation.isValid, isTrue);
+      expect(parsedValidation.isValid, isTrue);
+      expect(parsed.toScanResult(thumbnail: '/tmp/card.jpg').estimatedValue, 0);
     });
   });
 

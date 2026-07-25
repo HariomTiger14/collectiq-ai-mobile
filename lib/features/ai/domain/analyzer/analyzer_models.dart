@@ -93,7 +93,9 @@ class AnalyzerConfig {
     );
 
     final providerType = configuredProvider.trim().isEmpty
-        ? _defaultAnalyzerProviderFor(EnvironmentConfig.fromEnvironment().environment)
+        ? _defaultAnalyzerProviderFor(
+            EnvironmentConfig.fromEnvironment().environment,
+          )
         : AnalyzerProviderType.fromConfig(configuredProvider);
 
     return AnalyzerConfig(
@@ -132,8 +134,8 @@ class AnalyzerRetryPolicy {
     return switch (type) {
       AnalyzerErrorType.timeout ||
       AnalyzerErrorType.network ||
-      AnalyzerErrorType.providerUnavailable ||
       AnalyzerErrorType.unknown => true,
+      AnalyzerErrorType.providerUnavailable ||
       AnalyzerErrorType.invalidImage ||
       AnalyzerErrorType.quotaExceeded ||
       AnalyzerErrorType.authentication ||

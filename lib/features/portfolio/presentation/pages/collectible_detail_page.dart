@@ -11,6 +11,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
+import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
@@ -1362,6 +1363,7 @@ class _DetailOverviewSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-overview-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1402,6 +1404,7 @@ class _DetailGallerySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-gallery-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1448,6 +1451,7 @@ class _DetailInfoSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = _detailMetadataRows(item);
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-info-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1482,6 +1486,7 @@ class _DetailMarketSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = _detailMarketRows(item);
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-market-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1516,6 +1521,7 @@ class _DetailInsightsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final summary = _storedAiSummaryFor(item);
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-insights-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1578,6 +1584,7 @@ class _DetailNotesAndStatusSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      key: const ValueKey('collectible-detail-notes-status-section'),
       children: [
         _NotesCard(item: item),
         const SizedBox(height: AppSpacing.sm),
@@ -1656,6 +1663,7 @@ class _DetailActionsMenuSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-actions-section'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1664,8 +1672,8 @@ class _DetailActionsMenuSection extends StatelessWidget {
           _DetailActionMenuRow(
             key: const ValueKey('collectible-detail-primary-edit-action'),
             icon: Icons.edit_outlined,
-            label: 'Edit item',
-            description: 'Update saved details',
+            label: 'Review details',
+            description: 'Correct identifiers and retry pricing',
             onTap: onEdit,
           ),
           _DetailActionMenuRow(
@@ -2891,21 +2899,70 @@ Future<void> _showEditCollectibleDialog({
   required WidgetRef ref,
   required CollectibleItem item,
 }) async {
-  final editedItem = await showModalBottomSheet<CollectibleItem>(
+  final editResult = await showModalBottomSheet<_EditCollectibleResult>(
     context: context,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: .62),
     isScrollControlled: true,
     builder: (_) => _EditCollectibleDialog(item: item),
   );
-  if (editedItem == null) {
+  if (editResult == null) {
     return;
   }
 
-  await ref.read(portfolioControllerProvider.notifier).updateItem(editedItem);
-  if (context.mounted) {
-    _showDetailSnackBar(context, 'Collectible updated');
+  var nextItem = editResult.item;
+  ValuationStatus? refreshedStatus;
+  if (editResult.retryPricing) {
+    try {
+      final quote = await ref
+          .read(scanPricingQuoteServiceProvider)
+          .quoteItem(nextItem);
+      refreshedStatus = quote.valuationStatus;
+      nextItem = nextItem.copyWith(
+        estimatedValue: quote.estimatedValue,
+        pricing: quote.pricing,
+        marketSummary: quote.marketSummary,
+        valuationStatus: quote.valuationStatus,
+        valuationSource: quote.valuationSource,
+        aiEstimatedValue: quote.aiEstimatedValue,
+      );
+    } catch (_) {
+      refreshedStatus = null;
+    }
   }
+
+  await ref.read(portfolioControllerProvider.notifier).updateItem(nextItem);
+  if (context.mounted) {
+    _showDetailSnackBar(
+      context,
+      editResult.retryPricing
+          ? _pricingRetryMessage(refreshedStatus)
+          : 'Collectible updated',
+    );
+  }
+}
+
+String _pricingRetryMessage(ValuationStatus? status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => 'Details saved and pricing refreshed',
+    ValuationStatus.noMarketMatch =>
+      'Details saved. No reliable market match yet.',
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable ||
+    ValuationStatus.aiEstimated => 'Details saved. Pricing still needs review.',
+    null => 'Details saved. Pricing retry failed.',
+  };
+}
+
+class _EditCollectibleResult {
+  const _EditCollectibleResult({
+    required this.item,
+    required this.retryPricing,
+  });
+
+  final CollectibleItem item;
+  final bool retryPricing;
 }
 
 class _EditCollectibleDialog extends StatefulWidget {
@@ -2922,7 +2979,13 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
   late final TextEditingController _manufacturerController;
+  late final TextEditingController _setController;
   late final TextEditingController _seriesController;
+  late final TextEditingController _cardNumberController;
+  late final TextEditingController _rarityController;
+  late final TextEditingController _conditionController;
+  late final TextEditingController _languageController;
+  late final TextEditingController _editionController;
   late final TextEditingController _yearController;
   late final TextEditingController _countryController;
   late final TextEditingController _lowValueController;
@@ -2939,7 +3002,17 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _manufacturerController = TextEditingController(
       text: widget.item.brand ?? '',
     );
+    _setController = TextEditingController(text: widget.item.setName ?? '');
     _seriesController = TextEditingController(text: widget.item.series ?? '');
+    _cardNumberController = TextEditingController(
+      text: widget.item.cardNumber ?? '',
+    );
+    _rarityController = TextEditingController(text: widget.item.rarity ?? '');
+    _conditionController = TextEditingController(text: widget.item.condition);
+    _languageController = TextEditingController(
+      text: widget.item.language ?? '',
+    );
+    _editionController = TextEditingController(text: widget.item.edition ?? '');
     _yearController = TextEditingController(text: widget.item.year ?? '');
     _countryController = TextEditingController(text: widget.item.country ?? '');
     _lowValueController = TextEditingController(
@@ -2956,7 +3029,13 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _titleController.dispose();
     _categoryController.dispose();
     _manufacturerController.dispose();
+    _setController.dispose();
     _seriesController.dispose();
+    _cardNumberController.dispose();
+    _rarityController.dispose();
+    _conditionController.dispose();
+    _languageController.dispose();
+    _editionController.dispose();
     _yearController.dispose();
     _countryController.dispose();
     _lowValueController.dispose();
@@ -3063,7 +3142,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Update saved local details for this Portfolio item.',
+                            'Update saved details, or retry pricing after correcting identifiers like set, card number, edition, language, and condition.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: HomeTokens.textSecondary,
@@ -3097,10 +3176,53 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
+                              'edit-collectible-set-field',
+                            ),
+                            controller: _setController,
+                            label: 'Set',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
                               'edit-collectible-series-field',
                             ),
                             controller: _seriesController,
                             label: 'Series',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-card-number-field',
+                            ),
+                            controller: _cardNumberController,
+                            label: 'Card / model number',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-rarity-field',
+                            ),
+                            controller: _rarityController,
+                            label: 'Rarity',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-condition-field',
+                            ),
+                            controller: _conditionController,
+                            label: 'Condition',
+                            validator: _requiredText,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-language-field',
+                            ),
+                            controller: _languageController,
+                            label: 'Language',
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
+                              'edit-collectible-edition-field',
+                            ),
+                            controller: _editionController,
+                            label: 'Edition / variant',
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
@@ -3124,7 +3246,6 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                             controller: _lowValueController,
                             label: 'Estimated value low',
                             keyboardType: TextInputType.number,
-                            validator: _requiredMoney,
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
@@ -3133,7 +3254,6 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                             controller: _highValueController,
                             label: 'Estimated value high',
                             keyboardType: TextInputType.number,
-                            validator: _requiredMoney,
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
@@ -3172,7 +3292,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                         Expanded(
                           child: FilledButton.icon(
                             key: const ValueKey('edit-collectible-save-button'),
-                            onPressed: _save,
+                            onPressed: () => _save(retryPricing: false),
                             icon: const Icon(Icons.save_outlined, size: 18),
                             label: const Text('Save'),
                             style: FilledButton.styleFrom(
@@ -3188,6 +3308,23 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    child: FilledButton.icon(
+                      key: const ValueKey(
+                        'edit-collectible-save-retry-pricing-button',
+                      ),
+                      onPressed: () => _save(retryPricing: true),
+                      icon: const Icon(Icons.manage_search_outlined, size: 18),
+                      label: const Text('Save & retry pricing'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8BE7FF),
+                        foregroundColor: const Color(0xFF07111D),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                        minimumSize: const Size.fromHeight(46),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -3197,7 +3334,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     );
   }
 
-  void _save() {
+  void _save({required bool retryPricing}) {
     if (_formKey.currentState?.validate() != true) {
       return;
     }
@@ -3208,41 +3345,42 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     final normalizedHigh = high >= low ? high : low;
     final estimatedValue = (normalizedLow + normalizedHigh) / 2;
     Navigator.of(context).pop(
-      widget.item.copyWith(
-        title: _titleController.text.trim(),
-        category: _categoryController.text.trim(),
-        estimatedValue: estimatedValue,
-        pricing: _updatedPricing(
-          widget.item,
-          normalizedLow,
-          normalizedHigh,
-          estimatedValue,
+      _EditCollectibleResult(
+        retryPricing: retryPricing,
+        item: widget.item.copyWith(
+          title: _titleController.text.trim(),
+          category: _categoryController.text.trim(),
+          estimatedValue: estimatedValue,
+          condition: _conditionController.text.trim(),
+          pricing: _updatedPricing(
+            widget.item,
+            normalizedLow,
+            normalizedHigh,
+            estimatedValue,
+          ),
+          marketSummary: _updatedMarketSummary(
+            widget.item.marketSummary,
+            normalizedLow,
+            normalizedHigh,
+            estimatedValue,
+          ),
+          year: _yearController.text.trim(),
+          brand: _manufacturerController.text.trim(),
+          setName: _setController.text.trim(),
+          series: _seriesController.text.trim(),
+          cardNumber: _cardNumberController.text.trim(),
+          rarity: _rarityController.text.trim(),
+          language: _languageController.text.trim(),
+          edition: _editionController.text.trim(),
+          country: _countryController.text.trim(),
+          notes: _notesController.text.trim(),
         ),
-        marketSummary: _updatedMarketSummary(
-          widget.item.marketSummary,
-          normalizedLow,
-          normalizedHigh,
-          estimatedValue,
-        ),
-        year: _yearController.text.trim(),
-        brand: _manufacturerController.text.trim(),
-        series: _seriesController.text.trim(),
-        country: _countryController.text.trim(),
-        notes: _notesController.text.trim(),
       ),
     );
   }
 
   String? _requiredText(String? value) {
     return (value ?? '').trim().isEmpty ? 'Required' : null;
-  }
-
-  String? _requiredMoney(String? value) {
-    final parsed = _parseMoney(value ?? '');
-    if (parsed <= 0) {
-      return 'Enter a value above 0';
-    }
-    return null;
   }
 }
 

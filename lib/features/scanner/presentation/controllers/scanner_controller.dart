@@ -1770,6 +1770,7 @@ class ScannerController extends Notifier<ScannerState> {
     String? cardNumber,
     String? rarity,
     String? edition,
+    String? language,
     String? notes,
   }) async {
     final result = state.scanResult;
@@ -1794,6 +1795,7 @@ class ScannerController extends Notifier<ScannerState> {
         cardNumber: _reviewEditValue(cardNumber, result.cardNumber),
         rarity: _reviewEditValue(rarity, result.rarity),
         edition: _reviewEditValue(edition, result.edition),
+        language: _reviewEditValue(language, result.language),
         notes: notes?.trim(),
       ),
     );

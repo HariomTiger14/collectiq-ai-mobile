@@ -19,6 +19,7 @@ class ScanResultReviewEdits {
     this.cardNumber,
     this.rarity,
     this.edition,
+    this.language,
     this.notes,
   });
 
@@ -32,6 +33,7 @@ class ScanResultReviewEdits {
   final String? cardNumber;
   final String? rarity;
   final String? edition;
+  final String? language;
   final String? notes;
 }
 
@@ -920,6 +922,7 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
   late final TextEditingController _cardNumberController;
   late final TextEditingController _rarityController;
   late final TextEditingController _editionController;
+  late final TextEditingController _languageController;
   late final TextEditingController _notesController;
 
   @override
@@ -942,6 +945,7 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
     );
     _rarityController = TextEditingController(text: result.rarity ?? '');
     _editionController = TextEditingController(text: result.edition ?? '');
+    _languageController = TextEditingController(text: result.language ?? '');
     _notesController = TextEditingController(text: result.notes ?? '');
   }
 
@@ -957,6 +961,7 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
     _cardNumberController.dispose();
     _rarityController.dispose();
     _editionController.dispose();
+    _languageController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -1056,6 +1061,11 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
                   icon: Icons.auto_awesome_outlined,
                 ),
                 _ReviewTextField(
+                  controller: _languageController,
+                  label: 'Language',
+                  icon: Icons.translate_outlined,
+                ),
+                _ReviewTextField(
                   controller: _rarityController,
                   label: 'Rarity',
                   icon: Icons.diamond_outlined,
@@ -1109,6 +1119,7 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
         cardNumber: _cardNumberController.text,
         rarity: _rarityController.text,
         edition: _editionController.text,
+        language: _languageController.text,
         notes: _notesController.text,
       ),
     );
@@ -1540,6 +1551,10 @@ String _rarityLabel(ScanResult result) {
   final rarity = result.rarity?.trim();
   if (rarity != null && rarity.isNotEmpty) {
     return rarity;
+  }
+  if (result.valuationStatus == ValuationStatus.marketEstimated &&
+      result.pricing.estimatedMarketValue > 0) {
+    return 'Price matched';
   }
   if (result.confidence >= 0.85) {
     return 'Strong match';
