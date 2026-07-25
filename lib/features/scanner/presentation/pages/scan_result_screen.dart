@@ -1161,13 +1161,13 @@ String _formatMoney(double value, String currency) {
     return '\$$withCommas AUD';
   }
   if (normalizedCurrency == 'USD') {
-    return 'US\$$withCommas';
+    return 'USD \$$withCommas';
   }
   if (normalizedCurrency == 'GBP') {
     return '£$withCommas';
   }
   if (normalizedCurrency == 'CAD') {
-    return 'CA\$$withCommas';
+    return 'CAD \$$withCommas';
   }
   return '$normalizedCurrency $withCommas';
 }
