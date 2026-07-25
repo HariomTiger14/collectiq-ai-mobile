@@ -27,13 +27,17 @@ void main() {
       },
     );
 
-    expect(find.text('PackLox'), findsOneWidget);
     expect(find.text('Portfolio'), findsOneWidget);
-    expect(find.text('Start your portfolio'), findsOneWidget);
     expect(find.text('Start with your first item'), findsOneWidget);
+    expect(
+      find.textContaining('Your portfolio is waiting for saved collectibles.'),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('portfolio-metric-grid')), findsNothing);
 
-    await tester.tap(find.text('Scan first item'));
+    await tester.tap(
+      find.byKey(const ValueKey('home-action-portfolio-guided-scan')),
+    );
     await tester.pump();
     expect(scanTapped, isTrue);
   });
@@ -670,8 +674,8 @@ Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
   final scroll = find.byType(CustomScrollView);
   for (var attempt = 0; attempt < 12; attempt += 1) {
     if (finder.evaluate().isNotEmpty) {
-      await tester.ensureVisible(finder);
-      await tester.pumpAndSettle();
+      await tester.ensureVisible(finder.first);
+      await tester.pump();
       return;
     }
     await tester.drag(scroll.first, const Offset(0, -260));

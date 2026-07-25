@@ -199,6 +199,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 320));
   });
 
   testWidgets('selected semantics are announced by shell navigation', (
@@ -213,95 +214,33 @@ void main() {
     expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
   });
 
-  testWidgets(
-    'Settings Home preview selection returns to Home with nav visible',
-    (tester) async {
-      await tester.pumpShell(
-        environmentConfig: const EnvironmentConfig(
-          environment: AppEnvironment.sit,
-        ),
-      );
+  testWidgets('normal SIT settings hides developer preview shortcuts', (
+    tester,
+  ) async {
+    await tester.pumpShell(
+      environmentConfig: const EnvironmentConfig(
+        environment: AppEnvironment.sit,
+      ),
+    );
 
-      await tester.tap(find.byKey(const ValueKey('nav-settings')));
-      await tester.pumpTabSwitch();
-      await tester.revealFinder(
-        find.byKey(const ValueKey('settings-home-state-preview')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('settings-home-state-preview')),
-      );
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nav-settings')));
+    await tester.pumpTabSwitch();
 
-      expect(find.text('Home State Preview'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('home-preview-scenario-picker')),
-        findsNothing,
-      );
-
-      await tester.tap(
-        find.byKey(const ValueKey('home-action-preview-defaultData')),
-      );
-      await tester.pumpAndSettle();
-
-      final navigation = tester.widget<GlassBottomNavBar>(
-        find.byKey(const ValueKey('bottom-navigation')),
-      );
-      expect(navigation.currentIndex, AppShellTabController.homeTab);
-      expect(
-        find.byKey(const ValueKey('shell-destination-home')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
-      await tester.revealText('Collection value');
-      expect(find.text('Collection value'), findsOneWidget);
-      expect(find.text('\$2,275'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('home-preview-scenario-picker')),
-        findsNothing,
-      );
-    },
-  );
-
-  testWidgets(
-    'Settings Portfolio preview selection returns to Portfolio with nav visible',
-    (tester) async {
-      await tester.pumpShell(
-        environmentConfig: const EnvironmentConfig(
-          environment: AppEnvironment.sit,
-        ),
-      );
-
-      await tester.tap(find.byKey(const ValueKey('nav-settings')));
-      await tester.pumpTabSwitch();
-      await tester.revealFinder(
-        find.byKey(const ValueKey('settings-portfolio-state-preview')),
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('settings-portfolio-state-preview')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Portfolio State Preview'), findsWidgets);
-
-      await tester.tap(
-        find.byKey(const ValueKey('home-action-portfolio-preview-partial')),
-      );
-      await tester.pumpAndSettle();
-
-      final navigation = tester.widget<GlassBottomNavBar>(
-        find.byKey(const ValueKey('bottom-navigation')),
-      );
-      expect(navigation.currentIndex, AppShellTabController.portfolioTab);
-      expect(
-        find.byKey(const ValueKey('shell-destination-portfolio')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
-      await tester.revealText('Needs value');
-      expect(find.text('Needs value'), findsOneWidget);
-      expect(find.byType(DropdownButton), findsNothing);
-    },
-  );
+    expect(
+      find.byKey(const ValueKey('shell-destination-settings')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-home-state-preview')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-portfolio-state-preview')),
+      findsNothing,
+    );
+    expect(find.text('Developer Tools'), findsNothing);
+  });
   testWidgets('light and dark shell navigation render without overflow', (
     tester,
   ) async {
@@ -395,37 +334,6 @@ extension _ShellPump on WidgetTester {
   Future<void> pumpTabSwitch() async {
     await pump();
     await pump(const Duration(milliseconds: 180));
-  }
-
-  Future<void> revealText(String text) async {
-    await revealFinder(find.text(text), description: text);
-  }
-
-  Future<void> revealFinder(Finder finder, {String? description}) async {
-    for (var attempt = 0; attempt < 24; attempt += 1) {
-      if (finder.evaluate().isNotEmpty) {
-        await ensureVisible(finder.first);
-        await pump();
-        return;
-      }
-      for (final element in find.byType(Scrollable).evaluate()) {
-        if (element is! StatefulElement || element.state is! ScrollableState) {
-          continue;
-        }
-        final position = (element.state as ScrollableState).position;
-        if (!position.hasPixels || position.maxScrollExtent <= 0) {
-          continue;
-        }
-        position.jumpTo(
-          (position.pixels + 420).clamp(
-            position.minScrollExtent,
-            position.maxScrollExtent,
-          ),
-        );
-      }
-      await pumpAndSettle();
-    }
-    fail('Could not reveal "${description ?? finder}" in AppShell.');
   }
 
   Future<void> pumpNavigationOnly({
