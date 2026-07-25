@@ -114,6 +114,11 @@ class ScanResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _FadeInMetadata(
+                  delay: const Duration(milliseconds: 135),
+                  child: _PricingReliabilityPanel(result: result),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FadeInMetadata(
                   delay: const Duration(milliseconds: 150),
                   child: _ResultSection(
                     title: 'Market check',
@@ -283,6 +288,123 @@ class _InsightTile extends StatelessWidget {
                 color: ScannerVisualTheme.textPrimary,
                 fontWeight: FontWeight.w900,
                 height: 1.12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PricingReliabilityPanel extends StatelessWidget {
+  const _PricingReliabilityPanel({required this.result});
+
+  final ScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final signal = _pricingReliabilitySignal(result);
+    final color = _reliabilityColor(signal);
+    final textTheme = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: color.withValues(alpha: 0.34)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(_reliabilityIcon(signal), color: color, size: 24),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _reliabilityTitle(signal),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: ScannerVisualTheme.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _reliabilityMessage(result, signal),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: ScannerVisualTheme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                _ReviewPill(
+                  icon: Icons.edit_note_outlined,
+                  label: _primaryReviewAction(signal),
+                ),
+                _ReviewPill(
+                  icon: Icons.camera_alt_outlined,
+                  label: _photoReviewAction(result),
+                ),
+                if (result.alternativeMatches.isNotEmpty)
+                  _ReviewPill(
+                    icon: Icons.compare_arrows_outlined,
+                    label: 'Check alternatives',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewPill extends StatelessWidget {
+  const _ReviewPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ScannerVisualTheme.surface.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: ScannerVisualTheme.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: ScannerVisualTheme.cyan, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: ScannerVisualTheme.textPrimary,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ],
@@ -1113,23 +1235,118 @@ String _photosUsedLabel(ScanResult result) {
 }
 
 String _reviewStatus(ScanResult result) {
-  if (result.confidence >= 0.85 && result.estimatedValue > 0) {
+  if (_pricingReliabilitySignal(result) == _PricingReliabilitySignal.ready) {
     return 'Ready to save';
   }
-  if (result.confidence >= 0.70) {
+  if (_pricingReliabilitySignal(result) == _PricingReliabilitySignal.review) {
     return 'Review details';
   }
-  return 'Needs more photos';
+  if (_pricingReliabilitySignal(result) == _PricingReliabilitySignal.unpriced) {
+    return 'Pricing pending';
+  }
+  return 'Confirm match';
 }
 
 Color _reviewStatusColor(ScanResult result) {
-  if (result.confidence >= 0.85 && result.estimatedValue > 0) {
-    return ScannerVisualTheme.success;
+  return _reliabilityColor(_pricingReliabilitySignal(result));
+}
+
+enum _PricingReliabilitySignal { ready, review, ambiguous, unpriced }
+
+_PricingReliabilitySignal _pricingReliabilitySignal(ScanResult result) {
+  final hasMarketPrice =
+      result.valuationStatus == ValuationStatus.marketEstimated &&
+      result.pricing.estimatedMarketValue > 0;
+  final hasCloseAlternative =
+      result.alternativeMatches.isNotEmpty &&
+      result.alternativeMatches.first.confidence >= 0.70 &&
+      (result.confidence - result.alternativeMatches.first.confidence).abs() <
+          0.14;
+
+  if (!hasMarketPrice) {
+    return _PricingReliabilitySignal.unpriced;
   }
-  if (result.confidence >= 0.70) {
-    return const Color(0xFFF59E0B);
+  if (result.confidence < 0.70) {
+    return _PricingReliabilitySignal.review;
   }
-  return ScannerVisualTheme.danger;
+  if (hasCloseAlternative) {
+    return _PricingReliabilitySignal.ambiguous;
+  }
+  return _PricingReliabilitySignal.ready;
+}
+
+Color _reliabilityColor(_PricingReliabilitySignal signal) {
+  return switch (signal) {
+    _PricingReliabilitySignal.ready => ScannerVisualTheme.success,
+    _PricingReliabilitySignal.review => const Color(0xFFF59E0B),
+    _PricingReliabilitySignal.ambiguous => ScannerVisualTheme.cyan,
+    _PricingReliabilitySignal.unpriced => ScannerVisualTheme.danger,
+  };
+}
+
+IconData _reliabilityIcon(_PricingReliabilitySignal signal) {
+  return switch (signal) {
+    _PricingReliabilitySignal.ready => Icons.verified_outlined,
+    _PricingReliabilitySignal.review => Icons.manage_search_outlined,
+    _PricingReliabilitySignal.ambiguous => Icons.compare_arrows_outlined,
+    _PricingReliabilitySignal.unpriced => Icons.info_outline,
+  };
+}
+
+String _reliabilityTitle(_PricingReliabilitySignal signal) {
+  return switch (signal) {
+    _PricingReliabilitySignal.ready => 'Market match looks strong',
+    _PricingReliabilitySignal.review => 'Review identification before saving',
+    _PricingReliabilitySignal.ambiguous => 'Possible close match',
+    _PricingReliabilitySignal.unpriced => 'Pricing needs confirmation',
+  };
+}
+
+String _reliabilityMessage(
+  ScanResult result,
+  _PricingReliabilitySignal signal,
+) {
+  return switch (signal) {
+    _PricingReliabilitySignal.ready =>
+      'PackLox found a market-backed value. Save this as a portfolio snapshot after checking condition and variant.',
+    _PricingReliabilitySignal.review =>
+      'The item is identified, but confidence is not strong enough for a high-trust valuation. Check the name, set, number, edition, and condition.',
+    _PricingReliabilitySignal.ambiguous =>
+      'There are similar possible matches. Compare the alternatives before saving so the portfolio value is attached to the right item.',
+    _PricingReliabilitySignal.unpriced => _unpricedReliabilityMessage(result),
+  };
+}
+
+String _unpricedReliabilityMessage(ScanResult result) {
+  return switch (result.valuationStatus) {
+    ValuationStatus.noMarketMatch =>
+      'No reliable PriceCharting match was found yet. Save only if you want to keep the item pending, or rescan with clearer identifiers.',
+    ValuationStatus.providerNotConfigured =>
+      'This category is not connected to a pricing source yet. PackLox will keep the item details without showing a guessed price.',
+    ValuationStatus.lookupFailed =>
+      'The price lookup did not complete. Try again before relying on this value.',
+    _ =>
+      'PackLox has not confirmed a market-backed price for this item yet. Avoid treating this as a sale or insurance value.',
+  };
+}
+
+String _primaryReviewAction(_PricingReliabilitySignal signal) {
+  return switch (signal) {
+    _PricingReliabilitySignal.ready => 'Save snapshot',
+    _PricingReliabilitySignal.review => 'Check fields',
+    _PricingReliabilitySignal.ambiguous => 'Choose match',
+    _PricingReliabilitySignal.unpriced => 'Keep pending',
+  };
+}
+
+String _photoReviewAction(ScanResult result) {
+  if (result.photoRoles.length < 2) {
+    return 'Add back photo';
+  }
+  if (result.detectionQuality.toLowerCase().contains('blur')) {
+    return 'Retake clearer photo';
+  }
+  return 'Verify condition';
 }
 
 String _formatShortDate(DateTime? date) {
