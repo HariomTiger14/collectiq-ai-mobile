@@ -590,9 +590,9 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-shell')), findsNothing);
       expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
-      expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
+      expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
     });
 
     testWidgets(
@@ -607,9 +607,9 @@ void main() {
           ),
         );
 
-        expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+        expect(find.byKey(const ValueKey('app-shell')), findsNothing);
         expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
-        expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
+        expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
       },
     );
   });

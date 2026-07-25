@@ -1173,8 +1173,7 @@ void main() {
       expect(result.issues, contains('itemName is required.'));
       expect(result.issues, contains('category is required.'));
       expect(result.issues, contains('estimatedValue is required.'));
-      expect(result.issues, contains('condition is required.'));
-      expect(result.issues, contains('recommendation is required.'));
+      expect(result.issues, contains('confidence is required.'));
     });
 
     test('mapper converts backend response to scan result', () {

@@ -175,20 +175,18 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpAuthScreen(const SettingsScreen());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(
       find.byKey(const ValueKey('settings-auth-email-field')),
       findsNothing,
     );
 
-    await tester.scrollUntilVisible(
-      find.text('Sign In').first,
-      400,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Sign In').first);
-    await tester.pumpAndSettle();
+    expect(find.text('Account'), findsOneWidget);
+    await tester.tap(find.text('Account').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth-sign-in-screen')), findsNothing);
@@ -511,18 +509,21 @@ void main() {
     container
         .read(appShellTabControllerProvider.notifier)
         .selectTab(AppShellTabController.settingsTab, reason: 'test-settings');
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(
       find.byKey(const ValueKey('shell-destination-settings')),
       findsOneWidget,
     );
 
-    await tester.revealText('Sign In');
-    await tester.tap(find.text('Sign In').first);
-    await tester.pumpAndSettle();
+    await tester.revealText('Account');
+    await tester.tap(find.text('Account').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
     await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     await tester.enterText(
       _textFieldIn(const ValueKey('auth-sign-in-email-field')),
@@ -534,7 +535,8 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('auth-sign-in-submit')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(container.read(authControllerProvider).isSignedIn, isTrue);
     expect(
@@ -2073,7 +2075,8 @@ void main() {
       initialUser: _cloudUser('collector@example.com'),
     );
     await tester.pumpAuthScreen(const SettingsScreen(), repository: repository);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(find.text('collector@example.com'), findsWidgets);
     expect(
@@ -2086,8 +2089,11 @@ void main() {
     );
     expect(find.text('Sign Out'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Sign Out'));
+    await tester.pump();
     await tester.tap(find.text('Sign Out'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
     expect(repository.signOutCalls, 1);
   });

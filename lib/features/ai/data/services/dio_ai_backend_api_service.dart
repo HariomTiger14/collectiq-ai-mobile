@@ -247,8 +247,11 @@ class DioAiBackendApiService implements AiBackendApiService {
     int statusCode,
   ) {
     final errorJson = decoded['error'];
+    final detailJson = decoded['detail'];
     final payload = errorJson is Map
         ? Map<String, dynamic>.from(errorJson)
+        : detailJson is Map
+        ? Map<String, dynamic>.from(detailJson)
         : decoded;
     final error = AiBackendAnalysisError.fromJson({
       'code': payload['code'] ?? 'backend_ai_error',
