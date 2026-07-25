@@ -343,8 +343,31 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       'scanner_workspace_single' => _QaScannerWorkspace(photoCount: 1),
       'scanner_workspace_multi' => _QaScannerWorkspace(photoCount: 3),
       'scanner_analyzing' => const _QaScannerAnalyzing(),
-      'scanner_result' => _QaScannerResult(isSaved: false),
-      'scanner_save_confirmation' => _QaScannerResult(isSaved: true),
+      'scanner_result' => _QaScannerResult(
+        isSaved: false,
+        result: _qaScanResult(),
+        scrollOffset: _scrollOffset,
+      ),
+      'scanner_result_no_market' => _QaScannerResult(
+        isSaved: false,
+        result: _qaScanResultNoMarket(),
+        scrollOffset: _scrollOffset,
+      ),
+      'scanner_result_close_match' => _QaScannerResult(
+        isSaved: false,
+        result: _qaScanResultCloseMatch(),
+        scrollOffset: _scrollOffset,
+      ),
+      'scanner_result_low_confidence' => _QaScannerResult(
+        isSaved: false,
+        result: _qaScanResultLowConfidence(),
+        scrollOffset: _scrollOffset,
+      ),
+      'scanner_save_confirmation' => _QaScannerResult(
+        isSaved: true,
+        result: _qaScanResult(),
+        scrollOffset: _scrollOffset,
+      ),
       'scanner_analysis_failure' => const _QaScannerAnalysisFailure(),
       'scanner_permission_denied' => const _QaScannerErrorState(
         title: 'Camera access needed',
@@ -776,20 +799,27 @@ class _QaScannerAnalyzing extends StatelessWidget {
 }
 
 class _QaScannerResult extends StatelessWidget {
-  const _QaScannerResult({required this.isSaved});
+  const _QaScannerResult({
+    required this.isSaved,
+    required this.result,
+    required this.scrollOffset,
+  });
 
   final bool isSaved;
+  final ScanResult result;
+  final double scrollOffset;
 
   @override
   Widget build(BuildContext context) {
     return ScanResultScreen(
-      result: _qaScanResult(),
+      result: result,
       activeSlot: _qaScannerSlots().first,
       isSaved: isSaved,
       isSaving: false,
       onSave: () async {},
       onScanAnother: () {},
       onViewPortfolio: () {},
+      qaInitialScrollOffset: scrollOffset,
     );
   }
 }
@@ -1021,6 +1051,11 @@ ScanResult _qaScanResult() {
       valuationStatus: ValuationStatus.marketEstimated,
       valuationSource: 'qa_preview_provider',
       aiEstimatedValue: 238,
+      displayString: r'$245.00 AUD',
+      originalPrice: 161,
+      originalCurrency: 'USD',
+      exchangeRateUsed: 1.52,
+      exchangeRateDate: DateTime(2026, 7, 23),
     ),
     brand: 'PackLox Studio',
     series: 'Authority',
@@ -1032,6 +1067,165 @@ ScanResult _qaScanResult() {
     aiEstimatedValue: 238,
     photosUsed: 3,
     photoRoles: const ['front', 'back', 'detail'],
+  );
+}
+
+ScanResult _qaScanResultNoMarket() {
+  return ScanResult(
+    id: 'qa-scan-result-no-market',
+    title: 'Mystery Authority Coupe',
+    category: 'Diecast / Toy car',
+    estimatedValue: 0,
+    confidence: 0.84,
+    condition: 'Good',
+    thumbnail: 'sample://front',
+    scanDate: DateTime(2026, 7, 23, 10),
+    primaryMatch: 'Mystery Authority Coupe',
+    alternativeMatches: const [
+      ScanAlternativeMatch(
+        title: 'Unmarked 1:64 coupe',
+        category: 'Diecast / Toy car',
+        confidence: 0.68,
+        reason: 'Similar body shape, but no confirmed catalog identifier.',
+      ),
+    ],
+    confidenceExplanation:
+        'The item type is visible, but markings are not enough for a catalog match.',
+    detectionQuality: 'Front photo is clear; base text is not readable.',
+    aiReasoning:
+        'PackLox can identify a diecast coupe, but cannot confirm the exact release.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 0,
+      lowEstimate: 0,
+      highEstimate: 0,
+      currency: 'AUD',
+      pricingSource: 'PriceCharting catalog',
+      pricingConfidence: 0,
+      lastUpdated: DateTime(2026, 7, 23),
+      valuationStatus: ValuationStatus.noMarketMatch,
+      valuationSource: 'pricecharting_catalog',
+      pricingExplanation:
+          'No reliable catalog match was found for the detected title and visible identifiers.',
+      reasonCode: 'NO_MARKET_MATCH',
+      valuationStrategy: 'unavailable',
+    ),
+    brand: 'Unknown',
+    series: 'Unconfirmed',
+    year: 'Unknown',
+    valuationStatus: ValuationStatus.noMarketMatch,
+    valuationSource: 'pricecharting_catalog',
+    photosUsed: 1,
+    photoRoles: const ['front'],
+  );
+}
+
+ScanResult _qaScanResultCloseMatch() {
+  return ScanResult(
+    id: 'qa-scan-result-close-match',
+    title: 'PackLox Authority Coupe',
+    category: 'Diecast / Toy car',
+    estimatedValue: 245,
+    confidence: 0.86,
+    condition: 'Near mint',
+    thumbnail: 'sample://front',
+    scanDate: DateTime(2026, 7, 23, 10),
+    primaryMatch: 'PackLox Authority Coupe 1:64',
+    alternativeMatches: const [
+      ScanAlternativeMatch(
+        title: 'PackLox Authority Coupe chase variant',
+        category: 'Diecast / Toy car',
+        confidence: 0.80,
+        reason:
+            'Similar markings and packaging color; variant badge is unclear.',
+      ),
+      ScanAlternativeMatch(
+        title: 'PackLox Coupe prototype',
+        category: 'Diecast / Toy car',
+        confidence: 0.73,
+        reason: 'Same body casting with different base text.',
+      ),
+    ],
+    confidenceExplanation:
+        'The model is likely correct, but the variant badge is partially hidden.',
+    detectionQuality:
+        'Good front and base photos, packaging variant is unclear.',
+    aiReasoning:
+        'The main casting matches, while the visible packaging leaves a close variant possibility.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 245,
+      lowEstimate: 220,
+      highEstimate: 275,
+      currency: 'AUD',
+      pricingSource: 'PriceCharting catalog',
+      pricingConfidence: 0.76,
+      lastUpdated: DateTime(2026, 7, 23),
+      valuationStatus: ValuationStatus.marketEstimated,
+      valuationSource: 'pricecharting_catalog',
+      pricingExplanation:
+          'Matched by title and category, but variant needs user confirmation.',
+      displayString: r'$245.00 AUD',
+      originalPrice: 161,
+      originalCurrency: 'USD',
+    ),
+    brand: 'PackLox Studio',
+    series: 'Authority',
+    year: '2026',
+    rarity: 'Variant unclear',
+    valuationStatus: ValuationStatus.marketEstimated,
+    valuationSource: 'pricecharting_catalog',
+    photosUsed: 3,
+    photoRoles: const ['front', 'back', 'detail'],
+  );
+}
+
+ScanResult _qaScanResultLowConfidence() {
+  return ScanResult(
+    id: 'qa-scan-result-low-confidence',
+    title: 'PackLox Authority Coupe',
+    category: 'Diecast / Toy car',
+    estimatedValue: 245,
+    confidence: 0.63,
+    condition: 'Good',
+    thumbnail: 'sample://front',
+    scanDate: DateTime(2026, 7, 23, 10),
+    primaryMatch: 'PackLox Authority Coupe 1:64',
+    alternativeMatches: const [
+      ScanAlternativeMatch(
+        title: 'PackLox Coupe prototype',
+        category: 'Diecast / Toy car',
+        confidence: 0.55,
+        reason: 'Blurred base text makes the exact release uncertain.',
+      ),
+    ],
+    confidenceExplanation:
+        'Low confidence because the base text and packaging details are blurred.',
+    detectionQuality: 'Blurred base text; add a sharper back or base photo.',
+    aiReasoning:
+        'The silhouette and color are plausible, but identifiers need a clearer image.',
+    pricing: PricingInfo(
+      estimatedMarketValue: 245,
+      lowEstimate: 220,
+      highEstimate: 275,
+      currency: 'AUD',
+      pricingSource: 'PriceCharting catalog',
+      pricingConfidence: 0.58,
+      lastUpdated: DateTime(2026, 7, 23),
+      valuationStatus: ValuationStatus.marketEstimated,
+      valuationSource: 'pricecharting_catalog',
+      pricingExplanation:
+          'Pricing match exists, but the scan confidence is low and needs review.',
+      displayString: r'$245.00 AUD',
+      originalPrice: 161,
+      originalCurrency: 'USD',
+    ),
+    brand: 'PackLox Studio',
+    series: 'Authority',
+    year: '2026',
+    rarity: 'Unconfirmed',
+    valuationStatus: ValuationStatus.marketEstimated,
+    valuationSource: 'pricecharting_catalog',
+    photosUsed: 2,
+    photoRoles: const ['front', 'detail'],
   );
 }
 

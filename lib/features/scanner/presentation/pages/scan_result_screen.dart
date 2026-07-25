@@ -16,6 +16,7 @@ class ScanResultScreen extends StatelessWidget {
     required this.onSave,
     required this.onScanAnother,
     required this.onViewPortfolio,
+    this.qaInitialScrollOffset = 0,
     super.key,
   });
 
@@ -26,6 +27,7 @@ class ScanResultScreen extends StatelessWidget {
   final Future<void> Function() onSave;
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
+  final double qaInitialScrollOffset;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +52,10 @@ class ScanResultScreen extends StatelessWidget {
         ),
         body: SafeArea(
           child: SingleChildScrollView(
+            controller: ScrollController(
+              initialScrollOffset: qaInitialScrollOffset,
+              keepScrollOffset: false,
+            ),
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.md,
@@ -362,7 +368,8 @@ class _PricingReliabilityPanel extends StatelessWidget {
                   icon: Icons.camera_alt_outlined,
                   label: _photoReviewAction(result),
                 ),
-                if (result.alternativeMatches.isNotEmpty)
+                if (result.alternativeMatches.isNotEmpty &&
+                    signal != _PricingReliabilitySignal.ready)
                   _ReviewPill(
                     icon: Icons.compare_arrows_outlined,
                     label: 'Check alternatives',
