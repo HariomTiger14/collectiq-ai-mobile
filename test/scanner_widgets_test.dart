@@ -811,6 +811,12 @@ void main() {
         find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
         findsOneWidget,
       );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('capture-guide-expansion')),
+      );
+      await tester.tap(find.byKey(const ValueKey('capture-guide-expansion')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('listing-ready evidence'), findsOneWidget);
     },
   );
 

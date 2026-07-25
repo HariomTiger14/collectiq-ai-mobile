@@ -8,6 +8,8 @@ import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_hub_pres
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+const _showSampleScan = bool.fromEnvironment('PACKLOX_SHOW_SAMPLE_SCAN');
+
 /// Design Bible Volume 03, S01 scanner entry hub behavior coordinator.
 class ScanHubPage extends ConsumerStatefulWidget {
   const ScanHubPage({
@@ -83,16 +85,20 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
         variant: PackLoxEntryTileVariant.scanner,
         onTap: () => unawaited(_pickFromGallery(context)),
       ),
-      sampleTile: PackLoxEntryTile(
-        key: const ValueKey('scan-hub-sample-button'),
-        compatibilityKey: const ValueKey('scan-secondary-Use Sample Scan'),
-        semanticLabel: 'Try a sample scan. See how PackLox works.',
-        icon: Icons.science_outlined,
-        title: 'Try a sample scan',
-        supportingText: 'See how PackLox works',
-        variant: PackLoxEntryTileVariant.scanner,
-        onTap: ref.read(scannerControllerProvider.notifier).useSampleScan,
-      ),
+      sampleTile: _showSampleScan
+          ? PackLoxEntryTile(
+              key: const ValueKey('scan-hub-sample-button'),
+              compatibilityKey: const ValueKey(
+                'scan-secondary-Use Sample Scan',
+              ),
+              semanticLabel: 'Try a sample scan. See how PackLox works.',
+              icon: Icons.science_outlined,
+              title: 'Try a sample scan',
+              supportingText: 'See how PackLox works',
+              variant: PackLoxEntryTileVariant.scanner,
+              onTap: ref.read(scannerControllerProvider.notifier).useSampleScan,
+            )
+          : null,
     );
   }
 

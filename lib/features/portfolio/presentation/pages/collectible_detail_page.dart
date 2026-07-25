@@ -57,7 +57,6 @@ class CollectibleDetailPage extends ConsumerStatefulWidget {
 
 class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
-  bool _isFavorited = false;
   String? _selectedGalleryPath;
 
   @override
@@ -105,6 +104,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     final galleryImages = currentItem.effectiveGalleryImages;
     final selectedImage = _selectedImageFor(currentItem, _selectedGalleryPath);
     _selectedGalleryPath ??= selectedImage?.path;
+    final wishlistStatus = ref.watch(
+      wishlistStatusForItemProvider(currentItem.id),
+    );
+    final isFavorited = wishlistStatus.maybeWhen(
+      data: (status) => status == WishlistStatus.wanted,
+      orElse: () => false,
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -139,7 +145,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                   HomeSection(
                     child: _DetailAuthorityHeader(
                       item: currentItem,
-                      isFavorited: _isFavorited,
+                      isFavorited: isFavorited,
                       onBack: () => Navigator.of(context).maybePop(),
                       onEdit: () => _showEditCollectibleDialog(
                         context: context,
@@ -147,22 +153,15 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                         item: currentItem,
                       ),
                       onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () {
-                        setState(() => _isFavorited = !_isFavorited);
-                        _showDetailSnackBar(
-                          context,
-                          _isFavorited
-                              ? 'Added to favorites'
-                              : 'Removed from favorites',
-                        );
-                      },
+                      onFavorite: () =>
+                          _toggleWishlistFavorite(currentItem, wishlistStatus),
                     ),
                   ),
                   HomeSection(
                     child: _DetailAuthorityOverview(
                       item: currentItem,
                       selectedImage: selectedImage,
-                      isFavorited: _isFavorited,
+                      isFavorited: isFavorited,
                       onImageSelected: (image) {
                         setState(() => _selectedGalleryPath = image.path);
                       },
@@ -185,7 +184,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                     child: _DetailInlineContent(
                       item: currentItem,
                       galleryImages: galleryImages,
-                      isFavorited: _isFavorited,
+                      isFavorited: isFavorited,
                       onImageSelected: (image) {
                         setState(() => _selectedGalleryPath = image.path);
                       },
@@ -206,15 +205,8 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                         item: currentItem,
                       ),
                       onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () {
-                        setState(() => _isFavorited = !_isFavorited);
-                        _showDetailSnackBar(
-                          context,
-                          _isFavorited
-                              ? 'Added to favorites'
-                              : 'Removed from favorites',
-                        );
-                      },
+                      onFavorite: () =>
+                          _toggleWishlistFavorite(currentItem, wishlistStatus),
                       onDelete: widget.onDelete == null
                           ? null
                           : () => _confirmDetailDelete(
@@ -230,6 +222,33 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _toggleWishlistFavorite(
+    CollectibleItem item,
+    AsyncValue<WishlistStatus> currentStatus,
+  ) async {
+    final status = currentStatus.maybeWhen(
+      data: (value) => value,
+      orElse: () => WishlistStatus.owned,
+    );
+    final nextStatus = status == WishlistStatus.wanted
+        ? WishlistStatus.owned
+        : WishlistStatus.wanted;
+    await ref
+        .read(wishlistRepositoryProvider)
+        .saveStatus(item: item, status: nextStatus);
+    ref.invalidate(wishlistEntriesProvider);
+    ref.invalidate(wishlistStatusForItemProvider(item.id));
+    if (!mounted) {
+      return;
+    }
+    _showDetailSnackBar(
+      context,
+      nextStatus == WishlistStatus.wanted
+          ? 'Added to wishlist'
+          : 'Removed from wishlist',
     );
   }
 
@@ -368,7 +387,23 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
 }
 
 void _shareItem(BuildContext context, CollectibleItem item) {
-  _showDetailSnackBar(context, 'Sharing coming soon');
+  Clipboard.setData(ClipboardData(text: _shareSummary(item)));
+  _showDetailSnackBar(context, 'Item summary copied');
+}
+
+String _shareSummary(CollectibleItem item) {
+  final lines = <String>[
+    item.title,
+    'Category: ${_fallback(item.category)}',
+    'Condition: ${_fallback(item.condition)}',
+    'Value: ${_formatMoney(item.estimatedValue, item.pricing?.currency ?? 'AUD')}',
+  ];
+  final source = item.pricing?.pricingSource.trim();
+  if (source != null && source.isNotEmpty) {
+    lines.add('Source: $source');
+  }
+  lines.add('Saved in PackLox');
+  return lines.join('\n');
 }
 
 Future<void> _confirmDetailDelete(

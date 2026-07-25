@@ -29,6 +29,7 @@ import 'package:collectiq_ai/features/profile/presentation/controllers/profile_c
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -218,12 +219,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           context,
         ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen())),
       ),
-      const _SettingsRow(
+      _SettingsRow(
         icon: Icons.help_outline_rounded,
         title: 'Help & Feedback',
-        subtitle: 'Support channels are not connected yet.',
-        trailing: 'Soon',
-        message: 'Help and feedback are coming soon.',
+        subtitle: 'Contact, scan issue, and privacy support.',
+        trailing: 'Open',
+        onTap: _showHelpAndFeedbackSheet,
       ),
     ];
 
@@ -612,6 +613,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showHelpAndFeedbackSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: HomeTokens.surfaceRaised,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: _HelpAndFeedbackSheet(
+              onCopy: (message) async {
+                final navigator = Navigator.of(sheetContext);
+                await Clipboard.setData(ClipboardData(text: message));
+                if (!mounted) {
+                  return;
+                }
+                navigator.pop();
+                _showSettingsSnackBar('Support details copied.');
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _maskedEmail(String? email) {
     final trimmed = email?.trim();
     if (trimmed == null || trimmed.isEmpty) {
@@ -870,6 +897,111 @@ class _SettingsSurface extends StatelessWidget {
         border: Border.all(color: HomeTokens.border),
       ),
       child: child,
+    );
+  }
+}
+
+class _HelpAndFeedbackSheet extends StatelessWidget {
+  const _HelpAndFeedbackSheet({required this.onCopy});
+
+  final Future<void> Function(String message) onCopy;
+
+  static const _supportEmail = 'support@packlox.com';
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Help & Feedback',
+            style: textTheme.titleLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Use these details when reporting scan results, pricing mismatches, account issues, or release feedback.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              height: 1.32,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SettingsCardGroup(
+            children: [
+              _HelpActionRow(
+                icon: Icons.mail_outline_rounded,
+                title: 'Contact support',
+                subtitle: _supportEmail,
+                trailing: 'Copy',
+                onTap: () => onCopy(_supportEmail),
+              ),
+              _HelpActionRow(
+                icon: Icons.document_scanner_outlined,
+                title: 'Report scan issue',
+                subtitle: 'Copies a ready-to-send scan support template.',
+                trailing: 'Copy',
+                onTap: () => onCopy(_scanIssueTemplate),
+              ),
+              _HelpActionRow(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy note',
+                subtitle: 'Images stay local unless cloud sync is configured.',
+                trailing: 'View',
+                onTap: () => onCopy(_privacyNote),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+      ),
+    );
+  }
+
+  static const _scanIssueTemplate = '''
+PackLox scan issue
+
+Item:
+Expected result:
+Actual result:
+Country/region:
+Screenshots or notes:
+''';
+
+  static const _privacyNote =
+      'PackLox keeps images local unless cloud sync is configured. Pricing and AI analysis may use backend services when enabled for the current app environment.';
+}
+
+class _HelpActionRow extends StatelessWidget {
+  const _HelpActionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String trailing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ModernSettingsRow(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailingText: trailing,
+      onTap: onTap,
     );
   }
 }

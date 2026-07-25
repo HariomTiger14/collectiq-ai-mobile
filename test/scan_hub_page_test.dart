@@ -9,7 +9,6 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
-import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -30,7 +29,7 @@ void main() {
     expect(find.text('Collector'), findsOneWidget);
     expect(find.byType(PackLoxHeader), findsOneWidget);
     expect(find.byType(PackLoxHero), findsOneWidget);
-    expect(find.byType(PackLoxEntryTile), findsNWidgets(3));
+    expect(find.byType(PackLoxEntryTile), findsNWidgets(2));
     expect(find.text('Ready when your item is.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
@@ -42,10 +41,10 @@ void main() {
     );
     expect(find.text('Take a photo'), findsOneWidget);
     expect(find.text('Choose from gallery'), findsOneWidget);
-    expect(find.text('Try a sample scan'), findsOneWidget);
+    expect(find.text('Try a sample scan'), findsNothing);
     expect(find.byIcon(Icons.photo_camera_outlined), findsOneWidget);
     expect(find.byIcon(Icons.image_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.science_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.science_outlined), findsNothing);
     expect(find.textContaining('Auto Detect'), findsNothing);
     expect(find.textContaining('Confidence'), findsNothing);
     expect(find.textContaining('Photo readiness'), findsNothing);
@@ -143,12 +142,13 @@ void main() {
       expect(tile.variant, PackLoxEntryTileVariant.scanner);
       expect(tile.onTap, isNotNull);
     }
-    for (final key in const [
-      ValueKey('scan-hub-tile-gap-1'),
-      ValueKey('scan-hub-tile-gap-2'),
-    ]) {
-      expect(tester.widget<SizedBox>(find.byKey(key)).height, 6);
-    }
+    expect(
+      tester
+          .widget<SizedBox>(find.byKey(const ValueKey('scan-hub-tile-gap-1')))
+          .height,
+      6,
+    );
+    expect(find.byKey(const ValueKey('scan-hub-tile-gap-2')), findsNothing);
     expect(
       find.byKey(const ValueKey('scan-hub-entry-icon-container')),
       findsNothing,
@@ -192,7 +192,11 @@ void main() {
 
     expect(find.byKey(const ValueKey('scan-hub-scroll-view')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('scan-hub-sample-button')),
+      find.byKey(const ValueKey('scan-hub-capture-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('scan-hub-gallery-button')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -213,25 +217,16 @@ void main() {
     );
     expect(find.text('Take a photo'), findsOneWidget);
     expect(find.text('Choose from gallery'), findsOneWidget);
-    expect(find.text('Try a sample scan'), findsOneWidget);
+    expect(find.text('Try a sample scan'), findsNothing);
   });
 
-  testWidgets('gallery and sample actions remain connected', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('gallery action remains connected', (WidgetTester tester) async {
     final gallery = _TrackingGalleryService();
     await _pumpHub(tester, galleryService: gallery);
 
     await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
     await tester.pump();
     expect(gallery.pickCount, 1);
-
-    final sample = find.byKey(const ValueKey('scan-hub-sample-button'));
-    await tester.ensureVisible(sample);
-    await tester.pump();
-    await tester.tap(sample);
-    await tester.pump();
-    expect(find.byType(ScannerScreen), findsOneWidget);
   });
 
   testWidgets('S01 exposes meaningful accessibility labels', (
@@ -251,7 +246,7 @@ void main() {
     );
     expect(
       find.bySemanticsLabel('Try a sample scan. See how PackLox works.'),
-      findsOneWidget,
+      findsNothing,
     );
     semantics.dispose();
   });

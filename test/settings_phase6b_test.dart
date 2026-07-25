@@ -32,6 +32,20 @@ void main() {
     }
   });
 
+  testWidgets('Help and feedback opens usable support actions', (tester) async {
+    await tester.pumpSettings();
+
+    await tester.revealText('Help & Feedback');
+    await tester.tap(find.text('Help & Feedback'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Contact support'), findsOneWidget);
+    expect(find.text('support@packlox.com'), findsOneWidget);
+    expect(find.text('Report scan issue'), findsOneWidget);
+    expect(find.text('Privacy note'), findsOneWidget);
+    expect(find.text('Help and feedback are coming soon.'), findsNothing);
+  });
+
   testWidgets('profile name can be edited from settings header', (
     tester,
   ) async {

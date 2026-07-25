@@ -1,0 +1,301 @@
+import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
+import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
+import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('searches saved portfolio items by title and metadata', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([
+        _item(
+          id: 'hot-wheels',
+          title: 'Hot Wheels Mazda MX-5',
+          category: 'Toy Cars',
+          brand: 'Mattel',
+        ),
+        _item(
+          id: 'charizard',
+          title: 'Charizard Base Set',
+          category: 'Pokemon Cards',
+          setName: 'Base Set',
+          cardNumber: '4/102',
+        ),
+      ]),
+    );
+
+    expect(find.text('2 saved items searchable'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      '4/102',
+    );
+    await tester.pump();
+
+    expect(find.text('1 saved match'), findsOneWidget);
+    expect(find.text('Charizard Base Set'), findsOneWidget);
+    expect(find.text('Hot Wheels Mazda MX-5'), findsNothing);
+  });
+
+  testWidgets('quick filters fill the query from saved categories', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([
+        _item(
+          id: 'hot-wheels',
+          title: 'Hot Wheels Mazda MX-5',
+          category: 'Toy Cars',
+        ),
+      ]),
+    );
+
+    await tester.tap(find.text('Toy Cars'));
+    await tester.pump();
+
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('discover-search-input')),
+    );
+    expect(input.controller?.text, 'Toy Cars');
+    expect(find.text('Hot Wheels Mazda MX-5'), findsOneWidget);
+  });
+
+  testWidgets('result cards open the saved item detail screen', (tester) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([
+        _item(
+          id: 'hot-wheels',
+          title: 'Hot Wheels Mazda MX-5',
+          category: 'Toy Cars',
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'mazda',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('discover-result-hot-wheels')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(CollectibleDetailPage), findsOneWidget);
+  });
+
+  testWidgets('portfolio load failure shows retryable search error state', (
+    tester,
+  ) async {
+    final repository = _FailingOncePortfolioRepository([
+      _item(id: 'coin', title: 'Silver Eagle', category: 'Coins'),
+    ]);
+    await _pumpSearch(tester, repository: repository);
+
+    expect(find.byKey(const ValueKey('discover-error-state')), findsOneWidget);
+    expect(find.text('Search is unavailable'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('discover-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('discover-error-state')), findsNothing);
+    expect(find.text('1 saved item searchable'), findsOneWidget);
+  });
+
+  testWidgets('catalog search shows backend catalog results', (tester) async {
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-charizard',
+        title: 'Charizard #4 Base Set',
+        category: 'Pokemon Cards',
+        source: 'PriceCharting',
+        setName: 'Base Set',
+        identifier: '4/102',
+        currency: 'USD',
+        marketValue: 161,
+        confidence: 0.91,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+
+    expect(catalogRepository.queries, ['charizard']);
+    expect(find.text('Charizard #4 Base Set'), findsOneWidget);
+    expect(find.text('USD \$161'), findsOneWidget);
+    expect(find.text('91% match'), findsOneWidget);
+  });
+
+  testWidgets('catalog search has a clear unavailable state', (tester) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _FailingCatalogSearchRepository(),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'nintendo',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('discover-catalog-error-state')),
+      findsOneWidget,
+    );
+    expect(find.text('Catalog search unavailable'), findsOneWidget);
+  });
+}
+
+Future<void> _pumpSearch(
+  WidgetTester tester, {
+  required PortfolioRepository repository,
+  CatalogSearchRepository? catalogRepository,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        portfolioRepositoryProvider.overrideWithValue(repository),
+        if (catalogRepository != null)
+          catalogSearchRepositoryProvider.overrideWithValue(catalogRepository),
+      ],
+      child: const MaterialApp(home: SearchScreen()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+CollectibleItem _item({
+  required String id,
+  required String title,
+  required String category,
+  String? brand,
+  String? setName,
+  String? cardNumber,
+}) {
+  return CollectibleItem(
+    id: id,
+    title: title,
+    category: category,
+    estimatedValue: id == 'hot-wheels' ? 18 : 0,
+    confidence: 0.88,
+    condition: 'Good',
+    recommendation: 'Saved test item.',
+    imagePath: '',
+    createdAt: DateTime(2026, 7, 26, 12),
+    brand: brand,
+    setName: setName,
+    cardNumber: cardNumber,
+  );
+}
+
+class _MemoryPortfolioRepository implements PortfolioRepository {
+  _MemoryPortfolioRepository(this.items);
+
+  final List<CollectibleItem> items;
+
+  @override
+  Future<CollectibleItem> addItem(CollectibleItem item) async {
+    items.add(item);
+    return item;
+  }
+
+  @override
+  Future<void> clearPortfolio() async {
+    items.clear();
+  }
+
+  @override
+  Future<List<CollectibleItem>> getItems() async {
+    return items;
+  }
+
+  @override
+  Future<void> removeItem(String id) async {
+    items.removeWhere((item) => item.id == id);
+  }
+
+  @override
+  Future<void> updateItem(CollectibleItem item) async {
+    final index = items.indexWhere((existing) => existing.id == item.id);
+    if (index >= 0) {
+      items[index] = item;
+    }
+  }
+
+  @override
+  Future<void> updateItemImageSync({
+    required String itemId,
+    required String imageStoragePath,
+    required String cloudImageUrl,
+  }) async {}
+
+  @override
+  Future<void> upsertSyncedItem(CollectibleItem item) async {
+    await updateItem(item);
+  }
+}
+
+class _FailingOncePortfolioRepository extends _MemoryPortfolioRepository {
+  _FailingOncePortfolioRepository(super.items);
+
+  var _hasFailed = false;
+
+  @override
+  Future<List<CollectibleItem>> getItems() async {
+    if (!_hasFailed) {
+      _hasFailed = true;
+      throw StateError('Search test failure');
+    }
+    return super.getItems();
+  }
+}
+
+class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
+  _MemoryCatalogSearchRepository(this.results);
+
+  final List<CatalogSearchResult> results;
+  final List<String> queries = [];
+
+  @override
+  Future<List<CatalogSearchResult>> searchCatalog({
+    required String query,
+    int limit = 20,
+  }) async {
+    queries.add(query);
+    return results;
+  }
+}
+
+class _FailingCatalogSearchRepository implements CatalogSearchRepository {
+  @override
+  Future<List<CatalogSearchResult>> searchCatalog({
+    required String query,
+    int limit = 20,
+  }) async {
+    throw StateError('Catalog endpoint missing');
+  }
+}

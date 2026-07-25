@@ -22,12 +22,13 @@ class ScannerPageScaffold extends StatelessWidget {
     required this.onNotifications,
     required this.cameraTile,
     required this.galleryTile,
-    required this.sampleTile,
+    this.sampleTile,
     super.key,
   });
   final String period, firstName;
   final VoidCallback? onNotifications;
-  final PackLoxEntryTile cameraTile, galleryTile, sampleTile;
+  final PackLoxEntryTile cameraTile, galleryTile;
+  final PackLoxEntryTile? sampleTile;
 
   @override
   Widget build(BuildContext context) => ScannerFocusTheme(
@@ -87,11 +88,13 @@ class ScannerPageScaffold extends StatelessWidget {
                       height: ScannerS01VisualValues.tileGap,
                     ),
                     galleryTile,
-                    const SizedBox(
-                      key: ValueKey('scan-hub-tile-gap-2'),
-                      height: ScannerS01VisualValues.tileGap,
-                    ),
-                    sampleTile,
+                    if (sampleTile != null) ...[
+                      const SizedBox(
+                        key: ValueKey('scan-hub-tile-gap-2'),
+                        height: ScannerS01VisualValues.tileGap,
+                      ),
+                      sampleTile!,
+                    ],
                   ],
                 ),
               );

@@ -1,6 +1,10 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
+import 'package:collectiq_ai/features/wishlist/domain/repositories/wishlist_repository.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -111,6 +115,28 @@ void main() {
       expect(find.text('Estimated from saved market data'), findsWidgets);
     },
   );
+
+  testWidgets('favorite action persists wishlist status', (tester) async {
+    final repository = _MemoryWishlistRepository();
+    final item = _authorityItem();
+    await _pumpDetail(tester, item, wishlistRepository: repository);
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-favorite-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(await repository.getStatusForItem(item.id), WishlistStatus.wanted);
+    expect(find.text('Added to wishlist'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-favorite-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(await repository.getStatusForItem(item.id), WishlistStatus.owned);
+    expect(find.text('Removed from wishlist'), findsOneWidget);
+  });
 
   testWidgets('pending detail state keeps valuation and image fallbacks clear', (
     tester,
@@ -454,6 +480,7 @@ Future<void> _pumpDetail(
   WidgetTester tester,
   CollectibleItem item, {
   Future<bool> Function(String itemId)? onDelete,
+  WishlistRepository? wishlistRepository,
 }) async {
   tester.view.physicalSize = const Size(900, 1200);
   tester.view.devicePixelRatio = 1;
@@ -462,6 +489,10 @@ Future<void> _pumpDetail(
 
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        if (wishlistRepository != null)
+          wishlistRepositoryProvider.overrideWithValue(wishlistRepository),
+      ],
       child: MaterialApp(
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
@@ -471,6 +502,44 @@ Future<void> _pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _MemoryWishlistRepository implements WishlistRepository {
+  final Map<String, WishlistStatusEntry> _entries = {};
+
+  @override
+  Future<void> clear() async {
+    _entries.clear();
+  }
+
+  @override
+  Future<void> deleteStatus(String itemId) async {
+    _entries.remove(itemId);
+  }
+
+  @override
+  Future<List<WishlistStatusEntry>> getEntries() async {
+    return _entries.values.toList();
+  }
+
+  @override
+  Future<WishlistStatus> getStatusForItem(String itemId) async {
+    return _entries[itemId]?.status ?? WishlistStatus.owned;
+  }
+
+  @override
+  Future<void> saveStatus({
+    required CollectibleItem item,
+    required WishlistStatus status,
+  }) async {
+    _entries[item.id] = WishlistStatusEntry(
+      itemId: item.id,
+      title: item.title,
+      category: item.category,
+      status: status,
+      updatedAt: DateTime(2026, 7, 26),
+    );
+  }
 }
 
 Future<void> _revealText(WidgetTester tester, String text) async {

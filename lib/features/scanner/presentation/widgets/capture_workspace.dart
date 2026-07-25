@@ -287,7 +287,7 @@ class CaptureWorkspace extends StatelessWidget {
                     label: const Text('New Scan'),
                   ),
                 )
-              else
+              else if (onSample != null)
                 Expanded(
                   child: TextButton.icon(
                     key: const ValueKey('scan-secondary-Use Sample Scan'),
@@ -298,7 +298,8 @@ class CaptureWorkspace extends StatelessWidget {
                 ),
             ],
           ),
-          if (slots.isNotEmpty || hasResult || analyzeReady) ...[
+          if (onSample != null &&
+              (slots.isNotEmpty || hasResult || analyzeReady)) ...[
             const SizedBox(height: AppSpacing.xs),
             Align(
               alignment: Alignment.centerLeft,
@@ -1980,7 +1981,7 @@ class _GoalHint extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Text(
-        'Listing asset generation is coming soon.',
+        'Capture front, back, label, and condition photos so the saved item has listing-ready evidence.',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: ScannerVisualTheme.textSecondary,
         ),

@@ -22,6 +22,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
+const _showSampleScan = bool.fromEnvironment('PACKLOX_SHOW_SAMPLE_SCAN');
+
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({this.onViewPortfolio, super.key});
 
@@ -211,7 +213,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             },
             onAnalyze: scannerController.analyzeWithAi,
             onSelectPhoto: scannerController.selectCapturedPhoto,
-            onSample: scannerController.useSampleScan,
+            onSample: _showSampleScan ? scannerController.useSampleScan : null,
             onEnhance: activeSlot == null
                 ? null
                 : () => scannerController.applyEnhancementToPhoto(
@@ -284,7 +286,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                             scannerController.useCapturedPhotoAsPrimary,
                         onEnhance: scannerController.applyEnhancementToPhoto,
                         onDelete: scannerController.deleteCapturedImage,
-                        onSample: scannerController.useSampleScan,
+                        onSample: _showSampleScan
+                            ? scannerController.useSampleScan
+                            : null,
                         onReset: scannerController.resetScan,
                       ),
                       if (scannerState.errorMessage != null) ...[
@@ -321,7 +325,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           ),
           onAnalyze: scannerController.analyzeWithAi,
           onSelectPhoto: scannerController.selectCapturedPhoto,
-          onSample: scannerController.useSampleScan,
+          onSample: _showSampleScan ? scannerController.useSampleScan : null,
           onEnhance: activeSlot == null
               ? null
               : () => scannerController.applyEnhancementToPhoto(
@@ -675,7 +679,7 @@ class _SnapchatScanSurface extends StatefulWidget {
   final VoidCallback onGallery;
   final VoidCallback onAnalyze;
   final ValueChanged<ScannerPhotoSlot> onSelectPhoto;
-  final VoidCallback onSample;
+  final VoidCallback? onSample;
   final VoidCallback? onEnhance;
 
   @override
@@ -951,19 +955,20 @@ class _SnapchatScanSurfaceState extends State<_SnapchatScanSurface> {
               onAnalyze: widget.onAnalyze,
             ),
           ),
-          Positioned(
-            left: 0,
-            top: 0,
-            child: SizedBox.square(
-              dimension: 1,
-              child: IconButton(
-                key: const ValueKey('scan-secondary-Use Sample Scan'),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onSample,
-                icon: const SizedBox.shrink(),
+          if (_showSampleScan)
+            Positioned(
+              left: 0,
+              top: 0,
+              child: SizedBox.square(
+                dimension: 1,
+                child: IconButton(
+                  key: const ValueKey('scan-secondary-Use Sample Scan'),
+                  padding: EdgeInsets.zero,
+                  onPressed: widget.onSample,
+                  icon: const SizedBox.shrink(),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
