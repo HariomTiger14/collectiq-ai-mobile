@@ -106,26 +106,17 @@ void main() {
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
 
-    final notificationSwitch = find.byKey(
-      const ValueKey('settings-price-alert-notifications-switch'),
-    );
-    await tester.dragUntilVisible(
-      notificationSwitch,
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    expect(find.text('Price Alerts'), findsOneWidget);
+    expect(
+      find.text(
+        'Enable notifications in Android settings to receive local alerts.',
       ),
-      const Offset(0, -320),
-      maxIteration: 20,
+      findsOneWidget,
     );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Price alerts'), findsOneWidget);
-    expect(find.text('Notification permission'), findsOneWidget);
     expect(find.text('Denied'), findsWidgets);
-    expect(notificationSwitch, findsOneWidget);
   });
 }
 

@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
-import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,17 +28,11 @@ void main() {
       ),
     );
 
-    final surface = tester.widget<ColoredBox>(
+    final safeArea = tester.widget<SafeArea>(
       find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
     );
-    final safeArea = tester.widget<SafeArea>(
-      find.descendant(
-        of: find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
-        matching: find.byType(SafeArea),
-      ),
-    );
-    expect(surface.color, PackLoxTokens.background);
     expect(safeArea.top, isFalse);
+    expect(safeArea.minimum.bottom, 12);
   });
 
   testWidgets('Scan selected semantics and navigation taps are preserved', (

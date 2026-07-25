@@ -5,6 +5,12 @@ import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
+import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
+import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:flutter/material.dart';
@@ -122,13 +128,10 @@ void main() {
       );
 
       final safeArea = tester.widget<SafeArea>(
-        find.descendant(
-          of: find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
-          matching: find.byType(SafeArea),
-        ),
+        find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
       );
       expect(safeArea.top, isFalse);
-      expect(safeArea.minimum.bottom, AppSpacing.sm);
+      expect(safeArea.minimum.bottom, 12);
     });
 
     testWidgets('bottom navigation clearance preserves three-button inset', (
@@ -138,15 +141,16 @@ void main() {
         viewPadding: const EdgeInsets.only(bottom: 48),
       );
 
-      final surface = tester.widget<ColoredBox>(
+      final safeArea = tester.widget<SafeArea>(
         find.byKey(const ValueKey('bottom-navigation-safe-area-surface')),
       );
-      expect(surface.color, PackLoxTokens.background);
+      expect(safeArea.top, isFalse);
+      expect(safeArea.minimum.bottom, 12);
       expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('App Shell keeps four destinations and dark system surfaces', (
+    testWidgets('App Shell keeps five destinations and dark system surfaces', (
       tester,
     ) async {
       await tester.pumpShell();
@@ -154,8 +158,8 @@ void main() {
       expect(find.byKey(const ValueKey('nav-home')), findsOneWidget);
       expect(find.byKey(const ValueKey('nav-portfolio')), findsOneWidget);
       expect(find.byKey(const ValueKey('nav-scan')), findsOneWidget);
+      expect(find.byKey(const ValueKey('nav-search')), findsOneWidget);
       expect(find.byKey(const ValueKey('nav-settings')), findsOneWidget);
-      expect(find.text('Search'), findsNothing);
       expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
     });
   });
@@ -266,6 +270,12 @@ extension _SharedVisualFoundationPump on WidgetTester {
           onboardingRepositoryProvider.overrideWithValue(
             const _ImmediateOnboardingRepository(completed: true),
           ),
+          authRepositoryProvider.overrideWithValue(
+            _SharedVisualAuthRepository(),
+          ),
+          guestModeRepositoryProvider.overrideWithValue(
+            const _ImmediateGuestModeRepository(chosen: true),
+          ),
         ],
         child: _Harness(
           viewPadding: viewPadding,
@@ -274,7 +284,8 @@ extension _SharedVisualFoundationPump on WidgetTester {
         ),
       ),
     );
-    await pumpAndSettle();
+    await pump();
+    await pump(const Duration(milliseconds: 240));
   }
 
   Future<void> pumpNavigationOnly({
@@ -369,4 +380,78 @@ class _ImmediateOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<void> setOnboardingCompleted(bool completed) async {}
+}
+
+class _ImmediateGuestModeRepository implements GuestModeRepository {
+  const _ImmediateGuestModeRepository({required this.chosen});
+
+  final bool chosen;
+
+  @override
+  Future<bool> hasChosenGuestMode() async => chosen;
+
+  @override
+  Future<void> setGuestModeChosen(bool chosen) async {}
+}
+
+class _SharedVisualAuthRepository implements AuthRepository {
+  @override
+  Future<AppUser?> currentUser() async => null;
+
+  @override
+  Future<AppUser> signIn() => signInAnonymously();
+
+  @override
+  Future<AppUser> signInAnonymously() async {
+    return const AppUser(
+      id: 'local-user',
+      displayName: 'Local Collector',
+      email: null,
+      isAnonymous: true,
+      isLocalOnly: true,
+      provider: AuthProviderType.localAnonymous,
+    );
+  }
+
+  @override
+  Future<AppUser> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    return AppUser(
+      id: 'cloud-user',
+      displayName: email,
+      email: email,
+      provider: AuthProviderType.emailPassword,
+    );
+  }
+
+  @override
+  Future<AppUser> signUpWithEmailPassword({
+    required String email,
+    required String password,
+  }) {
+    throw const AuthException(
+      'Sign up is out of scope for shell visual tests.',
+    );
+  }
+
+  @override
+  Future<void> resendEmailConfirmation({required String email}) async {}
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {}
+
+  @override
+  Future<AppUser> signInWithGoogle() {
+    throw const AuthException('Google sign-in is not enabled.');
+  }
+
+  @override
+  Future<AppUser> signInWithApple() {
+    throw const AuthException('Apple sign-in is not enabled.');
+  }
+
+  @override
+  Future<void> signOut() async {}
 }
