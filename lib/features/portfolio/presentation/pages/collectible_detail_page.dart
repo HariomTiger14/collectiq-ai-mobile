@@ -1896,6 +1896,12 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
+        'Value at scan',
+        _displayValue(pricing, fallbackValue: item.estimatedValue),
+      ),
+      if (_sourceMarketValue(pricing) != null)
+        _DetailInfoRowData('Source market value', _sourceMarketValue(pricing)!),
+      _DetailInfoRowData(
         'Value range',
         '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
       ),
@@ -3968,9 +3974,14 @@ class _PriceHistorySection extends StatelessWidget {
     final metadata = <AppMetadataItem>[
       if (pricing != null) ...[
         AppMetadataItem(
-          label: 'Estimated market value',
-          value: _formatMoney(pricing.estimatedMarketValue, pricing.currency),
+          label: 'Value at scan',
+          value: _displayValue(pricing, fallbackValue: item.estimatedValue),
         ),
+        if (_sourceMarketValue(pricing) != null)
+          AppMetadataItem(
+            label: 'Source market value',
+            value: _sourceMarketValue(pricing)!,
+          ),
         AppMetadataItem(
           label: 'Estimated range',
           value:
@@ -4564,6 +4575,30 @@ String _formatDate(DateTime date) {
   return '$day/$month/${date.year}';
 }
 
+String _displayValue(PricingInfo pricing, {required double fallbackValue}) {
+  final displayString = pricing.displayString?.trim();
+  if (displayString != null && displayString.isNotEmpty) {
+    return displayString;
+  }
+  final value = pricing.estimatedMarketValue > 0
+      ? pricing.estimatedMarketValue
+      : fallbackValue;
+  return _formatMoney(value, pricing.currency);
+}
+
+String? _sourceMarketValue(PricingInfo pricing) {
+  final originalPrice = pricing.originalPrice;
+  final originalCurrency = pricing.originalCurrency?.trim();
+  if (originalPrice == null ||
+      originalPrice <= 0 ||
+      originalCurrency == null ||
+      originalCurrency.isEmpty ||
+      originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
+    return null;
+  }
+  return _formatMoney(originalPrice, originalCurrency);
+}
+
 String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
@@ -4573,10 +4608,20 @@ String _formatMoney(double value, String currency) {
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  if (currency.trim().isEmpty || currency.toUpperCase() == 'AUD') {
-    return '\$$withCommas';
+  final normalizedCurrency = currency.trim().toUpperCase();
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '\$$withCommas AUD';
   }
-  return '$currency $withCommas';
+  if (normalizedCurrency == 'USD') {
+    return 'US\$$withCommas';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return '£$withCommas';
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CA\$$withCommas';
+  }
+  return '$normalizedCurrency $withCommas';
 }
 
 String _formatPricingDate(DateTime? date) {

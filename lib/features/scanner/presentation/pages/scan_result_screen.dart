@@ -102,11 +102,9 @@ class ScanResultScreen extends StatelessWidget {
                 _FadeInMetadata(
                   delay: const Duration(milliseconds: 90),
                   child: _ValueCard(
-                    value: _formatScanValue(
-                      result.estimatedValue,
-                      result.valuationStatus,
-                    ),
+                    value: _primaryValueLabel(result),
                     source: _valueSourceLabel(result),
+                    secondaryValue: _sourceMarketValueLabel(result.pricing),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -356,13 +354,13 @@ class _MarketEvidence extends StatelessWidget {
       children: [
         _ResultRow(
           label: 'Estimated market value',
-          value: _formatScanValue(
-            pricing.estimatedMarketValue > 0
-                ? pricing.estimatedMarketValue
-                : result.estimatedValue,
-            result.valuationStatus,
-          ),
+          value: _primaryValueLabel(result),
         ),
+        if (_sourceMarketValueLabel(pricing) != null)
+          _ResultRow(
+            label: 'Source market value',
+            value: _sourceMarketValueLabel(pricing)!,
+          ),
         _ResultRow(label: 'Estimated range', value: _valueRange(result)),
         _ResultRow(
           label: 'Pricing source',
@@ -772,10 +770,15 @@ class _ConfidenceMeter extends StatelessWidget {
 }
 
 class _ValueCard extends StatelessWidget {
-  const _ValueCard({required this.value, required this.source});
+  const _ValueCard({
+    required this.value,
+    required this.source,
+    this.secondaryValue,
+  });
 
   final String value;
   final String source;
+  final String? secondaryValue;
 
   @override
   Widget build(BuildContext context) {
@@ -818,6 +821,16 @@ class _ValueCard extends StatelessWidget {
                 letterSpacing: 0,
               ),
             ),
+            if (secondaryValue != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                secondaryValue!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: ScannerVisualTheme.cyan,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.xs),
             Text(
               source,
@@ -973,17 +986,61 @@ class _ResultChip extends StatelessWidget {
   }
 }
 
-String _formatScanValue(double value, ValuationStatus status) {
+String _primaryValueLabel(ScanResult result) {
+  final pricing = result.pricing;
+  final value = pricing.estimatedMarketValue > 0
+      ? pricing.estimatedMarketValue
+      : result.estimatedValue;
+  return _formatScanValue(value, result.valuationStatus, pricing.currency);
+}
+
+String? _sourceMarketValueLabel(PricingInfo pricing) {
+  final originalPrice = pricing.originalPrice;
+  final originalCurrency = pricing.originalCurrency?.trim();
+  if (originalPrice == null ||
+      originalPrice <= 0 ||
+      originalCurrency == null ||
+      originalCurrency.isEmpty ||
+      originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
+    return null;
+  }
+  return 'Source: ${_formatMoney(originalPrice, originalCurrency)}';
+}
+
+String _formatScanValue(
+  double value,
+  ValuationStatus status, [
+  String currency = 'AUD',
+]) {
   if (value <= 0) {
     return _valuationStatusMessage(status);
   }
+  return _formatMoney(value, currency);
+}
 
+String _formatMoney(double value, String currency) {
+  if (value <= 0) {
+    return 'Value unavailable';
+  }
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  return '\$$withCommas';
+  final normalizedCurrency = currency.trim().toUpperCase();
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '\$$withCommas AUD';
+  }
+  if (normalizedCurrency == 'USD') {
+    return 'US\$$withCommas';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return '£$withCommas';
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CA\$$withCommas';
+  }
+  return '$normalizedCurrency $withCommas';
 }
 
 String _valuationStatusMessage(ValuationStatus status) {
@@ -1033,14 +1090,14 @@ String _valueRange(ScanResult result) {
   final low = result.pricing.lowEstimate;
   final high = result.pricing.highEstimate;
   if (low > 0 && high > 0 && high >= low) {
-    return '${_formatScanValue(low, result.valuationStatus)} - '
-        '${_formatScanValue(high, result.valuationStatus)}';
+    return '${_formatScanValue(low, result.valuationStatus, result.pricing.currency)} - '
+        '${_formatScanValue(high, result.valuationStatus, result.pricing.currency)}';
   }
   if (result.estimatedValue > 0) {
     final lower = result.estimatedValue * 0.82;
     final upper = result.estimatedValue * 1.18;
-    return '${_formatScanValue(lower, result.valuationStatus)} - '
-        '${_formatScanValue(upper, result.valuationStatus)}';
+    return '${_formatScanValue(lower, result.valuationStatus, result.pricing.currency)} - '
+        '${_formatScanValue(upper, result.valuationStatus, result.pricing.currency)}';
   }
   return 'Needs market check';
 }

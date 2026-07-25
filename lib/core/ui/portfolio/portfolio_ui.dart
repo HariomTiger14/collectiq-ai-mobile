@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 
 class PortfolioHeroHeader extends StatelessWidget {
@@ -665,7 +666,9 @@ class _PortfolioItemDetails extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _MetadataPill(label: _formatAud(item.estimatedValue)),
+            _MetadataPill(label: _portfolioValueLabel(item)),
+            if (_sourceMarketValueLabel(item.pricing) != null)
+              _MetadataPill(label: _sourceMarketValueLabel(item.pricing)!),
             _MetadataPill(label: 'Category ${item.category}'),
             _MetadataPill(label: 'Saved ${_formatDate(item.createdAt)}'),
             _MetadataPill(
@@ -800,11 +803,64 @@ String _formatDate(DateTime date) {
   return '$day/$month/${date.year}';
 }
 
-String _formatAud(double value) {
+String _portfolioValueLabel(CollectibleItem item) {
+  final pricing = item.pricing;
+  final value =
+      pricing?.estimatedMarketValue == null ||
+          pricing!.estimatedMarketValue <= 0
+      ? item.estimatedValue
+      : pricing.estimatedMarketValue;
+  final currency = pricing?.currency ?? 'AUD';
+  if (value <= 0) {
+    return _portfolioValueUnavailableLabel(item.valuationStatus);
+  }
+  return _formatMoney(value, currency);
+}
+
+String _portfolioValueUnavailableLabel(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.providerNotConfigured => 'Pricing coming soon',
+    ValuationStatus.noMarketMatch => 'No market match',
+    ValuationStatus.lookupFailed => 'Lookup failed',
+    ValuationStatus.aiEstimated => 'AI estimate pending',
+    _ => 'Value unavailable',
+  };
+}
+
+String? _sourceMarketValueLabel(PricingInfo? pricing) {
+  if (pricing == null) {
+    return null;
+  }
+  final originalPrice = pricing.originalPrice;
+  final originalCurrency = pricing.originalCurrency?.trim();
+  if (originalPrice == null ||
+      originalPrice <= 0 ||
+      originalCurrency == null ||
+      originalCurrency.isEmpty ||
+      originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
+    return null;
+  }
+  return _formatMoney(originalPrice, originalCurrency);
+}
+
+String _formatMoney(double value, String currency) {
   final whole = value.toStringAsFixed(0);
   final withCommas = whole.replaceAllMapped(
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  return 'AUD $withCommas';
+  final normalizedCurrency = currency.trim().toUpperCase();
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '\$$withCommas AUD';
+  }
+  if (normalizedCurrency == 'USD') {
+    return 'US\$$withCommas';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return '£$withCommas';
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CA\$$withCommas';
+  }
+  return '$normalizedCurrency $withCommas';
 }
