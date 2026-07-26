@@ -52,6 +52,15 @@ void main() {
       );
       await _revealText(tester, 'Market & Value');
       expect(find.text('Market & Value'), findsOneWidget);
+      expect(find.text('Value History'), findsOneWidget);
+      expect(find.text('At scan'), findsOneWidget);
+      expect(find.text('Current'), findsOneWidget);
+      expect(find.text('Gain/Loss'), findsOneWidget);
+      expect(find.text('USD \$200'), findsWidgets);
+      expect(find.text('USD \$245'), findsWidgets);
+      expect(find.text('+USD \$45'), findsOneWidget);
+      expect(find.text('+22.5%'), findsOneWidget);
+      expect(find.text('Last refreshed 26/07/2026'), findsOneWidget);
       expect(find.text('Collectible Details'), findsNothing);
     },
   );
@@ -634,5 +643,7 @@ CollectibleItem _authorityItem({
       pricingConfidence: 0.82,
       lastUpdated: null,
     ),
+    valueAtScan: 200,
+    lastValueRefreshedAt: DateTime(2026, 7, 26),
   );
 }

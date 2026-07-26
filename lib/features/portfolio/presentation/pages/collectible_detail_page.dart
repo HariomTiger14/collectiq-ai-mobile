@@ -1687,6 +1687,8 @@ class _DetailMarketSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _DetailAuthorityValueBlock(item: item),
           const SizedBox(height: AppSpacing.md),
+          _DetailValueHistoryPanel(item: item),
+          const SizedBox(height: AppSpacing.md),
           if (rows.isEmpty)
             const _DetailEmptyCopy(
               'No market pricing evidence has been saved for this collectible.',
@@ -1702,6 +1704,220 @@ class _DetailMarketSection extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _DetailValueHistoryPanel extends StatelessWidget {
+  const _DetailValueHistoryPanel({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = item.pricing?.currency ?? 'AUD';
+    final scanValue = _valueAtScanFor(item);
+    final currentValue = _currentValueFor(item);
+    final delta = currentValue - scanValue;
+    final hasMovement = scanValue > 0 && currentValue > 0;
+    final isPositive = delta >= 0;
+    final movementColor = !hasMovement
+        ? HomeTokens.textSecondary
+        : isPositive
+        ? HomeTokens.positive
+        : Theme.of(context).colorScheme.error;
+    final movementLabel = hasMovement
+        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), currency)}'
+        : 'Waiting for refresh';
+    final movementPercent = hasMovement && scanValue > 0
+        ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
+        : 'No trend yet';
+
+    return Container(
+      key: const ValueKey('collectible-detail-value-history-panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Value History',
+            icon: Icons.show_chart_rounded,
+            compact: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _DetailValueHistoryMetric(
+                  label: 'At scan',
+                  value: _formatMoney(scanValue, currency),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _DetailValueHistoryMetric(
+                  label: 'Current',
+                  value: _formatMoney(currentValue, currency),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _DetailValueHistoryMetric(
+                  label: 'Gain/Loss',
+                  value: movementLabel,
+                  valueColor: movementColor,
+                  subtitle: movementPercent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            height: 54,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: HomeTokens.background.withValues(alpha: 0.48),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(
+                color: HomeTokens.border.withValues(alpha: 0.62),
+              ),
+            ),
+            child: CustomPaint(
+              painter: _ValueHistorySparklinePainter(
+                color: movementColor,
+                isFlat: !hasMovement || delta == 0,
+                isPositive: isPositive,
+              ),
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  child: Text(
+                    _lastRefreshedLabel(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: HomeTokens.textSecondary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailValueHistoryMetric extends StatelessWidget {
+  const _DetailValueHistoryMetric({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.subtitle,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: HomeTokens.textSecondary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: valueColor ?? HomeTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (subtitle != null)
+          Text(
+            subtitle!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ValueHistorySparklinePainter extends CustomPainter {
+  const _ValueHistorySparklinePainter({
+    required this.color,
+    required this.isFlat,
+    required this.isPositive,
+  });
+
+  final Color color;
+  final bool isFlat;
+  final bool isPositive;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.9)
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final path = Path();
+    final left = AppSpacing.sm;
+    final right = size.width - AppSpacing.sm;
+    final mid = size.height * 0.52;
+    final startY = isFlat
+        ? mid
+        : isPositive
+        ? size.height * 0.72
+        : size.height * 0.32;
+    final endY = isFlat
+        ? mid
+        : isPositive
+        ? size.height * 0.28
+        : size.height * 0.72;
+    path
+      ..moveTo(left, startY)
+      ..cubicTo(
+        size.width * 0.34,
+        startY,
+        size.width * 0.54,
+        endY,
+        right,
+        endY,
+      );
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ValueHistorySparklinePainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.isFlat != isFlat ||
+        oldDelegate.isPositive != isPositive;
   }
 }
 
@@ -2141,6 +2357,30 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
       _DetailInfoRowData('Sources', market.sources.join(', ')),
     ],
   ];
+}
+
+double _valueAtScanFor(CollectibleItem item) {
+  final valueAtScan = item.valueAtScan;
+  if (valueAtScan != null && valueAtScan > 0) {
+    return valueAtScan;
+  }
+  return item.estimatedValue;
+}
+
+double _currentValueFor(CollectibleItem item) {
+  final marketValue = item.pricing?.estimatedMarketValue;
+  if (marketValue != null && marketValue > 0) {
+    return marketValue;
+  }
+  return item.estimatedValue;
+}
+
+String _lastRefreshedLabel(CollectibleItem item) {
+  final refreshedAt = item.lastValueRefreshedAt;
+  if (refreshedAt != null) {
+    return 'Last refreshed ${_formatPricingDate(refreshedAt)}';
+  }
+  return 'Refresh value to start history';
 }
 
 _DetailInfoRowData? _detailRow(String label, String? value) {
