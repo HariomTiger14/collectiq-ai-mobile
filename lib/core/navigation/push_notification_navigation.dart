@@ -5,10 +5,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 class PushNotificationNavigationCoordinator {
-  PushNotificationNavigationCoordinator({FirebaseMessaging? messaging})
-    : _messaging = messaging ?? FirebaseMessaging.instance;
+  PushNotificationNavigationCoordinator({this.messaging});
 
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? messaging;
   StreamSubscription<RemoteMessage>? _openedSubscription;
   String? _lastHandledMessageKey;
 
@@ -17,7 +16,8 @@ class PushNotificationNavigationCoordinator {
     onIntent,
   }) async {
     await _ensureFirebaseInitialized();
-    final initialMessage = await _messaging.getInitialMessage();
+    final firebaseMessaging = messaging ?? FirebaseMessaging.instance;
+    final initialMessage = await firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
       unawaited(_handleMessage(initialMessage, onIntent: onIntent));
     }
