@@ -219,6 +219,31 @@ void main() {
     expect(find.text('No valuation saved'), findsWidgets);
   });
 
+  testWidgets('catalog placeholder item prompts user to add photos', (
+    tester,
+  ) async {
+    await _pumpDetail(
+      tester,
+      _authorityItem(
+        imagePath:
+            'assets/packlox/icons/categories/3d/packlox_category_placeholder_card_v1.png',
+        galleryImages: const [],
+      ),
+    );
+
+    await _revealText(tester, 'Add your photos');
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-photo-evidence-prompt')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('collectible-detail-add-photo-action')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('saved from catalog search'), findsOneWidget);
+  });
+
   testWidgets('QA capture exposes Portfolio Detail visual states', (
     tester,
   ) async {

@@ -199,6 +199,8 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                               onDelete: _deleteGalleryImage,
                               onEdit: _editGalleryImage,
                             ),
+                      onAddPhoto: () =>
+                          _addPortfolioPhotoFromGallery(currentItem),
                       onEdit: () => _showEditCollectibleDialog(
                         context: context,
                         ref: ref,
@@ -383,6 +385,43 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       _showDetailSnackBar(context, 'Photo updated');
     }
     return updatedImage;
+  }
+
+  Future<void> _addPortfolioPhotoFromGallery(CollectibleItem item) async {
+    try {
+      final galleryService = ref.read(galleryServiceProvider);
+      final pickedImage = await galleryService.pickImage();
+      if (pickedImage == null) {
+        return;
+      }
+      await galleryService.validateImage(pickedImage);
+      final persistedImage = await galleryService.persistSelectedImage(
+        pickedImage,
+      );
+      final portfolioImage = CollectibleImage(
+        path: persistedImage.path,
+        role: 'front',
+        source: 'gallery',
+        originalPath: pickedImage.path,
+        isPrimary: true,
+      );
+      setState(() => _selectedGalleryPath = portfolioImage.path);
+      await ref
+          .read(portfolioControllerProvider.notifier)
+          .updateItem(
+            item.copyWith(
+              imagePath: portfolioImage.path,
+              galleryImages: [portfolioImage],
+            ),
+          );
+      if (mounted) {
+        _showDetailSnackBar(context, 'Photo added to portfolio item');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showDetailSnackBar(context, 'Unable to add photo');
+      }
+    }
   }
 }
 
@@ -1062,6 +1101,7 @@ class _DetailInlineContent extends StatelessWidget {
     required this.selectedImage,
     required this.onImageSelected,
     required this.onImageTap,
+    required this.onAddPhoto,
     required this.onEdit,
     required this.onShare,
     required this.onFavorite,
@@ -1074,6 +1114,7 @@ class _DetailInlineContent extends StatelessWidget {
   final CollectibleImage? selectedImage;
   final ValueChanged<CollectibleImage> onImageSelected;
   final VoidCallback? onImageTap;
+  final VoidCallback onAddPhoto;
   final VoidCallback onEdit;
   final VoidCallback onShare;
   final VoidCallback onFavorite;
@@ -1085,6 +1126,10 @@ class _DetailInlineContent extends StatelessWidget {
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
         _DetailOverviewSection(item: item),
+        if (_usesCatalogPlaceholderImage(item)) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
+        ],
         if (galleryImages.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailGallerySection(
@@ -1471,6 +1516,70 @@ class _DetailGallerySection extends StatelessWidget {
               onSelected: onImageSelected,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailPhotoEvidencePrompt extends StatelessWidget {
+  const _DetailPhotoEvidencePrompt({
+    required this.onAddPhoto,
+    required this.onEdit,
+  });
+
+  final VoidCallback onAddPhoto;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-photo-evidence-prompt'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Add your photos',
+            icon: Icons.add_photo_alternate_outlined,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'This item was saved from catalog search, so PackLox is showing a category placeholder. Add your own photos to make the portfolio record personal and evidence-backed.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              FilledButton.icon(
+                key: const ValueKey('collectible-detail-add-photo-action'),
+                onPressed: onAddPhoto,
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+                label: const Text('Add your photos'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8BE7FF),
+                  foregroundColor: const Color(0xFF07111D),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('collectible-detail-review-details-action'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Review details'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: HomeTokens.textPrimary,
+                  side: const BorderSide(color: HomeTokens.border),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -4612,6 +4721,16 @@ String _shortGalleryRoleLabel(CollectibleImage image) {
     return 'Primary';
   }
   return _galleryRoleLabel(image);
+}
+
+bool _usesCatalogPlaceholderImage(CollectibleItem item) {
+  return _isPackLoxCategoryPlaceholderPath(item.imagePath);
+}
+
+bool _isPackLoxCategoryPlaceholderPath(String path) {
+  return path.trim().startsWith(
+    'assets/packlox/icons/categories/3d/packlox_category_',
+  );
 }
 
 String _formatAud(double value) {
