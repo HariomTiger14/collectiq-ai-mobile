@@ -1283,6 +1283,30 @@ class _CatalogPlaceholderArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = _placeholderStyle(category, title, setName);
+    if (style.assetPath != null) {
+      return Image.asset(
+        style.assetPath!,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) =>
+            _FallbackCatalogPlaceholderArt(style: style, compact: compact),
+      );
+    }
+    return _FallbackCatalogPlaceholderArt(style: style, compact: compact);
+  }
+}
+
+class _FallbackCatalogPlaceholderArt extends StatelessWidget {
+  const _FallbackCatalogPlaceholderArt({
+    required this.style,
+    required this.compact,
+  });
+
+  final _PlaceholderStyle style;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -1781,6 +1805,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.card,
       accent: PackLoxTokens.cyan,
       background: Color(0xFF171421),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_card_v1.png',
     );
   }
   if (text.contains('comic')) {
@@ -1789,6 +1815,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.comic,
       accent: Color(0xFF9B7CFF),
       background: Color(0xFF171421),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_comic_v1.png',
     );
   }
   if (text.contains('watch')) {
@@ -1797,6 +1825,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.watch,
       accent: PackLoxTokens.success,
       background: Color(0xFF102019),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_watch_v1.png',
     );
   }
   if (text.contains('shoe') || text.contains('sneaker')) {
@@ -1805,6 +1835,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.shoe,
       accent: PackLoxTokens.blue,
       background: Color(0xFF111827),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_shoe_v1.png',
     );
   }
   if (text.contains('game') ||
@@ -1817,6 +1849,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.game,
       accent: PackLoxTokens.cyan,
       background: Color(0xFF101C22),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_game_v1.png',
     );
   }
   if (text.contains('toy') ||
@@ -1827,6 +1861,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.toy,
       accent: PackLoxTokens.blue,
       background: Color(0xFF111827),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_toy_v1.png',
     );
   }
   if (text.contains('coin')) {
@@ -1835,6 +1871,8 @@ _PlaceholderStyle _placeholderStyle(
       mark: _PlaceholderMark.coin,
       accent: PackLoxTokens.amber,
       background: Color(0xFF201C12),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_coin_v1.png',
     );
   }
   return const _PlaceholderStyle(
@@ -1842,6 +1880,7 @@ _PlaceholderStyle _placeholderStyle(
     mark: _PlaceholderMark.collectible,
     accent: PackLoxTokens.cyan,
     background: Color(0xFF101A20),
+    assetPath: 'assets/packlox/brand/packlox_brand_v2_app_icon_authority.png',
   );
 }
 
@@ -1851,12 +1890,14 @@ class _PlaceholderStyle {
     required this.mark,
     required this.accent,
     required this.background,
+    this.assetPath,
   });
 
   final String label;
   final _PlaceholderMark mark;
   final Color accent;
   final Color background;
+  final String? assetPath;
 }
 
 IconData _quickFilterIcon(String label) {

@@ -76,6 +76,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/packlox/brand/packlox_brand_v2_app_icon_authority.png
     - assets/packlox/brand/packlox_brand_v2_emblem_authority_v0_7.png
     - assets/packlox/brand/packlox_emblem_layered_v1.svg
     - assets/packlox/icons/actions/packlox_icon_notification_bell_v1.svg
@@ -83,6 +84,7 @@ flutter:
     - assets/packlox/icons/categories/packlox_icon_category_coins_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_figures_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_more_v1.svg
+    - assets/packlox/icons/categories/3d/
     - assets/packlox/icons/navigation/packlox_icon_nav_home_v1.svg
     - assets/packlox/icons/navigation/packlox_icon_nav_portfolio_v1.svg
     - assets/packlox/icons/navigation/packlox_icon_nav_scan_v1.svg
