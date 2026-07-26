@@ -1876,12 +1876,12 @@ _PlaceholderStyle _placeholderStyle(
     );
   }
   return const _PlaceholderStyle(
-    label: 'PX',
+    label: 'ITEM',
     mark: _PlaceholderMark.collectible,
     accent: PackLoxTokens.cyan,
     background: Color(0xFF101A20),
     assetPath:
-        'assets/packlox/icons/categories/3d/packlox_category_placeholder_px_v2.png',
+        'assets/packlox/icons/categories/3d/packlox_category_placeholder_item_v1.png',
   );
 }
 
