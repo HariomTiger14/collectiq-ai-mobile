@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -1009,17 +1010,9 @@ class _PortfolioResultCard extends StatelessWidget {
         child: _SurfaceCard(
           child: Row(
             children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: PackLoxTokens.cyan.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: PackLoxTokens.cyan,
-                ),
+              _SearchThumbnail(
+                key: ValueKey('discover-portfolio-image-${item.id}'),
+                item: item,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1098,17 +1091,11 @@ class _CatalogResultCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: PackLoxTokens.amber.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.dataset_outlined,
-              color: PackLoxTokens.amber,
-            ),
+          _CatalogPlaceholderThumbnail(
+            key: ValueKey('discover-catalog-placeholder-${result.id}'),
+            category: result.category,
+            title: result.title,
+            setName: result.setName,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1165,6 +1152,191 @@ class _CatalogResultCard extends StatelessWidget {
   }
 }
 
+class _SearchThumbnail extends StatelessWidget {
+  const _SearchThumbnail({required this.item, super.key});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final imagePath = _searchImagePath(item);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: PackLoxTokens.border),
+        ),
+        child: imagePath == null
+            ? _CatalogPlaceholderArt(
+                category: item.category,
+                title: item.title,
+                setName: item.setName,
+                compact: true,
+              )
+            : _SearchImage(path: imagePath),
+      ),
+    );
+  }
+}
+
+class _SearchImage extends StatelessWidget {
+  const _SearchImage({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedPath = path.trim();
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return Image.network(
+        normalizedPath,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const _MissingSearchImage(),
+      );
+    }
+    if (normalizedPath.startsWith('assets/')) {
+      return Image.asset(
+        normalizedPath,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const _MissingSearchImage(),
+      );
+    }
+    return buildLocalPortfolioImage(
+      imagePath: normalizedPath,
+      fit: BoxFit.cover,
+      placeholderBuilder: () => const _MissingSearchImage(),
+    );
+  }
+}
+
+class _MissingSearchImage extends StatelessWidget {
+  const _MissingSearchImage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Icon(
+        Icons.inventory_2_outlined,
+        color: PackLoxTokens.cyan,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _CatalogPlaceholderThumbnail extends StatelessWidget {
+  const _CatalogPlaceholderThumbnail({
+    required this.category,
+    required this.title,
+    required this.setName,
+    super.key,
+  });
+
+  final String category;
+  final String title;
+  final String? setName;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 56,
+        height: 64,
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: PackLoxTokens.border),
+        ),
+        child: _CatalogPlaceholderArt(
+          category: category,
+          title: title,
+          setName: setName,
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogPlaceholderArt extends StatelessWidget {
+  const _CatalogPlaceholderArt({
+    required this.category,
+    required this.title,
+    required this.setName,
+    this.compact = false,
+  });
+
+  final String category;
+  final String title;
+  final String? setName;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _placeholderStyle(category, title, setName);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(color: style.background),
+        Align(
+          alignment: Alignment.topRight,
+          child: Container(
+            width: compact ? 28 : 34,
+            height: compact ? 28 : 34,
+            decoration: BoxDecoration(
+              color: style.accent.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Center(
+          child: Container(
+            width: compact ? 34 : 36,
+            height: compact ? 42 : 48,
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surface.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: style.accent.withValues(alpha: 0.55)),
+            ),
+            child: Icon(
+              style.icon,
+              color: style.accent,
+              size: compact ? 18 : 20,
+            ),
+          ),
+        ),
+        if (!compact)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              color: PackLoxTokens.surface.withValues(alpha: 0.72),
+              child: Text(
+                style.label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _SearchPill extends StatelessWidget {
   const _SearchPill({required this.label});
 
@@ -1188,6 +1360,120 @@ class _SearchPill extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _searchImagePath(CollectibleItem item) {
+  final cloudImageUrl = item.cloudImageUrl?.trim();
+  if (cloudImageUrl != null && cloudImageUrl.isNotEmpty) {
+    return cloudImageUrl;
+  }
+  for (final image in item.galleryImages) {
+    final cloudUrl = image.cloudImageUrl?.trim();
+    if (cloudUrl != null && cloudUrl.isNotEmpty) {
+      return cloudUrl;
+    }
+  }
+  final primaryPath = item.imagePath.trim();
+  if (primaryPath.isNotEmpty && !primaryPath.startsWith('sample://')) {
+    return primaryPath;
+  }
+  for (final image in item.galleryImages) {
+    final path = image.path.trim();
+    if (path.isNotEmpty && !path.startsWith('sample://')) {
+      return path;
+    }
+  }
+  return null;
+}
+
+_PlaceholderStyle _placeholderStyle(
+  String category,
+  String title,
+  String? setName,
+) {
+  final text = '$category $title ${setName ?? ''}'.toLowerCase();
+  if (text.contains('pokemon')) {
+    return const _PlaceholderStyle(
+      label: 'PKMN',
+      icon: Icons.catching_pokemon_outlined,
+      accent: PackLoxTokens.amber,
+      background: Color(0xFF221A10),
+    );
+  }
+  if (text.contains('magic')) {
+    return const _PlaceholderStyle(
+      label: 'MTG',
+      icon: Icons.auto_stories_outlined,
+      accent: Color(0xFF9B7CFF),
+      background: Color(0xFF171421),
+    );
+  }
+  if (text.contains('yugioh') || text.contains('yu-gi-oh')) {
+    return const _PlaceholderStyle(
+      label: 'YGO',
+      icon: Icons.shield_outlined,
+      accent: Color(0xFFFF6B6B),
+      background: Color(0xFF211316),
+    );
+  }
+  if (text.contains('one piece')) {
+    return const _PlaceholderStyle(
+      label: 'OP',
+      icon: Icons.explore_outlined,
+      accent: PackLoxTokens.success,
+      background: Color(0xFF102019),
+    );
+  }
+  if (text.contains('game') ||
+      text.contains('nintendo') ||
+      text.contains('playstation') ||
+      text.contains('xbox') ||
+      text.contains('sega')) {
+    return const _PlaceholderStyle(
+      label: 'GAME',
+      icon: Icons.sports_esports_outlined,
+      accent: PackLoxTokens.cyan,
+      background: Color(0xFF101C22),
+    );
+  }
+  if (text.contains('toy') ||
+      text.contains('car') ||
+      text.contains('hot wheels')) {
+    return const _PlaceholderStyle(
+      label: 'TOY',
+      icon: Icons.directions_car_filled_outlined,
+      accent: PackLoxTokens.blue,
+      background: Color(0xFF111827),
+    );
+  }
+  if (text.contains('coin')) {
+    return const _PlaceholderStyle(
+      label: 'COIN',
+      icon: Icons.album_outlined,
+      accent: PackLoxTokens.amber,
+      background: Color(0xFF201C12),
+    );
+  }
+  return const _PlaceholderStyle(
+    label: 'PX',
+    icon: Icons.inventory_2_outlined,
+    accent: PackLoxTokens.cyan,
+    background: Color(0xFF101A20),
+  );
+}
+
+class _PlaceholderStyle {
+  const _PlaceholderStyle({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.background,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final Color background;
 }
 
 IconData _quickFilterIcon(String label) {

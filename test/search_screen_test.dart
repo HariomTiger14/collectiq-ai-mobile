@@ -43,6 +43,10 @@ void main() {
 
     expect(find.text('1 saved match'), findsOneWidget);
     expect(find.text('Charizard Base Set'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('discover-portfolio-image-charizard')),
+      findsOneWidget,
+    );
     expect(find.text('Hot Wheels Mazda MX-5'), findsNothing);
   });
 
@@ -145,6 +149,10 @@ void main() {
     expect(find.text('Charizard #4 Base Set'), findsOneWidget);
     expect(find.text('USD \$161'), findsOneWidget);
     expect(find.text('91% match'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('discover-catalog-placeholder-pc-charizard')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('catalog search has a clear unavailable state', (tester) async {
