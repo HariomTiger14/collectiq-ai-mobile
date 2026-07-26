@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
+import 'package:collectiq_ai/core/navigation/push_notification_navigation.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
@@ -14,12 +15,14 @@ import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +38,9 @@ class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   static const _scanTabIndex = AppShellTabController.scanTab;
   final PageStorageBucket _shellPageStorageBucket = PageStorageBucket();
+  final PushNotificationNavigationCoordinator
+  _pushNotificationNavigationCoordinator =
+      PushNotificationNavigationCoordinator();
   String? _lastPostSignInSyncUserId;
 
   @override
@@ -45,6 +51,11 @@ class _AppShellState extends ConsumerState<AppShell>
       if (!mounted) {
         return;
       }
+      unawaited(
+        _pushNotificationNavigationCoordinator.start(
+          onIntent: _handlePushNotificationNavigationIntent,
+        ),
+      );
       unawaited(
         ref
             .read(appTelemetryServiceProvider)
@@ -59,6 +70,7 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_pushNotificationNavigationCoordinator.dispose());
     super.dispose();
   }
 
@@ -158,6 +170,99 @@ class _AppShellState extends ConsumerState<AppShell>
             ),
       );
     }
+  }
+
+  Future<void> _handlePushNotificationNavigationIntent(
+    PushNotificationNavigationIntent intent,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+    switch (intent.target) {
+      case PushNotificationNavigationTarget.settings:
+        _selectTab(
+          AppShellTabController.settingsTab,
+          reason: 'push-notification-test',
+        );
+        _popToShellRoot();
+      case PushNotificationNavigationTarget.home:
+        _selectTab(
+          AppShellTabController.homeTab,
+          reason: 'push-notification-home',
+        );
+        _popToShellRoot();
+      case PushNotificationNavigationTarget.portfolioItem:
+        await _openPortfolioItemFromPush(intent.portfolioItemId);
+    }
+  }
+
+  Future<void> _openPortfolioItemFromPush(String? itemId) async {
+    if (itemId == null || itemId.isEmpty) {
+      _selectTab(
+        AppShellTabController.portfolioTab,
+        reason: 'push-notification-missing-item-id',
+      );
+      _showShellSnackBar('Price alert item is no longer available.');
+      return;
+    }
+
+    await ref.read(portfolioControllerProvider.notifier).loadItems();
+    if (!mounted) {
+      return;
+    }
+    final item = ref
+        .read(portfolioControllerProvider)
+        .items
+        .where((candidate) => candidate.id == itemId)
+        .firstOrNull;
+
+    _selectTab(
+      AppShellTabController.portfolioTab,
+      reason: 'push-notification-price-alert',
+    );
+    _popToShellRoot();
+
+    if (item == null) {
+      _showShellSnackBar('Price alert item is no longer available.');
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _pushPortfolioDetail(item);
+    });
+  }
+
+  void _pushPortfolioDetail(CollectibleItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CollectibleDetailPage(
+          item: item,
+          onDelete: (itemId) async {
+            await ref
+                .read(portfolioControllerProvider.notifier)
+                .removeItem(itemId);
+            return true;
+          },
+        ),
+        settings: RouteSettings(name: '/portfolio/${item.id}'),
+      ),
+    );
+  }
+
+  void _popToShellRoot() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  void _showShellSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   List<AppShellDestination> get _destinations => [
