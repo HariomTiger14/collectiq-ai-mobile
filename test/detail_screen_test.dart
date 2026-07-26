@@ -120,7 +120,7 @@ void main() {
       );
 
       await _revealText(tester, 'Market & Value');
-      expect(find.textContaining(r'$0'), findsWidgets);
+      expect(find.textContaining('USD \$0'), findsWidgets);
       expect(find.text('Estimated from saved market data'), findsWidgets);
     },
   );

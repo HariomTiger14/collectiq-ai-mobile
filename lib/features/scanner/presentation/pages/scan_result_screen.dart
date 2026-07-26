@@ -1514,10 +1514,12 @@ String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+  final amount = _formatMoneyAmount(value);
+  final withCommas = amount.replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
   final normalizedCurrency = currency.trim().toUpperCase();
   if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
@@ -1533,6 +1535,11 @@ String _formatMoney(double value, String currency) {
     return 'CAD \$$withCommas';
   }
   return '$normalizedCurrency $withCommas';
+}
+
+String _formatMoneyAmount(double value) {
+  final fixed = value.toStringAsFixed(2);
+  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
 }
 
 String _valuationStatusMessage(ValuationStatus status) {

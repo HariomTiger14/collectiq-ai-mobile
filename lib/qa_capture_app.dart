@@ -24,6 +24,9 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_scr
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/analyze_animation.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
+import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
+import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -171,6 +174,17 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       ),
       'search_results' => const SearchScreen(
         previewState: SearchPreviewState.results,
+      ),
+      'search_catalog_detail' => ProviderScope(
+        overrides: [
+          catalogSearchRepositoryProvider.overrideWithValue(
+            const _QaCatalogSearchRepository(),
+          ),
+        ],
+        child: CatalogResultDetailPreviewPage(
+          result: _qaCatalogResult,
+          qaInitialScrollOffset: _scrollOffset,
+        ),
       ),
       'search_empty' => const SearchScreen(
         previewState: SearchPreviewState.empty,
@@ -337,6 +351,10 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
           galleryImages: const [],
         ),
       ),
+      'portfolio_detail_catalog_snapshot' => CollectibleDetailPage(
+        qaInitialScrollOffset: _scrollOffset,
+        item: _qaCatalogPortfolioItem,
+      ),
       'scanner_hub' => ScanHubPage(now: () => DateTime(2026, 7, 23, 9)),
       'scanner_camera_mock' => const _QaScannerCameraMock(),
       'scanner_review_photo' => const _QaScannerReviewPhoto(),
@@ -427,6 +445,94 @@ const _qaSettingsUser = AppUser(
   email: 'collector@example.com',
   provider: AuthProviderType.emailPassword,
 );
+
+final _qaCatalogResult = CatalogSearchResult(
+  id: '3666974',
+  title: 'Charizard #10',
+  category: 'Pokemon Cards',
+  source: 'PriceCharting',
+  setName: 'Pokemon Go',
+  identifier: '10',
+  currency: 'USD',
+  marketValue: 3.89,
+  lowEstimate: 3.31,
+  highEstimate: 4.47,
+  confidence: 0.82,
+  lastUpdated: DateTime.utc(2026, 7, 26, 1, 18),
+  attribution: 'Pricing data by PriceCharting',
+  history: <CatalogPriceHistoryPoint>[
+    CatalogPriceHistoryPoint(
+      validFrom: DateTime.utc(2026, 7, 26, 1, 18),
+      isCurrent: true,
+      currency: 'USD',
+      marketValue: 3.89,
+      lowEstimate: 3.31,
+      highEstimate: 4.47,
+      sourceFile: 'pokemon.csv',
+      sourceDownloadedAt: DateTime.utc(2026, 7, 26, 1, 18),
+    ),
+  ],
+);
+
+final _qaCatalogPortfolioItem = CollectibleItem(
+  id: 'catalog-3666974-qa',
+  title: 'Charizard #10',
+  category: 'Pokemon Cards',
+  estimatedValue: 3.89,
+  confidence: 0.82,
+  condition: 'Unspecified',
+  recommendation:
+      'Saved from catalog search. Add your own photos and condition notes to improve portfolio accuracy.',
+  imagePath:
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_card_v1.png',
+  createdAt: DateTime.utc(2026, 7, 26, 1, 20),
+  setName: 'Pokemon Go',
+  cardNumber: '10',
+  notes:
+      'Catalog ID: 3666974\nSource: PriceCharting\n'
+      'Pricing data by PriceCharting',
+  valuationStatus: ValuationStatus.marketEstimated,
+  valuationSource: 'pricecharting',
+  valueAtScan: 3.89,
+  lastValueRefreshedAt: DateTime.utc(2026, 7, 26, 1, 18),
+  pricing: PricingInfo(
+    estimatedMarketValue: 3.89,
+    lowEstimate: 3.31,
+    highEstimate: 4.47,
+    currency: 'USD',
+    pricingSource: 'PriceCharting',
+    pricingConfidence: 0.82,
+    lastUpdated: DateTime.utc(2026, 7, 26, 1, 18),
+    valuationStatus: ValuationStatus.marketEstimated,
+    valuationSource: 'pricecharting',
+    pricingExplanation:
+        'Saved from PackLox catalog search as a dated portfolio snapshot.',
+    reasonCode: 'CATALOG_SEARCH_MATCH',
+    valuationStrategy: 'catalog_lookup',
+    attributionText: 'Pricing data by PriceCharting',
+    displayString: 'USD \$3.89',
+  ),
+);
+
+class _QaCatalogSearchRepository implements CatalogSearchRepository {
+  const _QaCatalogSearchRepository();
+
+  @override
+  Future<List<CatalogSearchResult>> searchCatalog({
+    required String query,
+    int limit = 20,
+  }) async {
+    return [_qaCatalogResult];
+  }
+
+  @override
+  Future<CatalogSearchResult> getCatalogDetail({
+    required CatalogSearchResult result,
+    int historyLimit = 30,
+  }) async {
+    return _qaCatalogResult;
+  }
+}
 
 class _QaSettingsScreen extends StatelessWidget {
   const _QaSettingsScreen({required this.scrollOffset, required this.user});

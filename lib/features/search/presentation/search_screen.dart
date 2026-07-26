@@ -1192,13 +1192,34 @@ class _CatalogResultCard extends StatelessWidget {
 }
 
 class _CatalogResultDetailPage extends ConsumerStatefulWidget {
-  const _CatalogResultDetailPage({required this.result});
+  const _CatalogResultDetailPage({
+    required this.result,
+    this.qaInitialScrollOffset = 0,
+  });
 
   final CatalogSearchResult result;
+  final double qaInitialScrollOffset;
 
   @override
   ConsumerState<_CatalogResultDetailPage> createState() =>
       _CatalogResultDetailPageState();
+}
+
+class CatalogResultDetailPreviewPage extends StatelessWidget {
+  const CatalogResultDetailPreviewPage({
+    required this.result,
+    this.qaInitialScrollOffset = 0,
+    super.key,
+  });
+
+  final CatalogSearchResult result;
+  final double qaInitialScrollOffset;
+
+  @override
+  Widget build(BuildContext context) => _CatalogResultDetailPage(
+    result: result,
+    qaInitialScrollOffset: qaInitialScrollOffset,
+  );
 }
 
 class _CatalogResultDetailPageState
@@ -1207,14 +1228,24 @@ class _CatalogResultDetailPageState
   var _isLoadingDetail = true;
   String? _detailError;
   late CatalogSearchResult _result;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _result = widget.result;
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.qaInitialScrollOffset,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCatalogDetail();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1250,6 +1281,7 @@ class _CatalogResultDetailPageState
         body: SafeArea(
           bottom: false,
           child: CustomScrollView(
+            controller: _scrollController,
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
@@ -1713,8 +1745,8 @@ class _CatalogDetailRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 128,
+        Expanded(
+          flex: 5,
           child: Text(
             row.label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1725,8 +1757,10 @@ class _CatalogDetailRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
+          flex: 7,
           child: Text(
             row.value,
+            textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: PackLoxTokens.textPrimary,
               fontWeight: FontWeight.w700,
@@ -2593,10 +2627,12 @@ String _formatSearchValue(CollectibleItem item) {
     return 'Pending';
   }
   final currency = item.pricing?.currency.trim().toUpperCase() ?? 'AUD';
-  final whole = item.estimatedValue.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+  final amount = _formatCatalogAmount(item.estimatedValue);
+  final withCommas = amount.replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
   if (currency == 'AUD' || currency.isEmpty) {
     return '\$$withCommas AUD';
@@ -2612,10 +2648,12 @@ String _formatCatalogValue(CatalogSearchResult result) {
   if (value == null || value <= 0) {
     return 'No price';
   }
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+  final amount = _formatCatalogAmount(value);
+  final withCommas = amount.replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
   final currency = result.currency.trim().toUpperCase();
   if (currency == 'AUD' || currency.isEmpty) {
@@ -2641,6 +2679,11 @@ String _formatOptionalCatalogValue(double? value, String currency) {
       marketValue: value,
     ),
   );
+}
+
+String _formatCatalogAmount(double value) {
+  final fixed = value.toStringAsFixed(2);
+  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
 }
 
 String _formatShortDate(DateTime value) {
@@ -2691,6 +2734,7 @@ class _SurfaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: PackLoxTokens.surface,
         borderRadius: BorderRadius.circular(18),

@@ -1614,9 +1614,8 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FilledButton.icon(
                 key: const ValueKey('collectible-detail-add-photo-action'),
@@ -1626,9 +1625,11 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF8BE7FF),
                   foregroundColor: const Color(0xFF07111D),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   textStyle: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
+              const SizedBox(height: AppSpacing.xs),
               OutlinedButton.icon(
                 key: const ValueKey('collectible-detail-review-details-action'),
                 onPressed: onEdit,
@@ -1637,6 +1638,7 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: HomeTokens.textPrimary,
                   side: const BorderSide(color: HomeTokens.border),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   textStyle: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -1712,7 +1714,7 @@ class _DetailMarketSection extends StatelessWidget {
               'No market pricing evidence has been saved for this collectible.',
             )
           else
-            _DetailAuthorityRows(rows: rows),
+            _DetailAuthorityRows(rows: rows, alignValuesRight: true),
           const SizedBox(height: AppSpacing.md),
           _DetailEmptyCopy(
             item.marketSummary == null
@@ -1860,7 +1862,7 @@ class _SnapshotEvidenceRows extends StatelessWidget {
       if (pricing.reasonCode?.trim().isNotEmpty ?? false)
         _DetailInfoRowData('Reason', _humanizeToken(pricing.reasonCode!)),
     ];
-    return _DetailAuthorityRows(rows: rows);
+    return _DetailAuthorityRows(rows: rows, alignValuesRight: true);
   }
 }
 
@@ -2426,9 +2428,13 @@ class _DetailInfoRowData {
 }
 
 class _DetailAuthorityRows extends StatelessWidget {
-  const _DetailAuthorityRows({required this.rows});
+  const _DetailAuthorityRows({
+    required this.rows,
+    this.alignValuesRight = false,
+  });
 
   final List<_DetailInfoRowData> rows;
+  final bool alignValuesRight;
 
   @override
   Widget build(BuildContext context) {
@@ -2438,8 +2444,8 @@ class _DetailAuthorityRows extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 116,
+              Expanded(
+                flex: 5,
                 child: Text(
                   row.label,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -2450,8 +2456,10 @@ class _DetailAuthorityRows extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
+                flex: 7,
                 child: Text(
                   row.value,
+                  textAlign: alignValuesRight ? TextAlign.right : null,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: PackLoxTokens.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -2669,10 +2677,28 @@ String _detailValueLabel(BuildContext context, CollectibleItem item) {
   if (!_shouldShowDetailValue(item)) {
     return 'Value unavailable';
   }
+  final currency = item.pricing?.currency ?? 'AUD';
   if (item.estimatedValue == 0) {
-    return '${_currencySymbolForLocale(Localizations.localeOf(context))}0';
+    return _formatZeroMoney(currency);
   }
-  return _formatPortfolioValue(context, item.estimatedValue);
+  return _formatMoney(item.estimatedValue, currency);
+}
+
+String _formatZeroMoney(String currency) {
+  final normalizedCurrency = currency.trim().toUpperCase();
+  if (normalizedCurrency == 'USD') {
+    return 'USD \$0';
+  }
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '\$0 AUD';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return '£0';
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CAD \$0';
+  }
+  return '$normalizedCurrency 0';
 }
 
 String _detailValueStatusLabel(CollectibleItem item) {
@@ -5334,39 +5360,14 @@ String _formatAud(double value) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+  final amount = _formatMoneyAmount(value);
+  final withCommas = amount.replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
   return '\$$withCommas';
-}
-
-String _formatPortfolioValue(BuildContext context, double value) {
-  if (value <= 0) {
-    return 'Value unavailable';
-  }
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  return '${_currencySymbolForLocale(Localizations.localeOf(context))}$withCommas';
-}
-
-String _currencySymbolForLocale(Locale locale) {
-  final countryCode = locale.countryCode?.toUpperCase();
-  if (countryCode == 'GB') {
-    return '£';
-  }
-  if (countryCode == 'DE' ||
-      countryCode == 'ES' ||
-      countryCode == 'FR' ||
-      countryCode == 'IT' ||
-      countryCode == 'NL') {
-    return '€';
-  }
-  return '\$';
 }
 
 String _rarityLabel(CollectibleItem item) {
@@ -5492,10 +5493,12 @@ String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+  final amount = _formatMoneyAmount(value);
+  final withCommas = amount.replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
   final normalizedCurrency = currency.trim().toUpperCase();
   if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
@@ -5511,6 +5514,11 @@ String _formatMoney(double value, String currency) {
     return 'CAD \$$withCommas';
   }
   return '$normalizedCurrency $withCommas';
+}
+
+String _formatMoneyAmount(double value) {
+  final fixed = value.toStringAsFixed(2);
+  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
 }
 
 String _formatPricingDate(DateTime? date) {
