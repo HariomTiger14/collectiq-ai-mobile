@@ -6,6 +6,7 @@ import 'package:collectiq_ai/features/search/domain/entities/catalog_search_resu
 import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -153,6 +154,72 @@ void main() {
       find.byKey(const ValueKey('discover-catalog-placeholder-pc-charizard')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('catalog result detail saves a portfolio snapshot', (
+    tester,
+  ) async {
+    final repository = _MemoryPortfolioRepository([]);
+    await _pumpSearch(
+      tester,
+      repository: repository,
+      catalogRepository: _MemoryCatalogSearchRepository([
+        CatalogSearchResult(
+          id: 'pc-mario-kart',
+          title: 'Mario Kart 64',
+          category: 'Video Games',
+          source: 'PriceCharting',
+          setName: 'Nintendo 64',
+          currency: 'USD',
+          marketValue: 82,
+          lowEstimate: 70,
+          highEstimate: 96,
+          confidence: 0.87,
+          lastUpdated: DateTime(2026, 7, 25),
+          attribution: 'Pricing data by PriceCharting',
+        ),
+      ]),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'mario kart',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-pc-mario-kart')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('catalog-result-detail-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Current value'), findsOneWidget);
+    expect(find.text('USD \$82'), findsOneWidget);
+    expect(find.text('Low'), findsOneWidget);
+    expect(find.text('High'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(repository.items, hasLength(1));
+    expect(repository.items.single.title, 'Mario Kart 64');
+    expect(repository.items.single.pricing?.pricingSource, 'PriceCharting');
+    expect(
+      repository.items.single.valuationStatus,
+      ValuationStatus.marketEstimated,
+    );
+    expect(find.byType(CollectibleDetailPage), findsOneWidget);
   });
 
   testWidgets('catalog search has a clear unavailable state', (tester) async {

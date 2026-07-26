@@ -8,6 +8,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_l
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,7 +185,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               for (final result in _catalogResults.take(
                                 20,
                               )) ...[
-                                _CatalogResultCard(result: result),
+                                _CatalogResultCard(
+                                  result: result,
+                                  onTap: () =>
+                                      _openCatalogResult(context, result),
+                                ),
                                 const SizedBox(height: 10),
                               ],
                             ],
@@ -360,6 +365,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           },
         ),
         settings: RouteSettings(name: '/search/portfolio/${item.id}'),
+      ),
+    );
+  }
+
+  Future<void> _openCatalogResult(
+    BuildContext context,
+    CatalogSearchResult result,
+  ) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _CatalogResultDetailPage(result: result),
+        settings: RouteSettings(name: '/search/catalog/${result.id}'),
       ),
     );
   }
@@ -1073,9 +1090,10 @@ class _PortfolioResultCard extends StatelessWidget {
 }
 
 class _CatalogResultCard extends StatelessWidget {
-  const _CatalogResultCard({required this.result});
+  const _CatalogResultCard({required this.result, required this.onTap});
 
   final CatalogSearchResult result;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1088,68 +1106,484 @@ class _CatalogResultCard extends StatelessWidget {
     final confidence = result.confidence == null
         ? null
         : '${(result.confidence!.clamp(0, 1) * 100).round()}% match';
-    return _SurfaceCard(
-      key: ValueKey('discover-catalog-result-${result.id}'),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CatalogPlaceholderThumbnail(
-            key: ValueKey('discover-catalog-placeholder-${result.id}'),
-            category: result.category,
-            title: result.title,
-            setName: result.setName,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  result.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    height: 1.12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle.isEmpty ? result.source : subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: PackLoxTokens.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+    return Semantics(
+      button: true,
+      label: 'Open ${result.title}',
+      child: GestureDetector(
+        key: ValueKey('discover-catalog-result-${result.id}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: _SurfaceCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CatalogPlaceholderThumbnail(
+                key: ValueKey('discover-catalog-placeholder-${result.id}'),
+                category: result.category,
+                title: result.title,
+                setName: result.setName,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SearchPill(label: result.source),
-                    if (confidence != null) _SearchPill(label: confidence),
-                    if (result.attribution != null)
-                      _SearchPill(label: result.attribution!),
+                    Text(
+                      result.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: PackLoxTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        height: 1.12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle.isEmpty ? result.source : subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: PackLoxTokens.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _SearchPill(label: result.source),
+                        if (confidence != null) _SearchPill(label: confidence),
+                        if (result.attribution != null)
+                          _SearchPill(label: result.attribution!),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: PackLoxTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: PackLoxTokens.textSecondary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogResultDetailPage extends ConsumerStatefulWidget {
+  const _CatalogResultDetailPage({required this.result});
+
+  final CatalogSearchResult result;
+
+  @override
+  ConsumerState<_CatalogResultDetailPage> createState() =>
+      _CatalogResultDetailPageState();
+}
+
+class _CatalogResultDetailPageState
+    extends ConsumerState<_CatalogResultDetailPage> {
+  var _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
+    final value = _formatCatalogValue(result);
+    final confidence = result.confidence == null
+        ? 'Not supplied'
+        : '${(result.confidence!.clamp(0, 1) * 100).round()}%';
+    final rows = [
+      _CatalogDetailRowData('Category', result.category),
+      if (_clean(result.setName) != null)
+        _CatalogDetailRowData('Set / product family', result.setName!.trim()),
+      if (_clean(result.identifier) != null)
+        _CatalogDetailRowData('Identifier', result.identifier!.trim()),
+      _CatalogDetailRowData('Source', result.source),
+      _CatalogDetailRowData('Confidence', confidence),
+      if (result.lastUpdated != null)
+        _CatalogDetailRowData('Updated', _formatShortDate(result.lastUpdated!)),
+      if (_clean(result.attribution) != null)
+        _CatalogDetailRowData('Attribution', result.attribution!.trim()),
+    ];
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        key: const ValueKey('catalog-result-detail-screen'),
+        backgroundColor: PackLoxTokens.background,
+        body: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CatalogDetailTopBar(
+                            onBack: () => Navigator.of(context).maybePop(),
+                          ),
+                          const SizedBox(height: 18),
+                          Center(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: Container(
+                                width: 180,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color: PackLoxTokens.surfaceRaised,
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(
+                                    color: PackLoxTokens.border,
+                                  ),
+                                ),
+                                child: _CatalogPlaceholderArt(
+                                  category: result.category,
+                                  title: result.title,
+                                  setName: result.setName,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            result.title,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: PackLoxTokens.textPrimary,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.04,
+                                ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _SearchPill(label: result.category),
+                              _SearchPill(label: result.source),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          _CatalogValuePanel(result: result, value: value),
+                          const SizedBox(height: 14),
+                          _SurfaceCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _SectionTitle('Catalog identity'),
+                                const SizedBox(height: 12),
+                                for (final row in rows) ...[
+                                  _CatalogDetailRow(row: row),
+                                  if (row != rows.last)
+                                    const Divider(
+                                      color: PackLoxTokens.border,
+                                      height: 18,
+                                    ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          _SurfaceCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _SectionTitle('Portfolio snapshot'),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Saving stores this catalog match and current valuation as a dated portfolio snapshot. Browsing your portfolio will not call pricing APIs again.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: PackLoxTokens.textSecondary,
+                                        height: 1.34,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              key: const ValueKey(
+                                'catalog-detail-add-to-portfolio',
+                              ),
+                              onPressed: _isSaving ? null : _saveToPortfolio,
+                              icon: _isSaving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.add_rounded),
+                              label: Text(
+                                _isSaving ? 'Saving' : 'Add to Portfolio',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: PackLoxTokens.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                textStyle: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveToPortfolio() async {
+    setState(() => _isSaving = true);
+    final item = _catalogResultToPortfolioItem(widget.result);
+    try {
+      await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+      final savedItem = ref
+          .read(portfolioControllerProvider)
+          .items
+          .where((candidate) => candidate.id == item.id)
+          .firstOrNull;
+      if (!mounted) {
+        return;
+      }
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => CollectibleDetailPage(
+            item: savedItem ?? item,
+            onDelete: (itemId) async {
+              await ref
+                  .read(portfolioControllerProvider.notifier)
+                  .removeItem(itemId);
+              return true;
+            },
+          ),
+          settings: RouteSettings(name: '/portfolio/catalog/${item.id}'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save catalog item')),
+      );
+    }
+  }
+}
+
+class _CatalogDetailTopBar extends StatelessWidget {
+  const _CatalogDetailTopBar({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton.filledTonal(
+          key: const ValueKey('catalog-detail-back'),
+          onPressed: onBack,
+          icon: const Icon(Icons.close_rounded),
+          style: IconButton.styleFrom(
+            backgroundColor: PackLoxTokens.surfaceRaised,
+            foregroundColor: PackLoxTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Catalog match',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CatalogValuePanel extends StatelessWidget {
+  const _CatalogValuePanel({required this.result, required this.value});
+
+  final CatalogSearchResult result;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Current value',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(height: 6),
           Text(
             value,
-            textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _CatalogEstimateChip(
+                label: 'Low',
+                value: _formatOptionalCatalogValue(
+                  result.lowEstimate,
+                  result.currency,
+                ),
+              ),
+              _CatalogEstimateChip(
+                label: 'High',
+                value: _formatOptionalCatalogValue(
+                  result.highEstimate,
+                  result.currency,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogEstimateChip extends StatelessWidget {
+  const _CatalogEstimateChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: PackLoxTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: PackLoxTokens.textPrimary,
               fontWeight: FontWeight.w900,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CatalogDetailRowData {
+  const _CatalogDetailRowData(this.label, this.value);
+
+  final String label;
+  final String value;
+}
+
+class _CatalogDetailRow extends StatelessWidget {
+  const _CatalogDetailRow({required this.row});
+
+  final _CatalogDetailRowData row;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 128,
+          child: Text(
+            row.label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            row.value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              height: 1.24,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1788,6 +2222,82 @@ String? _searchImagePath(CollectibleItem item) {
   return null;
 }
 
+CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
+  final now = DateTime.now();
+  final value = result.marketValue ?? 0;
+  final low = result.lowEstimate ?? value;
+  final high = result.highEstimate ?? value;
+  final confidence = (result.confidence?.clamp(0, 1) ?? 0.72).toDouble();
+  final attribution = result.attribution ?? 'Pricing data by ${result.source}';
+  final imagePath =
+      _placeholderStyle(
+        result.category,
+        result.title,
+        result.setName,
+      ).assetPath ??
+      '';
+  final pricing = PricingInfo(
+    estimatedMarketValue: value,
+    lowEstimate: low,
+    highEstimate: high,
+    currency: result.currency,
+    pricingSource: result.source,
+    pricingConfidence: confidence,
+    lastUpdated: result.lastUpdated ?? now,
+    valuationStatus: value > 0
+        ? ValuationStatus.marketEstimated
+        : ValuationStatus.noMarketMatch,
+    valuationSource: result.source.toLowerCase().replaceAll(' ', '_'),
+    pricingExplanation:
+        'Saved from PackLox catalog search as a dated portfolio snapshot.',
+    reasonCode: value > 0 ? 'CATALOG_SEARCH_MATCH' : 'CATALOG_NO_PRICE',
+    valuationStrategy: 'catalog_lookup',
+    attributionText: attribution,
+    displayString: value > 0 ? _formatCatalogValue(result) : null,
+  );
+  return CollectibleItem(
+    id: 'catalog-${_safeId(result.id)}-${now.microsecondsSinceEpoch}',
+    title: result.title,
+    category: result.category,
+    estimatedValue: value,
+    confidence: confidence,
+    condition: 'Unspecified',
+    recommendation:
+        'Saved from catalog search. Add your own photos and condition notes to improve portfolio accuracy.',
+    imagePath: imagePath,
+    createdAt: now,
+    setName: _clean(result.setName),
+    cardNumber: _clean(result.identifier),
+    notes: _catalogSnapshotNotes(result),
+    valuationStatus: pricing.valuationStatus,
+    valuationSource: pricing.valuationSource,
+    pricing: pricing,
+  );
+}
+
+String _catalogSnapshotNotes(CatalogSearchResult result) {
+  final parts = [
+    'Catalog ID: ${result.id}',
+    'Source: ${result.source}',
+    if (_clean(result.attribution) != null) result.attribution!.trim(),
+  ];
+  return parts.join('\n');
+}
+
+String _safeId(String value) {
+  final normalized = value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  return normalized.isEmpty ? 'item' : normalized;
+}
+
+String? _clean(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
 _PlaceholderStyle _placeholderStyle(
   String category,
   String title,
@@ -1964,6 +2474,40 @@ String _formatCatalogValue(CatalogSearchResult result) {
     return 'USD \$$withCommas';
   }
   return '$currency $withCommas';
+}
+
+String _formatOptionalCatalogValue(double? value, String currency) {
+  if (value == null || value <= 0) {
+    return 'Not supplied';
+  }
+  return _formatCatalogValue(
+    CatalogSearchResult(
+      id: 'estimate',
+      title: 'Estimate',
+      category: 'Catalog',
+      source: 'PackLox',
+      currency: currency,
+      marketValue: value,
+    ),
+  );
+}
+
+String _formatShortDate(DateTime value) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${value.day} ${months[value.month - 1]} ${value.year}';
 }
 
 class _SectionTitle extends StatelessWidget {
