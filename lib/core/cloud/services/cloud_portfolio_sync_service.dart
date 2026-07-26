@@ -1,4 +1,75 @@
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+
+class PortfolioValuationSnapshot {
+  const PortfolioValuationSnapshot({
+    required this.id,
+    required this.portfolioItemId,
+    required this.valuationStatus,
+    required this.pricedAt,
+    this.valueAud,
+    this.lowEstimateAud,
+    this.highEstimateAud,
+    this.displayString,
+    this.pricingProvider,
+    this.confidenceScore,
+  });
+
+  final String id;
+  final String portfolioItemId;
+  final double? valueAud;
+  final double? lowEstimateAud;
+  final double? highEstimateAud;
+  final String? displayString;
+  final ValuationStatus valuationStatus;
+  final String? pricingProvider;
+  final double? confidenceScore;
+  final DateTime pricedAt;
+
+  factory PortfolioValuationSnapshot.fromJson(Map<String, dynamic> json) {
+    return PortfolioValuationSnapshot(
+      id: _string(json['id']) ?? '',
+      portfolioItemId: _string(json['portfolio_item_id']) ?? '',
+      valueAud: _double(json['value_aud']),
+      lowEstimateAud: _double(json['low_estimate_aud']),
+      highEstimateAud: _double(json['high_estimate_aud']),
+      displayString: _string(json['display_string']),
+      valuationStatus: ValuationStatus.fromJson(json['valuation_status']),
+      pricingProvider: _string(json['pricing_provider']),
+      confidenceScore: _double(json['confidence_score']),
+      pricedAt:
+          _date(json['priced_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+String? _string(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final clean = value.trim();
+  return clean.isEmpty ? null : clean;
+}
+
+double? _double(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value);
+  }
+  return null;
+}
+
+DateTime? _date(Object? value) {
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
 
 class CloudPortfolioSyncStatus {
   const CloudPortfolioSyncStatus({
@@ -22,6 +93,10 @@ abstract interface class CloudPortfolioSyncService {
   Future<void> deleteItem(String itemId);
 
   Future<void> syncValuationSnapshot(CollectibleItem item);
+
+  Future<List<PortfolioValuationSnapshot>> fetchValuationSnapshots(
+    String itemId,
+  );
 
   Future<List<CollectibleItem>> fetchItems();
 

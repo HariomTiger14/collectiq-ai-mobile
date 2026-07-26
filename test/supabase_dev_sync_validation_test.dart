@@ -155,6 +155,32 @@ void main() {
       expect(row['evidence_json'], isA<Map<String, Object?>>());
     });
 
+    test('valuation snapshot parser reads Supabase numeric strings', () {
+      final snapshot = PortfolioValuationSnapshot.fromJson(const {
+        'id': 'snapshot-1',
+        'portfolio_item_id': 'item-1',
+        'value_aud': '55.25',
+        'low_estimate_aud': '40.00',
+        'high_estimate_aud': '70.00',
+        'display_string': r'$55.25 AUD',
+        'valuation_status': 'market_estimated',
+        'pricing_provider': 'PriceCharting',
+        'confidence_score': '0.8200',
+        'priced_at': '2026-07-26T04:10:00Z',
+      });
+
+      expect(snapshot.id, 'snapshot-1');
+      expect(snapshot.portfolioItemId, 'item-1');
+      expect(snapshot.valueAud, 55.25);
+      expect(snapshot.lowEstimateAud, 40);
+      expect(snapshot.highEstimateAud, 70);
+      expect(snapshot.displayString, r'$55.25 AUD');
+      expect(snapshot.valuationStatus, ValuationStatus.marketEstimated);
+      expect(snapshot.pricingProvider, 'PriceCharting');
+      expect(snapshot.confidenceScore, 0.82);
+      expect(snapshot.pricedAt, DateTime.parse('2026-07-26T04:10:00Z'));
+    });
+
     test('anonymous auth startup succeeds before sync status check', () async {
       final auth = _RecordingAuthService();
       final sync = _RecordingPortfolioSyncService(auth: auth);
@@ -442,6 +468,13 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
   @override
   Future<void> syncValuationSnapshot(CollectibleItem item) async {
     valuationSnapshots.add(item);
+  }
+
+  @override
+  Future<List<PortfolioValuationSnapshot>> fetchValuationSnapshots(
+    String itemId,
+  ) async {
+    return const [];
   }
 
   @override

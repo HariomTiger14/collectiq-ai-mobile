@@ -1,4 +1,6 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -22,6 +24,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+
+final _portfolioValuationSnapshotsProvider =
+    FutureProvider.family<List<PortfolioValuationSnapshot>, String>((
+      ref,
+      itemId,
+    ) async {
+      return ref
+          .watch(cloudServiceRegistryProvider)
+          .cloudPortfolioSyncService
+          .fetchValuationSnapshots(itemId);
+    });
 
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends ConsumerStatefulWidget {
@@ -1707,13 +1720,21 @@ class _DetailMarketSection extends StatelessWidget {
   }
 }
 
-class _DetailValueHistoryPanel extends StatelessWidget {
+class _DetailValueHistoryPanel extends ConsumerWidget {
   const _DetailValueHistoryPanel({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshotsAsync = ref.watch(
+      _portfolioValuationSnapshotsProvider(item.id),
+    );
+    final snapshots = snapshotsAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <PortfolioValuationSnapshot>[],
+    );
+    final chartValues = _valueHistoryChartValues(item, snapshots);
     final currency = item.pricing?.currency ?? 'AUD';
     final scanValue = _valueAtScanFor(item);
     final currentValue = _currentValueFor(item);
@@ -1731,6 +1752,11 @@ class _DetailValueHistoryPanel extends StatelessWidget {
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
         : 'No trend yet';
+    final footerLabel = snapshotsAsync.isLoading
+        ? 'Loading cloud history'
+        : snapshots.isNotEmpty
+        ? _snapshotHistoryLabel(snapshots)
+        : _lastRefreshedLabel(item);
 
     return Container(
       key: const ValueKey('collectible-detail-value-history-panel'),
@@ -1790,15 +1816,14 @@ class _DetailValueHistoryPanel extends StatelessWidget {
             child: CustomPaint(
               painter: _ValueHistorySparklinePainter(
                 color: movementColor,
-                isFlat: !hasMovement || delta == 0,
-                isPositive: isPositive,
+                values: chartValues,
               ),
               child: Align(
                 alignment: Alignment.bottomRight,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xs),
                   child: Text(
-                    _lastRefreshedLabel(item),
+                    footerLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1871,16 +1896,18 @@ class _DetailValueHistoryMetric extends StatelessWidget {
 class _ValueHistorySparklinePainter extends CustomPainter {
   const _ValueHistorySparklinePainter({
     required this.color,
-    required this.isFlat,
-    required this.isPositive,
+    required this.values,
   });
 
   final Color color;
-  final bool isFlat;
-  final bool isPositive;
+  final List<double> values;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final cleanedValues = values.where((value) => value >= 0).toList();
+    if (cleanedValues.isEmpty) {
+      return;
+    }
     final paint = Paint()
       ..color = color.withValues(alpha: 0.9)
       ..strokeWidth = 2.4
@@ -1889,35 +1916,31 @@ class _ValueHistorySparklinePainter extends CustomPainter {
     final path = Path();
     final left = AppSpacing.sm;
     final right = size.width - AppSpacing.sm;
-    final mid = size.height * 0.52;
-    final startY = isFlat
-        ? mid
-        : isPositive
-        ? size.height * 0.72
-        : size.height * 0.32;
-    final endY = isFlat
-        ? mid
-        : isPositive
-        ? size.height * 0.28
-        : size.height * 0.72;
-    path
-      ..moveTo(left, startY)
-      ..cubicTo(
-        size.width * 0.34,
-        startY,
-        size.width * 0.54,
-        endY,
-        right,
-        endY,
-      );
+    final top = size.height * 0.22;
+    final bottom = size.height * 0.76;
+    final minValue = cleanedValues.reduce((a, b) => a < b ? a : b);
+    final maxValue = cleanedValues.reduce((a, b) => a > b ? a : b);
+    final range = maxValue - minValue;
+    Offset pointFor(int index, double value) {
+      final x = cleanedValues.length == 1
+          ? size.width / 2
+          : left + ((right - left) * index / (cleanedValues.length - 1));
+      final normalized = range <= 0 ? 0.5 : (value - minValue) / range;
+      return Offset(x, bottom - ((bottom - top) * normalized));
+    }
+
+    final firstPoint = pointFor(0, cleanedValues.first);
+    path.moveTo(firstPoint.dx, firstPoint.dy);
+    for (var index = 1; index < cleanedValues.length; index += 1) {
+      final point = pointFor(index, cleanedValues[index]);
+      path.lineTo(point.dx, point.dy);
+    }
     canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant _ValueHistorySparklinePainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.isFlat != isFlat ||
-        oldDelegate.isPositive != isPositive;
+    return oldDelegate.color != color || oldDelegate.values != values;
   }
 }
 
@@ -2373,6 +2396,45 @@ double _currentValueFor(CollectibleItem item) {
     return marketValue;
   }
   return item.estimatedValue;
+}
+
+List<double> _valueHistoryChartValues(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  final values = <double>[];
+  final scanValue = _valueAtScanFor(item);
+  if (scanValue > 0) {
+    values.add(scanValue);
+  }
+  final sortedSnapshots = [...snapshots]
+    ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
+  for (final snapshot in sortedSnapshots) {
+    final value = snapshot.valueAud;
+    if (value != null && value > 0) {
+      values.add(value);
+    }
+  }
+  final currentValue = _currentValueFor(item);
+  if (currentValue > 0 &&
+      (values.isEmpty || (values.last - currentValue).abs() > 0.01)) {
+    values.add(currentValue);
+  }
+  if (values.isEmpty) {
+    return const [0, 0];
+  }
+  if (values.length == 1) {
+    return [values.first, values.first];
+  }
+  return values;
+}
+
+String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
+  final sortedSnapshots = [...snapshots]
+    ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
+  final latest = sortedSnapshots.last;
+  final count = sortedSnapshots.length;
+  return '$count cloud snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
 }
 
 String _lastRefreshedLabel(CollectibleItem item) {
