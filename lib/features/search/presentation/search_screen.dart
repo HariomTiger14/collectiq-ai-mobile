@@ -1392,36 +1392,41 @@ _PlaceholderStyle _placeholderStyle(
   String? setName,
 ) {
   final text = '$category $title ${setName ?? ''}'.toLowerCase();
-  if (text.contains('pokemon')) {
+  if (text.contains('pokemon') ||
+      text.contains('magic') ||
+      text.contains('yugioh') ||
+      text.contains('yu-gi-oh') ||
+      text.contains('one piece') ||
+      text.contains('card')) {
     return const _PlaceholderStyle(
-      label: 'PKMN',
-      icon: Icons.catching_pokemon_outlined,
-      accent: PackLoxTokens.amber,
-      background: Color(0xFF221A10),
+      label: 'CARD',
+      icon: Icons.style_outlined,
+      accent: PackLoxTokens.cyan,
+      background: Color(0xFF171421),
     );
   }
-  if (text.contains('magic')) {
+  if (text.contains('comic')) {
     return const _PlaceholderStyle(
-      label: 'MTG',
-      icon: Icons.auto_stories_outlined,
+      label: 'COMIC',
+      icon: Icons.menu_book_outlined,
       accent: Color(0xFF9B7CFF),
       background: Color(0xFF171421),
     );
   }
-  if (text.contains('yugioh') || text.contains('yu-gi-oh')) {
+  if (text.contains('watch')) {
     return const _PlaceholderStyle(
-      label: 'YGO',
-      icon: Icons.shield_outlined,
-      accent: Color(0xFFFF6B6B),
-      background: Color(0xFF211316),
-    );
-  }
-  if (text.contains('one piece')) {
-    return const _PlaceholderStyle(
-      label: 'OP',
-      icon: Icons.explore_outlined,
+      label: 'WATCH',
+      icon: Icons.watch_outlined,
       accent: PackLoxTokens.success,
       background: Color(0xFF102019),
+    );
+  }
+  if (text.contains('shoe') || text.contains('sneaker')) {
+    return const _PlaceholderStyle(
+      label: 'SHOE',
+      icon: Icons.directions_walk_outlined,
+      accent: PackLoxTokens.blue,
+      background: Color(0xFF111827),
     );
   }
   if (text.contains('game') ||
