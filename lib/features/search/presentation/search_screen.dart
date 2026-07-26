@@ -1880,7 +1880,8 @@ _PlaceholderStyle _placeholderStyle(
     mark: _PlaceholderMark.collectible,
     accent: PackLoxTokens.cyan,
     background: Color(0xFF101A20),
-    assetPath: 'assets/packlox/brand/packlox_brand_v2_app_icon_authority.png',
+    assetPath:
+        'assets/packlox/icons/categories/3d/packlox_category_placeholder_px_v2.png',
   );
 }
 
