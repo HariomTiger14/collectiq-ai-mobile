@@ -58,6 +58,7 @@ class CollectibleDetailPage extends ConsumerStatefulWidget {
 class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
   late final ScrollController _scrollController;
   String? _selectedGalleryPath;
+  var _isRefreshingValue = false;
 
   @override
   void initState() {
@@ -201,6 +202,8 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                             ),
                       onAddPhoto: () =>
                           _addPortfolioPhotoFromGallery(currentItem),
+                      isRefreshingValue: _isRefreshingValue,
+                      onRefreshValue: () => _refreshPortfolioValue(currentItem),
                       onEdit: () => _showEditCollectibleDialog(
                         context: context,
                         ref: ref,
@@ -421,6 +424,43 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       if (mounted) {
         _showDetailSnackBar(context, 'Unable to add photo');
       }
+    }
+  }
+
+  Future<void> _refreshPortfolioValue(CollectibleItem item) async {
+    if (_isRefreshingValue) {
+      return;
+    }
+
+    setState(() => _isRefreshingValue = true);
+    ValuationStatus? refreshedStatus;
+    try {
+      final quote = await ref
+          .read(scanPricingQuoteServiceProvider)
+          .quoteItem(item);
+      refreshedStatus = quote.valuationStatus;
+      await ref
+          .read(portfolioControllerProvider.notifier)
+          .updateItem(
+            item.copyWith(
+              estimatedValue: quote.estimatedValue,
+              pricing: quote.pricing,
+              marketSummary: quote.marketSummary,
+              valuationStatus: quote.valuationStatus,
+              valuationSource: quote.valuationSource,
+              aiEstimatedValue: quote.aiEstimatedValue,
+            ),
+          );
+    } catch (_) {
+      refreshedStatus = null;
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshingValue = false);
+      }
+    }
+
+    if (mounted) {
+      _showDetailSnackBar(context, _valueRefreshMessage(refreshedStatus));
     }
   }
 }
@@ -1102,6 +1142,8 @@ class _DetailInlineContent extends StatelessWidget {
     required this.onImageSelected,
     required this.onImageTap,
     required this.onAddPhoto,
+    required this.isRefreshingValue,
+    required this.onRefreshValue,
     required this.onEdit,
     required this.onShare,
     required this.onFavorite,
@@ -1115,6 +1157,8 @@ class _DetailInlineContent extends StatelessWidget {
   final ValueChanged<CollectibleImage> onImageSelected;
   final VoidCallback? onImageTap;
   final VoidCallback onAddPhoto;
+  final bool isRefreshingValue;
+  final VoidCallback onRefreshValue;
   final VoidCallback onEdit;
   final VoidCallback onShare;
   final VoidCallback onFavorite;
@@ -1152,6 +1196,8 @@ class _DetailInlineContent extends StatelessWidget {
         _DetailActionsMenuSection(
           item: item,
           isFavorited: isFavorited,
+          isRefreshingValue: isRefreshingValue,
+          onRefreshValue: onRefreshValue,
           onEdit: onEdit,
           onShare: onShare,
           onFavorite: onFavorite,
@@ -1791,6 +1837,8 @@ class _DetailActionsMenuSection extends StatelessWidget {
   const _DetailActionsMenuSection({
     required this.item,
     required this.isFavorited,
+    required this.isRefreshingValue,
+    required this.onRefreshValue,
     required this.onEdit,
     required this.onShare,
     required this.onFavorite,
@@ -1799,6 +1847,8 @@ class _DetailActionsMenuSection extends StatelessWidget {
 
   final CollectibleItem item;
   final bool isFavorited;
+  final bool isRefreshingValue;
+  final VoidCallback onRefreshValue;
   final VoidCallback onEdit;
   final VoidCallback onShare;
   final VoidCallback onFavorite;
@@ -1819,6 +1869,15 @@ class _DetailActionsMenuSection extends StatelessWidget {
             label: 'Review details',
             description: 'Correct identifiers and retry pricing',
             onTap: onEdit,
+          ),
+          _DetailActionMenuRow(
+            key: const ValueKey('collectible-detail-refresh-value-action'),
+            icon: isRefreshingValue
+                ? Icons.hourglass_top_rounded
+                : Icons.refresh_rounded,
+            label: isRefreshingValue ? 'Refreshing value' : 'Refresh value',
+            description: 'Get the latest available pricing snapshot',
+            onTap: onRefreshValue,
           ),
           _DetailActionMenuRow(
             key: const ValueKey('collectible-detail-action-favorite-row'),
@@ -3096,6 +3155,18 @@ String _pricingRetryMessage(ValuationStatus? status) {
     ValuationStatus.unavailable ||
     ValuationStatus.aiEstimated => 'Details saved. Pricing still needs review.',
     null => 'Details saved. Pricing retry failed.',
+  };
+}
+
+String _valueRefreshMessage(ValuationStatus? status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => 'Portfolio value refreshed',
+    ValuationStatus.noMarketMatch => 'No reliable market match yet',
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable ||
+    ValuationStatus.aiEstimated => 'Pricing still needs review',
+    null => 'Value refresh failed',
   };
 }
 
