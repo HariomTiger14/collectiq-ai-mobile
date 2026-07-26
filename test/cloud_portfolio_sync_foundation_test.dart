@@ -415,6 +415,7 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
 
   int syncCount = 0;
   final syncedItems = <CollectibleItem>[];
+  final valuationSnapshots = <CollectibleItem>[];
   final List<CollectibleItem> cloudItems;
   final deletedItemIds = <String>[];
 
@@ -430,6 +431,11 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
   @override
   Future<void> deleteItem(String itemId) async {
     deletedItemIds.add(itemId);
+  }
+
+  @override
+  Future<void> syncValuationSnapshot(CollectibleItem item) async {
+    valuationSnapshots.add(item);
   }
 
   @override

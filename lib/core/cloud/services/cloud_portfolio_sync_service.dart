@@ -21,6 +21,8 @@ abstract interface class CloudPortfolioSyncService {
 
   Future<void> deleteItem(String itemId);
 
+  Future<void> syncValuationSnapshot(CollectibleItem item);
+
   Future<List<CollectibleItem>> fetchItems();
 
   Future<CollectibleItem> markSynced(CollectibleItem item);

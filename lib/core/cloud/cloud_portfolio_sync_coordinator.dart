@@ -86,6 +86,13 @@ class CloudPortfolioSyncCoordinator {
     await registry.cloudPortfolioSyncService.deleteItem(itemId);
   }
 
+  Future<void> syncValuationSnapshot(CollectibleItem item) async {
+    if (!await _canSync()) {
+      return;
+    }
+    await registry.cloudPortfolioSyncService.syncValuationSnapshot(item);
+  }
+
   Future<bool> _canSync() async {
     final flags = registry.config.featureFlags;
     if (!registry.config.allowsCloudServices) {

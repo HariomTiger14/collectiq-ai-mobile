@@ -72,6 +72,9 @@ class NoOpCloudPortfolioSyncService implements CloudPortfolioSyncService {
   Future<void> deleteItem(String itemId) async {}
 
   @override
+  Future<void> syncValuationSnapshot(CollectibleItem item) async {}
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async {
     return const [];
   }

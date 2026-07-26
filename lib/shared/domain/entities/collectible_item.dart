@@ -165,6 +165,8 @@ class CollectibleItem {
     this.valuationStatus = ValuationStatus.unavailable,
     this.valuationSource = 'unknown',
     this.aiEstimatedValue,
+    this.valueAtScan,
+    this.lastValueRefreshedAt,
   });
 
   /// Unique item identifier.
@@ -235,6 +237,8 @@ class CollectibleItem {
   final ValuationStatus valuationStatus;
   final String valuationSource;
   final double? aiEstimatedValue;
+  final double? valueAtScan;
+  final DateTime? lastValueRefreshedAt;
 
   /// Creates a collectible item from a JSON map.
   factory CollectibleItem.fromJson(Map<String, dynamic> json) {
@@ -288,6 +292,8 @@ class CollectibleItem {
       valuationStatus: ValuationStatus.fromJson(json['valuationStatus']),
       valuationSource: _optionalString(json['valuationSource']) ?? 'unknown',
       aiEstimatedValue: _optionalDouble(json['aiEstimatedValue']),
+      valueAtScan: _optionalDouble(json['valueAtScan']),
+      lastValueRefreshedAt: _optionalDateTime(json['lastValueRefreshedAt']),
     );
   }
 
@@ -339,6 +345,8 @@ class CollectibleItem {
       'valuationStatus': valuationStatus.wireValue,
       'valuationSource': valuationSource,
       'aiEstimatedValue': aiEstimatedValue,
+      'valueAtScan': valueAtScan,
+      'lastValueRefreshedAt': lastValueRefreshedAt?.toIso8601String(),
     };
   }
 
@@ -400,6 +408,8 @@ class CollectibleItem {
       valuationStatus: valuationStatus,
       valuationSource: valuationSource,
       aiEstimatedValue: aiEstimatedValue,
+      valueAtScan: valueAtScan,
+      lastValueRefreshedAt: lastValueRefreshedAt,
     );
   }
 
@@ -445,6 +455,8 @@ class CollectibleItem {
       valuationStatus: valuationStatus,
       valuationSource: valuationSource,
       aiEstimatedValue: aiEstimatedValue,
+      valueAtScan: valueAtScan ?? estimatedValue,
+      lastValueRefreshedAt: lastValueRefreshedAt,
     );
   }
 
@@ -497,6 +509,8 @@ class CollectibleItem {
       valuationStatus: valuationStatus,
       valuationSource: valuationSource,
       aiEstimatedValue: aiEstimatedValue,
+      valueAtScan: valueAtScan,
+      lastValueRefreshedAt: lastValueRefreshedAt,
     );
   }
 
@@ -528,6 +542,8 @@ class CollectibleItem {
     ValuationStatus? valuationStatus,
     String? valuationSource,
     double? aiEstimatedValue,
+    double? valueAtScan,
+    DateTime? lastValueRefreshedAt,
     List<CollectibleImage>? galleryImages,
   }) {
     return CollectibleItem(
@@ -570,6 +586,8 @@ class CollectibleItem {
       valuationStatus: valuationStatus ?? this.valuationStatus,
       valuationSource: valuationSource ?? this.valuationSource,
       aiEstimatedValue: aiEstimatedValue ?? this.aiEstimatedValue,
+      valueAtScan: valueAtScan ?? this.valueAtScan,
+      lastValueRefreshedAt: lastValueRefreshedAt ?? this.lastValueRefreshedAt,
     );
   }
 }

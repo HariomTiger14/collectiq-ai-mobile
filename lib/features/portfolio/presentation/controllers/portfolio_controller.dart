@@ -103,7 +103,10 @@ class PortfolioController extends Notifier<PortfolioState> {
   Future<void> saveItem(CollectibleItem item) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      final savedItem = await _repository.addItem(item);
+      final itemForSave = item.valueAtScan == null
+          ? item.copyWith(valueAtScan: item.estimatedValue)
+          : item;
+      final savedItem = await _repository.addItem(itemForSave);
       final immediateItems = collectiblesNewestFirst([
         savedItem,
         ...state.items.where((existingItem) => existingItem.id != savedItem.id),
@@ -165,6 +168,12 @@ class PortfolioController extends Notifier<PortfolioState> {
         errorMessage: 'Unable to update portfolio item.',
       );
     }
+  }
+
+  /// Updates [item] and records a cloud valuation snapshot when available.
+  Future<void> updateItemWithValuationSnapshot(CollectibleItem item) async {
+    await updateItem(item);
+    await _syncCloudValuationSnapshot(item);
   }
 
   /// Removes the item with [id] and refreshes portfolio state.
@@ -271,6 +280,15 @@ class PortfolioController extends Notifier<PortfolioState> {
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
     }
+  }
+
+  Future<void> _syncCloudValuationSnapshot(CollectibleItem item) async {
+    try {
+      await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).syncValuationSnapshot(item);
+    } catch (_) {}
   }
 
   Future<void> _deleteCloudItem(String id) async {

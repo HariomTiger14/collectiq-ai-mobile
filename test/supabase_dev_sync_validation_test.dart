@@ -129,6 +129,32 @@ void main() {
       expect(row.keys, containsAll(['created_at', 'updated_at']));
     });
 
+    test('valuation snapshot row matches immutable ledger schema', () {
+      final row = supabaseValuationSnapshotRowForItem(
+        _item().copyWith(
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'pricecharting',
+          valueAtScan: 42,
+          lastValueRefreshedAt: DateTime.parse('2026-07-26T04:10:00Z'),
+        ),
+        'dev-user',
+      );
+
+      expect(row['user_id'], 'dev-user');
+      expect(row['portfolio_item_id'], 'item-1');
+      expect(row['value_aud'], 50);
+      expect(row['low_estimate_aud'], 40);
+      expect(row['high_estimate_aud'], 60);
+      expect(row['display_string'], 'AUD 50');
+      expect(row['valuation_status'], 'market_estimated');
+      expect(row['valuation_strategy'], 'sold_completed');
+      expect(row['pricing_provider'], 'Mock market blend');
+      expect(row['confidence_score'], 0.8);
+      expect(row['condition_label'], 'Good');
+      expect(row['priced_at'], '2026-07-26T04:10:00.000Z');
+      expect(row['evidence_json'], isA<Map<String, Object?>>());
+    });
+
     test('anonymous auth startup succeeds before sync status check', () async {
       final auth = _RecordingAuthService();
       final sync = _RecordingPortfolioSyncService(auth: auth);
@@ -399,6 +425,7 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
 
   final AuthService auth;
   final List<CollectibleItem> syncedItems = [];
+  final List<CollectibleItem> valuationSnapshots = [];
   int statusChecks = 0;
 
   @override
@@ -411,6 +438,11 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
 
   @override
   Future<void> deleteItem(String itemId) async {}
+
+  @override
+  Future<void> syncValuationSnapshot(CollectibleItem item) async {
+    valuationSnapshots.add(item);
+  }
 
   @override
   Future<List<CollectibleItem>> fetchItems() async => syncedItems;

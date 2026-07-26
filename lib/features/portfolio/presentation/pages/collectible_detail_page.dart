@@ -439,9 +439,10 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           .read(scanPricingQuoteServiceProvider)
           .quoteItem(item);
       refreshedStatus = quote.valuationStatus;
+      final refreshedAt = DateTime.now();
       await ref
           .read(portfolioControllerProvider.notifier)
-          .updateItem(
+          .updateItemWithValuationSnapshot(
             item.copyWith(
               estimatedValue: quote.estimatedValue,
               pricing: quote.pricing,
@@ -449,6 +450,8 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
               valuationStatus: quote.valuationStatus,
               valuationSource: quote.valuationSource,
               aiEstimatedValue: quote.aiEstimatedValue,
+              valueAtScan: item.valueAtScan ?? item.estimatedValue,
+              lastValueRefreshedAt: refreshedAt,
             ),
           );
     } catch (_) {
@@ -2107,9 +2110,18 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
-        'Value at scan',
+        'Current value',
         _displayValue(pricing, fallbackValue: item.estimatedValue),
       ),
+      _DetailInfoRowData(
+        'Value at scan',
+        _formatMoney(item.valueAtScan ?? item.estimatedValue, pricing.currency),
+      ),
+      if (item.lastValueRefreshedAt != null)
+        _DetailInfoRowData(
+          'Last refreshed',
+          _formatPricingDate(item.lastValueRefreshedAt),
+        ),
       if (_sourceMarketValue(pricing) != null)
         _DetailInfoRowData('Source market value', _sourceMarketValue(pricing)!),
       _DetailInfoRowData(

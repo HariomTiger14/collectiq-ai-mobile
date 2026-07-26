@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/cloud/supabase/supabase_bootstrap.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:dio/dio.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/foundation.dart';
 
 class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
@@ -12,12 +13,14 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     required this.authService,
     this.supabaseDataGateway,
     this.tableName = 'portfolio_items',
+    this.valuationSnapshotTableName = 'portfolio_valuation_snapshots',
   });
 
   final SupabaseBootstrap bootstrap;
   final AuthService authService;
   final SupabaseDataGateway? supabaseDataGateway;
   final String tableName;
+  final String valuationSnapshotTableName;
 
   @override
   String get providerName => 'Supabase Portfolio Sync';
@@ -52,6 +55,21 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
         .update({'sync_status': 'deleted', 'updated_at': _nowIso()})
         .eq('id', itemId)
         .eq('user_id', userId);
+  }
+
+  @override
+  Future<void> syncValuationSnapshot(CollectibleItem item) async {
+    if (await _syncValuationSnapshotWithRestSession(item)) {
+      return;
+    }
+
+    final userId = await _signedInUserId();
+    if (userId == null) {
+      return;
+    }
+    await bootstrap.client!
+        .from(valuationSnapshotTableName)
+        .insert(supabaseValuationSnapshotRowForItem(item, userId));
   }
 
   @override
@@ -195,6 +213,23 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     return true;
   }
 
+  Future<bool> _syncValuationSnapshotWithRestSession(
+    CollectibleItem item,
+  ) async {
+    final gateway = supabaseDataGateway;
+    final session = await _signedInRestSession();
+    if (gateway == null || session == null) {
+      return false;
+    }
+    await gateway.authenticatedPostWithSession<List<dynamic>>(
+      '/rest/v1/$valuationSnapshotTableName',
+      session: session,
+      data: [supabaseValuationSnapshotRowForItem(item, session.userId)],
+      options: Options(headers: const {'Prefer': 'return=minimal'}),
+    );
+    return true;
+  }
+
   Future<List<CollectibleItem>?> _fetchItemsWithRestSession() async {
     final gateway = supabaseDataGateway;
     final session = await _signedInRestSession();
@@ -244,6 +279,55 @@ Map<String, dynamic> supabaseRowForItem(CollectibleItem item, String userId) {
     'raw_json': rawJson,
     'created_at': item.createdAt.toIso8601String(),
     'updated_at': _nowIso(),
+  };
+}
+
+@visibleForTesting
+Map<String, dynamic> supabaseValuationSnapshotRowForItem(
+  CollectibleItem item,
+  String userId,
+) {
+  final pricing = item.pricing;
+  final market = item.marketSummary;
+  final value = _snapshotValue(item);
+  final currency = pricing?.currency.trim().toUpperCase() ?? 'AUD';
+  final pricedAt =
+      item.lastValueRefreshedAt?.toIso8601String() ??
+      pricing?.lastUpdated?.toIso8601String() ??
+      _nowIso();
+  final provider = pricing?.pricingSource.trim().isNotEmpty == true
+      ? pricing!.pricingSource
+      : item.valuationSource;
+
+  return {
+    'user_id': userId,
+    'portfolio_item_id': item.id,
+    'value_aud': value,
+    'low_estimate_aud': pricing?.lowEstimate ?? market?.lowPrice,
+    'high_estimate_aud': pricing?.highEstimate ?? market?.highPrice,
+    'display_string': value == null ? null : _snapshotDisplay(value, currency),
+    'valuation_status': item.valuationStatus.wireValue,
+    'reason_code': item.valuationStatus.wireValue,
+    'valuation_strategy':
+        item.valuationStatus == ValuationStatus.marketEstimated
+        ? 'sold_completed'
+        : 'unavailable',
+    'pricing_provider': provider,
+    'attribution_text': provider,
+    'confidence_score': pricing?.pricingConfidence ?? market?.confidence,
+    'condition_label': item.condition,
+    'priced_at': pricedAt,
+    'evidence_json': {
+      'title': item.title,
+      'category': item.category,
+      'brand': item.brand,
+      'setName': item.setName,
+      'series': item.series,
+      'cardNumber': item.cardNumber,
+      'rarity': item.rarity,
+      'pricing': pricing?.toJson(),
+      'marketSummary': market?.toJson(),
+    },
   };
 }
 
@@ -307,6 +391,24 @@ num? _number(Object? value) {
     return num.tryParse(value);
   }
   return null;
+}
+
+double? _snapshotValue(CollectibleItem item) {
+  final marketValue = item.pricing?.estimatedMarketValue;
+  if (marketValue != null && marketValue > 0) {
+    return marketValue;
+  }
+  if (item.estimatedValue > 0) {
+    return item.estimatedValue;
+  }
+  return null;
+}
+
+String _snapshotDisplay(double value, String currency) {
+  final rounded = value.toStringAsFixed(
+    value.truncateToDouble() == value ? 0 : 2,
+  );
+  return '$currency $rounded';
 }
 
 String _nowIso() => DateTime.now().toIso8601String();
