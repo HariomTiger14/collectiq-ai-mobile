@@ -253,6 +253,34 @@ void main() {
     expect(find.textContaining('saved from catalog search'), findsOneWidget);
   });
 
+  testWidgets('catalog saved item shows valuation snapshot evidence', (
+    tester,
+  ) async {
+    await _pumpDetail(tester, _catalogSnapshotItem());
+
+    await _revealText(tester, 'Saved valuation snapshot');
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-catalog-snapshot-card')),
+      findsOneWidget,
+    );
+    expect(find.text('Saved valuation snapshot'), findsOneWidget);
+    expect(
+      find.textContaining('Opening Portfolio does not call pricing APIs'),
+      findsOneWidget,
+    );
+    expect(find.text('Snapshot value'), findsOneWidget);
+    expect(find.text('USD \$161'), findsWidgets);
+    expect(find.text('Source'), findsWidgets);
+    expect(find.text('PriceCharting'), findsWidgets);
+    expect(find.text('Catalog ID'), findsOneWidget);
+    expect(find.text('3666974'), findsOneWidget);
+    expect(find.text('Attribution'), findsOneWidget);
+    expect(find.text('Pricing data by PriceCharting'), findsOneWidget);
+    expect(find.text('Strategy'), findsOneWidget);
+    expect(find.text('Catalog Lookup'), findsOneWidget);
+  });
+
   testWidgets('QA capture exposes Portfolio Detail visual states', (
     tester,
   ) async {
@@ -645,5 +673,40 @@ CollectibleItem _authorityItem({
     ),
     valueAtScan: 200,
     lastValueRefreshedAt: DateTime(2026, 7, 26),
+  );
+}
+
+CollectibleItem _catalogSnapshotItem() {
+  return _authorityItem(
+    estimatedValue: 161,
+    imagePath:
+        'assets/packlox/icons/categories/3d/packlox_category_placeholder_card_v1.png',
+    galleryImages: const [],
+  ).copyWith(
+    title: 'Charizard #10',
+    category: 'Pokemon Card',
+    setName: 'Pokemon Go',
+    cardNumber: '10',
+    notes:
+        'Catalog ID: 3666974\nSource: PriceCharting\nPricing data by PriceCharting',
+    pricing: PricingInfo(
+      estimatedMarketValue: 161,
+      lowEstimate: 3.89,
+      highEstimate: 25,
+      currency: 'USD',
+      pricingSource: 'PriceCharting',
+      pricingConfidence: 0.96,
+      lastUpdated: DateTime(2026, 7, 26),
+      valuationStatus: ValuationStatus.marketEstimated,
+      valuationSource: 'pricecharting',
+      pricingExplanation:
+          'Saved from PackLox catalog search as a dated portfolio snapshot.',
+      reasonCode: 'CATALOG_SEARCH_MATCH',
+      valuationStrategy: 'catalog_lookup',
+      attributionText: 'Pricing data by PriceCharting',
+      displayString: 'USD \$161',
+    ),
+    valueAtScan: 161,
+    lastValueRefreshedAt: null,
   );
 }

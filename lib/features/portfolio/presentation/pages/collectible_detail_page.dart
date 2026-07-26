@@ -1691,6 +1691,7 @@ class _DetailMarketSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = _detailMarketRows(item);
+    final catalogSnapshot = _catalogSnapshotFor(item);
     return _DetailAuthorityPanel(
       key: const ValueKey('collectible-detail-market-section'),
       child: Column(
@@ -1701,6 +1702,10 @@ class _DetailMarketSection extends StatelessWidget {
           _DetailAuthorityValueBlock(item: item),
           const SizedBox(height: AppSpacing.md),
           _DetailValueHistoryPanel(item: item),
+          if (catalogSnapshot != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _CatalogSnapshotPanel(snapshot: catalogSnapshot),
+          ],
           const SizedBox(height: AppSpacing.md),
           if (rows.isEmpty)
             const _DetailEmptyCopy(
@@ -1717,6 +1722,145 @@ class _DetailMarketSection extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _CatalogSnapshotPanel extends StatelessWidget {
+  const _CatalogSnapshotPanel({required this.snapshot});
+
+  final _CatalogSnapshotData snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final pricing = snapshot.pricing;
+    return Container(
+      key: const ValueKey('collectible-detail-catalog-snapshot-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _DetailSectionTitle(
+            title: 'Saved valuation snapshot',
+            icon: Icons.lock_clock_rounded,
+            compact: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'This value was saved with the portfolio item. Opening Portfolio does not call pricing APIs.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+              height: 1.32,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _SnapshotMetricChip(
+                label: 'Snapshot value',
+                value: _displayValue(
+                  pricing,
+                  fallbackValue: snapshot.savedValue,
+                ),
+              ),
+              _SnapshotMetricChip(
+                label: 'Source',
+                value: pricing.pricingSource,
+              ),
+              if (snapshot.catalogId != null)
+                _SnapshotMetricChip(
+                  label: 'Catalog ID',
+                  value: snapshot.catalogId!,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _SnapshotEvidenceRows(snapshot: snapshot),
+        ],
+      ),
+    );
+  }
+}
+
+class _SnapshotMetricChip extends StatelessWidget {
+  const _SnapshotMetricChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 112),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: HomeTokens.background.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: 0.62)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SnapshotEvidenceRows extends StatelessWidget {
+  const _SnapshotEvidenceRows({required this.snapshot});
+
+  final _CatalogSnapshotData snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final pricing = snapshot.pricing;
+    final rows = [
+      _DetailInfoRowData('Attribution', snapshot.attribution),
+      if (pricing.lastUpdated != null)
+        _DetailInfoRowData(
+          'Provider checked',
+          _formatPricingDate(pricing.lastUpdated),
+        ),
+      if (pricing.valuationStrategy?.trim().isNotEmpty ?? false)
+        _DetailInfoRowData(
+          'Strategy',
+          _humanizeToken(pricing.valuationStrategy!),
+        ),
+      if (pricing.reasonCode?.trim().isNotEmpty ?? false)
+        _DetailInfoRowData('Reason', _humanizeToken(pricing.reasonCode!)),
+    ];
+    return _DetailAuthorityRows(rows: rows);
   }
 }
 
@@ -2380,6 +2524,74 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
       _DetailInfoRowData('Sources', market.sources.join(', ')),
     ],
   ];
+}
+
+class _CatalogSnapshotData {
+  const _CatalogSnapshotData({
+    required this.pricing,
+    required this.savedValue,
+    required this.attribution,
+    this.catalogId,
+  });
+
+  final PricingInfo pricing;
+  final double savedValue;
+  final String attribution;
+  final String? catalogId;
+}
+
+_CatalogSnapshotData? _catalogSnapshotFor(CollectibleItem item) {
+  final pricing = item.pricing;
+  if (pricing == null) {
+    return null;
+  }
+  final catalogId = _catalogIdFromNotes(item.notes);
+  final strategy = pricing.valuationStrategy?.trim().toLowerCase();
+  final reason = pricing.reasonCode?.trim().toUpperCase();
+  final source = pricing.pricingSource.trim().toLowerCase();
+  final isCatalogSnapshot =
+      strategy == 'catalog_lookup' ||
+      reason == 'CATALOG_SEARCH_MATCH' ||
+      catalogId != null ||
+      source.contains('pricecharting');
+  if (!isCatalogSnapshot) {
+    return null;
+  }
+  final attribution =
+      _clean(pricing.attributionText) ??
+      (source.contains('pricecharting')
+          ? 'Pricing data by PriceCharting'
+          : 'Pricing data by ${pricing.pricingSource}');
+  return _CatalogSnapshotData(
+    pricing: pricing,
+    savedValue: item.estimatedValue,
+    attribution: attribution,
+    catalogId: catalogId,
+  );
+}
+
+String? _catalogIdFromNotes(String? notes) {
+  final text = notes ?? '';
+  final match = RegExp(
+    r'Catalog ID:\s*([^\n\r]+)',
+    caseSensitive: false,
+  ).firstMatch(text);
+  return _clean(match?.group(1));
+}
+
+String _humanizeToken(String value) {
+  final clean = value
+      .trim()
+      .replaceAll(RegExp(r'[_\-]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .toLowerCase();
+  if (clean.isEmpty) {
+    return 'Unknown';
+  }
+  return clean
+      .split(' ')
+      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+      .join(' ');
 }
 
 double _valueAtScanFor(CollectibleItem item) {
