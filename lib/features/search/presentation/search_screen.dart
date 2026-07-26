@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -1285,6 +1287,21 @@ class _CatalogPlaceholderArt extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         ColoredBox(color: style.background),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  PackLoxTokens.textPrimary.withValues(alpha: 0.045),
+                  Colors.transparent,
+                  style.accent.withValues(alpha: 0.08),
+                ],
+              ),
+            ),
+          ),
+        ),
         Align(
           alignment: Alignment.topRight,
           child: Container(
@@ -1296,19 +1313,27 @@ class _CatalogPlaceholderArt extends StatelessWidget {
             ),
           ),
         ),
-        Center(
+        Align(
+          alignment: Alignment.bottomLeft,
           child: Container(
-            width: compact ? 34 : 36,
-            height: compact ? 42 : 48,
+            width: compact ? 20 : 26,
+            height: compact ? 20 : 26,
             decoration: BoxDecoration(
-              color: PackLoxTokens.surface.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: style.accent.withValues(alpha: 0.55)),
+              color: PackLoxTokens.textPrimary.withValues(alpha: 0.04),
+              shape: BoxShape.circle,
             ),
-            child: Icon(
-              style.icon,
-              color: style.accent,
-              size: compact ? 18 : 20,
+          ),
+        ),
+        Center(
+          child: SizedBox(
+            width: compact ? 34 : 38,
+            height: compact ? 34 : 38,
+            child: CustomPaint(
+              painter: _PlaceholderMarkPainter(
+                mark: style.mark,
+                accent: style.accent,
+                compact: compact,
+              ),
             ),
           ),
         ),
@@ -1317,8 +1342,13 @@ class _CatalogPlaceholderArt extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              color: PackLoxTokens.surface.withValues(alpha: 0.72),
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                color: PackLoxTokens.surface.withValues(alpha: 0.62),
+                border: Border(
+                  top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
+                ),
+              ),
               child: Text(
                 style.label,
                 textAlign: TextAlign.center,
@@ -1362,6 +1392,354 @@ class _SearchPill extends StatelessWidget {
   }
 }
 
+enum _PlaceholderMark { card, game, toy, coin, comic, watch, shoe, collectible }
+
+class _PlaceholderMarkPainter extends CustomPainter {
+  const _PlaceholderMarkPainter({
+    required this.mark,
+    required this.accent,
+    required this.compact,
+  });
+
+  final _PlaceholderMark mark;
+  final Color accent;
+  final bool compact;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = accent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = compact ? 1.8 : 2.1
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()
+      ..color = accent.withValues(alpha: 0.12)
+      ..style = PaintingStyle.fill;
+    final glow = Paint()
+      ..color = accent.withValues(alpha: 0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = compact ? 5 : 6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+
+    switch (mark) {
+      case _PlaceholderMark.card:
+        _drawCard(canvas, size, glow);
+        _drawCard(canvas, size, stroke);
+      case _PlaceholderMark.game:
+        _drawGame(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.toy:
+        _drawToy(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.coin:
+        _drawCoin(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.comic:
+        _drawComic(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.watch:
+        _drawWatch(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.shoe:
+        _drawShoe(canvas, size, fill, glow, stroke);
+      case _PlaceholderMark.collectible:
+        _drawCollectible(canvas, size, fill, glow, stroke);
+    }
+  }
+
+  void _drawCard(Canvas canvas, Size size, Paint paint) {
+    final rect = Rect.fromLTWH(
+      size.width * 0.30,
+      size.height * 0.16,
+      size.width * 0.44,
+      size.height * 0.62,
+    );
+    canvas.save();
+    canvas.translate(size.width * 0.05, size.height * 0.02);
+    canvas.rotate(-0.16);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.07)),
+      paint,
+    );
+    canvas.restore();
+    canvas.save();
+    canvas.translate(-size.width * 0.04, size.height * 0.05);
+    canvas.rotate(0.12);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.07)),
+      paint,
+    );
+    canvas.restore();
+  }
+
+  void _drawGame(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final body = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.12,
+        size.height * 0.32,
+        size.width * 0.76,
+        size.height * 0.34,
+      ),
+      Radius.circular(size.width * 0.18),
+    );
+    canvas.drawRRect(body, fill);
+    canvas.drawRRect(body, glow);
+    canvas.drawRRect(body, stroke);
+    canvas.drawLine(
+      Offset(size.width * 0.28, size.height * 0.49),
+      Offset(size.width * 0.42, size.height * 0.49),
+      stroke,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.35, size.height * 0.42),
+      Offset(size.width * 0.35, size.height * 0.56),
+      stroke,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.64, size.height * 0.46),
+      2.8,
+      stroke,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.74, size.height * 0.53),
+      2.8,
+      stroke,
+    );
+  }
+
+  void _drawToy(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final body = Path()
+      ..moveTo(size.width * 0.18, size.height * 0.56)
+      ..lineTo(size.width * 0.28, size.height * 0.40)
+      ..lineTo(size.width * 0.62, size.height * 0.40)
+      ..lineTo(size.width * 0.78, size.height * 0.55)
+      ..lineTo(size.width * 0.84, size.height * 0.61)
+      ..lineTo(size.width * 0.16, size.height * 0.61)
+      ..close();
+    canvas.drawPath(body, fill);
+    canvas.drawPath(body, glow);
+    canvas.drawPath(body, stroke);
+    canvas.drawCircle(
+      Offset(size.width * 0.32, size.height * 0.65),
+      4.2,
+      stroke,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.68, size.height * 0.65),
+      4.2,
+      stroke,
+    );
+  }
+
+  void _drawCoin(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide * 0.31;
+    canvas.drawCircle(center, radius, fill);
+    canvas.drawCircle(center, radius, glow);
+    canvas.drawCircle(center, radius, stroke);
+    canvas.drawCircle(center, radius * 0.64, stroke);
+    for (var i = -2; i <= 2; i++) {
+      canvas.drawLine(
+        Offset(center.dx + i * 4, center.dy - radius * 0.88),
+        Offset(center.dx + i * 4, center.dy - radius * 0.62),
+        stroke,
+      );
+    }
+  }
+
+  void _drawComic(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final page = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.24,
+        size.height * 0.16,
+        size.width * 0.52,
+        size.height * 0.68,
+      ),
+      Radius.circular(size.width * 0.05),
+    );
+    canvas.drawRRect(page, fill);
+    canvas.drawRRect(page, glow);
+    canvas.drawRRect(page, stroke);
+    canvas.drawLine(
+      Offset(size.width * 0.34, size.height * 0.36),
+      Offset(size.width * 0.66, size.height * 0.36),
+      stroke,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.34, size.height * 0.52),
+      Offset(size.width * 0.66, size.height * 0.52),
+      stroke,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.50, size.height * 0.24),
+      Offset(size.width * 0.50, size.height * 0.72),
+      stroke,
+    );
+  }
+
+  void _drawWatch(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final center = Offset(size.width / 2, size.height / 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.39,
+          2,
+          size.width * 0.22,
+          size.height * 0.24,
+        ),
+        Radius.circular(size.width * 0.05),
+      ),
+      stroke,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.39,
+          size.height * 0.74,
+          size.width * 0.22,
+          size.height * 0.24,
+        ),
+        Radius.circular(size.width * 0.05),
+      ),
+      stroke,
+    );
+    canvas.drawCircle(center, size.shortestSide * 0.25, fill);
+    canvas.drawCircle(center, size.shortestSide * 0.25, glow);
+    canvas.drawCircle(center, size.shortestSide * 0.25, stroke);
+    canvas.drawLine(
+      center,
+      Offset(center.dx, center.dy - size.height * 0.13),
+      stroke,
+    );
+    canvas.drawLine(
+      center,
+      Offset(center.dx + size.width * 0.11, center.dy),
+      stroke,
+    );
+  }
+
+  void _drawShoe(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final shoe = Path()
+      ..moveTo(size.width * 0.18, size.height * 0.62)
+      ..quadraticBezierTo(
+        size.width * 0.34,
+        size.height * 0.52,
+        size.width * 0.42,
+        size.height * 0.34,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.58,
+        size.height * 0.48,
+        size.width * 0.78,
+        size.height * 0.55,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.88,
+        size.height * 0.58,
+        size.width * 0.84,
+        size.height * 0.68,
+      )
+      ..lineTo(size.width * 0.20, size.height * 0.68)
+      ..close();
+    canvas.drawPath(shoe, fill);
+    canvas.drawPath(shoe, glow);
+    canvas.drawPath(shoe, stroke);
+    canvas.drawLine(
+      Offset(size.width * 0.42, size.height * 0.50),
+      Offset(size.width * 0.58, size.height * 0.55),
+      stroke,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.46, size.height * 0.44),
+      Offset(size.width * 0.62, size.height * 0.50),
+      stroke,
+    );
+  }
+
+  void _drawCollectible(
+    Canvas canvas,
+    Size size,
+    Paint fill,
+    Paint glow,
+    Paint stroke,
+  ) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final path = Path();
+    for (var i = 0; i < 6; i++) {
+      final angle = -1.5708 + i * 1.0472;
+      final point = Offset(
+        center.dx + size.width * 0.30 * math.cos(angle),
+        center.dy + size.height * 0.30 * math.sin(angle),
+      );
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, fill);
+    canvas.drawPath(path, glow);
+    canvas.drawPath(path, stroke);
+    canvas.drawLine(
+      center,
+      Offset(center.dx, center.dy - size.height * 0.30),
+      stroke,
+    );
+    canvas.drawLine(
+      center,
+      Offset(center.dx + size.width * 0.26, center.dy + size.height * 0.15),
+      stroke,
+    );
+    canvas.drawLine(
+      center,
+      Offset(center.dx - size.width * 0.26, center.dy + size.height * 0.15),
+      stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlaceholderMarkPainter oldDelegate) {
+    return oldDelegate.mark != mark ||
+        oldDelegate.accent != accent ||
+        oldDelegate.compact != compact;
+  }
+}
+
 String? _searchImagePath(CollectibleItem item) {
   final cloudImageUrl = item.cloudImageUrl?.trim();
   if (cloudImageUrl != null && cloudImageUrl.isNotEmpty) {
@@ -1400,7 +1778,7 @@ _PlaceholderStyle _placeholderStyle(
       text.contains('card')) {
     return const _PlaceholderStyle(
       label: 'CARD',
-      icon: Icons.style_outlined,
+      mark: _PlaceholderMark.card,
       accent: PackLoxTokens.cyan,
       background: Color(0xFF171421),
     );
@@ -1408,7 +1786,7 @@ _PlaceholderStyle _placeholderStyle(
   if (text.contains('comic')) {
     return const _PlaceholderStyle(
       label: 'COMIC',
-      icon: Icons.menu_book_outlined,
+      mark: _PlaceholderMark.comic,
       accent: Color(0xFF9B7CFF),
       background: Color(0xFF171421),
     );
@@ -1416,7 +1794,7 @@ _PlaceholderStyle _placeholderStyle(
   if (text.contains('watch')) {
     return const _PlaceholderStyle(
       label: 'WATCH',
-      icon: Icons.watch_outlined,
+      mark: _PlaceholderMark.watch,
       accent: PackLoxTokens.success,
       background: Color(0xFF102019),
     );
@@ -1424,7 +1802,7 @@ _PlaceholderStyle _placeholderStyle(
   if (text.contains('shoe') || text.contains('sneaker')) {
     return const _PlaceholderStyle(
       label: 'SHOE',
-      icon: Icons.directions_walk_outlined,
+      mark: _PlaceholderMark.shoe,
       accent: PackLoxTokens.blue,
       background: Color(0xFF111827),
     );
@@ -1436,7 +1814,7 @@ _PlaceholderStyle _placeholderStyle(
       text.contains('sega')) {
     return const _PlaceholderStyle(
       label: 'GAME',
-      icon: Icons.sports_esports_outlined,
+      mark: _PlaceholderMark.game,
       accent: PackLoxTokens.cyan,
       background: Color(0xFF101C22),
     );
@@ -1446,7 +1824,7 @@ _PlaceholderStyle _placeholderStyle(
       text.contains('hot wheels')) {
     return const _PlaceholderStyle(
       label: 'TOY',
-      icon: Icons.directions_car_filled_outlined,
+      mark: _PlaceholderMark.toy,
       accent: PackLoxTokens.blue,
       background: Color(0xFF111827),
     );
@@ -1454,14 +1832,14 @@ _PlaceholderStyle _placeholderStyle(
   if (text.contains('coin')) {
     return const _PlaceholderStyle(
       label: 'COIN',
-      icon: Icons.album_outlined,
+      mark: _PlaceholderMark.coin,
       accent: PackLoxTokens.amber,
       background: Color(0xFF201C12),
     );
   }
   return const _PlaceholderStyle(
     label: 'PX',
-    icon: Icons.inventory_2_outlined,
+    mark: _PlaceholderMark.collectible,
     accent: PackLoxTokens.cyan,
     background: Color(0xFF101A20),
   );
@@ -1470,13 +1848,13 @@ _PlaceholderStyle _placeholderStyle(
 class _PlaceholderStyle {
   const _PlaceholderStyle({
     required this.label,
-    required this.icon,
+    required this.mark,
     required this.accent,
     required this.background,
   });
 
   final String label;
-  final IconData icon;
+  final _PlaceholderMark mark;
   final Color accent;
   final Color background;
 }
