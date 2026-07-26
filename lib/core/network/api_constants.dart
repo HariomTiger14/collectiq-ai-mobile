@@ -94,6 +94,9 @@ class ApiConstants {
   /// Price/catalog search endpoint for Discover.
   static const pricingCatalogSearchPath = '/api/pricing/catalog/search';
 
+  /// Price/catalog detail endpoint prefix.
+  static const pricingCatalogDetailPath = '/api/pricing/catalog';
+
   /// Portfolio endpoint.
   static const portfolioPath = '/portfolio';
 

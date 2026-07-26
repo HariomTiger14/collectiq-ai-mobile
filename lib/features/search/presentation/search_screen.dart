@@ -1204,10 +1204,22 @@ class _CatalogResultDetailPage extends ConsumerStatefulWidget {
 class _CatalogResultDetailPageState
     extends ConsumerState<_CatalogResultDetailPage> {
   var _isSaving = false;
+  var _isLoadingDetail = true;
+  String? _detailError;
+  late CatalogSearchResult _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _result = widget.result;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCatalogDetail();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final result = widget.result;
+    final result = _result;
     final value = _formatCatalogValue(result);
     final confidence = result.confidence == null
         ? 'Not supplied'
@@ -1294,6 +1306,12 @@ class _CatalogResultDetailPageState
                           ),
                           const SizedBox(height: 18),
                           _CatalogValuePanel(result: result, value: value),
+                          const SizedBox(height: 14),
+                          _CatalogHistoryPanel(
+                            history: result.history,
+                            isLoading: _isLoadingDetail,
+                            errorMessage: _detailError,
+                          ),
                           const SizedBox(height: 14),
                           _SurfaceCard(
                             child: Column(
@@ -1382,7 +1400,7 @@ class _CatalogResultDetailPageState
 
   Future<void> _saveToPortfolio() async {
     setState(() => _isSaving = true);
-    final item = _catalogResultToPortfolioItem(widget.result);
+    final item = _catalogResultToPortfolioItem(_result);
     try {
       await ref.read(portfolioControllerProvider.notifier).saveItem(item);
       final savedItem = ref
@@ -1415,6 +1433,30 @@ class _CatalogResultDetailPageState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to save catalog item')),
       );
+    }
+  }
+
+  Future<void> _loadCatalogDetail() async {
+    try {
+      final detail = await ref
+          .read(catalogSearchRepositoryProvider)
+          .getCatalogDetail(result: widget.result);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _result = detail;
+        _isLoadingDetail = false;
+        _detailError = null;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingDetail = false;
+        _detailError = 'History unavailable';
+      });
     }
   }
 }
@@ -1541,6 +1583,115 @@ class _CatalogEstimateChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CatalogHistoryPanel extends StatelessWidget {
+  const _CatalogHistoryPanel({
+    required this.history,
+    required this.isLoading,
+    required this.errorMessage,
+  });
+
+  final List<CatalogPriceHistoryPoint> history;
+  final bool isLoading;
+  final String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _SectionTitle('Price history')),
+              if (isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (history.isNotEmpty) ...[
+            for (final point in history.take(4)) ...[
+              _CatalogHistoryRow(point: point),
+              if (point != history.take(4).last)
+                const Divider(color: PackLoxTokens.border, height: 18),
+            ],
+          ] else
+            Text(
+              isLoading
+                  ? 'Loading observed catalog history...'
+                  : errorMessage ??
+                        'History starts after daily catalog refreshes.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+                height: 1.32,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogHistoryRow extends StatelessWidget {
+  const _CatalogHistoryRow({required this.point});
+
+  final CatalogPriceHistoryPoint point;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _formatOptionalCatalogValue(
+      point.marketValue,
+      point.currency,
+    );
+    final range = point.isCurrent
+        ? 'Current from ${_formatShortDate(point.validFrom)}'
+        : '${_formatShortDate(point.validFrom)} - ${point.validTo == null ? 'ended' : _formatShortDate(point.validTo!)}';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(
+            color: point.isCurrent ? PackLoxTokens.success : PackLoxTokens.cyan,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                range,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_clean(point.sourceFile) != null)
+          _SearchPill(label: point.sourceFile!.replaceAll('.csv', '')),
+      ],
     );
   }
 }

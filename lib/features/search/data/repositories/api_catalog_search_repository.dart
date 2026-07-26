@@ -39,4 +39,29 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
         .map(CatalogSearchResult.fromJson)
         .toList(growable: false);
   }
+
+  @override
+  Future<CatalogSearchResult> getCatalogDetail({
+    required CatalogSearchResult result,
+    int historyLimit = 30,
+  }) async {
+    final response = await _apiClient.get(
+      '${ApiConstants.pricingCatalogDetailPath}/${Uri.encodeComponent(result.id)}',
+      queryParameters: {'historyLimit': historyLimit},
+    );
+    final data = response.data;
+    if (data is! Map<String, dynamic>) {
+      return result;
+    }
+    final detail = data['result'] is Map<String, dynamic>
+        ? CatalogSearchResult.fromJson(data['result'] as Map<String, dynamic>)
+        : result;
+    final history = data['history'] is List<dynamic>
+        ? (data['history'] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map(CatalogPriceHistoryPoint.fromJson)
+              .toList(growable: false)
+        : detail.history;
+    return detail.copyWith(history: history);
+  }
 }

@@ -7,4 +7,10 @@ abstract class CatalogSearchRepository {
     required String query,
     int limit = 20,
   });
+
+  /// Loads a catalog item with richer detail/history when available.
+  Future<CatalogSearchResult> getCatalogDetail({
+    required CatalogSearchResult result,
+    int historyLimit = 30,
+  });
 }

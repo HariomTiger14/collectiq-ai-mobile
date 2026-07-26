@@ -222,6 +222,65 @@ void main() {
     expect(find.byType(CollectibleDetailPage), findsOneWidget);
   });
 
+  testWidgets('catalog result detail shows backend price history', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        CatalogSearchResult(
+          id: 'pc-charizard',
+          title: 'Charizard #4 Base Set',
+          category: 'Pokemon Cards',
+          source: 'PriceCharting',
+          setName: 'Base Set',
+          currency: 'USD',
+          marketValue: 161,
+          confidence: 0.91,
+          lastUpdated: DateTime(2026, 7, 26),
+          attribution: 'Pricing data by PriceCharting',
+          history: [
+            CatalogPriceHistoryPoint(
+              validFrom: DateTime(2026, 7, 26),
+              isCurrent: true,
+              currency: 'USD',
+              marketValue: 161,
+              lowEstimate: 150,
+              highEstimate: 800,
+              sourceFile: 'pokemon.csv',
+            ),
+            CatalogPriceHistoryPoint(
+              validFrom: DateTime(2026, 7, 25),
+              validTo: DateTime(2026, 7, 26),
+              currency: 'USD',
+              marketValue: 150,
+              sourceFile: 'pokemon.csv',
+            ),
+          ],
+        ),
+      ]),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'charizard',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Price history'), findsOneWidget);
+    expect(find.text('Current from 26 Jul 2026'), findsOneWidget);
+    expect(find.text('25 Jul 2026 - 26 Jul 2026'), findsOneWidget);
+    expect(find.text('USD \$161'), findsWidgets);
+    expect(find.text('pokemon'), findsWidgets);
+  });
+
   testWidgets('catalog search has a clear unavailable state', (tester) async {
     await _pumpSearch(
       tester,
@@ -363,6 +422,17 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
     queries.add(query);
     return results;
   }
+
+  @override
+  Future<CatalogSearchResult> getCatalogDetail({
+    required CatalogSearchResult result,
+    int historyLimit = 30,
+  }) async {
+    return results.firstWhere(
+      (candidate) => candidate.id == result.id,
+      orElse: () => result,
+    );
+  }
 }
 
 class _FailingCatalogSearchRepository implements CatalogSearchRepository {
@@ -370,6 +440,14 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+  }) async {
+    throw StateError('Catalog endpoint missing');
+  }
+
+  @override
+  Future<CatalogSearchResult> getCatalogDetail({
+    required CatalogSearchResult result,
+    int historyLimit = 30,
   }) async {
     throw StateError('Catalog endpoint missing');
   }
