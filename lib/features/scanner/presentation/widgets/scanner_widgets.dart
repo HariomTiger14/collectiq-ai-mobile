@@ -1266,12 +1266,9 @@ class AiResultCard extends ConsumerWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: TextButton.icon(
-                    onPressed: () => _showScannerSnackBar(
-                      context,
-                      'Retry analysis coming soon',
-                    ),
-                    icon: const Icon(Icons.refresh_outlined),
-                    label: const Text('Retry Analysis'),
+                    onPressed: onScanAnother,
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: const Text('Scan Another'),
                   ),
                 ),
               ],

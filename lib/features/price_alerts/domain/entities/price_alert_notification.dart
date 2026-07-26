@@ -87,6 +87,7 @@ class PriceAlertNotificationState {
     required this.enabled,
     required this.permissionStatus,
     required this.lastDeliveryStatus,
+    this.pushRegistrationStatus = PushNotificationRegistrationStatus.idle,
     this.lastMessage,
     this.lastNotificationAt,
     this.isLoading = false,
@@ -95,6 +96,7 @@ class PriceAlertNotificationState {
   final bool enabled;
   final PriceAlertNotificationPermissionStatus permissionStatus;
   final PriceAlertNotificationDeliveryStatus lastDeliveryStatus;
+  final PushNotificationRegistrationStatus pushRegistrationStatus;
   final String? lastMessage;
   final DateTime? lastNotificationAt;
   final bool isLoading;
@@ -110,6 +112,10 @@ class PriceAlertNotificationState {
         PriceAlertNotificationPermissionStatus.notSupported) {
       return 'Unavailable';
     }
+    if (pushRegistrationStatus ==
+        PushNotificationRegistrationStatus.registered) {
+      return 'Cloud ready';
+    }
     return permissionStatus.canNotify ? 'On' : 'Needs permission';
   }
 
@@ -118,11 +124,15 @@ class PriceAlertNotificationState {
       return 'Price alert notifications are disabled on this device.';
     }
     if (permissionStatus == PriceAlertNotificationPermissionStatus.denied) {
-      return 'Enable notifications in Android settings to receive local alerts.';
+      return 'Enable notifications in device settings to receive local alerts.';
     }
     if (permissionStatus ==
         PriceAlertNotificationPermissionStatus.notSupported) {
       return 'Local notifications are not supported on this platform.';
+    }
+    if (pushRegistrationStatus ==
+        PushNotificationRegistrationStatus.registered) {
+      return 'Cloud push is ready for price alerts on this device.';
     }
     return 'Local notifications are shown only when saved price alerts trigger.';
   }
@@ -131,6 +141,7 @@ class PriceAlertNotificationState {
     bool? enabled,
     PriceAlertNotificationPermissionStatus? permissionStatus,
     PriceAlertNotificationDeliveryStatus? lastDeliveryStatus,
+    PushNotificationRegistrationStatus? pushRegistrationStatus,
     String? lastMessage,
     DateTime? lastNotificationAt,
     bool? isLoading,
@@ -141,6 +152,8 @@ class PriceAlertNotificationState {
       enabled: enabled ?? this.enabled,
       permissionStatus: permissionStatus ?? this.permissionStatus,
       lastDeliveryStatus: lastDeliveryStatus ?? this.lastDeliveryStatus,
+      pushRegistrationStatus:
+          pushRegistrationStatus ?? this.pushRegistrationStatus,
       lastMessage: clearLastMessage ? null : lastMessage ?? this.lastMessage,
       lastNotificationAt: clearLastNotificationAt
           ? null
@@ -160,4 +173,32 @@ class PriceAlertNotificationResult {
   final PriceAlertNotificationDeliveryStatus status;
   final String message;
   final int deliveredCount;
+}
+
+enum PushNotificationRegistrationStatus {
+  idle(label: 'Not registered'),
+  registered(label: 'Cloud ready'),
+  permissionRequired(label: 'Needs permission'),
+  unavailable(label: 'Unavailable'),
+  failed(label: 'Failed');
+
+  const PushNotificationRegistrationStatus({required this.label});
+
+  final String label;
+}
+
+class PushNotificationToken {
+  const PushNotificationToken({
+    required this.token,
+    required this.provider,
+    required this.platform,
+    required this.createdAt,
+  });
+
+  final String token;
+  final String provider;
+  final String platform;
+  final DateTime createdAt;
+
+  bool get isValid => token.trim().isNotEmpty;
 }

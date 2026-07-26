@@ -1,16 +1,29 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/network/api_client.dart';
+import 'package:collectiq_ai/core/network/api_constants.dart';
+import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
+import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_task.dart';
+import 'package:collectiq_ai/features/image_sync/domain/entities/sync_queue_snapshot.dart';
+import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
+import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
+import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/domain/repositories/wishlist_repository.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -253,6 +266,80 @@ void main() {
     expect(find.textContaining('saved from catalog search'), findsOneWidget);
   });
 
+  testWidgets('adding a portfolio photo preserves existing gallery images', (
+    tester,
+  ) async {
+    final item = _authorityItem();
+    final repository = _MemoryPortfolioRepository([item]);
+    final syncQueueRepository = _RecordingSyncQueueRepository();
+    final galleryService = _FakeGalleryService(
+      pickedImage: XFile('/source/new-front.jpg', name: 'new-front.jpg'),
+      persistedImage: XFile('/persisted/new-front.jpg', name: 'new-front.jpg'),
+    );
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      galleryService: galleryService,
+      syncQueueRepository: syncQueueRepository,
+    );
+
+    await _revealText(tester, 'Image Gallery');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-gallery-add-photo-action')),
+    );
+    await tester.pumpAndSettle();
+
+    final updated = repository.items.single;
+    expect(updated.imagePath, '/persisted/new-front.jpg');
+    expect(updated.galleryImages, hasLength(3));
+    expect(updated.galleryImages.last.path, '/persisted/new-front.jpg');
+    expect(updated.galleryImages.last.isPrimary, isTrue);
+    expect(
+      updated.galleryImages.take(2).every((image) => image.isPrimary == false),
+      isTrue,
+    );
+    expect(syncQueueRepository.tasks, hasLength(1));
+    expect(syncQueueRepository.tasks.single.collectibleId, item.id);
+    expect(
+      syncQueueRepository.tasks.single.localPath,
+      '/persisted/new-front.jpg',
+    );
+    expect(find.text('Photo added to portfolio item'), findsOneWidget);
+  });
+
+  testWidgets('unavailable refresh keeps saved valuation evidence', (
+    tester,
+  ) async {
+    final item = _authorityItem();
+    final repository = _MemoryPortfolioRepository([item]);
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: _UnavailablePricingApiClient(),
+    );
+
+    await _revealText(tester, 'Actions Menu');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-refresh-value-action')),
+    );
+    await tester.pumpAndSettle();
+
+    final updated = repository.items.single;
+    expect(updated.estimatedValue, item.estimatedValue);
+    expect(
+      updated.pricing?.estimatedMarketValue,
+      item.pricing?.estimatedMarketValue,
+    );
+    expect(updated.pricing?.pricingSource, 'Saved provider');
+    expect(updated.valuationStatus, ValuationStatus.noMarketMatch);
+    expect(updated.valueAtScan, item.valueAtScan);
+    expect(find.text('No reliable market match yet'), findsOneWidget);
+  });
+
   testWidgets('catalog saved item shows valuation snapshot evidence', (
     tester,
   ) async {
@@ -271,6 +358,9 @@ void main() {
     );
     expect(find.text('Snapshot value'), findsOneWidget);
     expect(find.text('USD \$161'), findsWidgets);
+    expect(find.text('Gain/Loss'), findsNothing);
+    expect(find.text('Trend begins after next refresh.'), findsOneWidget);
+    expect(find.text('+Value unavailable'), findsNothing);
     expect(find.text('Source'), findsWidgets);
     expect(find.text('PriceCharting'), findsWidgets);
     expect(find.text('Catalog ID'), findsOneWidget);
@@ -543,6 +633,10 @@ Future<void> _pumpDetail(
   CollectibleItem item, {
   Future<bool> Function(String itemId)? onDelete,
   WishlistRepository? wishlistRepository,
+  PortfolioRepository? portfolioRepository,
+  GalleryService? galleryService,
+  SyncQueueRepository? syncQueueRepository,
+  ApiClient? apiClient,
 }) async {
   tester.view.physicalSize = const Size(900, 1200);
   tester.view.devicePixelRatio = 1;
@@ -554,6 +648,21 @@ Future<void> _pumpDetail(
       overrides: [
         if (wishlistRepository != null)
           wishlistRepositoryProvider.overrideWithValue(wishlistRepository),
+        if (portfolioRepository != null)
+          portfolioRepositoryProvider.overrideWithValue(portfolioRepository),
+        if (galleryService != null)
+          galleryServiceProvider.overrideWithValue(galleryService),
+        if (syncQueueRepository != null) ...[
+          supabaseConfigProvider.overrideWithValue(
+            const SupabaseConfig(
+              url: 'https://packlox.test',
+              anonKey: 'test-anon-key',
+              isEnabled: true,
+            ),
+          ),
+          syncQueueRepositoryProvider.overrideWithValue(syncQueueRepository),
+        ],
+        if (apiClient != null) apiClientProvider.overrideWithValue(apiClient),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -564,6 +673,167 @@ Future<void> _pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _MemoryPortfolioRepository implements PortfolioRepository {
+  _MemoryPortfolioRepository(this.items);
+
+  final List<CollectibleItem> items;
+
+  @override
+  Future<CollectibleItem> addItem(CollectibleItem item) async {
+    items.add(item);
+    return item;
+  }
+
+  @override
+  Future<void> clearPortfolio() async {
+    items.clear();
+  }
+
+  @override
+  Future<List<CollectibleItem>> getItems() async {
+    return items;
+  }
+
+  @override
+  Future<void> removeItem(String id) async {
+    items.removeWhere((item) => item.id == id);
+  }
+
+  @override
+  Future<void> updateItem(CollectibleItem item) async {
+    final index = items.indexWhere((existing) => existing.id == item.id);
+    if (index >= 0) {
+      items[index] = item;
+    }
+  }
+
+  @override
+  Future<void> updateItemImageSync({
+    required String itemId,
+    required String imageStoragePath,
+    required String cloudImageUrl,
+  }) async {}
+
+  @override
+  Future<void> upsertSyncedItem(CollectibleItem item) async {
+    await updateItem(item);
+  }
+}
+
+class _RecordingSyncQueueRepository implements SyncQueueRepository {
+  final List<ImageUploadTask> tasks = [];
+  DateTime? lastSyncAt;
+
+  @override
+  Future<ImageUploadTask> enqueueImageUpload({
+    required String collectibleId,
+    required String localPath,
+  }) async {
+    final now = DateTime(2026, 7, 26, 12);
+    final task = ImageUploadTask(
+      id: 'queued-${tasks.length + 1}',
+      collectibleId: collectibleId,
+      localPath: localPath,
+      status: ImageUploadTaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+    );
+    tasks.add(task);
+    return task;
+  }
+
+  @override
+  Future<List<ImageUploadTask>> getTasks() async => List.unmodifiable(tasks);
+
+  @override
+  Future<List<ImageUploadTask>> getUploadableTasks() async => const [];
+
+  @override
+  Future<void> markLastSync(DateTime syncedAt) async {
+    lastSyncAt = syncedAt;
+  }
+
+  @override
+  Future<void> saveTask(ImageUploadTask task) async {
+    final index = tasks.indexWhere((existing) => existing.id == task.id);
+    if (index >= 0) {
+      tasks[index] = task;
+    } else {
+      tasks.add(task);
+    }
+  }
+
+  @override
+  Future<SyncQueueSnapshot> snapshot() async {
+    return SyncQueueSnapshot(
+      tasks: List.unmodifiable(tasks),
+      lastSyncAt: lastSyncAt,
+    );
+  }
+}
+
+class _FakeGalleryService extends GalleryService {
+  _FakeGalleryService({
+    required this.pickedImage,
+    required this.persistedImage,
+  });
+
+  final XFile pickedImage;
+  final XFile persistedImage;
+
+  @override
+  Future<XFile?> pickImage() async => pickedImage;
+
+  @override
+  Future<bool> validateImage(XFile image) async => true;
+
+  @override
+  Future<XFile> persistSelectedImage(XFile image) async => persistedImage;
+}
+
+class _UnavailablePricingApiClient extends ApiClient {
+  _UnavailablePricingApiClient()
+    : super(
+        config: const EnvironmentConfig(
+          environment: AppEnvironment.development,
+        ),
+      );
+
+  @override
+  Future<dio.Response<dynamic>> post(
+    String path, {
+    Object? data,
+    dio.Options? options,
+  }) async {
+    return dio.Response<dynamic>(
+      requestOptions: dio.RequestOptions(path: path),
+      data: {
+        'success': true,
+        'data': {
+          'estimatedValue': 0,
+          'estimatedMarketValue': 0,
+          'currency': 'USD',
+          'valuationStatus': 'no_market_match',
+          'valuationSource': 'catalog_lookup',
+          'valuationConfidence': 0,
+          'pricing': {
+            'estimatedMarketValue': 0,
+            'lowEstimate': 0,
+            'highEstimate': 0,
+            'currency': 'USD',
+            'pricingSource': 'PriceCharting',
+            'pricingConfidence': 0,
+            'valuationStatus': 'no_market_match',
+            'valuationSource': 'catalog_lookup',
+            'reasonCode': 'NO_MARKET_MATCH',
+            'valuationStrategy': 'catalog_lookup',
+          },
+        },
+      },
+    );
+  }
 }
 
 class _MemoryWishlistRepository implements WishlistRepository {

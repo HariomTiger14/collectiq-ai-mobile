@@ -12,4 +12,6 @@ abstract class PriceAlertNotificationService {
     required String title,
     required String body,
   });
+
+  Future<PushNotificationToken?> getPushToken();
 }

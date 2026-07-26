@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
+import 'package:collectiq_ai/features/price_alerts/data/repositories/supabase_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
@@ -9,6 +12,14 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final priceAlertRepositoryProvider = Provider<PriceAlertRepository>((ref) {
+  final supabaseDataGateway = ref.watch(supabaseServiceProvider);
+  final registry = ref.watch(cloudServiceRegistryProvider);
+  if (supabaseDataGateway.isConfigured) {
+    return SupabasePriceAlertRepository(
+      authService: registry.authService,
+      supabaseDataGateway: supabaseDataGateway,
+    );
+  }
   return const SharedPreferencesPriceAlertRepository();
 });
 

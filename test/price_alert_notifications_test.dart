@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_notification_repository.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/repositories/push_device_registration_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_dispatcher.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_notification_service.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
@@ -112,12 +113,53 @@ void main() {
     expect(find.text('Price Alerts'), findsOneWidget);
     expect(
       find.text(
-        'Enable notifications in Android settings to receive local alerts.',
+        'Enable notifications in device settings to receive local alerts.',
       ),
       findsOneWidget,
     );
     expect(find.text('Denied'), findsWidgets);
   });
+
+  test(
+    'notification controller registers push token after permission',
+    () async {
+      final repository = _FakeNotificationRepository();
+      final service = _FakeNotificationService(
+        permissionStatus: PriceAlertNotificationPermissionStatus.granted,
+        pushToken: PushNotificationToken(
+          token: 'fcm-token-1',
+          provider: 'fcm',
+          platform: 'ios',
+          createdAt: DateTime(2026, 7, 26, 12),
+        ),
+      );
+      final pushRepository = _FakePushDeviceRegistrationRepository();
+      final container = ProviderContainer(
+        overrides: [
+          priceAlertNotificationRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+          priceAlertNotificationServiceProvider.overrideWithValue(service),
+          pushDeviceRegistrationRepositoryProvider.overrideWithValue(
+            pushRepository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await Future<void>.delayed(Duration.zero);
+      await container
+          .read(priceAlertNotificationControllerProvider.notifier)
+          .requestPermission();
+
+      final state = container.read(priceAlertNotificationControllerProvider);
+      expect(
+        state.pushRegistrationStatus,
+        PushNotificationRegistrationStatus.registered,
+      );
+      expect(pushRepository.tokens.single.token, 'fcm-token-1');
+    },
+  );
 }
 
 PriceAlertEvaluation _triggeredEvaluation() {
@@ -204,9 +246,10 @@ class _FakeNotificationRepository implements PriceAlertNotificationRepository {
 }
 
 class _FakeNotificationService implements PriceAlertNotificationService {
-  _FakeNotificationService({required this.permissionStatus});
+  _FakeNotificationService({required this.permissionStatus, this.pushToken});
 
   PriceAlertNotificationPermissionStatus permissionStatus;
+  PushNotificationToken? pushToken;
   int showCount = 0;
 
   @override
@@ -216,6 +259,11 @@ class _FakeNotificationService implements PriceAlertNotificationService {
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<PushNotificationToken?> getPushToken() async {
+    return pushToken;
+  }
 
   @override
   Future<PriceAlertNotificationPermissionStatus> requestPermission() async {
@@ -234,5 +282,18 @@ class _FakeNotificationService implements PriceAlertNotificationService {
       message: body,
       deliveredCount: 1,
     );
+  }
+}
+
+class _FakePushDeviceRegistrationRepository
+    implements PushDeviceRegistrationRepository {
+  final List<PushNotificationToken> tokens = [];
+
+  @override
+  Future<PushNotificationRegistrationStatus> registerToken(
+    PushNotificationToken token,
+  ) async {
+    tokens.add(token);
+    return PushNotificationRegistrationStatus.registered;
   }
 }

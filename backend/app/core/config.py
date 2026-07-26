@@ -145,6 +145,10 @@ class Settings:
     pricing_provider_min_interval_ms: int = int(
         os.getenv("PRICING_PROVIDER_MIN_INTERVAL_MS", "250")
     )
+    admin_job_token: str = os.getenv("ADMIN_JOB_TOKEN", os.getenv("ADMIN_IMPORT_TOKEN", ""))
+    firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    firebase_service_account_json: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+    firebase_access_token: str = os.getenv("FIREBASE_ACCESS_TOKEN", "")
 
 
 settings = Settings()

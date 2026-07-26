@@ -8,9 +8,7 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
-import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:flutter/material.dart';
@@ -273,9 +271,6 @@ extension _SharedVisualFoundationPump on WidgetTester {
           authRepositoryProvider.overrideWithValue(
             _SharedVisualAuthRepository(),
           ),
-          guestModeRepositoryProvider.overrideWithValue(
-            const _ImmediateGuestModeRepository(chosen: true),
-          ),
         ],
         child: _Harness(
           viewPadding: viewPadding,
@@ -382,21 +377,16 @@ class _ImmediateOnboardingRepository implements OnboardingRepository {
   Future<void> setOnboardingCompleted(bool completed) async {}
 }
 
-class _ImmediateGuestModeRepository implements GuestModeRepository {
-  const _ImmediateGuestModeRepository({required this.chosen});
-
-  final bool chosen;
-
-  @override
-  Future<bool> hasChosenGuestMode() async => chosen;
-
-  @override
-  Future<void> setGuestModeChosen(bool chosen) async {}
-}
-
 class _SharedVisualAuthRepository implements AuthRepository {
   @override
-  Future<AppUser?> currentUser() async => null;
+  Future<AppUser?> currentUser() async {
+    return const AppUser(
+      id: 'visual-user',
+      displayName: 'Visual Collector',
+      email: 'visual@example.com',
+      provider: AuthProviderType.emailPassword,
+    );
+  }
 
   @override
   Future<AppUser> signIn() => signInAnonymously();

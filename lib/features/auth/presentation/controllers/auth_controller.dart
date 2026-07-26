@@ -188,7 +188,7 @@ class AuthState {
   /// Current account mode label.
   String get accountModeLabel {
     if (user == null || user!.isLocalOnly) {
-      return AuthProviderType.localAnonymous.displayName;
+      return 'Signed out';
     }
 
     return user!.provider.displayName;
@@ -202,7 +202,7 @@ class AuthState {
     if (isAnonymousCloudSession) {
       return 'Anonymous dev session';
     }
-    return 'Local mode';
+    return 'Signed out';
   }
 
   /// Returns the active resend block end time, if any.
@@ -438,7 +438,7 @@ class AuthController extends Notifier<AuthState> {
     return signInAnonymously();
   }
 
-  /// Starts an anonymous session or local guest placeholder.
+  /// Starts an anonymous compatibility session when a backend explicitly uses it.
   Future<void> signInAnonymously() async {
     _sessionMutationVersion++;
     state = state.copyWith(
@@ -841,7 +841,7 @@ class AuthController extends Notifier<AuthState> {
     );
   }
 
-  /// Signs out and returns to guest mode.
+  /// Signs out and returns to the account gate.
   Future<void> signOut() async {
     state = state.copyWith(
       isLoading: true,

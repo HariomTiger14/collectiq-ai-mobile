@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import UPLOAD_DIR, settings
-from app.routers import api_analyze, auth, health, portfolio, scanner, search
+from app.routers import api_analyze, auth, health, portfolio, push, scanner, search
 
 
 app = FastAPI(
@@ -32,6 +32,7 @@ app.include_router(api_analyze.router)
 app.include_router(scanner.router)
 app.include_router(portfolio.router)
 app.include_router(search.router)
+app.include_router(push.router)
 
 
 @app.exception_handler(HTTPException)

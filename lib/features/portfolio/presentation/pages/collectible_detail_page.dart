@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
@@ -5,9 +7,12 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
+import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
@@ -23,7 +28,7 @@ import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 final _portfolioValuationSnapshotsProvider =
     FutureProvider.family<List<PortfolioValuationSnapshot>, String>((
@@ -421,15 +426,19 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
         originalPath: pickedImage.path,
         isPrimary: true,
       );
+      final updatedItem = _itemWithAddedPortfolioPhoto(item, portfolioImage);
       setState(() => _selectedGalleryPath = portfolioImage.path);
       await ref
           .read(portfolioControllerProvider.notifier)
-          .updateItem(
-            item.copyWith(
-              imagePath: portfolioImage.path,
-              galleryImages: [portfolioImage],
+          .updateItem(updatedItem);
+      unawaited(
+        ref
+            .read(imageSyncControllerProvider.notifier)
+            .enqueueImage(
+              collectibleId: updatedItem.id,
+              localPath: portfolioImage.path,
             ),
-          );
+      );
       if (mounted) {
         _showDetailSnackBar(context, 'Photo added to portfolio item');
       }
@@ -453,16 +462,21 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           .quoteItem(item);
       refreshedStatus = quote.valuationStatus;
       final refreshedAt = DateTime.now();
+      final hasRefreshedValue =
+          quote.valuationStatus == ValuationStatus.marketEstimated &&
+          quote.estimatedValue > 0;
       await ref
           .read(portfolioControllerProvider.notifier)
           .updateItemWithValuationSnapshot(
             item.copyWith(
-              estimatedValue: quote.estimatedValue,
-              pricing: quote.pricing,
-              marketSummary: quote.marketSummary,
+              estimatedValue: hasRefreshedValue
+                  ? quote.estimatedValue
+                  : item.estimatedValue,
+              pricing: hasRefreshedValue ? quote.pricing : item.pricing,
+              marketSummary: quote.marketSummary ?? item.marketSummary,
               valuationStatus: quote.valuationStatus,
               valuationSource: quote.valuationSource,
-              aiEstimatedValue: quote.aiEstimatedValue,
+              aiEstimatedValue: quote.aiEstimatedValue ?? item.aiEstimatedValue,
               valueAtScan: item.valueAtScan ?? item.estimatedValue,
               lastValueRefreshedAt: refreshedAt,
             ),
@@ -482,8 +496,38 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
 }
 
 void _shareItem(BuildContext context, CollectibleItem item) {
-  Clipboard.setData(ClipboardData(text: _shareSummary(item)));
-  _showDetailSnackBar(context, 'Item summary copied');
+  unawaited(_shareItemNative(context, item));
+}
+
+Future<void> _shareItemNative(
+  BuildContext context,
+  CollectibleItem item,
+) async {
+  final summary = _shareSummary(item);
+  try {
+    await SharePlus.instance.share(
+      ShareParams(
+        title: 'Share ${item.title}',
+        subject: '${item.title} in PackLox',
+        text: summary,
+        sharePositionOrigin: _shareOriginFor(context),
+      ),
+    );
+  } catch (_) {
+    await Clipboard.setData(ClipboardData(text: summary));
+    if (context.mounted) {
+      _showDetailSnackBar(context, 'Share unavailable. Summary copied.');
+    }
+  }
+}
+
+Rect? _shareOriginFor(BuildContext context) {
+  final renderBox = context.findRenderObject();
+  if (renderBox is! RenderBox || !renderBox.hasSize) {
+    return null;
+  }
+  final topLeft = renderBox.localToGlobal(Offset.zero);
+  return topLeft & renderBox.size;
 }
 
 String _shareSummary(CollectibleItem item) {
@@ -712,6 +756,41 @@ List<CollectibleImage> _normalizedGalleryWithPrimary(
         isPrimary: image.path == primaryPath,
       ),
   ];
+}
+
+CollectibleItem _itemWithAddedPortfolioPhoto(
+  CollectibleItem item,
+  CollectibleImage newImage,
+) {
+  final existing = item.galleryImages
+      .where((image) => image.path.trim().isNotEmpty)
+      .toList(growable: false);
+  final nextGallery = [
+    for (final image in existing)
+      CollectibleImage(
+        path: image.path,
+        role: image.role,
+        source: image.source,
+        originalPath: image.originalPath,
+        enhancementPreset: image.enhancementPreset,
+        qualityMetadata: image.qualityMetadata,
+        imageStoragePath: image.imageStoragePath,
+        cloudImageUrl: image.cloudImageUrl,
+        isPrimary: false,
+      ),
+    CollectibleImage(
+      path: newImage.path,
+      role: newImage.role,
+      source: newImage.source,
+      originalPath: newImage.originalPath,
+      enhancementPreset: newImage.enhancementPreset,
+      qualityMetadata: newImage.qualityMetadata,
+      imageStoragePath: newImage.imageStoragePath,
+      cloudImageUrl: newImage.cloudImageUrl,
+      isPrimary: true,
+    ),
+  ];
+  return item.copyWith(imagePath: newImage.path, galleryImages: nextGallery);
 }
 
 String _originalImagePathForEdit(CollectibleImage image) {
@@ -1198,6 +1277,7 @@ class _DetailInlineContent extends StatelessWidget {
             selectedImage: selectedImage,
             onImageSelected: onImageSelected,
             onImageTap: onImageTap,
+            onAddPhoto: onAddPhoto,
           ),
         ],
         const SizedBox(height: AppSpacing.sm),
@@ -1535,6 +1615,7 @@ class _DetailGallerySection extends StatelessWidget {
     required this.selectedImage,
     required this.onImageSelected,
     required this.onImageTap,
+    required this.onAddPhoto,
   });
 
   final CollectibleItem item;
@@ -1542,6 +1623,7 @@ class _DetailGallerySection extends StatelessWidget {
   final CollectibleImage? selectedImage;
   final ValueChanged<CollectibleImage> onImageSelected;
   final VoidCallback? onImageTap;
+  final VoidCallback onAddPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -1576,6 +1658,24 @@ class _DetailGallerySection extends StatelessWidget {
               item: item,
               selectedPath: selectedImage?.path,
               onSelected: onImageSelected,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey(
+                  'collectible-detail-gallery-add-photo-action',
+                ),
+                onPressed: onAddPhoto,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                label: const Text('Add photo'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: HomeTokens.textPrimary,
+                  side: const BorderSide(color: HomeTokens.border),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
           ],
         ],
@@ -1885,7 +1985,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
     final scanValue = _valueAtScanFor(item);
     final currentValue = _currentValueFor(item);
     final delta = currentValue - scanValue;
-    final hasMovement = scanValue > 0 && currentValue > 0;
+    final hasMovement = scanValue > 0 && currentValue > 0 && delta.abs() > 0.01;
     final isPositive = delta >= 0;
     final movementColor = !hasMovement
         ? HomeTokens.textSecondary
@@ -1894,10 +1994,10 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         : Theme.of(context).colorScheme.error;
     final movementLabel = hasMovement
         ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), currency)}'
-        : 'Waiting for refresh';
+        : null;
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
-        : 'No trend yet';
+        : null;
     final footerLabel = snapshotsAsync.isLoading
         ? 'Loading cloud history'
         : snapshots.isNotEmpty
@@ -1937,17 +2037,43 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                   value: _formatMoney(currentValue, currency),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _DetailValueHistoryMetric(
-                  label: 'Gain/Loss',
-                  value: movementLabel,
-                  valueColor: movementColor,
-                  subtitle: movementPercent,
+              if (hasMovement) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _DetailValueHistoryMetric(
+                    label: 'Gain/Loss',
+                    value: movementLabel!,
+                    valueColor: movementColor,
+                    subtitle: movementPercent,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
+          if (!hasMovement) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                Icon(
+                  Icons.timeline_rounded,
+                  size: 14,
+                  color: HomeTokens.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Trend begins after next refresh.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: HomeTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           Container(
             height: 54,
@@ -4955,12 +5081,15 @@ class _PriceAlertSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final alerts = ref.watch(itemPriceAlertsProvider(item.id));
+    final notificationState = ref.watch(
+      priceAlertNotificationControllerProvider,
+    );
 
     return AppProfileSection(
       title: 'Price Alerts',
       children: [
         Text(
-          'Track value changes locally. Push notifications are not enabled yet.',
+          notificationState.settingsSubtitle,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -5042,12 +5171,28 @@ class _CreateAlertButtons extends ConsumerWidget {
     CollectibleItem item,
     PriceAlertRuleType type,
   ) async {
+    var notificationState = ref.read(priceAlertNotificationControllerProvider);
+    if (notificationState.enabled &&
+        !notificationState.permissionStatus.canNotify &&
+        notificationState.permissionStatus !=
+            PriceAlertNotificationPermissionStatus.notSupported) {
+      await ref
+          .read(priceAlertNotificationControllerProvider.notifier)
+          .requestPermission();
+      notificationState = ref.read(priceAlertNotificationControllerProvider);
+    }
+
     final repository = ref.read(priceAlertRepositoryProvider);
     await repository.saveAlert(buildPriceAlert(item: item, type: type));
     ref.invalidate(itemPriceAlertsProvider(item.id));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
-      _showDetailSnackBar(context, 'Price alert created');
+      final message =
+          notificationState.enabled &&
+              notificationState.permissionStatus.canNotify
+          ? 'Price alert created. You will be notified on this device.'
+          : 'Price alert saved. Enable notifications to be alerted.';
+      _showDetailSnackBar(context, message);
     }
   }
 }

@@ -260,31 +260,31 @@ class _ControlStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'Your choice',
-      title: 'Start local. Sync when signed in.',
+      eyebrow: 'Your account',
+      title: 'Every item belongs to your PackLox account.',
       subtitle:
-          'PackLox is designed so you can try the app as a guest or back up your portfolio with an account.',
+          'Scan, pricing evidence, photos, alerts, and valuation history stay connected to your signed-in collection.',
       child: Column(
         children: [
           _OnboardingSignalCard(
-            icon: Icons.offline_bolt_outlined,
-            title: 'Guest mode stays useful',
-            body:
-                'You can scan and save on this device without an account gate in the way.',
-          ),
-          SizedBox(height: AppSpacing.md),
-          _OnboardingSignalCard(
             icon: Icons.cloud_done_outlined,
-            title: 'Signed-in backup',
+            title: 'Cloud-backed portfolio',
             body:
-                'When you sign in, PackLox can upload pending local items and keep cloud sync ready.',
+                'Your saved collectibles are tied to your account so they can come back after reinstall or device changes.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
             icon: Icons.verified_user_outlined,
-            title: 'Private by default',
+            title: 'Evidence stays attached',
             body:
-                'Your collection is yours. Photos and notes stay local unless you choose cloud sync.',
+                'Photos, notes, identifiers, and pricing snapshots remain part of the same portfolio record.',
+          ),
+          SizedBox(height: AppSpacing.md),
+          _OnboardingSignalCard(
+            icon: Icons.lock_outline_rounded,
+            title: 'Private account space',
+            body:
+                'Your collection is yours. PackLox keeps account access required before portfolio actions begin.',
           ),
         ],
       ),

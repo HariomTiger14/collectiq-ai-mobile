@@ -48,6 +48,9 @@ dependencies:
   in_app_purchase: ^3.2.1
   supabase_flutter: ^2.10.3
   flutter_svg: ^2.2.3
+  share_plus: ^13.3.0
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
 
 dev_dependencies:
   flutter_test:

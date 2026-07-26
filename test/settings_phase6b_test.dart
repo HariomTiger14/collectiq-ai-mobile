@@ -18,7 +18,7 @@ void main() {
     await tester.pumpSettings();
 
     for (final label in const [
-      'Guest Collector',
+      'PackLox Collector',
       'Account',
       'Collection & Backup',
       'Price Alerts',
@@ -84,7 +84,7 @@ void main() {
       find.byKey(const ValueKey('settings-auth-password-field')),
       findsNothing,
     );
-    expect(find.text('Guest Collector'), findsOneWidget);
+    expect(find.text('PackLox Collector'), findsOneWidget);
 
     await tester.revealText('Account');
     await tester.tap(find.text('Account').first);
@@ -125,7 +125,7 @@ void main() {
     expect(repository.signOutCalls, 1);
   });
 
-  testWidgets('backup and notification states stay real and local-first', (
+  testWidgets('backup and notification states stay real and account-first', (
     tester,
   ) async {
     await tester.pumpSettings();
@@ -135,7 +135,7 @@ void main() {
 
     await tester.revealText('Collection & Backup');
     expect(
-      find.text('Your collection is local on this device.'),
+      find.text('Sign in to save and sync your collection.'),
       findsOneWidget,
     );
     expect(find.textContaining('Last synced'), findsNothing);
@@ -175,7 +175,7 @@ void main() {
           textScaler: TextScaler.linear(1.3),
         ),
       );
-      expect(find.text('Guest Collector'), findsWidgets);
+      expect(find.text('PackLox Collector'), findsWidgets);
       expect(tester.takeException(), isNull);
     }
   });

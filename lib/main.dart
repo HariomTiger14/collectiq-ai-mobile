@@ -14,6 +14,7 @@ import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker_android/image_picker_android.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 
@@ -22,8 +23,11 @@ void main() {
   CloudServiceRegistry? cloudRegistry;
 
   runZonedGuarded(
-    () {
+    () async {
       WidgetsFlutterBinding.ensureInitialized();
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
       _disableReleaseDebugLogs();
       _configureAndroidImagePicker();
 

@@ -21,7 +21,6 @@ abstract final class AuthRouteNames {
   static const createPassword = 'auth/create-account/create-password';
   static const signIn = 'auth/sign-in';
   static const forgotPasswordEmail = 'auth/forgot-password/email';
-  static const guestHome = 'app/guest-home';
 }
 
 const _authRouteBackground = Color(0xFF070A12);
@@ -86,14 +85,12 @@ void _completeAuthenticatedAuthFlow({
 }
 
 class AuthWelcomeScreen extends StatelessWidget {
-  const AuthWelcomeScreen({this.onExploreAsGuest, super.key});
+  const AuthWelcomeScreen({super.key});
 
-  final VoidCallback? onExploreAsGuest;
-
-  static Route<void> route({VoidCallback? onExploreAsGuest}) {
+  static Route<void> route() {
     return _authRoute<void>(
       settings: const RouteSettings(name: AuthRouteNames.welcome),
-      builder: (_) => AuthWelcomeScreen(onExploreAsGuest: onExploreAsGuest),
+      builder: (_) => const AuthWelcomeScreen(),
     );
   }
 
@@ -103,15 +100,6 @@ class AuthWelcomeScreen extends StatelessWidget {
 
   void _openSignIn(BuildContext context) {
     Navigator.of(context).push(AuthSignInScreen.route());
-  }
-
-  void _exploreAsGuest(BuildContext context) {
-    final handler = onExploreAsGuest;
-    if (handler != null) {
-      handler();
-      return;
-    }
-    Navigator.of(context).maybePop();
   }
 
   @override
@@ -207,13 +195,6 @@ class AuthWelcomeScreen extends StatelessWidget {
                               label: 'Sign In',
                               semanticLabel: 'Sign In',
                               onPressed: () => _openSignIn(context),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            _QuietAuthAction(
-                              key: const ValueKey('auth-welcome-explore-guest'),
-                              label: 'Explore as Guest',
-                              semanticLabel: 'Explore as Guest',
-                              onPressed: () => _exploreAsGuest(context),
                             ),
                             const Spacer(),
                             const SizedBox(height: AppSpacing.lg),
@@ -3756,10 +3737,10 @@ class GuestAccessNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return PackLoxEntryTile(
       key: const ValueKey('auth-guest-access-note'),
-      icon: Icons.inventory_2_outlined,
-      title: 'Guest mode stays available',
+      icon: Icons.lock_outline_rounded,
+      title: 'Account required',
       supportingText:
-          'Use scanning and Portfolio locally without an account. Sign in only for cloud sync.',
+          'Sign in to use scanning, portfolio, wishlist, alerts, and cloud backup.',
       onTap: null,
       showTrailing: false,
     );

@@ -73,6 +73,7 @@ import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_re
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
+import 'package:collectiq_ai/features/price_alerts/data/repositories/supabase_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/captured_scan_image.dart';
@@ -160,6 +161,37 @@ void main() {
       expect(json['pricing']['currency'], 'AUD');
       expect(json['marketSummary']['salesCount'], 5);
       expect(json['marketSummary']['comps'], hasLength(1));
+    });
+
+    test('copyWithImageSync annotates matching gallery image', () {
+      final item = _testItemWith(imagePath: '/local/front.jpg').copyWith(
+        galleryImages: const [
+          CollectibleImage(
+            path: '/local/front.jpg',
+            role: 'front',
+            isPrimary: true,
+          ),
+          CollectibleImage(path: '/local/back.jpg', role: 'back'),
+        ],
+      );
+
+      final synced = item.copyWithImageSync(
+        imageStoragePath: 'portfolio-images/user/item/front.jpg',
+        cloudImageUrl: 'https://packlox.test/storage/front.jpg',
+      );
+
+      expect(synced.imageStoragePath, 'portfolio-images/user/item/front.jpg');
+      expect(synced.cloudImageUrl, 'https://packlox.test/storage/front.jpg');
+      expect(
+        synced.galleryImages.first.imageStoragePath,
+        'portfolio-images/user/item/front.jpg',
+      );
+      expect(
+        synced.galleryImages.first.cloudImageUrl,
+        'https://packlox.test/storage/front.jpg',
+      );
+      expect(synced.galleryImages.last.imageStoragePath, isNull);
+      expect(synced.galleryImages.last.cloudImageUrl, isNull);
     });
 
     test('fromJson restores all fields', () {
@@ -3422,17 +3454,17 @@ void main() {
   });
 
   group('AuthController', () {
-    test('starts in local mode and keeps sign in optional', () async {
+    test('starts signed out and keeps local placeholder internal', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       await Future<void>.delayed(Duration.zero);
       expect(container.read(authControllerProvider).isSignedIn, isFalse);
       expect(container.read(authControllerProvider).isLocalMode, isTrue);
-      expect(container.read(authControllerProvider).statusLabel, 'Local mode');
+      expect(container.read(authControllerProvider).statusLabel, 'Signed out');
       expect(
         container.read(authControllerProvider).accountModeLabel,
-        'Local Anonymous',
+        'Signed out',
       );
 
       await container.read(authControllerProvider.notifier).signIn();
@@ -3441,13 +3473,13 @@ void main() {
       expect(signedInState.isSignedIn, isFalse);
       expect(signedInState.isLocalMode, isTrue);
       expect(signedInState.user!.displayName, 'Local Collector');
-      expect(signedInState.statusLabel, 'Local mode');
+      expect(signedInState.statusLabel, 'Signed out');
 
       await container.read(authControllerProvider.notifier).signOut();
 
       expect(container.read(authControllerProvider).isSignedIn, isFalse);
       expect(container.read(authControllerProvider).isLocalMode, isTrue);
-      expect(container.read(authControllerProvider).statusLabel, 'Local mode');
+      expect(container.read(authControllerProvider).statusLabel, 'Signed out');
     });
 
     test('email sign-in success updates auth state', () async {
@@ -6203,6 +6235,71 @@ void main() {
       await repository.deleteAlert('alert-new');
       expect(await repository.getAlerts(), hasLength(1));
     });
+
+    test(
+      'cloud repository saves alert rule to Supabase and local cache',
+      () async {
+        const session = SupabaseAuthSession(
+          userId: 'user-1',
+          email: 'collector@example.com',
+          accessToken: 'token-1',
+          displayName: 'Collector',
+          isAnonymous: false,
+          projectUrl: 'https://example.supabase.co',
+        );
+        final gateway = _FakeSupabaseDataGateway(session: session);
+        const localRepository = SharedPreferencesPriceAlertRepository();
+        final repository = SupabasePriceAlertRepository(
+          authService: const _SignedInCloudAuthService(userId: 'user-1'),
+          supabaseDataGateway: gateway,
+          localRepository: localRepository,
+        );
+        final alert = _priceAlert(id: 'alert-cloud');
+
+        await repository.saveAlert(alert);
+
+        expect(gateway.lastPostPath, '/rest/v1/price_alerts');
+        expect(gateway.lastPostedRows, hasLength(1));
+        expect(gateway.lastPostedRows.single['id'], 'alert-cloud');
+        expect(gateway.lastPostedRows.single['user_id'], 'user-1');
+        expect(gateway.lastPostedRows.single['portfolio_item_id'], 'item-1');
+        expect(
+          gateway.lastPostedRows.single['rule_type'],
+          'priceRisesAboveAmount',
+        );
+        expect(gateway.lastPostedRows.single['target_amount'], 2000);
+        expect((await localRepository.getAlerts()).single.id, 'alert-cloud');
+      },
+    );
+
+    test('cloud repository fetches Supabase alerts into local cache', () async {
+      const session = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'collector@example.com',
+        accessToken: 'token-1',
+        displayName: 'Collector',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+      final gateway = _FakeSupabaseDataGateway(
+        session: session,
+        getRows: [
+          supabaseRowForPriceAlert(_priceAlert(id: 'alert-cloud'), 'user-1'),
+        ],
+      );
+      const localRepository = SharedPreferencesPriceAlertRepository();
+      final repository = SupabasePriceAlertRepository(
+        authService: const _SignedInCloudAuthService(userId: 'user-1'),
+        supabaseDataGateway: gateway,
+        localRepository: localRepository,
+      );
+
+      final alerts = await repository.getAlerts();
+
+      expect(gateway.lastGetPath, '/rest/v1/price_alerts');
+      expect(alerts.single.id, 'alert-cloud');
+      expect((await localRepository.getAlerts()).single.id, 'alert-cloud');
+    });
   });
 }
 
@@ -7093,10 +7190,17 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
 }
 
 class _FakeSupabaseDataGateway implements SupabaseDataGateway {
-  _FakeSupabaseDataGateway({required this.session, this.postError});
+  _FakeSupabaseDataGateway({
+    required this.session,
+    this.postError,
+    this.getRows = const [],
+  });
 
   final SupabaseAuthSession? session;
   final Object? postError;
+  final List<Map<String, dynamic>> getRows;
+  String? lastGetPath;
+  Map<String, dynamic>? lastGetQueryParameters;
   String? lastPostPath;
   List<Map<String, dynamic>> lastPostedRows = const [];
 
@@ -7191,9 +7295,11 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
     required SupabaseAuthSession session,
     Map<String, dynamic>? queryParameters,
   }) async {
+    lastGetPath = path;
+    lastGetQueryParameters = queryParameters;
     return Response<T>(
       requestOptions: RequestOptions(path: path),
-      data: <dynamic>[] as T,
+      data: getRows as T,
       statusCode: 200,
     );
   }

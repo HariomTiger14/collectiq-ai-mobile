@@ -19,7 +19,7 @@ class SupabaseAuthRepository
   @override
   Future<AppUser?> currentUser() async {
     if (!supabaseService.isConfigured) {
-      debugPrint('[Auth] Supabase not configured; current user is guest');
+      debugPrint('[Auth] Supabase not configured; current user is signed out');
       return fallbackRepository.currentUser();
     }
 
@@ -41,7 +41,9 @@ class SupabaseAuthRepository
   @override
   Future<AppUser> signInAnonymously() async {
     if (!supabaseService.isConfigured) {
-      debugPrint('[Auth] Supabase not configured; using local guest sign-in');
+      debugPrint(
+        '[Auth] Supabase not configured; anonymous sign-in unavailable',
+      );
       return fallbackRepository.signInAnonymously();
     }
 
@@ -148,16 +150,12 @@ class SupabaseAuthRepository
 
   @override
   Future<AppUser> signInWithGoogle() {
-    throw const AuthException(
-      'Google sign-in is coming soon. Local mode remains available.',
-    );
+    throw const AuthException('Google sign-in is coming soon.');
   }
 
   @override
   Future<AppUser> signInWithApple() {
-    throw const AuthException(
-      'Apple sign-in is coming soon. Local mode remains available.',
-    );
+    throw const AuthException('Apple sign-in is coming soon.');
   }
 
   @override

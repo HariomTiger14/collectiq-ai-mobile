@@ -1,7 +1,7 @@
 class CollectorProfile {
   const CollectorProfile({required this.displayName, this.avatarPath});
 
-  static const defaultDisplayName = 'Guest Collector';
+  static const defaultDisplayName = 'PackLox Collector';
 
   final String displayName;
   final String? avatarPath;

@@ -167,8 +167,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Collection & Backup',
         subtitle: canRunCloudSync
             ? syncState.errorMessage ?? syncState.status.message
-            : 'Your collection is local on this device.',
-        trailing: canRunCloudSync ? syncState.status.statusLabel : 'Local only',
+            : 'Sign in to save and sync your collection.',
+        trailing: canRunCloudSync ? syncState.status.statusLabel : 'Sign in',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
         ),
@@ -1461,9 +1461,9 @@ class _SettingsCompatibilityLabels extends StatelessWidget {
       'API backend configured',
       'Account mode',
       authState.accountModeLabel,
-      'Continue as Guest',
-      'Use camera, scans, and local portfolio without an account.',
-      'Local mode',
+      'Account required',
+      'Sign in to use scans, portfolio, wishlist, alerts, and cloud backup.',
+      'Signed out',
       'Plan & Usage',
       'Current plan',
       subscriptionState.entitlements.plan.displayName,

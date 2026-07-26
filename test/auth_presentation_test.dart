@@ -116,7 +116,11 @@ void main() {
     expect(find.byKey(const ValueKey('auth-welcome-hero')), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Explore as Guest'), findsOneWidget);
+    expect(find.text('Explore as Guest'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('auth-welcome-explore-guest')),
+      findsNothing,
+    );
     expect(find.text('Terms of Service'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
   });
@@ -154,16 +158,14 @@ void main() {
     );
   });
 
-  testWidgets('S01 guest action returns to previous route', (tester) async {
+  testWidgets('S01 does not expose guest return action', (tester) async {
     await tester.pumpAuthRoute(route: () => AuthWelcomeScreen.route());
 
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('auth-welcome-explore-guest')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
-    expect(find.byKey(const ValueKey('open-auth-route')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth-welcome-explore-guest')),
+      findsNothing,
+    );
   });
 
   testWidgets('Settings opens S01 before Sign In without embedding fields', (
@@ -429,7 +431,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('S05 authenticated success wins over local guest mode', (
+  testWidgets('S05 authenticated success wins over local placeholder state', (
     tester,
   ) async {
     final backendRepository = InMemoryAuthBackendRepository(
@@ -460,10 +462,9 @@ void main() {
 
     expect(backendRepository.signInCalls, 1);
     expect(container.read(authControllerProvider).isSignedIn, isTrue);
-    expect(await container.read(guestModeControllerProvider.future), isTrue);
   });
 
-  testWidgets('Settings-launched successful sign-in returns to Home shell', (
+  testWidgets('Auth-gated successful sign-in returns to Home shell', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1100);
@@ -504,23 +505,10 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
-    container
-        .read(appShellTabControllerProvider.notifier)
-        .selectTab(AppShellTabController.settingsTab, reason: 'test-settings');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('shell-destination-settings')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
 
-    await tester.revealText('Account');
-    await tester.tap(find.text('Account').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 240));
     await tester.tap(find.byKey(const ValueKey('auth-welcome-sign-in')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 240));
@@ -1424,32 +1412,35 @@ void main() {
     },
   );
 
-  testWidgets('S04 authenticated signup success wins over local guest mode', (
-    tester,
-  ) async {
-    final backendRepository = InMemoryAuthBackendRepository();
-    final container = await _pumpSignupFlowToS04(
-      tester,
-      backendRepository: backendRepository,
-      guestModeRepository: const _ImmediateGuestModeRepository(chosen: true),
-    );
+  testWidgets(
+    'S04 authenticated signup success wins over local placeholder state',
+    (tester) async {
+      final backendRepository = InMemoryAuthBackendRepository();
+      final container = await _pumpSignupFlowToS04(
+        tester,
+        backendRepository: backendRepository,
+        guestModeRepository: const _ImmediateGuestModeRepository(chosen: true),
+      );
 
-    await tester.enterText(
-      _textFieldIn(const ValueKey('auth-create-password-password-field')),
-      'memorable passphrase!',
-    );
-    await tester.enterText(
-      _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
-      'memorable passphrase!',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('auth-create-password-finish')));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-create-password-password-field')),
+        'memorable passphrase!',
+      );
+      await tester.enterText(
+        _textFieldIn(const ValueKey('auth-create-password-confirm-field')),
+        'memorable passphrase!',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('auth-create-password-finish')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(backendRepository.passwordCreateCalls, 1);
-    expect(container.read(authControllerProvider).isSignedIn, isTrue);
-    expect(await container.read(guestModeControllerProvider.future), isTrue);
-  });
+      expect(backendRepository.passwordCreateCalls, 1);
+      expect(container.read(authControllerProvider).isSignedIn, isTrue);
+      expect(await container.read(guestModeControllerProvider.future), isTrue);
+    },
+  );
 
   testWidgets('S04 capability failure shows safe error without fake auth', (
     tester,
@@ -2043,24 +2034,16 @@ void main() {
     );
   });
 
-  testWidgets('Guest return remains available without auth guard', (
+  testWidgets('Guest access remains unavailable without auth guard', (
     tester,
   ) async {
     await tester.pumpAuthRoute(route: () => AuthWelcomeScreen.route());
 
     expect(
       find.byKey(const ValueKey('auth-welcome-explore-guest')),
-      findsOneWidget,
+      findsNothing,
     );
-
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('auth-welcome-explore-guest')),
-    );
-    await tester.tap(find.byKey(const ValueKey('auth-welcome-explore-guest')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsNothing);
-    expect(find.byKey(const ValueKey('open-auth-route')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
   });
 
   testWidgets('Settings signed-in summary and sign-out remain real', (
@@ -2245,20 +2228,6 @@ extension on WidgetTester {
     expect(decoration?.labelText, isNull);
     expect(decoration?.floatingLabelBehavior, FloatingLabelBehavior.never);
     expect(decoration?.hintText, hint);
-  }
-
-  Future<void> revealText(String text) async {
-    final scrollable = find.byType(Scrollable).first;
-    for (var attempt = 0; attempt < 24; attempt += 1) {
-      if (find.text(text).evaluate().isNotEmpty) {
-        await ensureVisible(find.text(text).first);
-        await pump();
-        return;
-      }
-      await drag(scrollable, const Offset(0, -320));
-      await pump();
-    }
-    fail('Could not reveal "$text" in Settings.');
   }
 }
 

@@ -6,10 +6,7 @@ import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
-import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
-import 'package:collectiq_ai/features/auth/data/repositories/shared_preferences_guest_mode_repository.dart';
 import 'package:collectiq_ai/features/onboarding/data/repositories/shared_preferences_onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
@@ -65,7 +62,7 @@ void main() {
   ) async {
     await tester.pumpEntry(
       repository: _ImmediateOnboardingRepository(completed: false),
-      guestRepository: _ImmediateGuestModeRepository(chosen: false),
+      authRepository: _EntryAuthRepository(user: null),
     );
     await tester.pumpAndSettle();
 
@@ -85,7 +82,6 @@ void main() {
       authRepository: _EntryAuthRepository(
         user: _cloudUser('collector@example.com'),
       ),
-      guestRepository: _ImmediateGuestModeRepository(chosen: false),
     );
     await tester.pumpAndSettle();
 
@@ -109,40 +105,24 @@ void main() {
     expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
   });
 
-  testWidgets('Explore as Guest opens onboarding before guest Home', (
+  testWidgets('signed-out launch keeps onboarding and Home behind auth', (
     tester,
   ) async {
     final onboardingRepository = _MutableOnboardingRepository(completed: false);
-    final guestRepository = _MutableGuestModeRepository(chosen: false);
 
     await tester.pumpEntry(
       repository: onboardingRepository,
-      guestRepository: guestRepository,
+      authRepository: _EntryAuthRepository(user: null),
     );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('auth-welcome-explore-guest')));
-    await tester.pumpAndSettle();
-
-    expect(guestRepository.chosen, isTrue);
-    expect(find.byKey(const ValueKey('onboarding-screen')), findsOneWidget);
-    expect(find.text('Step 1 of 4'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('onboarding-next')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('onboarding-explore-dashboard')),
+    expect(
+      find.byKey(const ValueKey('auth-welcome-explore-guest')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-
-    expect(onboardingRepository.completed, isTrue);
-    expect(find.byKey(const ValueKey('app-shell')), findsOneWidget);
+    expect(onboardingRepository.completed, isFalse);
+    expect(find.byKey(const ValueKey('app-shell')), findsNothing);
     expect(find.byKey(const ValueKey('onboarding-screen')), findsNothing);
   });
 
@@ -267,20 +247,12 @@ void main() {
       'onboarding_completed_v1',
     );
   });
-
-  test('guest mode persistence key remains unchanged', () {
-    expect(
-      SharedPreferencesGuestModeRepository.chosenKey,
-      'auth_guest_mode_chosen_v1',
-    );
-  });
 }
 
 extension _EntryPump on WidgetTester {
   Future<void> pumpEntry({
     required OnboardingRepository repository,
     AuthRepository? authRepository,
-    GuestModeRepository? guestRepository,
     bool disableAnimations = false,
   }) {
     return pumpWidget(
@@ -288,10 +260,8 @@ extension _EntryPump on WidgetTester {
         overrides: [
           onboardingRepositoryProvider.overrideWithValue(repository),
           authRepositoryProvider.overrideWithValue(
-            authRepository ?? _EntryAuthRepository(),
-          ),
-          guestModeRepositoryProvider.overrideWithValue(
-            guestRepository ?? _ImmediateGuestModeRepository(chosen: true),
+            authRepository ??
+                _EntryAuthRepository(user: _cloudUser('collector@example.com')),
           ),
         ],
         child: _MediaWrappedApp(
@@ -412,34 +382,6 @@ class _FailOnceOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<void> setOnboardingCompleted(bool completed) async {}
-}
-
-class _ImmediateGuestModeRepository implements GuestModeRepository {
-  const _ImmediateGuestModeRepository({required this.chosen});
-
-  final bool chosen;
-
-  @override
-  Future<bool> hasChosenGuestMode() async => chosen;
-
-  @override
-  Future<void> setGuestModeChosen(bool chosen) async {}
-}
-
-class _MutableGuestModeRepository implements GuestModeRepository {
-  _MutableGuestModeRepository({required this.chosen});
-
-  bool chosen;
-  var writeCalls = 0;
-
-  @override
-  Future<bool> hasChosenGuestMode() async => chosen;
-
-  @override
-  Future<void> setGuestModeChosen(bool chosen) async {
-    writeCalls += 1;
-    this.chosen = chosen;
-  }
 }
 
 class _EntryAuthRepository implements AuthRepository {

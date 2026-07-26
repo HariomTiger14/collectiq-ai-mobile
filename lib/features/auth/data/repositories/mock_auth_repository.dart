@@ -37,7 +37,7 @@ class MockAuthRepository implements AuthRepository {
     required String password,
   }) async {
     throw const AuthException(
-      'Email/password sign-in requires Supabase configuration. Local mode remains available.',
+      'Email/password sign-in requires Supabase configuration.',
     );
   }
 
@@ -47,36 +47,32 @@ class MockAuthRepository implements AuthRepository {
     required String password,
   }) async {
     throw const AuthException(
-      'Email/password sign-up requires Supabase configuration. Local mode remains available.',
+      'Email/password sign-up requires Supabase configuration.',
     );
   }
 
   @override
   Future<void> resendEmailConfirmation({required String email}) async {
     throw const AuthException(
-      'Email confirmation requires Supabase configuration. Local mode remains available.',
+      'Email confirmation requires Supabase configuration.',
     );
   }
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     throw const AuthException(
-      'Password reset requires Supabase configuration. Local mode remains available.',
+      'Password reset requires Supabase configuration.',
     );
   }
 
   @override
   Future<AppUser> signInWithGoogle() async {
-    throw const AuthException(
-      'Google sign-in is coming soon. Local mode remains available.',
-    );
+    throw const AuthException('Google sign-in is coming soon.');
   }
 
   @override
   Future<AppUser> signInWithApple() async {
-    throw const AuthException(
-      'Apple sign-in is coming soon. Local mode remains available.',
-    );
+    throw const AuthException('Apple sign-in is coming soon.');
   }
 
   @override

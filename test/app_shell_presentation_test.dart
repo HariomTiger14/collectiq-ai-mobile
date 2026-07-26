@@ -9,9 +9,7 @@ import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/auth_exception.dart';
 import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.dart';
-import 'package:collectiq_ai/features/auth/domain/repositories/guest_mode_repository.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/features/auth/presentation/controllers/guest_mode_controller.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
@@ -315,9 +313,6 @@ extension _ShellPump on WidgetTester {
             const _ImmediateOnboardingRepository(completed: true),
           ),
           authRepositoryProvider.overrideWithValue(_ShellAuthRepository()),
-          guestModeRepositoryProvider.overrideWithValue(
-            const _ImmediateGuestModeRepository(chosen: true),
-          ),
         ],
         child: _Harness(
           themeMode: themeMode,
@@ -446,18 +441,6 @@ class _ImmediateOnboardingRepository implements OnboardingRepository {
   Future<void> setOnboardingCompleted(bool completed) async {}
 }
 
-class _ImmediateGuestModeRepository implements GuestModeRepository {
-  const _ImmediateGuestModeRepository({required this.chosen});
-
-  final bool chosen;
-
-  @override
-  Future<bool> hasChosenGuestMode() async => chosen;
-
-  @override
-  Future<void> setGuestModeChosen(bool chosen) async {}
-}
-
 class _ShellResultScannerController extends ScannerController {
   @override
   ScannerState build() {
@@ -500,7 +483,14 @@ class _ShellResultScannerController extends ScannerController {
 
 class _ShellAuthRepository implements AuthRepository {
   @override
-  Future<AppUser?> currentUser() async => null;
+  Future<AppUser?> currentUser() async {
+    return const AppUser(
+      id: 'shell-user',
+      displayName: 'Shell Collector',
+      email: 'shell@example.com',
+      provider: AuthProviderType.emailPassword,
+    );
+  }
 
   @override
   Future<AppUser> signIn() => signInAnonymously();

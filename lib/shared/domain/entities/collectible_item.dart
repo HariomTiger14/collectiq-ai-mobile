@@ -368,6 +368,15 @@ class CollectibleItem {
     required String imageStoragePath,
     required String cloudImageUrl,
   }) {
+    final syncedGalleryImages = [
+      for (final image in galleryImages)
+        image.path == imagePath
+            ? image.copyWithCloudImage(
+                imageStoragePath: imageStoragePath,
+                cloudImageUrl: cloudImageUrl,
+              )
+            : image,
+    ];
     return CollectibleItem(
       id: id,
       title: title,
@@ -377,7 +386,7 @@ class CollectibleItem {
       condition: condition,
       recommendation: recommendation,
       imagePath: imagePath,
-      galleryImages: galleryImages,
+      galleryImages: syncedGalleryImages,
       imageStoragePath: imageStoragePath,
       cloudImageUrl: cloudImageUrl,
       syncStatus: CloudItemSyncStatus.synced,
