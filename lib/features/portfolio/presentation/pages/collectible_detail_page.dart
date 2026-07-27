@@ -37,11 +37,34 @@ final _portfolioValuationSnapshotsProvider =
       ref,
       itemId,
     ) async {
-      return ref
+      final cloudSnapshots = await ref
           .watch(cloudServiceRegistryProvider)
           .cloudPortfolioSyncService
           .fetchValuationSnapshots(itemId);
+      final localSnapshots = await ref
+          .watch(valuationSnapshotRepositoryProvider)
+          .getSnapshots(itemId);
+      return _mergeValuationSnapshots(localSnapshots, cloudSnapshots);
     });
+
+List<PortfolioValuationSnapshot> _mergeValuationSnapshots(
+  List<PortfolioValuationSnapshot> localSnapshots,
+  List<PortfolioValuationSnapshot> cloudSnapshots,
+) {
+  final byKey = <String, PortfolioValuationSnapshot>{};
+  for (final snapshot in [...localSnapshots, ...cloudSnapshots]) {
+    final key = [
+      snapshot.portfolioItemId,
+      snapshot.pricedAt.toIso8601String(),
+      snapshot.valueAud?.toStringAsFixed(2) ?? '',
+      snapshot.valuationStatus.wireValue,
+    ].join('|');
+    byKey[key] = snapshot;
+  }
+  final merged = byKey.values.toList();
+  merged.sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
+  return merged;
+}
 
 /// Detail page for a saved portfolio collectible.
 class CollectibleDetailPage extends ConsumerStatefulWidget {
@@ -491,22 +514,35 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       final hasRefreshedValue =
           quote.valuationStatus == ValuationStatus.marketEstimated &&
           quote.estimatedValue > 0;
-      await ref
-          .read(portfolioControllerProvider.notifier)
-          .updateItemWithValuationSnapshot(
-            item.copyWith(
-              estimatedValue: hasRefreshedValue
-                  ? quote.estimatedValue
-                  : item.estimatedValue,
-              pricing: hasRefreshedValue ? quote.pricing : item.pricing,
-              marketSummary: quote.marketSummary ?? item.marketSummary,
-              valuationStatus: quote.valuationStatus,
-              valuationSource: quote.valuationSource,
-              aiEstimatedValue: quote.aiEstimatedValue ?? item.aiEstimatedValue,
-              valueAtScan: item.valueAtScan ?? item.estimatedValue,
-              lastValueRefreshedAt: refreshedAt,
-            ),
-          );
+      final refreshedItem = item.copyWith(
+        estimatedValue: hasRefreshedValue
+            ? quote.estimatedValue
+            : item.estimatedValue,
+        pricing: hasRefreshedValue ? quote.pricing : item.pricing,
+        marketSummary: hasRefreshedValue
+            ? quote.marketSummary ?? item.marketSummary
+            : item.marketSummary,
+        valuationStatus: hasRefreshedValue
+            ? quote.valuationStatus
+            : item.valuationStatus,
+        valuationSource: hasRefreshedValue
+            ? quote.valuationSource
+            : item.valuationSource,
+        aiEstimatedValue: quote.aiEstimatedValue ?? item.aiEstimatedValue,
+        valueAtScan: item.valueAtScan ?? item.estimatedValue,
+        lastValueRefreshedAt: hasRefreshedValue
+            ? refreshedAt
+            : item.lastValueRefreshedAt,
+      );
+      if (hasRefreshedValue) {
+        await ref
+            .read(portfolioControllerProvider.notifier)
+            .updateItemWithValuationSnapshot(refreshedItem);
+      } else {
+        await ref
+            .read(portfolioControllerProvider.notifier)
+            .updateItem(refreshedItem);
+      }
       await ref
           .read(subscriptionControllerProvider.notifier)
           .recordSuccessfulPriceRefresh();
@@ -2029,7 +2065,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
         : null;
     final footerLabel = snapshotsAsync.isLoading
-        ? 'Loading cloud history'
+        ? 'Loading value history'
         : snapshots.isNotEmpty
         ? _snapshotHistoryLabel(snapshots)
         : _lastRefreshedLabel(item);
@@ -2872,7 +2908,7 @@ String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
     ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
   final latest = sortedSnapshots.last;
   final count = sortedSnapshots.length;
-  return '$count cloud snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
+  return '$count valuation snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
 }
 
 String _lastRefreshedLabel(CollectibleItem item) {
@@ -3885,26 +3921,48 @@ Future<void> _showEditCollectibleDialog({
 
   var nextItem = editResult.item;
   ValuationStatus? refreshedStatus;
+  var hasRefreshedValue = false;
   if (editResult.retryPricing) {
     try {
       final quote = await ref
           .read(scanPricingQuoteServiceProvider)
           .quoteItem(nextItem);
       refreshedStatus = quote.valuationStatus;
+      hasRefreshedValue =
+          quote.valuationStatus == ValuationStatus.marketEstimated &&
+          quote.estimatedValue > 0;
       nextItem = nextItem.copyWith(
-        estimatedValue: quote.estimatedValue,
-        pricing: quote.pricing,
-        marketSummary: quote.marketSummary,
-        valuationStatus: quote.valuationStatus,
-        valuationSource: quote.valuationSource,
-        aiEstimatedValue: quote.aiEstimatedValue,
+        estimatedValue: hasRefreshedValue
+            ? quote.estimatedValue
+            : nextItem.estimatedValue,
+        pricing: hasRefreshedValue ? quote.pricing : nextItem.pricing,
+        marketSummary: hasRefreshedValue
+            ? quote.marketSummary ?? nextItem.marketSummary
+            : nextItem.marketSummary,
+        valuationStatus: hasRefreshedValue
+            ? quote.valuationStatus
+            : nextItem.valuationStatus,
+        valuationSource: hasRefreshedValue
+            ? quote.valuationSource
+            : nextItem.valuationSource,
+        aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
+        valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
+        lastValueRefreshedAt: hasRefreshedValue
+            ? DateTime.now()
+            : nextItem.lastValueRefreshedAt,
       );
     } catch (_) {
       refreshedStatus = null;
     }
   }
 
-  await ref.read(portfolioControllerProvider.notifier).updateItem(nextItem);
+  if (editResult.retryPricing && hasRefreshedValue) {
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .updateItemWithValuationSnapshot(nextItem);
+  } else {
+    await ref.read(portfolioControllerProvider.notifier).updateItem(nextItem);
+  }
   if (context.mounted) {
     _showDetailSnackBar(
       context,

@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -12,6 +13,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final portfolioRepositoryProvider = Provider<PortfolioRepository>((ref) {
   return const SharedPreferencesPortfolioRepository();
 });
+
+final valuationSnapshotRepositoryProvider =
+    Provider<SharedPreferencesValuationSnapshotRepository>((ref) {
+      return const SharedPreferencesValuationSnapshotRepository();
+    });
 
 /// Immutable state for the portfolio feature.
 class PortfolioState {
@@ -191,6 +197,7 @@ class PortfolioController extends Notifier<PortfolioState> {
   /// Updates [item] and records a cloud valuation snapshot when available.
   Future<void> updateItemWithValuationSnapshot(CollectibleItem item) async {
     await updateItem(item);
+    await ref.read(valuationSnapshotRepositoryProvider).recordSnapshot(item);
     await _syncCloudValuationSnapshot(item);
   }
 

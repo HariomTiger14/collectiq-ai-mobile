@@ -70,6 +70,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart
 import 'package:collectiq_ai/features/market/domain/repositories/market_pricing_provider.dart';
 import 'package:collectiq_ai/features/onboarding/data/repositories/shared_preferences_onboarding_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
+import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
@@ -6271,6 +6272,45 @@ void main() {
       expect(performance.dailySnapshots, isNotEmpty);
       expect(performance.dailySnapshots.last.totalPortfolioValue, 1200);
       expect(snapshots, hasLength(3));
+    });
+
+    test('local valuation snapshot repository records refreshed item value', () async {
+      final repository = SharedPreferencesValuationSnapshotRepository();
+      final item = _analyticsItem(
+        id: 'card',
+        title: 'Charizard Holo',
+        category: 'Trading Card',
+        value: 150,
+        confidence: 0.9,
+        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+      ).copyWith(
+        pricing: PricingInfo(
+          estimatedMarketValue: 150,
+          lowEstimate: 120,
+          highEstimate: 180,
+          currency: 'AUD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.82,
+          lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'PriceCharting',
+        ),
+        valuationStatus: ValuationStatus.marketEstimated,
+        valuationSource: 'PriceCharting',
+        lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+      );
+
+      await repository.recordSnapshot(item);
+      final snapshots = await repository.getSnapshots('card');
+
+      expect(snapshots, hasLength(1));
+      expect(snapshots.single.portfolioItemId, 'card');
+      expect(snapshots.single.valueAud, 150);
+      expect(snapshots.single.lowEstimateAud, 120);
+      expect(snapshots.single.highEstimateAud, 180);
+      expect(snapshots.single.displayString, 'AUD 150.00');
+      expect(snapshots.single.pricingProvider, 'PriceCharting');
+      expect(snapshots.single.valuationStatus, ValuationStatus.marketEstimated);
     });
   });
 
