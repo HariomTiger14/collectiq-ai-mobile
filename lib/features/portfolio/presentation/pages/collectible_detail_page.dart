@@ -2896,6 +2896,18 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
         'Match basis',
         _pricingStrategyLabel(pricing!.valuationStrategy!),
       ),
+    if (pricing != null &&
+        (pricing.lowEstimate > 0 || pricing.highEstimate > 0))
+      _DetailInfoRowData(
+        'Value range',
+        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+      ),
+    _DetailInfoRowData(
+      'Portfolio record',
+      item.lastValueRefreshedAt == null
+          ? 'Saved snapshot'
+          : 'Refreshed ${_formatPricingDate(item.lastValueRefreshedAt)}',
+    ),
     if (_pricingUnavailableReason(item) != null)
       _DetailInfoRowData('Reason', _pricingUnavailableReason(item)!),
     if (_sourceMarketValue(pricing ?? _emptyPricingFor(item)) != null)

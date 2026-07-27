@@ -1165,6 +1165,11 @@ class _CatalogResultCard extends StatelessWidget {
                                 hasValue: hasValue,
                               ),
                               _CatalogMetaPill(label: sourceLabel),
+                              if (result.confidence != null)
+                                _CatalogMetaPill(
+                                  label:
+                                      '${(result.confidence!.clamp(0, 1) * 100).round()}% match',
+                                ),
                             ],
                           ),
                         ),
@@ -1244,7 +1249,9 @@ class _CatalogMetaPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: PackLoxTokens.surfaceRaised.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.8)),
+          border: Border.all(
+            color: PackLoxTokens.border.withValues(alpha: 0.8),
+          ),
         ),
         child: Text(
           label,
@@ -1408,6 +1415,8 @@ class _CatalogResultDetailPageState
                           ),
                           const SizedBox(height: 18),
                           _CatalogValuePanel(result: result, value: value),
+                          const SizedBox(height: 14),
+                          _CatalogTrustPanel(result: result),
                           const SizedBox(height: 14),
                           _CatalogHistoryPanel(
                             history: result.history,
@@ -1683,6 +1692,98 @@ class _CatalogEstimateChip extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogTrustPanel extends StatelessWidget {
+  const _CatalogTrustPanel({required this.result});
+
+  final CatalogSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = _hasCatalogValue(result);
+    final confidence = result.confidence;
+    final rows = [
+      _CatalogDetailRowData(
+        'Status',
+        hasValue ? 'Provider-backed catalog value' : 'Price unavailable',
+      ),
+      _CatalogDetailRowData('Source', result.source),
+      if (confidence != null)
+        _CatalogDetailRowData(
+          'Confidence',
+          '${_catalogConfidenceBand(confidence)} (${(confidence.clamp(0, 1) * 100).round()}%)',
+        ),
+      if (_clean(result.setName) != null || _clean(result.identifier) != null)
+        _CatalogDetailRowData('Match basis', _catalogMatchBasis(result)),
+      _CatalogDetailRowData(
+        'Value range',
+        '${_formatOptionalCatalogValue(result.lowEstimate, result.currency)} - ${_formatOptionalCatalogValue(result.highEstimate, result.currency)}',
+      ),
+      if (result.lastUpdated != null)
+        _CatalogDetailRowData(
+          'Provider checked',
+          _formatShortDate(result.lastUpdated!),
+        ),
+      if (_clean(result.attribution) != null)
+        _CatalogDetailRowData('Attribution', result.attribution!.trim()),
+    ];
+
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle('Pricing confidence'),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: (hasValue ? PackLoxTokens.success : PackLoxTokens.cyan)
+                      .withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color:
+                        (hasValue ? PackLoxTokens.success : PackLoxTokens.cyan)
+                            .withValues(alpha: 0.30),
+                  ),
+                ),
+                child: Icon(
+                  hasValue
+                      ? Icons.verified_user_outlined
+                      : Icons.info_outline_rounded,
+                  color: hasValue ? PackLoxTokens.success : PackLoxTokens.cyan,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  hasValue
+                      ? 'This catalog value comes from saved provider data. PackLox saves it as a dated portfolio snapshot when you add the item.'
+                      : 'PackLox is not showing a value because this catalog result does not include trusted price data yet.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: PackLoxTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.34,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (final row in rows) ...[
+            _CatalogDetailRow(row: row),
+            if (row != rows.last)
+              const Divider(color: PackLoxTokens.border, height: 18),
+          ],
         ],
       ),
     );
@@ -2738,6 +2839,29 @@ String _formatCatalogValue(CatalogSearchResult result) {
 bool _hasCatalogValue(CatalogSearchResult result) {
   final value = result.marketValue;
   return value != null && value > 0;
+}
+
+String _catalogConfidenceBand(double confidence) {
+  final bounded = confidence.clamp(0, 1);
+  if (bounded >= 0.85) {
+    return 'High';
+  }
+  if (bounded >= 0.70) {
+    return 'Medium';
+  }
+  if (bounded > 0) {
+    return 'Low';
+  }
+  return 'Not scored';
+}
+
+String _catalogMatchBasis(CatalogSearchResult result) {
+  final parts = <String>[
+    'title',
+    if (_clean(result.setName) != null) 'set/product family',
+    if (_clean(result.identifier) != null) 'identifier',
+  ];
+  return 'Matched by ${parts.join(', ')}';
 }
 
 String _formatOptionalCatalogValue(double? value, String currency) {

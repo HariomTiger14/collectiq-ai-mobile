@@ -201,6 +201,11 @@ void main() {
     expect(find.text('USD \$82'), findsOneWidget);
     expect(find.text('Low'), findsOneWidget);
     expect(find.text('High'), findsOneWidget);
+    expect(find.text('Pricing confidence'), findsOneWidget);
+    expect(find.text('Provider-backed catalog value'), findsOneWidget);
+    expect(find.text('High (87%)'), findsOneWidget);
+    expect(find.text('Matched by title, set/product family'), findsOneWidget);
+    expect(find.text('USD \$70 - USD \$96'), findsOneWidget);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
