@@ -4,24 +4,29 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PackLox is a collector portfolio and valuation app that helps users scan, identify, save, and track collectibles with trusted market data and clear source attribution.">
-  <meta name="theme-color" content="#0B111A">
-  <title>PackLox | Collector Portfolio Valuation App</title>
-  <link rel="icon" type="image/png" href="favicon.png">
+  <meta name="description" content="PackLox is a premium collector portfolio and valuation app built around trusted market evidence, clear source attribution, portfolio snapshots, and no AI-invented prices.">
+  <meta name="theme-color" content="#030509">
+  <title>PackLox | Trusted Collector Valuations</title>
+  <link rel="icon" type="image/png" href="favicon.png?v=clean-icon-2">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="site.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="site.css?v=ebay-unavailable-7">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <header class="site-header">
     <a class="brand" href="/" aria-label="PackLox home">
-      <img class="brand-logo" src="/assets/brand/packlox_logo_horizontal_v1.svg" alt="PackLox">
+      <img class="brand-icon" src="/assets/brand/packlox_app_icon.png" alt="" aria-hidden="true">
+      <span class="brand-word">PackLox</span>
     </a>
     <nav class="site-nav" aria-label="Primary navigation">
-      <a href="#platform">Platform</a>
-      <a href="#valuation">Valuation</a>
-      <a href="#data-use">Data Use</a>
+      <a href="#trust">Trust</a>
+      <a href="#categories">Categories</a>
+      <a href="#providers">Providers</a>
+      <a href="#intelligence">Intelligence</a>
       <a href="#contact">Contact</a>
     </nav>
   </header>
@@ -29,109 +34,213 @@
   <main id="main-content">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow">Collector Portfolio App</p>
-        <h1 id="hero-title">Trusted collection intelligence for serious collectors.</h1>
-        <p class="hero-text">
-          PackLox helps collectors scan, identify, save, and track collectibles in a structured
-          portfolio. AI helps identify the item; trusted market evidence is used for valuation.
+        <div class="hero-kicker">
+          <img src="/assets/brand/packlox_app_icon.png" alt="" aria-hidden="true">
+          <span>Premium collector intelligence</span>
+        </div>
+        <h1 id="hero-title">Trusted valuations for the collections you care about.</h1>
+        <p class="hero-lead">
+          PackLox helps collectors identify, value, and protect their collection with provider-backed market evidence, portfolio snapshots, and clear unavailable states when evidence is weak.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="#valuation">How valuation works</a>
-          <a class="button secondary" href="#data-use">Data handling</a>
+          <a class="button primary" href="#trust">Why collectors trust it</a>
+          <a class="button secondary" href="#contact">Contact PackLox</a>
+        </div>
+        <div class="hero-proof" aria-label="PackLox trust principles">
+          <span>No AI-invented prices</span>
+          <span>Source attribution</span>
+          <span>Confidence scoring</span>
+          <span>Unavailable when evidence is weak</span>
         </div>
       </div>
-      <div class="hero-visual" aria-label="PackLox portfolio preview">
-        <div class="phone-shell">
-          <div class="phone-topbar"></div>
-          <div class="scan-card">
-            <span class="scan-badge">Verified workflow</span>
-            <strong>Scan → Identify → Price → Save</strong>
-            <p>Every value is backed by a connected provider or shown as unavailable.</p>
+
+      <aside class="collector-vault" aria-label="PackLox collector vault preview">
+        <div class="preview-top">
+          <span class="preview-dot"></span>
+          <span>Private collector vault</span>
+          <strong>Evidence-ready</strong>
+        </div>
+        <div class="vault-stage" aria-hidden="true">
+          <div class="category-token token-cards"><span class="material-symbols-rounded category-symbol" aria-hidden="true">style</span><strong>Cards</strong></div>
+          <div class="category-token token-cars"><span class="material-symbols-rounded category-symbol" aria-hidden="true">toys</span><strong>Toy Cars</strong></div>
+          <div class="category-token token-games"><span class="material-symbols-rounded category-symbol" aria-hidden="true">sports_esports</span><strong>Games</strong></div>
+          <div class="category-token token-comics"><span class="material-symbols-rounded category-symbol" aria-hidden="true">menu_book</span><strong>Comics</strong></div>
+          <div class="category-token token-sneakers"><span class="material-symbols-rounded category-symbol" aria-hidden="true">directions_run</span><strong>Sneakers</strong></div>
+          <div class="category-token token-coins"><span class="material-symbols-rounded category-symbol" aria-hidden="true">monetization_on</span><strong>Coins</strong></div>
+        </div>
+        <div class="app-preview-card">
+          <p class="eyebrow">Portfolio item</p>
+          <h2>Evidence-backed record</h2>
+          <p>Identity, condition notes, provider attribution, confidence, source currency, local currency, and dated value snapshots.</p>
+        </div>
+        <div class="value-panel">
+          <div>
+            <span>Valuation status</span>
+            <strong>Trusted source</strong>
           </div>
-          <div class="metric-grid">
-            <span><strong>Source</strong> Provider attribution</span>
-            <span><strong>Value</strong> Currency + timestamp</span>
-            <span><strong>Trust</strong> Confidence + reason</span>
+          <div>
+            <span>Portfolio state</span>
+            <strong>Snapshot saved</strong>
           </div>
         </div>
-      </div>
+        <div class="source-list">
+          <div><span>AI role</span><strong>Identify, not invent value</strong></div>
+          <div><span>Pricing role</span><strong>Provider evidence only</strong></div>
+        </div>
+      </aside>
     </section>
 
-    <section id="platform" class="feature-band" aria-labelledby="platform-title">
+    <section id="platform" class="section-block" aria-labelledby="platform-title">
       <div class="section-heading">
-        <p class="eyebrow">What PackLox Does</p>
-        <h2 id="platform-title">A mobile collection system built around evidence.</h2>
+        <p class="eyebrow">Collector Platform</p>
+        <h2 id="platform-title">A refined system for serious collections.</h2>
+        <p>PackLox is built for collectors who want beautiful records, multi-device portfolios, and valuations they can explain.</p>
       </div>
       <div class="feature-grid">
         <article>
-          <h3>AI Identification</h3>
-          <p>Users capture collectible images and PackLox extracts likely title, category, edition, set, SKU, card number, and condition clues.</p>
+          <span class="card-index">01</span>
+          <h3>Scan and identify</h3>
+          <p>Capture collectible images and review extracted title, category, set, SKU, card number, and condition clues.</p>
         </article>
         <article>
-          <h3>Portfolio Ledger</h3>
-          <p>Collectors save items to their account with photos, metadata, valuation snapshots, notes, and change history.</p>
+          <span class="card-index">02</span>
+          <h3>Correct and reprice</h3>
+          <p>Adjust item identity when needed, then rerun pricing against deterministic provider routes.</p>
         </article>
         <article>
-          <h3>Pricing Providers</h3>
-          <p>PackLox routes items to trusted pricing sources by category and clearly labels provider, currency, timestamp, and confidence.</p>
+          <span class="card-index">03</span>
+          <h3>Save the evidence</h3>
+          <p>Store photos, notes, metadata, price at scan, current value, and dated valuation snapshots.</p>
         </article>
       </div>
     </section>
 
-    <section id="valuation" class="trust-section" aria-labelledby="valuation-title">
-      <div class="section-heading">
-        <p class="eyebrow">Valuation Philosophy</p>
-        <h2 id="valuation-title">No AI-invented prices.</h2>
-        <p>
-          PackLox uses AI for recognition, not valuation. A price is shown only when a connected
-          catalog or marketplace data provider returns usable evidence. If trusted evidence is not
-          available, PackLox shows a clear unavailable state instead of guessing.
-        </p>
+    <section id="trust" class="section-block trust-section" aria-labelledby="trust-title">
+      <div class="section-heading wide">
+        <p class="eyebrow">Trust-First Valuation</p>
+        <h2 id="trust-title">Why collectors trust PackLox.</h2>
+        <p>Recognition can be assisted by AI, but valuation must be backed by real provider evidence. PackLox is designed to be honest when data is strong and honest when it is not available.</p>
       </div>
-      <div class="trust-grid">
+      <div class="trust-principles">
         <article>
-          <span class="status-dot"></span>
-          <h3>Deterministic provider routing</h3>
-          <p>Trading cards, games, and supported catalog categories can route to PriceCharting. General marketplace categories can use eBay signals where approved data is available.</p>
+          <span class="principle-mark"></span>
+          <h3>Real market evidence</h3>
+          <p>Values come from connected catalogs or approved marketplace data, not generated guesses.</p>
         </article>
         <article>
-          <span class="status-dot"></span>
-          <h3>Sold comps over asking prices</h3>
-          <p>PackLox distinguishes completed sales evidence from active listing asking prices. Asking prices are lower-trust signals and are labeled as such.</p>
+          <span class="principle-mark"></span>
+          <h3>Provider attribution</h3>
+          <p>Each valuation can show source, timestamp, currency, and valuation strategy.</p>
         </article>
         <article>
-          <span class="status-dot"></span>
-          <h3>Confidence and attribution</h3>
-          <p>Every valuation response is designed to include source attribution, currency, timestamp, range, confidence, and the reason a match was accepted or withheld.</p>
+          <span class="principle-mark"></span>
+          <h3>Confidence scoring</h3>
+          <p>PackLox explains match strength using item identity, category, condition, and evidence quality.</p>
+        </article>
+        <article>
+          <span class="principle-mark"></span>
+          <h3>Clear unavailable states</h3>
+          <p>Unsupported or weak-data categories show a reason instead of a fake number.</p>
+        </article>
+        <article>
+          <span class="principle-mark"></span>
+          <h3>No scraped marketplace images</h3>
+          <p>Catalog search uses neutral visuals and user-owned photos until licensed image sources are available.</p>
+        </article>
+        <article>
+          <span class="principle-mark"></span>
+          <h3>Portfolio snapshots</h3>
+          <p>Saved values are preserved as dated ledger entries so collectors can track change over time.</p>
         </article>
       </div>
     </section>
 
-    <section class="workflow" aria-labelledby="workflow-title">
+    <section id="categories" class="section-block" aria-labelledby="categories-title">
       <div class="section-heading">
-        <p class="eyebrow">Collector Workflow</p>
-        <h2 id="workflow-title">Scan, review, correct, and save.</h2>
+        <p class="eyebrow">Supported Categories</p>
+        <h2 id="categories-title">Collector worlds, represented safely.</h2>
+        <p>PackLox uses original neutral category visuals instead of trademarked artwork or marketplace photos.</p>
+      </div>
+      <div class="category-grid">
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">style</span><h3>Trading cards</h3><p>Catalog-backed cards across supported PriceCharting imports.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">sports_esports</span><h3>Video games</h3><p>Games and related catalog entries with evidence-backed pricing.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">toys</span><h3>Toy cars</h3><p>Tracks photos and details now; value stays unavailable until a trusted sold-comps provider is connected.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">menu_book</span><h3>Comics</h3><p>Structured identity and portfolio tracking, with trusted pricing expansion planned.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">directions_run</span><h3>Sneakers</h3><p>Future specialist provider routing for size, condition, and box-aware pricing.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">monetization_on</span><h3>Coins</h3><p>Conservative handling for condition-sensitive, specialist valuation categories.</p></article>
+        <article><span class="material-symbols-rounded category-symbol" aria-hidden="true">inventory_2</span><h3>General collectibles</h3><p>Private records, photos, notes, and unavailable states until evidence is strong.</p></article>
+      </div>
+    </section>
+
+    <section id="providers" class="section-block provider-section" aria-labelledby="providers-title">
+      <div class="section-heading wide">
+        <p class="eyebrow">Pricing Providers</p>
+        <h2 id="providers-title">A valuation stack built deliberately.</h2>
+        <p>PackLox expands by provider quality, category fit, and compliance readiness. A provider only becomes a pricing source when the evidence can be explained.</p>
+      </div>
+      <div class="provider-grid">
+        <article class="provider-card live">
+          <span>Connected</span>
+          <h3>PriceCharting</h3>
+          <p>Daily catalog imports for supported cards and video games, with current catalog rows and historical snapshots.</p>
+        </article>
+        <article class="provider-card unavailable">
+          <span>Unavailable</span>
+          <h3>eBay Marketplace Insights</h3>
+          <p>Sold-comps partner access was not granted. PackLox will not use active listing asking prices as trusted valuation.</p>
+        </article>
+        <article class="provider-card future">
+          <span>Future</span>
+          <h3>KicksDB</h3>
+          <p>Specialist sneaker data for size-aware valuation and secondary-market evidence.</p>
+        </article>
+        <article class="provider-card future">
+          <span>Future</span>
+          <h3>Specialist partners</h3>
+          <p>Watches, art, jewelry, and high-value categories stay unavailable until trusted partners are connected.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="intelligence" class="section-block intelligence-section" aria-labelledby="intelligence-title">
+      <div class="section-heading">
+        <p class="eyebrow">Portfolio Intelligence</p>
+        <h2 id="intelligence-title">More than a list of items.</h2>
+        <p>PackLox is designed to become a living portfolio that highlights quality, risk, and opportunities across the collection.</p>
+      </div>
+      <div class="intelligence-grid">
+        <article><strong>Collection score</strong><span>Portfolio quality based on value coverage, photos, metadata, and confidence.</span></article>
+        <article><strong>Health breakdown</strong><span>Spot missing photos, weak matches, stale values, and incomplete details.</span></article>
+        <article><strong>Top movers</strong><span>Track gainers, decliners, and value changes from saved snapshots.</span></article>
+        <article><strong>Price alerts</strong><span>Notify collectors when saved items cross important thresholds.</span></article>
+      </div>
+    </section>
+
+    <section class="section-block workflow" aria-labelledby="workflow-title">
+      <div class="section-heading">
+        <p class="eyebrow">Product Roadmap</p>
+        <h2 id="workflow-title">Premium launch priorities.</h2>
       </div>
       <ol class="steps">
         <li>
-          <strong>1. Identify</strong>
-          <span>Capture an item and review extracted identity details before pricing.</span>
+          <strong>Expand sold-comps coverage</strong>
+          <span>Connect a trusted non-scraped sold-comps provider for long-tail collectibles.</span>
         </li>
         <li>
-          <strong>2. Validate</strong>
-          <span>Match against connected catalog or marketplace evidence with clear confidence rules.</span>
+          <strong>Deepen portfolio intelligence</strong>
+          <span>Add collection score, stale value flags, and richer value history views.</span>
         </li>
         <li>
-          <strong>3. Track</strong>
-          <span>Save the item and valuation snapshot to the collector portfolio for future review.</span>
+          <strong>Launch paid entitlements</strong>
+          <span>Connect billing rules to premium scans, alerts, history, and intelligence.</span>
         </li>
       </ol>
     </section>
 
-    <section id="data-use" class="data-section" aria-labelledby="data-title">
+    <section id="data-use" class="section-block data-section" aria-labelledby="data-title">
       <div class="section-heading">
-        <p class="eyebrow">Data Handling</p>
-        <h2 id="data-title">Built for responsible provider use.</h2>
+        <p class="eyebrow">Responsible Data Use</p>
+        <h2 id="data-title">Built for provider compliance and collector trust.</h2>
       </div>
       <div class="data-grid">
         <article>
@@ -140,15 +249,15 @@
         </article>
         <article>
           <h3>No bulk redistribution</h3>
-          <p>Provider data is used to support user-facing valuation context, not to expose raw marketplace data for download.</p>
+          <p>Provider data supports user-facing valuation context, not raw marketplace data downloads.</p>
         </article>
         <article>
           <h3>User-owned portfolios</h3>
-          <p>Saved portfolio records belong to the user account and can include personal photos, notes, and dated valuation snapshots.</p>
+          <p>Saved records belong to the user account and can include photos, notes, and dated value snapshots.</p>
         </article>
         <article>
-          <h3>Clear unavailable states</h3>
-          <p>When PackLox cannot find enough trusted evidence, the app explains why the value is unavailable.</p>
+          <h3>Clear reasons</h3>
+          <p>When there is not enough trusted evidence, PackLox explains why the value is unavailable.</p>
         </article>
       </div>
     </section>
@@ -158,15 +267,13 @@
         <p class="eyebrow">Current Status</p>
         <h2 id="contact-title">In development and SIT testing.</h2>
         <p>
-          PackLox is preparing for public launch after production API access, compliance review,
-          and full mobile validation. The working app and backend are currently used for controlled
-          development and integration testing.
+          PackLox is preparing for public launch after production API access, compliance review, and full mobile validation.
         </p>
       </div>
       <div class="contact-card">
         <h3>Contact</h3>
         <p>For provider, compliance, or partnership review, contact the PackLox team.</p>
-        <a class="button secondary" href="mailto:hariomritesh@gmail.com">hariomritesh@gmail.com</a>
+        <a class="button secondary" href="mailto:hrtechconsultingptyltd@gmail.com">hrtechconsultingptyltd@gmail.com</a>
       </div>
     </section>
   </main>

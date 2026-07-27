@@ -236,19 +236,26 @@ input {
 }
 
 .strength-bar {
-  height: 100%;
   width: 0;
+  height: 100%;
   border-radius: inherit;
   background: transparent;
   transition: width 240ms ease, background-color 240ms ease;
 }
 
-.strength-bar.partial {
+.strength-bar.weak {
+  width: 33%;
+  background: var(--error);
+}
+
+.strength-bar.medium {
+  width: 66%;
   background: var(--warning);
 }
 
-.strength-bar.ready {
-  background: linear-gradient(90deg, var(--blue), var(--success-strong));
+.strength-bar.strong {
+  width: 100%;
+  background: var(--success);
 }
 
 .message {
@@ -309,15 +316,17 @@ input {
   filter: saturate(0.55) brightness(0.82);
 }
 
+.submit-button.loading .button-label {
+  opacity: 0;
+}
+
 .submit-button.loading .spinner {
   display: inline-block;
 }
 
 .spinner {
   display: none;
-  position: static;
-  flex: 0 0 auto;
-  margin-left: 10px;
+  position: absolute;
   width: 20px;
   height: 20px;
   border: 3px solid rgba(255, 255, 255, 0.42);
