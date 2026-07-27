@@ -93,6 +93,7 @@ class ScanPricingQuoteService {
       'itemId': result.id,
       'previousValue': result.estimatedMarketValue ?? result.estimatedValue,
       'previousCurrency': result.pricing.currency,
+      'displayCurrency': 'AUD',
       'correctionSource': 'scan_review',
       'identity': {
         'title': result.title,
