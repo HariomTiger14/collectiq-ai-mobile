@@ -10,17 +10,28 @@ class SharedPreferencesProfileRepository implements ProfileRepository {
 
   static const _displayNameKey = 'packlox.profile.display_name';
   static const _avatarPathKey = 'packlox.profile.avatar_path';
+  static const _countryCodeKey = 'packlox.profile.country_code';
+  static const _preferredCurrencyKey = 'packlox.profile.preferred_currency';
 
   @override
   Future<CollectorProfile> loadProfile() async {
     final preferences = await SharedPreferences.getInstance();
     final displayName = preferences.getString(_displayNameKey)?.trim();
     final avatarPath = preferences.getString(_avatarPathKey)?.trim();
+    final countryCode = CollectorProfile.normalizeCountryCode(
+      preferences.getString(_countryCodeKey) ?? '',
+    );
+    final preferredCurrency = CollectorProfile.normalizeCurrency(
+      preferences.getString(_preferredCurrencyKey) ??
+          CollectorProfile.currencyForCountry(countryCode),
+    );
     return CollectorProfile(
       displayName: displayName?.isNotEmpty == true
           ? displayName!
           : CollectorProfile.defaultDisplayName,
       avatarPath: avatarPath?.isNotEmpty == true ? avatarPath : null,
+      countryCode: countryCode,
+      preferredCurrency: preferredCurrency,
     );
   }
 
@@ -37,7 +48,20 @@ class SharedPreferencesProfileRepository implements ProfileRepository {
     } else {
       await preferences.setString(_avatarPathKey, avatarPath);
     }
-    return CollectorProfile(displayName: name, avatarPath: avatarPath);
+    final countryCode = CollectorProfile.normalizeCountryCode(
+      profile.countryCode,
+    );
+    final preferredCurrency = CollectorProfile.normalizeCurrency(
+      profile.preferredCurrency,
+    );
+    await preferences.setString(_countryCodeKey, countryCode);
+    await preferences.setString(_preferredCurrencyKey, preferredCurrency);
+    return CollectorProfile(
+      displayName: name,
+      avatarPath: avatarPath,
+      countryCode: countryCode,
+      preferredCurrency: preferredCurrency,
+    );
   }
 
   @override

@@ -34,4 +34,22 @@ class ProfileController extends AsyncNotifier<CollectorProfile> {
     final saved = await _repository.saveAvatarFromPath(sourcePath);
     state = AsyncValue.data(saved);
   }
+
+  Future<void> updateCountry(String countryCode) async {
+    final current = state.hasValue
+        ? state.requireValue
+        : await _repository.loadProfile();
+    final normalizedCountry = CollectorProfile.normalizeCountryCode(
+      countryCode,
+    );
+    final saved = await _repository.saveProfile(
+      current.copyWith(
+        countryCode: normalizedCountry,
+        preferredCurrency: CollectorProfile.currencyForCountry(
+          normalizedCountry,
+        ),
+      ),
+    );
+    state = AsyncValue.data(saved);
+  }
 }

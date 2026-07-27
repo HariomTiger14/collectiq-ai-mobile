@@ -114,6 +114,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         cloudRegistry.config.environment == AppEnvironment.sit;
     final showDeveloperTools = _showDeveloperSurfaces;
     final now = DateTime.now();
+    final profile = profileState.hasValue ? profileState.requireValue : null;
     Widget framed(Widget child, {EdgeInsetsGeometry? padding}) {
       return Padding(
         padding:
@@ -162,6 +163,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onTap: authState.isSignedIn
             ? null
             : () => Navigator.of(context).push(AuthWelcomeScreen.route()),
+      ),
+      _SettingsRow(
+        icon: Icons.public_outlined,
+        title: 'Country & Currency',
+        subtitle:
+            '${profile?.countryName ?? CollectorProfile.countryNameFor(CollectorProfile.defaultCountryCode)} pricing display.',
+        trailing: profile?.preferredCurrency ??
+            CollectorProfile.defaultPreferredCurrency,
+        onTap: () => _showCurrencyPicker(context),
       ),
       _SettingsRow(
         icon: Icons.inventory_2_outlined,
@@ -292,9 +302,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: framed(
                 IdentityBlock(
                   authState: authState,
-                  profile: profileState.hasValue
-                      ? profileState.requireValue
-                      : null,
+                  profile: profile,
                   isLoadingProfile: profileState.isLoading,
                   onEditProfile: () => _showProfileEditor(context),
                 ),
@@ -532,6 +540,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  Future<void> _showCurrencyPicker(BuildContext context) async {
+    final currentProfile =
+        (ref.read(profileControllerProvider).hasValue
+            ? ref.read(profileControllerProvider).requireValue
+            : null) ??
+        const CollectorProfile(
+          displayName: CollectorProfile.defaultDisplayName,
+        );
+    const options = [
+      _CurrencyOption('AU', 'Australia', 'AUD'),
+      _CurrencyOption('US', 'United States', 'USD'),
+      _CurrencyOption('CA', 'Canada', 'CAD'),
+      _CurrencyOption('GB', 'United Kingdom', 'GBP'),
+    ];
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              HomeTokens.pageGutter,
+              0,
+              HomeTokens.pageGutter,
+              HomeTokens.pageGutter,
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: HomeTokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: HomeTokens.border),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Country & currency',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: HomeTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'PackLox shows your portfolio value in this currency and keeps the original provider currency for audit.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: HomeTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  for (final option in options)
+                    _CurrencyOptionTile(
+                      option: option,
+                      isSelected:
+                          currentProfile.countryCode == option.countryCode,
+                      onTap: () async {
+                        await ref
+                            .read(profileControllerProvider.notifier)
+                            .updateCountry(option.countryCode);
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                        if (mounted) {
+                          _showSettingsSnackBar(
+                            'Currency set to ${option.currency}.',
+                          );
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -1608,6 +1699,88 @@ class _ProfileEditSheet extends StatefulWidget {
 
   @override
   State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+}
+
+class _CurrencyOption {
+  const _CurrencyOption(this.countryCode, this.countryName, this.currency);
+
+  final String countryCode;
+  final String countryName;
+  final String currency;
+}
+
+class _CurrencyOptionTile extends StatelessWidget {
+  const _CurrencyOptionTile({
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _CurrencyOption option;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isSelected
+            ? HomeTokens.accent.withValues(alpha: 0.14)
+            : HomeTokens.surfaceInteractive,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: isSelected
+                      ? HomeTokens.accent
+                      : HomeTokens.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        option.countryName,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        option.currency,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  option.currency,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ProfileEditSheetState extends State<_ProfileEditSheet> {

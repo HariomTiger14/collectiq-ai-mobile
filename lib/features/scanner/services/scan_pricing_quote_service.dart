@@ -2,6 +2,8 @@ import 'package:collectiq_ai/core/network/api_client.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart';
 import 'package:collectiq_ai/core/utils/json_parse.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -10,16 +12,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final scanPricingQuoteServiceProvider = Provider<ScanPricingQuoteService>((
   ref,
 ) {
-  return ScanPricingQuoteService(apiClient: ref.watch(apiClientProvider));
+  final profileState = ref.watch(profileControllerProvider);
+  final profile = profileState.hasValue ? profileState.requireValue : null;
+  return ScanPricingQuoteService(
+    apiClient: ref.watch(apiClientProvider),
+    displayCurrency:
+        profile?.preferredCurrency ?? CollectorProfile.defaultPreferredCurrency,
+  );
 });
 
 class ScanPricingQuoteService {
-  const ScanPricingQuoteService({required ApiClient apiClient})
-    : this._(apiClient);
+  const ScanPricingQuoteService({
+    required ApiClient apiClient,
+    required String displayCurrency,
+  }) : this._(apiClient, displayCurrency);
 
-  const ScanPricingQuoteService._(this._apiClient);
+  const ScanPricingQuoteService._(this._apiClient, this._displayCurrency);
 
   final ApiClient _apiClient;
+  final String _displayCurrency;
 
   Future<ScanPricingQuote> quote(ScanResult result) async {
     final response = await _apiClient.post(
@@ -54,7 +65,7 @@ class ScanPricingQuoteService {
       'category': result.category,
       'condition': result.condition,
       'estimatedValue': result.aiEstimatedValue ?? result.estimatedValue,
-      'displayCurrency': result.pricing.currency,
+      'displayCurrency': _displayCurrency,
       'year': result.year,
       'brand': result.brand,
       'setName': result.setName,
@@ -74,7 +85,7 @@ class ScanPricingQuoteService {
       'category': item.category,
       'condition': item.condition,
       'estimatedValue': item.aiEstimatedValue ?? item.estimatedValue,
-      'displayCurrency': item.pricing?.currency ?? 'AUD',
+      'displayCurrency': _displayCurrency,
       'year': item.year,
       'brand': item.brand,
       'setName': item.setName,
@@ -93,7 +104,7 @@ class ScanPricingQuoteService {
       'itemId': result.id,
       'previousValue': result.estimatedMarketValue ?? result.estimatedValue,
       'previousCurrency': result.pricing.currency,
-      'displayCurrency': 'AUD',
+      'displayCurrency': _displayCurrency,
       'correctionSource': 'scan_review',
       'identity': {
         'title': result.title,
