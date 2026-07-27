@@ -1098,14 +1098,13 @@ class _CatalogResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = _formatCatalogValue(result);
+    final hasValue = _hasCatalogValue(result);
     final subtitle = [
       result.category,
       result.setName,
       result.identifier,
     ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' - ');
-    final confidence = result.confidence == null
-        ? null
-        : '${(result.confidence!.clamp(0, 1) * 100).round()}% match';
+    final sourceLabel = result.source;
     return Semantics(
       button: true,
       label: 'Open ${result.title}',
@@ -1114,18 +1113,22 @@ class _CatalogResultCard extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: _SurfaceCard(
+          padding: const EdgeInsets.all(14),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _CatalogPlaceholderThumbnail(
-                key: ValueKey('discover-catalog-placeholder-${result.id}'),
-                category: result.category,
-                title: result.title,
-                setName: result.setName,
+              SizedBox(
+                width: 64,
+                child: _CatalogPlaceholderThumbnail(
+                  key: ValueKey('discover-catalog-placeholder-${result.id}'),
+                  category: result.category,
+                  title: result.title,
+                  setName: result.setName,
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -1138,7 +1141,7 @@ class _CatalogResultCard extends StatelessWidget {
                         height: 1.12,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       subtitle.isEmpty ? result.source : subtitle,
                       maxLines: 2,
@@ -1149,41 +1152,108 @@ class _CatalogResultCard extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                    const SizedBox(height: 12),
+                    Row(
                       children: [
-                        _SearchPill(label: result.source),
-                        if (confidence != null) _SearchPill(label: confidence),
-                        if (result.attribution != null)
-                          _SearchPill(label: result.attribution!),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _CatalogValueBadge(
+                                value: value,
+                                hasValue: hasValue,
+                              ),
+                              _CatalogMetaPill(label: sourceLabel),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: PackLoxTokens.textSecondary,
+                          size: 22,
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: PackLoxTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: PackLoxTokens.textSecondary,
-                    size: 20,
-                  ),
-                ],
-              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogValueBadge extends StatelessWidget {
+  const _CatalogValueBadge({required this.value, required this.hasValue});
+
+  final String value;
+  final bool hasValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 126),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: hasValue
+              ? PackLoxTokens.cyan.withValues(alpha: 0.12)
+              : PackLoxTokens.textSecondary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: hasValue
+                ? PackLoxTokens.cyan.withValues(alpha: 0.28)
+                : PackLoxTokens.border.withValues(alpha: 0.82),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          child: Text(
+            hasValue ? value : 'Unavailable',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: hasValue
+                  ? PackLoxTokens.textPrimary
+                  : PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogMetaPill extends StatelessWidget {
+  const _CatalogMetaPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 124),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surfaceRaised.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: PackLoxTokens.border.withValues(alpha: 0.8)),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w800,
+            height: 1,
           ),
         ),
       ),
@@ -2646,7 +2716,7 @@ String _formatSearchValue(CollectibleItem item) {
 String _formatCatalogValue(CatalogSearchResult result) {
   final value = result.marketValue;
   if (value == null || value <= 0) {
-    return 'No price';
+    return 'Price unavailable';
   }
   final amount = _formatCatalogAmount(value);
   final withCommas = amount.replaceFirstMapped(
@@ -2663,6 +2733,11 @@ String _formatCatalogValue(CatalogSearchResult result) {
     return 'USD \$$withCommas';
   }
   return '$currency $withCommas';
+}
+
+bool _hasCatalogValue(CatalogSearchResult result) {
+  final value = result.marketValue;
+  return value != null && value > 0;
 }
 
 String _formatOptionalCatalogValue(double? value, String currency) {

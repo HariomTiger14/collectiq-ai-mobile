@@ -117,9 +117,10 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
   final displayName = authState.isSignedIn
       ? authState.user?.displayName.trim() ?? ''
       : '';
-  final firstName = displayName.isEmpty
+  final safeDisplayName = displayName.contains('@') ? '' : displayName;
+  final firstName = safeDisplayName.isEmpty
       ? 'Collector'
-      : displayName.split(RegExp(r'\s+')).first;
+      : safeDisplayName.split(RegExp(r'\s+')).first;
   final period = switch (now.hour) {
     < 12 => 'Good morning',
     < 18 => 'Good afternoon',

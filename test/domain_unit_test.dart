@@ -38,6 +38,7 @@ import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_a
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/home/data/repositories/shared_preferences_portfolio_history_repository.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/features/home/domain/services/portfolio_history_service.dart';
 import 'package:collectiq_ai/features/home/domain/services/smart_collector_insights_service.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
@@ -1048,6 +1049,33 @@ void main() {
         expect(csv, isNot(contains('Unknown')));
       },
     );
+  });
+
+  group('CatalogSearchResult', () {
+    test('parses backend pricing market value for Discover cards', () {
+      final result = CatalogSearchResult.fromJson({
+        'id': '10769851',
+        'title': 'Pikachu',
+        'category': 'Pokemon Cards',
+        'source': 'PriceCharting',
+        'setName': 'Pokemon My First Battle',
+        'pricing': {
+          'currency': 'USD',
+          'marketValue': 14.07,
+          'lowEstimate': 10.0,
+          'highEstimate': 25.32,
+          'loosePrice': 14.07,
+          'cibPrice': 10.0,
+          'newPrice': 13.03,
+          'gradedPrice': 25.32,
+        },
+      });
+
+      expect(result.currency, 'USD');
+      expect(result.marketValue, 14.07);
+      expect(result.lowEstimate, 10.0);
+      expect(result.highEstimate, 25.32);
+    });
   });
 
   group('RecognitionResult', () {

@@ -135,6 +135,11 @@ class CatalogSearchResult {
           _number(json['marketValue']) ??
           _number(json['valueAud']) ??
           _number(json['price']) ??
+          _number(pricing['marketValue']) ??
+          _number(pricing['loosePrice']) ??
+          _number(pricing['cibPrice']) ??
+          _number(pricing['newPrice']) ??
+          _number(pricing['gradedPrice']) ??
           _number(pricing['estimatedMarketValue']),
       lowEstimate:
           _number(json['lowEstimate']) ?? _number(pricing['lowEstimate']),

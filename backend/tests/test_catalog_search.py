@@ -79,6 +79,53 @@ class CatalogSearchServiceTest(unittest.TestCase):
         self.assertEqual(response.count, 0)
         self.assertEqual(response.results, [])
 
+    def test_search_prioritizes_priced_results_for_broad_queries(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "pricecharting_id": "unpriced-perfect",
+                        "product_name": "Pikachu",
+                        "console_name": "Pokemon Cards",
+                        "category": "Pokemon Cards",
+                        "loose_price_cents": None,
+                        "cib_price_cents": None,
+                        "new_price_cents": None,
+                        "graded_price_cents": None,
+                        "currency": "USD",
+                        "source_file": "pokemon.csv",
+                        "normalized_identity": "pikachu pokemon cards",
+                    },
+                    {
+                        "pricecharting_id": "priced-match",
+                        "product_name": "Pikachu V #43",
+                        "console_name": "Pokemon Cards",
+                        "category": "Pokemon Cards",
+                        "loose_price_cents": 175,
+                        "cib_price_cents": None,
+                        "new_price_cents": None,
+                        "graded_price_cents": 1200,
+                        "currency": "USD",
+                        "source_file": "pokemon.csv",
+                        "normalized_identity": "pikachu v #43 pokemon cards",
+                    },
+                ],
+            )
+
+        service = CatalogSearchService(
+            supabase_url="https://example.supabase.co",
+            service_role_key="service-role",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+
+        response = service.search("pikachu", limit=10)
+
+        self.assertEqual(response.count, 2)
+        self.assertEqual(response.results[0].id, "priced-match")
+        self.assertEqual(response.results[0].pricing.marketValue, 1.75)
+        self.assertEqual(response.results[1].id, "unpriced-perfect")
+
 
 class CatalogSearchEndpointTest(unittest.TestCase):
     def setUp(self) -> None:

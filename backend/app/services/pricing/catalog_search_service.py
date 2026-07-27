@@ -159,7 +159,18 @@ def _pricing_from_row(row: dict[str, Any]) -> CatalogSearchPricing:
 
 
 def _rank_rows(rows: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
-    return sorted(rows, key=lambda row: (-_match_score(row, query), str(row.get("product_name") or "")))
+    return sorted(
+        rows,
+        key=lambda row: (
+            -_priced_rank(row),
+            -_match_score(row, query),
+            str(row.get("product_name") or ""),
+        ),
+    )
+
+
+def _priced_rank(row: dict[str, Any]) -> int:
+    return 1 if _pricing_from_row(row).marketValue is not None else 0
 
 
 def _match_confidence(row: dict[str, Any], query: str) -> float:

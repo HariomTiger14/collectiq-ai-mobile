@@ -30,7 +30,11 @@ class GlassBottomNavBar extends StatelessWidget {
   }
 
   static double scrollContentClearance(BuildContext context) {
-    return heightFor(context) + AppSpacing.xs + bottomBreathingGap;
+    final mediaQuery = MediaQuery.of(context);
+    return heightFor(context) +
+        mediaQuery.padding.bottom +
+        AppSpacing.xs +
+        bottomBreathingGap;
   }
 
   static double bodyContentInset(BuildContext context) {

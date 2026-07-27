@@ -59,28 +59,18 @@ class PackLoxHeader extends StatelessWidget {
                 if (profileLoading)
                   const SizedBox(width: 160, height: 32)
                 else
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        name,
-                        key: const ValueKey('scan-hub-title'),
-                        style: const TextStyle(
-                          color: PackLoxTokens.textPrimary,
-                          fontSize: 30,
-                          height: 1.18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -1.05,
-                        ),
-                      ),
-                      const ExcludeSemantics(
-                        child: Text(
-                          '\u{1F44B}',
-                          style: TextStyle(fontSize: 24, height: 1),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    name,
+                    key: const ValueKey('scan-hub-title'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: PackLoxTokens.textPrimary,
+                      fontSize: 30,
+                      height: 1.18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
                   ),
               ],
             ),
