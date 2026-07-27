@@ -59,6 +59,15 @@ class ScanPricingQuoteService {
     return ScanPricingQuote.fromRepriceJson(payload);
   }
 
+  Future<ScanPricingQuote> repriceItem(CollectibleItem item) async {
+    final response = await _apiClient.post(
+      ApiConstants.pricingRepricePath,
+      data: _repriceRequestForItem(item),
+    );
+    final payload = _unwrapResponse(response.data);
+    return ScanPricingQuote.fromRepriceJson(payload);
+  }
+
   Map<String, dynamic> _requestFor(ScanResult result) {
     return {
       'itemName': result.title,
@@ -121,6 +130,33 @@ class ScanPricingQuoteService {
         'playerOrCharacter': result.playerOrCharacter,
         'estimatedGrade': result.estimatedGrade,
         'notes': result.notes,
+      },
+    };
+  }
+
+  Map<String, dynamic> _repriceRequestForItem(CollectibleItem item) {
+    return {
+      'itemId': item.id,
+      'previousValue':
+          item.pricing?.estimatedMarketValue ?? item.estimatedValue,
+      'previousCurrency': item.pricing?.currency,
+      'displayCurrency': _displayCurrency,
+      'correctionSource': 'portfolio_manual_correction',
+      'identity': {
+        'title': item.title,
+        'category': item.category,
+        'brand': item.brand,
+        'setName': item.setName,
+        'series': item.series,
+        'cardNumber': item.cardNumber,
+        'condition': item.condition,
+        'year': item.year,
+        'edition': item.edition,
+        'language': item.language,
+        'rarity': item.rarity,
+        'playerOrCharacter': item.playerOrCharacter,
+        'estimatedGrade': item.estimatedGrade,
+        'notes': item.notes,
       },
     };
   }

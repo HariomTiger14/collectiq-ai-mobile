@@ -2597,8 +2597,8 @@ class _DetailActionsMenuSection extends StatelessWidget {
           _DetailActionMenuRow(
             key: const ValueKey('collectible-detail-primary-edit-action'),
             icon: Icons.edit_outlined,
-            label: 'Review details',
-            description: 'Correct identifiers and retry pricing',
+            label: 'Correct & reprice',
+            description: 'Fix identifiers, then run trusted pricing again',
             onTap: onEdit,
           ),
           _DetailActionMenuRow(
@@ -4200,7 +4200,7 @@ Future<void> _showEditCollectibleDialog({
     try {
       final quote = await ref
           .read(scanPricingQuoteServiceProvider)
-          .quoteItem(nextItem);
+          .repriceItem(nextItem);
       refreshedStatus = quote.valuationStatus;
       hasRefreshedValue =
           quote.valuationStatus == ValuationStatus.marketEstimated &&
@@ -4209,16 +4209,12 @@ Future<void> _showEditCollectibleDialog({
         estimatedValue: hasRefreshedValue
             ? quote.estimatedValue
             : nextItem.estimatedValue,
-        pricing: hasRefreshedValue ? quote.pricing : nextItem.pricing,
+        pricing: quote.pricing,
         marketSummary: hasRefreshedValue
             ? quote.marketSummary ?? nextItem.marketSummary
             : nextItem.marketSummary,
-        valuationStatus: hasRefreshedValue
-            ? quote.valuationStatus
-            : nextItem.valuationStatus,
-        valuationSource: hasRefreshedValue
-            ? quote.valuationSource
-            : nextItem.valuationSource,
+        valuationStatus: quote.valuationStatus,
+        valuationSource: quote.valuationSource,
         aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
         valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
         lastValueRefreshedAt: hasRefreshedValue
@@ -4459,7 +4455,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Update saved details, or retry pricing after correcting identifiers like set, card number, edition, language, and condition.',
+                            'Correct identifiers like set, card number, edition, language, and condition. Repricing uses trusted market sources, not a user-entered value.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: HomeTokens.textSecondary,
@@ -4633,7 +4629,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                       ),
                       onPressed: () => _save(retryPricing: true),
                       icon: const Icon(Icons.manage_search_outlined, size: 18),
-                      label: const Text('Save & retry pricing'),
+                      label: const Text('Save & reprice'),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF8BE7FF),
                         foregroundColor: const Color(0xFF07111D),

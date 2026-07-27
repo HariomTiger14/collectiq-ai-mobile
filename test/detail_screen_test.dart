@@ -387,6 +387,64 @@ void main() {
     expect(find.text('No reliable market match yet'), findsOneWidget);
   });
 
+  testWidgets('correct and reprice uses backend reprice contract', (
+    tester,
+  ) async {
+    final item = _authorityItem();
+    final repository = _MemoryPortfolioRepository([item]);
+    final apiClient = _SuccessfulRepriceApiClient();
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: apiClient,
+    );
+
+    await _openEditSheet(tester);
+    expect(find.text('Save & reprice'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-title-field')),
+      '1999 Pokemon Charizard Holo',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-category-field')),
+      'Pokemon Card',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-set-field')),
+      'Base Set',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-collectible-card-number-field')),
+      '4/102',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('edit-collectible-save-retry-pricing-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(apiClient.lastPath, ApiConstants.pricingRepricePath);
+    final payload = apiClient.lastPayload;
+    expect(payload['correctionSource'], 'portfolio_manual_correction');
+    final identity = payload['identity'] as Map<String, dynamic>;
+    expect(identity['title'], '1999 Pokemon Charizard Holo');
+    expect(identity['category'], 'Pokemon Card');
+    expect(identity['setName'], 'Base Set');
+    expect(identity['cardNumber'], '4/102');
+
+    final updated = repository.items.single;
+    expect(updated.title, '1999 Pokemon Charizard Holo');
+    expect(updated.category, 'Pokemon Card');
+    expect(updated.estimatedValue, 310);
+    expect(updated.valuationStatus, ValuationStatus.marketEstimated);
+    expect(updated.valuationSource, 'PriceCharting');
+    expect(updated.pricing?.pricingSource, 'PriceCharting');
+    expect(updated.pricing?.reasonCode, isNull);
+    expect(updated.valueAtScan, item.valueAtScan);
+    expect(find.text('Details saved and pricing refreshed'), findsOneWidget);
+  });
+
   testWidgets('catalog saved item shows valuation snapshot evidence', (
     tester,
   ) async {
@@ -894,6 +952,56 @@ class _UnavailablePricingApiClient extends ApiClient {
             'reasonCode': 'NO_MARKET_MATCH',
             'valuationStrategy': 'catalog_lookup',
           },
+        },
+      },
+    );
+  }
+}
+
+class _SuccessfulRepriceApiClient extends ApiClient {
+  _SuccessfulRepriceApiClient()
+    : super(
+        config: const EnvironmentConfig(
+          environment: AppEnvironment.development,
+        ),
+      );
+
+  String? lastPath;
+  Map<String, dynamic> lastPayload = const {};
+
+  @override
+  Future<dio.Response<dynamic>> post(
+    String path, {
+    Object? data,
+    dio.Options? options,
+  }) async {
+    lastPath = path;
+    lastPayload = Map<String, dynamic>.from(data! as Map);
+    return dio.Response<dynamic>(
+      requestOptions: dio.RequestOptions(path: path),
+      data: {
+        'success': true,
+        'pricing': {
+          'status': 'available',
+          'estimatedMarketValue': 310,
+          'lowEstimate': 290,
+          'highEstimate': 340,
+          'currency': 'USD',
+          'displayString': 'USD \$310.00',
+          'confidenceScore': 0.88,
+          'pricingConfidence': 88,
+          'valuationStrategy': 'catalog_lookup',
+          'pricingSource': {
+            'name': 'PriceCharting',
+            'attributionText': 'Pricing data powered by PriceCharting',
+            'lastChecked': '2026-07-27T00:00:00Z',
+          },
+          'originalMarketPayload': {'price': 310, 'currency': 'USD'},
+          'matchMetadata': {
+            'reason': 'Matched by corrected title, set, and card number.',
+          },
+          'comparableSales': const [],
+          'diagnostics': const {},
         },
       },
     );
