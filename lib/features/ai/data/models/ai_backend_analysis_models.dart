@@ -90,6 +90,7 @@ class AiBackendAnalysisResponse {
     required this.estimatedValue,
     required this.lowEstimate,
     required this.highEstimate,
+    required this.currency,
     required this.confidence,
     required this.condition,
     required this.marketTrend,
@@ -117,6 +118,7 @@ class AiBackendAnalysisResponse {
   final double estimatedValue;
   final double lowEstimate;
   final double highEstimate;
+  final String currency;
   final double confidence;
   final String condition;
   final String marketTrend;
@@ -197,6 +199,10 @@ class AiBackendAnalysisResponse {
       estimatedValue: estimatedValue,
       lowEstimate: lowEstimate,
       highEstimate: highEstimate,
+      currency: parseString(
+        json['currency'] ?? marketSource['currency'],
+        fallback: 'AUD',
+      ).toUpperCase(),
       confidence: _normalizeConfidence(
         json['confidence'] ?? aiDetected['confidence'],
       ),
@@ -322,16 +328,22 @@ class AiBackendAnalysisResponse {
         estimatedMarketValue ??
         parseNullableDouble(marketSource['estimatedValue']) ??
         estimatedValue;
-    final pricingSource = valuationSource == 'unknown'
-        ? resolvedMarketSummary == null || resolvedMarketSummary.sources.isEmpty
-              ? 'Backend AI'
-              : resolvedMarketSummary.sources.first
-        : valuationSource;
+    final marketPricingSource = _optionalString(marketSource['pricingSource']);
+    final pricingSourceName = _optionalString(pricingSourcePayload['name']);
+    final pricingSource =
+        marketPricingSource ??
+        pricingSourceName ??
+        (valuationSource == 'unknown'
+            ? resolvedMarketSummary == null ||
+                      resolvedMarketSummary.sources.isEmpty
+                  ? 'Backend AI'
+                  : resolvedMarketSummary.sources.first
+            : valuationSource);
     final pricing = PricingInfo(
       estimatedMarketValue: resolvedEstimatedMarketValue,
       lowEstimate: lowEstimate,
       highEstimate: highEstimate,
-      currency: parseString(marketSource['currency'], fallback: 'AUD'),
+      currency: currency,
       pricingSource: pricingSource,
       pricingConfidence:
           valuationConfidence ?? resolvedMarketSummary?.confidence ?? 0,

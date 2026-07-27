@@ -4,9 +4,11 @@ import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_usage_repository.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/sit_dummy_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/unavailable_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_exception.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/purchase_result.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
@@ -68,8 +70,24 @@ final googlePlayBillingConfigProvider = Provider<GooglePlayBillingConfig>((
   return GooglePlayBillingConfig.fromEnvironment();
 });
 
+/// Provides SIT dummy billing config.
+final sitDummyBillingConfigProvider = Provider<SitDummyBillingConfig>((ref) {
+  return SitDummyBillingConfig.fromEnvironment();
+});
+
+/// Whether this build has any billing provider configured.
+final paymentsConfiguredProvider = Provider<bool>((ref) {
+  return ref.watch(sitDummyBillingConfigProvider).enabled ||
+      ref.watch(googlePlayBillingConfigProvider).enabled;
+});
+
 /// Provides billing repository.
 final billingRepositoryProvider = Provider<BillingRepository>((ref) {
+  final sitConfig = ref.watch(sitDummyBillingConfigProvider);
+  if (sitConfig.enabled) {
+    return SitDummyBillingRepository(config: sitConfig);
+  }
+
   final config = ref.watch(googlePlayBillingConfigProvider);
   if (!config.enabled) {
     return const UnavailableBillingRepository();
@@ -88,7 +106,7 @@ final userEntitlementsProvider = Provider<UserEntitlements>((ref) {
   return UserEntitlements.forPlan(
     plan: UserEntitlements.developmentFree.plan,
     freeLimit: ref.watch(usageLimitConfigProvider).usageLimit,
-    paymentsConfigured: ref.watch(googlePlayBillingConfigProvider).enabled,
+    paymentsConfigured: ref.watch(paymentsConfiguredProvider),
   );
 });
 
@@ -106,6 +124,7 @@ class SubscriptionState {
     this.products = const [],
     this.isBillingAvailable = false,
     this.purchaseMessage,
+    this.priceRefreshesUsedThisMonth = 0,
     this.isLoading = false,
     this.errorMessage,
   }) : entitlements = entitlements ?? UserEntitlements.developmentFree,
@@ -131,6 +150,9 @@ class SubscriptionState {
   /// Last purchase or restore message.
   final String? purchaseMessage;
 
+  /// Manual price refreshes used in the current local month.
+  final int priceRefreshesUsedThisMonth;
+
   /// Whether usage state is loading.
   final bool isLoading;
 
@@ -150,6 +172,23 @@ class SubscriptionState {
     return 'Not configured';
   }
 
+  /// Remaining manual price refreshes this month.
+  int get remainingPriceRefreshes {
+    final limit = entitlements.planLimits.monthlyPriceRefreshes;
+    return (limit - priceRefreshesUsedThisMonth).clamp(0, 1 << 30);
+  }
+
+  /// User-facing monthly refresh usage label.
+  String get priceRefreshUsageLabel {
+    return '$priceRefreshesUsedThisMonth / ${entitlements.planLimits.monthlyPriceRefreshes}';
+  }
+
+  /// Whether another manual price refresh is available.
+  bool get canRefreshValue {
+    return priceRefreshesUsedThisMonth <
+        entitlements.planLimits.monthlyPriceRefreshes;
+  }
+
   /// Creates a copy.
   SubscriptionState copyWith({
     UserEntitlements? entitlements,
@@ -157,6 +196,7 @@ class SubscriptionState {
     List<BillingProduct>? products,
     bool? isBillingAvailable,
     String? purchaseMessage,
+    int? priceRefreshesUsedThisMonth,
     bool? isLoading,
     String? errorMessage,
     bool clearPurchaseMessage = false,
@@ -170,6 +210,8 @@ class SubscriptionState {
       purchaseMessage: clearPurchaseMessage
           ? null
           : purchaseMessage ?? this.purchaseMessage,
+      priceRefreshesUsedThisMonth:
+          priceRefreshesUsedThisMonth ?? this.priceRefreshesUsedThisMonth,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage
           ? null
@@ -184,7 +226,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
   late final EntitlementRepository _entitlementRepository;
   late final BillingRepository _billingRepository;
   late final UsageLimitConfig _usageConfig;
-  late final GooglePlayBillingConfig _billingConfig;
+  late final bool _paymentsConfigured;
   late final AppTelemetryService _telemetry;
 
   @override
@@ -193,7 +235,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     _entitlementRepository = ref.watch(entitlementRepositoryProvider);
     _billingRepository = ref.watch(billingRepositoryProvider);
     _usageConfig = ref.watch(usageLimitConfigProvider);
-    _billingConfig = ref.watch(googlePlayBillingConfigProvider);
+    _paymentsConfigured = ref.watch(paymentsConfiguredProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     final entitlements = ref.watch(userEntitlementsProvider);
     Future.microtask(() async {
@@ -219,6 +261,8 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final used = await _usageRepository.scansUsedToday();
+      final refreshesUsed = await _usageRepository
+          .priceRefreshesUsedThisMonth();
       final plan = await _entitlementRepository.loadPlan();
       final billingAvailable = await _billingRepository.isAvailable();
       var products = state.products;
@@ -237,7 +281,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       final entitlements = UserEntitlements.forPlan(
         plan: plan,
         freeLimit: _usageConfig.usageLimit,
-        paymentsConfigured: _billingConfig.enabled,
+        paymentsConfigured: _paymentsConfigured,
       );
       if (!ref.mounted) {
         return;
@@ -248,6 +292,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
           limit: entitlements.usageLimit,
           scansUsedToday: used,
         ),
+        priceRefreshesUsedThisMonth: refreshesUsed,
         products: products,
         isBillingAvailable: billingAvailable,
         isLoading: false,
@@ -291,6 +336,34 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     } on Object catch (error) {
       debugPrint('[Subscription] increment usage failed: $error');
       state = state.copyWith(errorMessage: 'Usage tracking will update later.');
+    }
+  }
+
+  /// Throws if a manual price refresh is not allowed by current monthly limits.
+  Future<void> ensureCanRefreshValue() async {
+    await loadUsage();
+    if (state.canRefreshValue) {
+      return;
+    }
+
+    throw SubscriptionException(
+      'Monthly price refresh limit reached. Your ${state.entitlements.plan.displayName} plan includes ${state.entitlements.planLimits.monthlyPriceRefreshes} refreshes per month.',
+    );
+  }
+
+  /// Records a successful manual value refresh.
+  Future<void> recordSuccessfulPriceRefresh() async {
+    try {
+      final used = await _usageRepository.incrementPriceRefreshesThisMonth();
+      state = state.copyWith(
+        priceRefreshesUsedThisMonth: used,
+        clearErrorMessage: true,
+      );
+    } on Object catch (error) {
+      debugPrint('[Subscription] increment price refresh failed: $error');
+      state = state.copyWith(
+        errorMessage: 'Refresh usage tracking will update later.',
+      );
     }
   }
 
@@ -367,7 +440,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       final entitlements = UserEntitlements.forPlan(
         plan: plan,
         freeLimit: _usageConfig.usageLimit,
-        paymentsConfigured: _billingConfig.enabled,
+        paymentsConfigured: _paymentsConfigured,
       );
       state = state.copyWith(
         entitlements: entitlements,
@@ -427,3 +500,8 @@ final subscriptionControllerProvider =
     NotifierProvider<SubscriptionController, SubscriptionState>(
       SubscriptionController.new,
     );
+
+/// Provides the active feature limits for the current plan.
+final activePlanLimitsProvider = Provider<PlanLimits>((ref) {
+  return ref.watch(subscriptionControllerProvider).entitlements.planLimits;
+});

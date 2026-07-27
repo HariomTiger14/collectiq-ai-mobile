@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,6 +79,25 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-card-1')),
     );
     expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
+  });
+
+  testWidgets('free plan keeps advanced filters visibly locked', (
+    tester,
+  ) async {
+    _seedPortfolio([_item('free-card', 'Free Plan Charizard', 1850)]);
+    await _pumpPortfolio(tester);
+
+    await _tapPortfolioToolbarButton(
+      tester,
+      const ValueKey('portfolio-action-filter'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_portfolioSheet, findsNothing);
+    expect(
+      find.text('Advanced filters are included with Pro and Premium.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('unavailable valuation is distinct from genuine zero', (
@@ -307,9 +330,12 @@ void main() {
 
   testWidgets('opens combined filter and sort bottom sheet', (tester) async {
     _seedPortfolio([_item('sort-card', 'Pokemon Charizard', 1850)]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
-    await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
+    await _tapPortfolioToolbarButton(
+      tester,
+      const ValueKey('portfolio-action-sort'),
+    );
     await tester.pumpAndSettle();
 
     expect(_portfolioSheet, findsOneWidget);
@@ -320,7 +346,7 @@ void main() {
       find.byKey(const ValueKey('portfolio-sort-option-status')),
       findsOneWidget,
     );
-    expect(find.text('Valued'), findsOneWidget);
+    expect(find.text('Valued'), findsWidgets);
     await _revealSheetControl(tester, const ValueKey('portfolio-filter-reset'));
     await _revealSheetControl(tester, const ValueKey('portfolio-filter-apply'));
   });
@@ -330,7 +356,7 @@ void main() {
       _item('low-card', 'Low Value Card', 12),
       _item('high-card', 'High Value Card', 240),
     ]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
     await _revealPortfolio(
       tester,
@@ -344,8 +370,10 @@ void main() {
       _itemTop(tester, 'low-card'),
       lessThan(_itemTop(tester, 'high-card')),
     );
-    await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
-    await tester.pumpAndSettle();
+    await _tapPortfolioToolbarButton(
+      tester,
+      const ValueKey('portfolio-action-filter'),
+    );
 
     await tester.tap(
       find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
@@ -358,8 +386,10 @@ void main() {
       lessThan(_itemTop(tester, 'high-card')),
     );
 
-    await tester.tap(find.byKey(const ValueKey('portfolio-action-sort')));
-    await tester.pumpAndSettle();
+    await _tapPortfolioToolbarButton(
+      tester,
+      const ValueKey('portfolio-action-sort'),
+    );
     await tester.tap(
       find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
     );
@@ -387,7 +417,7 @@ void main() {
         valuationStatus: 'provider_not_configured',
       ),
     ]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
@@ -420,7 +450,7 @@ void main() {
         valuationStatus: 'provider_not_configured',
       ),
     ]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
@@ -445,6 +475,10 @@ void main() {
       tester,
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
     );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-filter'),
+    );
     expect(find.text('Filter'), findsOneWidget);
     expect(find.text('Recent'), findsOneWidget);
   });
@@ -456,7 +490,7 @@ void main() {
       _item('valued-card', 'Valued Charizard', 1850),
       _item('valued-coin', 'Valued Silver Eagle', 52, category: 'Coin'),
     ]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.enterText(
       find.byKey(const ValueKey('portfolio-search-field-')),
@@ -490,7 +524,7 @@ void main() {
       _item('low-coin', 'Low Silver Eagle', 52, category: 'Coin'),
       _item('high-coin', 'High Silver Eagle', 250, category: 'Coin'),
     ]);
-    await _pumpPortfolio(tester);
+    await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
@@ -529,6 +563,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
       findsNothing,
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-filter'),
     );
     expect(find.text('Filter (1)'), findsOneWidget);
     expect(find.text('High value'), findsOneWidget);
@@ -644,12 +682,22 @@ Future<void> _pumpPortfolio(
   TextScaler textScaler = TextScaler.noScaling,
   PortfolioPreviewScenario? previewScenario,
   VoidCallback? onScanPressed,
+  bool paidFeatures = false,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        if (paidFeatures)
+          activePlanLimitsProvider.overrideWithValue(
+            PlanLimits.forPlan(
+              plan: SubscriptionPlan.pro,
+              freeScanLimit: const UsageLimit(dailyFreeScanLimit: 25),
+            ),
+          ),
+      ],
       child: MaterialApp(
         theme: AppTheme.dark,
         darkTheme: AppTheme.dark,
@@ -680,6 +728,33 @@ Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
     }
     await tester.drag(scroll.first, const Offset(0, -260));
     await tester.pump();
+  }
+  expect(finder, findsOneWidget);
+}
+
+Future<void> _tapPortfolioToolbarButton(
+  WidgetTester tester,
+  ValueKey<String> key,
+) async {
+  await _revealToolbarControl(tester, key);
+  await tester.tap(find.byKey(key));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _revealToolbarControl(
+  WidgetTester tester,
+  ValueKey<String> key,
+) async {
+  final finder = find.byKey(key);
+  final scroll = find.byType(CustomScrollView);
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(scroll.first, const Offset(0, 260));
+    await tester.pumpAndSettle();
   }
   expect(finder, findsOneWidget);
 }

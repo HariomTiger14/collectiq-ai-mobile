@@ -10,6 +10,15 @@ from app.services.pricing.mock_pricing_provider import MockPricingProvider
 from app.services.pricing.pricecharting_pricing_provider import (
     PriceChartingPricingProvider,
 )
+from app.services.pricing.pricecharting_catalog_provider import (
+    PriceChartingCatalogPricingProvider,
+)
+from app.services.pricing.currency_conversion import CurrencyConversionCache
+from app.services.pricing.pricing_engine import (
+    MultiProviderPricingEngine,
+    PricingProviderKey,
+    ProviderRegistration,
+)
 from app.services.pricing.tcgplayer_pricing_provider import TCGPlayerPricingProvider
 
 
@@ -37,20 +46,24 @@ _pricecharting_provider = PriceChartingPricingProvider(
     cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
     min_interval_ms=settings.pricing_provider_min_interval_ms,
 )
+_pricecharting_catalog_provider = PriceChartingCatalogPricingProvider(
+    timeout_seconds=settings.pricecharting_timeout_seconds,
+    cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
+)
 
 
 class AutoPricingProvider(PricingProvider):
     provider_name = "auto"
 
     def price(self, recognition: RecognitionResult):
-        providers = _providers_for_recognition(recognition)
-        if not providers:
-            raise PricingProviderUnavailableError(
-                "No real pricing provider is configured for this collectible. "
-                "Set EBAY_ACCESS_TOKEN, TCGPLAYER_CLIENT_ID/TCGPLAYER_CLIENT_SECRET, "
-                "or PRICECHARTING_API_KEY."
-            )
-        return PricingAggregationService(providers).price(recognition)
+        return MultiProviderPricingEngine(
+            registry=_provider_registry(),
+            currency_converter=CurrencyConversionCache(
+                target_currency=settings.pricing_target_currency,
+                rates_json=settings.pricing_currency_rates_json,
+                ttl_seconds=settings.pricing_currency_cache_ttl_seconds,
+            ),
+        ).price(recognition)
 
 
 _auto_provider = AutoPricingProvider()
@@ -59,7 +72,7 @@ _auto_provider = AutoPricingProvider()
 def get_pricing_provider(provider_name: str | None = None) -> PricingProvider:
     selected_provider = (provider_name or settings.pricing_provider).strip().lower()
 
-    if selected_provider in {"auto", "real"}:
+    if selected_provider in {"auto", "real", "engine", "multi_provider"}:
         return _auto_provider
 
     if selected_provider == "mock":
@@ -74,6 +87,9 @@ def get_pricing_provider(provider_name: str | None = None) -> PricingProvider:
     if selected_provider == "pricecharting":
         return _pricecharting_provider
 
+    if selected_provider in {"pricecharting_catalog", "catalog"}:
+        return _pricecharting_catalog_provider
+
     if selected_provider == "aggregate":
         providers = _configured_providers(
             [_ebay_provider, _tcgplayer_provider, _pricecharting_provider]
@@ -87,8 +103,73 @@ def get_pricing_provider(provider_name: str | None = None) -> PricingProvider:
 
     raise PricingProviderUnavailableError(
         f"Unsupported PRICING_PROVIDER '{selected_provider}'. "
-        "Supported providers: auto, mock, ebay, tcgplayer, pricecharting, aggregate."
+        "Supported providers: auto, mock, ebay, tcgplayer, pricecharting, "
+        "pricecharting_catalog, aggregate."
     )
+
+
+def _provider_registry() -> dict[PricingProviderKey, ProviderRegistration]:
+    return {
+        PricingProviderKey.PRICECHARTING_CATALOG: ProviderRegistration(
+            key=PricingProviderKey.PRICECHARTING_CATALOG,
+            provider=_pricecharting_catalog_provider,
+            display_name="PriceCharting",
+            attribution_text="Pricing data powered by PriceCharting",
+            configured=_pricecharting_catalog_provider.is_configured,
+            minimum_comps=1,
+            valuation_strategy="catalog_guide",
+        ),
+        PricingProviderKey.PRICECHARTING_API: ProviderRegistration(
+            key=PricingProviderKey.PRICECHARTING_API,
+            provider=_pricecharting_provider,
+            display_name="PriceCharting",
+            attribution_text="Pricing data powered by PriceCharting",
+            configured=bool(_provider_value(_pricecharting_provider, "_api_key")),
+            minimum_comps=1,
+            valuation_strategy="catalog_guide",
+        ),
+        PricingProviderKey.EBAY: ProviderRegistration(
+            key=PricingProviderKey.EBAY,
+            provider=_ebay_provider,
+            display_name="eBay sold comps",
+            attribution_text="Market data powered by eBay",
+            configured=bool(_provider_value(_ebay_provider, "_access_token")),
+            minimum_comps=3,
+            valuation_strategy="sold_completed",
+        ),
+        PricingProviderKey.TCGPLAYER: ProviderRegistration(
+            key=PricingProviderKey.TCGPLAYER,
+            provider=_tcgplayer_provider,
+            display_name="TCGplayer",
+            attribution_text="Market data powered by TCGplayer",
+            configured=bool(
+                _provider_value(_tcgplayer_provider, "_client_id")
+                and _provider_value(_tcgplayer_provider, "_client_secret")
+            ),
+            minimum_comps=1,
+            valuation_strategy="market_price",
+        ),
+        PricingProviderKey.KICKSDB: ProviderRegistration(
+            key=PricingProviderKey.KICKSDB,
+            provider=None,
+            display_name="KicksDB",
+            attribution_text="Market data powered by KicksDB",
+            configured=False,
+            minimum_comps=3,
+            valuation_strategy="sold_completed",
+            planned=True,
+        ),
+        PricingProviderKey.WATCHCHARTS: ProviderRegistration(
+            key=PricingProviderKey.WATCHCHARTS,
+            provider=None,
+            display_name="WatchCharts",
+            attribution_text="Market data powered by WatchCharts",
+            configured=False,
+            minimum_comps=3,
+            valuation_strategy="specialist_appraisal",
+            planned=True,
+        ),
+    }
 
 
 def _providers_for_recognition(recognition: RecognitionResult) -> list[PricingProvider]:

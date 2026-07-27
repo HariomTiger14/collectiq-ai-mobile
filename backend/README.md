@@ -76,6 +76,9 @@ PRICECHARTING_API_BASE=https://www.pricecharting.com
 PRICECHARTING_TIMEOUT_SECONDS=10
 PRICING_CACHE_TTL_SECONDS=900
 PRICING_PROVIDER_MIN_INTERVAL_MS=250
+PRICING_TARGET_CURRENCY=AUD
+PRICING_CURRENCY_RATES_JSON=
+PRICING_CURRENCY_CACHE_TTL_SECONDS=43200
 ```
 
 For v1.0 preparation, keep `AI_PROVIDER=mock` until the production backend AI
@@ -119,10 +122,16 @@ Provider selection:
 Pricing selection:
 
 - `PRICING_PROVIDER=mock`: default deterministic pricing and comparable sales.
+- `PRICING_PROVIDER=auto`: PackLox multi-provider pricing engine. It routes by
+  category, calls configured providers in deterministic priority order, applies
+  evidence rules, and returns a unified unavailable state when PackLox does not
+  have enough trusted market data.
 - `PRICING_PROVIDER=ebay`: backend-only eBay Browse API provider.
 - `PRICING_PROVIDER=tcgplayer`: backend-only TCGPlayer card pricing provider.
 - `PRICING_PROVIDER=pricecharting`: backend-only PriceCharting guide pricing
   provider.
+- `PRICING_PROVIDER=pricecharting_catalog`: backend-only lookup against the
+  imported PriceCharting CSV catalog in Supabase.
 - `PRICING_PROVIDER=aggregate`: blends available eBay, TCGPlayer, and
   PriceCharting provider data, with mock fallback when live providers fail.
 
@@ -135,6 +144,14 @@ The TCGPlayer provider requires `TCGPLAYER_CLIENT_ID` and
 refreshed server-side only. Flutter never receives TCGPlayer credentials or
 tokens. The PriceCharting provider requires `PRICECHARTING_API_KEY` in backend
 `.env` and normalizes guide prices into the existing Flutter pricing contract.
+The PriceCharting catalog provider requires `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`; it uses PackLox's imported CSV catalog and avoids
+calling PriceCharting's live API for every scan.
+
+Currency conversion is deterministic only. Set `PRICING_TARGET_CURRENCY` and a
+trusted `PRICING_CURRENCY_RATES_JSON` map such as `{"USD_AUD":1.52}` to convert
+provider values into the target display currency. If no trusted rate exists, the
+engine keeps the provider currency and records why conversion was not applied.
 
 When OpenAI is enabled, the backend sends the image to OpenAI's Responses API
 with a strict structured-output schema. The prompt asks for collectible

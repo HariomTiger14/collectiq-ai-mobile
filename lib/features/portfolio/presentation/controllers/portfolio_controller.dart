@@ -3,6 +3,7 @@ import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -103,6 +104,23 @@ class PortfolioController extends Notifier<PortfolioState> {
   Future<void> saveItem(CollectibleItem item) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
+      final persistedItemsBeforeSave = await _repository.getItems();
+      final replacingExisting = persistedItemsBeforeSave.any(
+        (existingItem) => existingItem.id == item.id,
+      );
+      final planLimits = ref.read(activePlanLimitsProvider);
+      if (!planLimits.canAddPortfolioItem(
+        persistedItemsBeforeSave.length,
+        replacingExisting: replacingExisting,
+      )) {
+        state = state.copyWith(
+          items: collectiblesNewestFirst(persistedItemsBeforeSave),
+          isLoading: false,
+          errorMessage: planLimits.portfolioLimitMessage,
+        );
+        return;
+      }
+
       final itemForSave = item.valueAtScan == null
           ? item.copyWith(valueAtScan: item.estimatedValue)
           : item;

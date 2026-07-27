@@ -516,26 +516,33 @@ class _MarketEvidence extends StatelessWidget {
   Widget build(BuildContext context) {
     final pricing = result.pricing;
     final explanation = pricing.pricingExplanation?.trim();
+    final sourceMarketValue = _sourceMarketValueLabel(pricing);
+    final reasonLabel = _pricingReasonLabel(pricing);
+    final attribution = pricing.attributionText?.trim();
+    final cacheReason = pricing.cachePolicyReason?.trim();
     return Column(
       children: [
         _ResultRow(
           label: 'Estimated market value',
           value: _primaryValueLabel(result),
         ),
-        if (_sourceMarketValueLabel(pricing) != null)
-          _ResultRow(
-            label: 'Source market value',
-            value: _sourceMarketValueLabel(pricing)!,
-          ),
+        if (sourceMarketValue != null)
+          _ResultRow(label: 'Original market value', value: sourceMarketValue),
         _ResultRow(label: 'Estimated range', value: _valueRange(result)),
         _ResultRow(
           label: 'Pricing source',
-          value: _fallback(pricing.pricingSource, _valueSourceLabel(result)),
+          value: _displayPricingSource(result),
         ),
         _ResultRow(
           label: 'Pricing confidence',
           value: '${(pricing.pricingConfidence.clamp(0, 1) * 100).round()}%',
         ),
+        if (reasonLabel != null)
+          _ResultRow(label: 'Pricing state', value: reasonLabel),
+        if (attribution != null && attribution.isNotEmpty)
+          _ResultRow(label: 'Attribution', value: attribution),
+        if (cacheReason != null && cacheReason.isNotEmpty)
+          _ResultRow(label: 'Refresh policy', value: cacheReason),
         _ResultRow(
           label: 'Last checked',
           value: _formatShortDate(pricing.lastUpdated),
@@ -1496,7 +1503,7 @@ String? _sourceMarketValueLabel(PricingInfo pricing) {
       originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
     return null;
   }
-  return 'Source: ${_formatMoney(originalPrice, originalCurrency)}';
+  return _formatMoney(originalPrice, originalCurrency);
 }
 
 String _formatScanValue(
@@ -1550,7 +1557,7 @@ String _valuationStatusMessage(ValuationStatus status) {
     ValuationStatus.lookupFailed => 'Value lookup failed - try again',
     ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
     ValuationStatus.marketEstimated => 'Market value unavailable',
-    ValuationStatus.unavailable => 'Value unavailable',
+    ValuationStatus.unavailable => 'Trusted value unavailable',
   };
 }
 
@@ -1573,15 +1580,89 @@ String _rarityLabel(ScanResult result) {
 }
 
 String _valueSourceLabel(ScanResult result) {
+  final pricing = result.pricing;
   if (result.valuationStatus == ValuationStatus.marketEstimated) {
-    return 'Market-informed estimate';
+    final source = _displayPricingSource(result);
+    return source == 'Pricing source pending'
+        ? 'Market-informed estimate'
+        : 'Market value by $source';
   }
   if (result.valuationStatus == ValuationStatus.aiEstimated) {
     return 'AI-estimated, not market verified';
   }
+  final reason = _pricingReasonLabel(pricing);
+  if (reason != null) {
+    return reason;
+  }
   return result.valuationSource == 'unknown'
       ? 'Pricing source pending'
-      : result.valuationSource;
+      : _humanizePricingToken(result.valuationSource);
+}
+
+String _displayPricingSource(ScanResult result) {
+  final pricing = result.pricing;
+  final source = pricing.pricingSource.trim();
+  if (source.isNotEmpty && source.toLowerCase() != 'unknown') {
+    return _humanizePricingToken(source);
+  }
+  final valuationSource = result.valuationSource.trim();
+  if (valuationSource.isNotEmpty &&
+      valuationSource.toLowerCase() != 'unknown') {
+    return _humanizePricingToken(valuationSource);
+  }
+  return 'Pricing source pending';
+}
+
+String? _pricingReasonLabel(PricingInfo pricing) {
+  if (pricing.valuationStatus == ValuationStatus.marketEstimated) {
+    return null;
+  }
+  final reason = pricing.reasonCode?.trim().toUpperCase();
+  return switch (reason) {
+    'PROVIDER_NOT_CONFIGURED' =>
+      'Pricing source not connected for this category',
+    'NO_MARKET_MATCH' => 'No trusted catalog or sold-comps match yet',
+    'INSUFFICIENT_TRUSTED_MARKET_DATA' =>
+      'Not enough trusted market evidence yet',
+    'LOW_PRICING_CONFIDENCE' => 'Pricing confidence is too low to show a value',
+    'LOOKUP_FAILED' => 'Pricing lookup did not complete',
+    null || '' => switch (pricing.valuationStatus) {
+      ValuationStatus.noMarketMatch => 'No trusted market match yet',
+      ValuationStatus.providerNotConfigured =>
+        'Pricing source not connected for this category',
+      ValuationStatus.lookupFailed => 'Pricing lookup did not complete',
+      _ => null,
+    },
+    _ => _humanizePricingToken(reason),
+  };
+}
+
+String _humanizePricingToken(String value) {
+  final normalized = value
+      .trim()
+      .replaceAll(RegExp(r'[_\-]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ');
+  if (normalized.isEmpty) {
+    return 'Unknown';
+  }
+  final lower = normalized.toLowerCase();
+  if (lower == 'pricecharting' || lower == 'pricecharting catalog') {
+    return 'PriceCharting';
+  }
+  if (lower == 'tcgplayer') {
+    return 'TCGplayer';
+  }
+  if (lower == 'ebay sold comps' || lower == 'ebay') {
+    return 'eBay sold comps';
+  }
+  return lower
+      .split(' ')
+      .map(
+        (word) => word.isEmpty
+            ? word
+            : '${word[0].toUpperCase()}${word.substring(1)}',
+      )
+      .join(' ');
 }
 
 String _fallback(String? value, String fallback) {
@@ -1699,6 +1780,10 @@ String _reliabilityMessage(
 }
 
 String _unpricedReliabilityMessage(ScanResult result) {
+  final reason = _pricingReasonLabel(result.pricing);
+  if (reason != null) {
+    return '$reason. PackLox will keep the item details without inventing a value.';
+  }
   return switch (result.valuationStatus) {
     ValuationStatus.noMarketMatch =>
       'No reliable PriceCharting match was found yet. Save only if you want to keep the item pending, or rescan with clearer identifiers.',

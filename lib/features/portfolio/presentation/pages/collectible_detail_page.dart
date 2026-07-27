@@ -20,6 +20,8 @@ import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
@@ -410,6 +412,16 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
 
   Future<void> _addPortfolioPhotoFromGallery(CollectibleItem item) async {
     try {
+      final planLimits = ref.read(activePlanLimitsProvider);
+      final currentPhotoCount = item.effectiveGalleryImages.length;
+      if (!planLimits.canAddPhoto(currentPhotoCount)) {
+        _showDetailSnackBar(
+          context,
+          'Your ${planLimits.plan.displayName} plan supports ${planLimits.photosPerItemLabel}. Upgrade to add more photos.',
+        );
+        return;
+      }
+
       final galleryService = ref.read(galleryServiceProvider);
       final pickedImage = await galleryService.pickImage();
       if (pickedImage == null) {
@@ -454,6 +466,20 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       return;
     }
 
+    try {
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanRefreshValue();
+    } on SubscriptionException catch (error) {
+      if (mounted) {
+        _showDetailSnackBar(context, error.message);
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
     setState(() => _isRefreshingValue = true);
     ValuationStatus? refreshedStatus;
     try {
@@ -481,6 +507,9 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
               lastValueRefreshedAt: refreshedAt,
             ),
           );
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .recordSuccessfulPriceRefresh();
     } catch (_) {
       refreshedStatus = null;
     } finally {
@@ -1973,6 +2002,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final planLimits = ref.watch(activePlanLimitsProvider);
     final snapshotsAsync = ref.watch(
       _portfolioValuationSnapshotsProvider(item.id),
     );
@@ -2075,36 +2105,98 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.sm),
-          Container(
-            height: 54,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: HomeTokens.background.withValues(alpha: 0.48),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color: HomeTokens.border.withValues(alpha: 0.62),
+          if (!planLimits.canUseFullValueHistory)
+            _DetailPlanLockedPanel(
+              icon: Icons.lock_outline_rounded,
+              title: 'Full history is a Pro tool',
+              message:
+                  'Free shows value at scan and current value. Upgrade for trend charts and deeper valuation history.',
+            )
+          else
+            Container(
+              height: 54,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: HomeTokens.background.withValues(alpha: 0.48),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(
+                  color: HomeTokens.border.withValues(alpha: 0.62),
+                ),
               ),
-            ),
-            child: CustomPaint(
-              painter: _ValueHistorySparklinePainter(
-                color: movementColor,
-                values: chartValues,
-              ),
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xs),
-                  child: Text(
-                    footerLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: HomeTokens.textSecondary,
-                      fontWeight: FontWeight.w800,
+              child: CustomPaint(
+                painter: _ValueHistorySparklinePainter(
+                  color: movementColor,
+                  values: chartValues,
+                ),
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    child: Text(
+                      footerLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
               ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailPlanLockedPanel extends StatelessWidget {
+  const _DetailPlanLockedPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: HomeTokens.accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: HomeTokens.accent.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: HomeTokens.accent, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -5171,6 +5263,22 @@ class _CreateAlertButtons extends ConsumerWidget {
     CollectibleItem item,
     PriceAlertRuleType type,
   ) async {
+    final planLimits = ref.read(activePlanLimitsProvider);
+    final repository = ref.read(priceAlertRepositoryProvider);
+    final allAlerts = await repository.getAlerts();
+    final activeAlertCount = allAlerts
+        .where((alert) => alert.status == PriceAlertStatus.active)
+        .length;
+    if (!planLimits.canCreatePriceAlert(activeAlertCount)) {
+      if (context.mounted) {
+        _showDetailSnackBar(
+          context,
+          'Your ${planLimits.plan.displayName} plan supports ${planLimits.priceAlertsLabel}. Upgrade to create more alerts.',
+        );
+      }
+      return;
+    }
+
     var notificationState = ref.read(priceAlertNotificationControllerProvider);
     if (notificationState.enabled &&
         !notificationState.permissionStatus.canNotify &&
@@ -5182,7 +5290,6 @@ class _CreateAlertButtons extends ConsumerWidget {
       notificationState = ref.read(priceAlertNotificationControllerProvider);
     }
 
-    final repository = ref.read(priceAlertRepositoryProvider);
     await repository.saveAlert(buildPriceAlert(item: item, type: type));
     ref.invalidate(itemPriceAlertsProvider(item.id));
     ref.invalidate(priceAlertSummaryProvider);

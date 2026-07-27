@@ -145,6 +145,11 @@ class Settings:
     pricing_provider_min_interval_ms: int = int(
         os.getenv("PRICING_PROVIDER_MIN_INTERVAL_MS", "250")
     )
+    pricing_target_currency: str = os.getenv("PRICING_TARGET_CURRENCY", "AUD")
+    pricing_currency_rates_json: str = os.getenv("PRICING_CURRENCY_RATES_JSON", "")
+    pricing_currency_cache_ttl_seconds: int = int(
+        os.getenv("PRICING_CURRENCY_CACHE_TTL_SECONDS", str(12 * 60 * 60))
+    )
     admin_job_token: str = os.getenv("ADMIN_JOB_TOKEN", os.getenv("ADMIN_IMPORT_TOKEN", ""))
     firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "")
     firebase_service_account_json: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")

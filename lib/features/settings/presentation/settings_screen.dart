@@ -26,6 +26,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.da
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
@@ -188,6 +189,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final subscriptionTiles = [
+      _SettingsRow(
+        icon: Icons.workspace_premium_outlined,
+        title: 'Plan & Usage',
+        subtitle: '${subscriptionState.remainingLabel} scans remaining today.',
+        trailing: subscriptionState.entitlements.plan.displayName,
+      ),
+      _SubscriptionPlanPanel(
+        state: subscriptionState,
+        onActivatePlan: _activateSubscriptionPlan,
+        onRestore: _restoreSubscriptionPlan,
+      ),
+    ];
+
     final demoDataTiles = [
       const _SettingsRow(
         icon: Icons.science_outlined,
@@ -318,6 +333,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ...sectionSlivers(primaryTiles),
+            ...sectionSlivers(subscriptionTiles, topSpacing: 14),
             if (demoSeedEnabled) ...sectionSlivers(demoDataTiles),
             if (showDeveloperTools) ...[
               sliverBox(
@@ -406,6 +422,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       _showSettingsSnackBar('Local collection cleared on this device.');
     }
+  }
+
+  Future<void> _activateSubscriptionPlan(SubscriptionPlan plan) async {
+    await ref.read(subscriptionControllerProvider.notifier).purchasePlan(plan);
+    if (!mounted) {
+      return;
+    }
+    final message =
+        ref.read(subscriptionControllerProvider).purchaseMessage ??
+        '${plan.displayName} plan updated.';
+    _showSettingsSnackBar(message);
+  }
+
+  Future<void> _restoreSubscriptionPlan() async {
+    await ref.read(subscriptionControllerProvider.notifier).restorePurchases();
+    if (!mounted) {
+      return;
+    }
+    final state = ref.read(subscriptionControllerProvider);
+    _showSettingsSnackBar(
+      state.purchaseMessage ?? state.errorMessage ?? 'Restore checked.',
+    );
   }
 
   Future<void> _showProfileEditor(BuildContext context) async {
@@ -743,6 +781,387 @@ class _DemoDataSeedPanel extends StatelessWidget {
               foregroundColor: HomeTokens.textPrimary,
               disabledForegroundColor: HomeTokens.textMuted,
               side: const BorderSide(color: HomeTokens.border),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubscriptionPlanPanel extends StatelessWidget {
+  const _SubscriptionPlanPanel({
+    required this.state,
+    required this.onActivatePlan,
+    required this.onRestore,
+  });
+
+  final SubscriptionState state;
+  final ValueChanged<SubscriptionPlan> onActivatePlan;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final products = state.products;
+    final isConfigured = state.isBillingAvailable && products.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _SubscriptionStatusChip(
+              label: state.paymentStatusLabel,
+              icon: state.entitlements.isPaid
+                  ? Icons.verified_rounded
+                  : Icons.tune_rounded,
+              color: state.isBillingAvailable
+                  ? HomeTokens.positive
+                  : HomeTokens.warning,
+            ),
+            _SubscriptionStatusChip(
+              label: state.entitlements.usageLimit.isUnlimited
+                  ? 'Unlimited scans'
+                  : '${state.entitlements.usageLimit.dailyFreeScanLimit} scans/day',
+              icon: Icons.qr_code_scanner_rounded,
+              color: HomeTokens.accent,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _PlanLimitsSummary(state: state),
+        const SizedBox(height: AppSpacing.md),
+        if (!isConfigured)
+          Text(
+            'Payments are not configured for this build yet.',
+            style: textTheme.bodySmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              height: 1.3,
+            ),
+          )
+        else ...[
+          for (final product in products) ...[
+            _SubscriptionProductRow(
+              product: product,
+              isActive: state.entitlements.plan == product.plan,
+              isBusy: state.isLoading,
+              onActivate: () => onActivatePlan(product.plan),
+            ),
+            if (product != products.last)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Divider(height: 1, color: HomeTokens.border),
+              ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('settings-restore-subscription-button'),
+              onPressed: state.isLoading ? null : onRestore,
+              icon: const Icon(Icons.restore_rounded),
+              label: Text(state.isLoading ? 'Checking...' : 'Restore Purchase'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: HomeTokens.textPrimary,
+                disabledForegroundColor: HomeTokens.textMuted,
+                side: const BorderSide(color: HomeTokens.border),
+              ),
+            ),
+          ),
+        ],
+        if (state.purchaseMessage != null || state.errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _SubscriptionNotice(
+            message: state.purchaseMessage ?? state.errorMessage!,
+            isError:
+                state.errorMessage != null && state.purchaseMessage == null,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PlanLimitsSummary extends StatelessWidget {
+  const _PlanLimitsSummary({required this.state});
+
+  final SubscriptionState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final limits = state.entitlements.planLimits;
+    final unlockedTools = [
+      if (limits.canUseFullValueHistory) 'History',
+      if (limits.canUseAdvancedFilters) 'Advanced filters',
+      if (limits.canExportPortfolio) 'Export',
+      if (limits.canUsePortfolioIntelligence) 'Intelligence',
+      if (limits.canBulkRefreshValues) 'Bulk refresh',
+    ];
+    final toolLabel = unlockedTools.isEmpty
+        ? 'Basic tools'
+        : unlockedTools.join(', ');
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _PlanLimitMetric(
+                label: 'Portfolio',
+                value: limits.portfolioItemsLabel,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _PlanLimitMetric(
+                label: 'Photos',
+                value: limits.photosPerItemLabel,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _PlanLimitMetric(
+                label: 'Alerts',
+                value: limits.priceAlertsLabel,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _PlanLimitMetric(
+                label: 'Refreshes',
+                value: state.priceRefreshUsageLabel,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _PlanLimitMetric(label: 'Paid tools', value: toolLabel),
+      ],
+    );
+  }
+}
+
+class _PlanLimitMetric extends StatelessWidget {
+  const _PlanLimitMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: 0.72)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelSmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionProductRow extends StatelessWidget {
+  const _SubscriptionProductRow({
+    required this.product,
+    required this.isActive,
+    required this.isBusy,
+    required this.onActivate,
+  });
+
+  final BillingProduct product;
+  final bool isActive;
+  final bool isBusy;
+  final VoidCallback onActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                product.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                product.price,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  color: HomeTokens.accent,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                product.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        SizedBox(
+          width: 104,
+          child: isActive
+              ? const _ActivePlanPill()
+              : FilledButton(
+                  key: ValueKey('settings-activate-${product.plan.name}-plan'),
+                  onPressed: isBusy || !product.isAvailable ? null : onActivate,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: HomeTokens.accentStrong,
+                    foregroundColor: HomeTokens.textPrimary,
+                    disabledBackgroundColor: HomeTokens.surfaceInteractive,
+                    disabledForegroundColor: HomeTokens.textMuted,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
+                  child: Text(isBusy ? 'Wait' : 'Activate'),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubscriptionStatusChip extends StatelessWidget {
+  const _SubscriptionStatusChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        border: Border.all(color: color.withValues(alpha: 0.34)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivePlanPill extends StatelessWidget {
+  const _ActivePlanPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: HomeTokens.positive.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        border: Border.all(color: HomeTokens.positive.withValues(alpha: 0.36)),
+      ),
+      child: Text(
+        'Active',
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: HomeTokens.positive,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SubscriptionNotice extends StatelessWidget {
+  const _SubscriptionNotice({required this.message, required this.isError});
+
+  final String message;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError ? HomeTokens.warning : HomeTokens.positive;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          isError ? Icons.info_outline_rounded : Icons.check_circle_rounded,
+          size: 18,
+          color: color,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              height: 1.3,
             ),
           ),
         ),

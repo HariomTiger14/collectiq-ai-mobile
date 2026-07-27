@@ -243,8 +243,8 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertIn("attributes", payload)
         self.assertIn("rawProviderPayload", payload)
         self.assertGreater(payload["estimatedValue"], 0)
-        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
-        self.assertEqual(payload["valuationSource"], "not_configured")
+        self.assertEqual(payload["valuationStatus"], "unavailable")
+        self.assertEqual(payload["valuationSource"], "pokemon_cards")
         self.assertEqual(payload["lowEstimate"], 0)
         self.assertEqual(payload["highEstimate"], 0)
         self.assertGreaterEqual(payload["confidence"], 0)
@@ -379,7 +379,7 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(payload["aiReview"]["primaryMatch"], payload["itemName"])
         self.assertEqual(len(payload["alternatives"]), 3)
         self.assertEqual(payload["marketSummary"]["salesCount"], 0)
-        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
+        self.assertEqual(payload["valuationStatus"], "unavailable")
         self.assertEqual(payload["comparableSales"], [])
         self.assertEqual(payload["confidenceLevel"], "High")
         self.assertEqual(payload["fieldConfidence"]["itemName"], 96)
@@ -754,7 +754,7 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(body["faceValue"], 2)
         self.assertIsNone(body["estimatedMarketValue"])
         self.assertEqual(body["aiEstimatedValue"], 12)
-        self.assertEqual(body["valuationStatus"], "provider_not_configured")
+        self.assertEqual(body["valuationStatus"], "unavailable")
         self.assertEqual(body["rawProviderPayload"]["photosUsed"], 2)
         self.assertEqual(body["rawProviderPayload"]["photoRoles"], ["front", "back"])
         sent_parts = gemini_client.last_request["json"]["contents"][0]["parts"]
@@ -805,7 +805,7 @@ class ApiEndpointsTest(unittest.TestCase):
         self.assertEqual(body["faceValue"], 2)
         self.assertEqual(body["estimatedValue"], 0)
         self.assertIsNone(body["estimatedMarketValue"])
-        self.assertEqual(body["valuationStatus"], "provider_not_configured")
+        self.assertEqual(body["valuationStatus"], "unavailable")
         self.assertIn("reverse", " ".join(body["scanRecommendations"]).lower())
 
     def test_api_analyze_response_contract_keys_remain_unchanged(self) -> None:
@@ -865,8 +865,8 @@ class ApiEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["valuationStatus"], "provider_not_configured")
-        self.assertEqual(payload["valuationSource"], "not_configured")
+        self.assertEqual(payload["valuationStatus"], "unavailable")
+        self.assertEqual(payload["valuationSource"], "pokemon_cards")
         self.assertGreater(payload["aiEstimatedValue"], 0)
         self.assertIsNone(payload["estimatedMarketValue"])
         self.assertEqual(payload["marketSummary"]["salesCount"], 0)

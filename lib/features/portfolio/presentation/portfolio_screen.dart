@@ -1,18 +1,23 @@
+import 'dart:convert';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 enum _PortfolioSortMode {
   newest(label: 'Recently added'),
@@ -391,8 +396,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             });
                           },
                           onSearchCleared: _clearSearch,
-                          onSort: () => _showSortFilterSheet(context),
-                          onFilter: () => _showSortFilterSheet(context),
+                          onSort: _openAdvancedFilters,
+                          onFilter: _openAdvancedFilters,
                           activeFilterCount: _activeFilterCount,
                           sortLabel: _sortMode.compactLabel,
                           autofocus:
@@ -414,6 +419,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           filteredCount: isFilteredEmpty
                               ? visibleItems.length
                               : null,
+                        ),
+                      ),
+                    if (hasItems)
+                      HomeSection(
+                        child: _PortfolioExportPanel(
+                          itemCount: portfolioState.items.length,
+                          onExport: () =>
+                              _startPortfolioExport(portfolioState.items),
                         ),
                       ),
                     HomeSection(
@@ -579,6 +592,143 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       _trendFilter = _PortfolioTrendFilter.all;
       _sortMode = _PortfolioSortMode.newest;
     });
+  }
+
+  void _openAdvancedFilters() {
+    final planLimits = ref.read(activePlanLimitsProvider);
+    if (!planLimits.canUseAdvancedFilters) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Advanced filters are included with Pro and Premium.',
+            ),
+          ),
+        );
+      return;
+    }
+    _showSortFilterSheet(context);
+  }
+
+  Future<void> _startPortfolioExport(List<CollectibleItem> items) async {
+    final planLimits = ref.read(activePlanLimitsProvider);
+    if (!planLimits.canExportPortfolio) {
+      _showPortfolioSnackBar(
+        'Portfolio export is included with Pro and Premium.',
+      );
+      return;
+    }
+    if (items.isEmpty) {
+      _showPortfolioSnackBar('Add items before exporting your portfolio.');
+      return;
+    }
+
+    final confirmed = await _showExportConfirmationSheet(items.length);
+    if (!mounted || !confirmed) {
+      return;
+    }
+
+    await _sharePortfolioCsv(items);
+  }
+
+  Future<bool> _showExportConfirmationSheet(int itemCount) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: .58),
+      isScrollControlled: true,
+      builder: (context) {
+        return _PortfolioBottomSheet(
+          key: const ValueKey('portfolio-export-confirmation-sheet'),
+          title: 'Export portfolio',
+          subtitle:
+              'PackLox will create a CSV file only after you confirm. You choose where it is saved or shared.',
+          children: [
+            _ExportDisclosureRow(
+              icon: Icons.inventory_2_outlined,
+              title: '$itemCount saved items',
+              subtitle:
+                  'Includes item names, categories, condition, values, notes, and metadata.',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const _ExportDisclosureRow(
+              icon: Icons.price_check_outlined,
+              title: 'Pricing context',
+              subtitle:
+                  'Includes valuation status, currency, source, confidence, and timestamps.',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const _ExportDisclosureRow(
+              icon: Icons.no_photography_outlined,
+              title: 'No private image files',
+              subtitle:
+                  'The CSV includes image count only. It does not attach your photos.',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const ValueKey('portfolio-export-cancel'),
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const ValueKey('portfolio-export-create-csv'),
+                    onPressed: () => Navigator.of(context).pop(true),
+                    icon: const Icon(Icons.file_download_outlined),
+                    label: const Text('Create CSV'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _sharePortfolioCsv(List<CollectibleItem> items) async {
+    try {
+      final csv = const PortfolioExportService().buildCsv(
+        collectiblesNewestFirst(items),
+      );
+      final fileName =
+          'packlox-portfolio-${_exportDateStamp(DateTime.now())}.csv';
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'Export PackLox portfolio',
+          subject: 'PackLox portfolio export',
+          text: 'PackLox portfolio export with ${items.length} items.',
+          files: [
+            XFile.fromData(
+              Uint8List.fromList(utf8.encode(csv)),
+              mimeType: 'text/csv',
+              name: fileName,
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showPortfolioSnackBar('Portfolio export is unavailable right now.');
+    }
+  }
+
+  void _showPortfolioSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openItem(CollectibleItem item) {
@@ -764,6 +914,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   }
 }
 
+String _exportDateStamp(DateTime dateTime) {
+  final month = dateTime.month.toString().padLeft(2, '0');
+  final day = dateTime.day.toString().padLeft(2, '0');
+  final hour = dateTime.hour.toString().padLeft(2, '0');
+  final minute = dateTime.minute.toString().padLeft(2, '0');
+  return '${dateTime.year}$month$day-$hour$minute';
+}
+
 class _PortfolioTitleBlock extends StatelessWidget {
   const _PortfolioTitleBlock();
 
@@ -794,6 +952,86 @@ class _PortfolioTitleBlock extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PortfolioExportPanel extends StatelessWidget {
+  const _PortfolioExportPanel({
+    required this.itemCount,
+    required this.onExport,
+  });
+
+  final int itemCount;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeSectionSurface(
+      keySeed: 'portfolio-export',
+      title: 'Collector tools',
+      child: HomeActionRow(
+        keySeed: 'portfolio-export-csv',
+        icon: Icons.file_download_outlined,
+        title: 'Export portfolio CSV',
+        subtitle: '$itemCount items with values, sources, notes, and metadata.',
+        onTap: onExport,
+      ),
+    );
+  }
+}
+
+class _ExportDisclosureRow extends StatelessWidget {
+  const _ExportDisclosureRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF8BC7FF), size: 22),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1466,11 +1704,13 @@ class _PortfolioBottomSheet extends StatelessWidget {
   const _PortfolioBottomSheet({
     required this.title,
     required this.children,
+    this.subtitle = 'Changes apply only when you tap Apply.',
     this.initialScrollOffset = 0,
     super.key,
   });
 
   final String title;
+  final String subtitle;
   final List<Widget> children;
   final double initialScrollOffset;
 
@@ -1530,7 +1770,7 @@ class _PortfolioBottomSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Changes apply only when you tap Apply.',
+                    subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: HomeTokens.textSecondary,
                       fontWeight: FontWeight.w700,

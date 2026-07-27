@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
 
@@ -7,6 +8,7 @@ class UserEntitlements {
   const UserEntitlements({
     required this.plan,
     required this.usageLimit,
+    required this.planLimits,
     this.paymentsConfigured = false,
   });
 
@@ -14,6 +16,19 @@ class UserEntitlements {
   static const developmentFree = UserEntitlements(
     plan: SubscriptionPlan.free,
     usageLimit: UsageLimit.unlimited,
+    planLimits: PlanLimits(
+      plan: SubscriptionPlan.free,
+      scanLimit: UsageLimit.unlimited,
+      maxPortfolioItems: 250,
+      maxPhotosPerItem: 2,
+      maxActivePriceAlerts: 3,
+      monthlyPriceRefreshes: 10,
+      canUseFullValueHistory: false,
+      canExportPortfolio: false,
+      canUseAdvancedFilters: false,
+      canBulkRefreshValues: false,
+      canUsePortfolioIntelligence: false,
+    ),
   );
 
   /// Current plan.
@@ -21,6 +36,9 @@ class UserEntitlements {
 
   /// Usage limits for the current plan.
   final UsageLimit usageLimit;
+
+  /// Feature limits and paid access for the current plan.
+  final PlanLimits planLimits;
 
   /// Whether payments are configured in this build.
   final bool paymentsConfigured;
@@ -34,18 +52,12 @@ class UserEntitlements {
     required UsageLimit freeLimit,
     bool paymentsConfigured = false,
   }) {
-    final usageLimit = switch (plan) {
-      SubscriptionPlan.free => freeLimit,
-      SubscriptionPlan.pro => const UsageLimit(
-        dailyFreeScanLimit: 250,
-        isUnlimited: false,
-      ),
-      SubscriptionPlan.premium => UsageLimit.unlimited,
-    };
+    final planLimits = PlanLimits.forPlan(plan: plan, freeScanLimit: freeLimit);
 
     return UserEntitlements(
       plan: plan,
-      usageLimit: usageLimit,
+      usageLimit: planLimits.scanLimit,
+      planLimits: planLimits,
       paymentsConfigured: paymentsConfigured,
     );
   }

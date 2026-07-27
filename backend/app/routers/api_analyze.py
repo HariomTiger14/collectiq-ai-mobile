@@ -265,7 +265,7 @@ async def _analyze_collectible(
         None
         if market_estimated_value
         else (
-            diagnostics.pricingFallbackReason
+            pricing.providerDiagnostics.get("reasonCode")
             or pricing.valuationStatus.upper()
         )
     )
@@ -273,7 +273,8 @@ async def _analyze_collectible(
         f"${display_value:,.2f} {pricing.currency}" if display_value else None
     )
     attribution_text = (
-        f"Pricing data powered by {diagnostics.pricingProvider}"
+        pricing.providerDiagnostics.get("attributionText")
+        or f"Pricing data powered by {diagnostics.pricingProvider}"
         if market_estimated_value and diagnostics.pricingProvider
         else None
     )
@@ -317,10 +318,18 @@ async def _analyze_collectible(
                 "lastChecked": pricing.lastUpdated,
             },
             "originalMarket": {
-                "price": display_value,
-                "currency": pricing.currency,
-                "exchangeRateUsed": 1,
-                "exchangeRateDate": pricing.lastUpdated,
+                "price": _parse_optional_number(
+                    pricing.providerDiagnostics.get("originalPrice")
+                )
+                or display_value,
+                "currency": pricing.providerDiagnostics.get("originalCurrency")
+                or pricing.currency,
+                "exchangeRateUsed": _parse_optional_number(
+                    pricing.providerDiagnostics.get("exchangeRateUsed")
+                )
+                or 1,
+                "exchangeRateDate": pricing.providerDiagnostics.get("exchangeRateDate")
+                or pricing.lastUpdated,
             },
             "matchMetadata": {
                 "reason": diagnostics.pricingExplanation,
@@ -922,6 +931,15 @@ def _parse_optional_int(value) -> int | None:
         return None
     try:
         return int(str(value).split(",")[0].strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_optional_number(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).split(",")[0].strip())
     except (TypeError, ValueError):
         return None
 

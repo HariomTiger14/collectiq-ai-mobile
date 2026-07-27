@@ -71,6 +71,7 @@ import 'package:collectiq_ai/features/onboarding/data/repositories/shared_prefer
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
+import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/supabase_price_alert_repository.dart';
@@ -994,6 +995,61 @@ void main() {
     });
   });
 
+  group('PortfolioExportService', () {
+    const service = PortfolioExportService();
+
+    test('builds a CSV export with portfolio pricing and metadata', () {
+      final item = _testItemWith(
+        id: 'card-1',
+        title: 'Charizard, "Holo"',
+      ).copyWithSavedAt(DateTime.parse('2026-07-27T10:15:00Z'));
+      final exportItem = item.copyWith(
+        estimatedValue: 161.45,
+        pricing: PricingInfo(
+          estimatedMarketValue: 161.45,
+          lowEstimate: 150.25,
+          highEstimate: 175.75,
+          currency: 'USD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.88,
+          lastUpdated: DateTime.parse('2026-07-27T08:00:00Z'),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'pricecharting_catalog',
+        ),
+        valuationStatus: ValuationStatus.marketEstimated,
+        valuationSource: 'pricecharting_catalog',
+      );
+
+      final csv = service.buildCsv([exportItem]);
+
+      expect(csv, contains('id,title,category,condition'));
+      expect(csv, contains('card-1,"Charizard, ""Holo"""'));
+      expect(csv, contains('161.45,USD,1850,150.25,175.75'));
+      expect(csv, contains('market_estimated,pricecharting_catalog'));
+      expect(csv, contains('PriceCharting,0.88,0.94'));
+      expect(csv, contains('2026-07-27T10:15:00.000Z'));
+      expect(csv, contains('2026-07-27T08:00:00.000Z'));
+    });
+
+    test(
+      'keeps unavailable pricing fields empty instead of inventing values',
+      () {
+        final item = _testItemWith(id: 'pending-1').copyWith(
+          estimatedValue: 0,
+          pricing: null,
+          valuationStatus: ValuationStatus.noMarketMatch,
+          valuationSource: 'pricecharting_catalog',
+        );
+
+        final csv = service.buildCsv([item]);
+
+        expect(csv, contains('pending-1,1999 Pokemon Charizard'));
+        expect(csv, contains('Trading Card,Near Mint,0,,,,,no_market_match'));
+        expect(csv, isNot(contains('Unknown')));
+      },
+    );
+  });
+
   group('RecognitionResult', () {
     test('fromJson parses backend response', () {
       final result = RecognitionResult.fromJson({
@@ -1348,6 +1404,87 @@ void main() {
       );
       expect(result.marketSummary?.sources, ['eBay Sold', 'TCGplayer']);
     });
+
+    test(
+      'backend pricing engine payload preserves currency and unavailable reason',
+      () {
+        final response = AiBackendAnalysisResponse.fromJson({
+          'id': 'engine-charizard-unavailable',
+          'itemName': 'Charizard #4 Base Set',
+          'category': 'Pokemon Cards',
+          'estimatedValue': 0,
+          'estimatedMarketValue': null,
+          'currency': 'USD',
+          'valuationStatus': 'unavailable',
+          'valuationSource': 'pokemon_cards',
+          'valuationConfidence': 0,
+          'confidence': 86,
+          'condition': 'Ungraded',
+          'lowEstimate': 0,
+          'highEstimate': 0,
+          'marketTrend': 'Unknown',
+          'keyAttributes': {'setName': 'Base Set', 'cardNumber': '4'},
+          'aiReview': {
+            'primaryMatch': 'Charizard #4 Base Set',
+            'confidenceExplanation': 'Visible name and number.',
+            'detectionQuality': 'Good',
+            'reasoning': 'Matched visible card details.',
+          },
+          'alternatives': [],
+          'recommendation': 'Save as pending.',
+          'marketSummary': {
+            'averagePrice': 0,
+            'medianPrice': 0,
+            'lowPrice': 0,
+            'highPrice': 0,
+            'salesCount': 0,
+            'trendLabel': 'Unknown',
+            'confidence': 0,
+            'lastUpdated': '2026-07-27T00:00:00Z',
+            'sources': ['PriceCharting'],
+            'comps': [],
+          },
+          'comparableSales': [],
+          'rawProviderPayload': {
+            'reasonCode': 'INSUFFICIENT_TRUSTED_MARKET_DATA',
+            'valuationStrategy': 'unavailable',
+            'displayString': null,
+            'pricingSource': {
+              'name': 'PriceCharting',
+              'attributionText': 'Pricing data powered by PriceCharting',
+            },
+            'originalMarket': {
+              'price': 161,
+              'currency': 'USD',
+              'exchangeRateUsed': 1,
+              'exchangeRateDate': '2026-07-27T00:00:00Z',
+            },
+            'cachePolicy': {
+              'ttlSeconds': 604800,
+              'reason': 'Unavailable states are cached for 7 days.',
+            },
+          },
+        });
+
+        final result = response.toScanResult(thumbnail: 'sample://charizard');
+
+        expect(result.pricing.currency, 'USD');
+        expect(result.pricing.valuationStatus, ValuationStatus.unavailable);
+        expect(result.pricing.valuationSource, 'pokemon_cards');
+        expect(result.pricing.reasonCode, 'INSUFFICIENT_TRUSTED_MARKET_DATA');
+        expect(
+          result.pricing.attributionText,
+          'Pricing data powered by PriceCharting',
+        );
+        expect(result.pricing.originalPrice, 161);
+        expect(result.pricing.originalCurrency, 'USD');
+        expect(result.pricing.cacheTtlSeconds, 604800);
+        expect(
+          result.pricing.cachePolicyReason,
+          'Unavailable states are cached for 7 days.',
+        );
+      },
+    );
 
     test('malformed response uses safe defaults', () {
       final response = AiBackendAnalysisResponse.fromJson({
@@ -4625,6 +4762,44 @@ void main() {
       expect(repository.count, 1);
     });
 
+    test('price refresh usage increments against monthly limit', () async {
+      final repository = _MemoryUsageRepository(initialRefreshCount: 9);
+      final container = ProviderContainer(
+        overrides: [usageRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(subscriptionControllerProvider.notifier).loadUsage();
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanRefreshValue();
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .recordSuccessfulPriceRefresh();
+
+      final state = container.read(subscriptionControllerProvider);
+      expect(repository.refreshCount, 10);
+      expect(state.priceRefreshesUsedThisMonth, 10);
+      expect(state.priceRefreshUsageLabel, '10 / 10');
+      expect(state.canRefreshValue, isFalse);
+    });
+
+    test('price refresh usage blocks when monthly limit is reached', () async {
+      final repository = _MemoryUsageRepository(initialRefreshCount: 10);
+      final container = ProviderContainer(
+        overrides: [usageRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(subscriptionControllerProvider.notifier)
+            .ensureCanRefreshValue(),
+        throwsA(isA<SubscriptionException>()),
+      );
+      expect(repository.refreshCount, 10);
+    });
+
     test('billing unavailable keeps payments unconfigured', () async {
       final container = ProviderContainer(
         overrides: [
@@ -6767,9 +6942,12 @@ class _FlakyCloudStorageService implements CloudStorageService {
 }
 
 class _MemoryUsageRepository implements UsageRepository {
-  _MemoryUsageRepository({int initialCount = 0}) : count = initialCount;
+  _MemoryUsageRepository({int initialCount = 0, int initialRefreshCount = 0})
+    : count = initialCount,
+      refreshCount = initialRefreshCount;
 
   int count;
+  int refreshCount;
 
   @override
   Future<int> scansUsedToday() async {
@@ -6783,8 +6961,20 @@ class _MemoryUsageRepository implements UsageRepository {
   }
 
   @override
+  Future<int> priceRefreshesUsedThisMonth() async {
+    return refreshCount;
+  }
+
+  @override
+  Future<int> incrementPriceRefreshesThisMonth() async {
+    refreshCount += 1;
+    return refreshCount;
+  }
+
+  @override
   Future<void> resetUsage() async {
     count = 0;
+    refreshCount = 0;
   }
 }
 
