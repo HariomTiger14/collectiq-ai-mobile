@@ -64,9 +64,13 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_TIMEOUT_SECONDS=30
 EBAY_ACCESS_TOKEN=
-EBAY_BROWSE_API_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
+EBAY_SOLD_COMPS_API_URL=
+EBAY_BROWSE_API_URL=
 EBAY_MARKETPLACE_ID=EBAY_AU
 EBAY_TIMEOUT_SECONDS=10
+EBAY_MIN_SOLD_COMPS=3
+EBAY_TITLE_SIMILARITY_THRESHOLD=0.45
+EBAY_OUTLIER_TRIM_RATIO=0.10
 TCGPLAYER_CLIENT_ID=
 TCGPLAYER_CLIENT_SECRET=
 TCGPLAYER_API_BASE=https://api.tcgplayer.com
@@ -456,15 +460,21 @@ backend only:
 ```text
 PRICING_PROVIDER=ebay
 EBAY_ACCESS_TOKEN=your-server-side-oauth-access-token
-EBAY_BROWSE_API_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
+EBAY_SOLD_COMPS_API_URL=https://your-approved-sold-comps-endpoint
+EBAY_BROWSE_API_URL=
 EBAY_MARKETPLACE_ID=EBAY_AU
 EBAY_TIMEOUT_SECONDS=10
+EBAY_MIN_SOLD_COMPS=3
+EBAY_TITLE_SIMILARITY_THRESHOLD=0.45
+EBAY_OUTLIER_TRIM_RATIO=0.10
 PRICING_CACHE_TTL_SECONDS=900
 PRICING_PROVIDER_MIN_INTERVAL_MS=250
 ```
 
 The eBay token must stay in `backend/.env`. Do not pass it to Flutter,
-`--dart-define`, app storage, or source code.
+`--dart-define`, app storage, or source code. PackLox does not use active
+Browse listings as valuation evidence; eBay pricing remains unavailable until
+an approved sold/completed-comps endpoint is configured.
 
 ### Enabling TCGPlayer Pricing Locally
 

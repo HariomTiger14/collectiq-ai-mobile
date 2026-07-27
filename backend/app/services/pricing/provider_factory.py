@@ -25,11 +25,15 @@ from app.services.pricing.tcgplayer_pricing_provider import TCGPlayerPricingProv
 _mock_provider = MockPricingProvider()
 _ebay_provider = EbayPricingProvider(
     access_token=settings.ebay_access_token,
+    sold_comps_api_url=settings.ebay_sold_comps_api_url,
     browse_api_url=settings.ebay_browse_api_url,
     marketplace_id=settings.ebay_marketplace_id,
     timeout_seconds=settings.ebay_timeout_seconds,
     cache_ttl_seconds=settings.pricing_cache_ttl_seconds,
     min_interval_ms=settings.pricing_provider_min_interval_ms,
+    min_sold_comps=settings.ebay_min_sold_comps,
+    title_similarity_threshold=settings.ebay_title_similarity_threshold,
+    outlier_trim_ratio=settings.ebay_outlier_trim_ratio,
 )
 _tcgplayer_provider = TCGPlayerPricingProvider(
     client_id=settings.tcgplayer_client_id,
@@ -132,9 +136,9 @@ def _provider_registry() -> dict[PricingProviderKey, ProviderRegistration]:
             key=PricingProviderKey.EBAY,
             provider=_ebay_provider,
             display_name="eBay sold comps",
-            attribution_text="Market data powered by eBay",
-            configured=bool(_provider_value(_ebay_provider, "_access_token")),
-            minimum_comps=3,
+            attribution_text="Pricing source: eBay sold listings",
+            configured=_ebay_provider.is_configured,
+            minimum_comps=settings.ebay_min_sold_comps,
             valuation_strategy="sold_completed",
         ),
         PricingProviderKey.TCGPLAYER: ProviderRegistration(
@@ -189,7 +193,7 @@ def _providers_for_recognition(recognition: RecognitionResult) -> list[PricingPr
 def _configured_providers(providers: list[PricingProvider]) -> list[PricingProvider]:
     configured: list[PricingProvider] = []
     for provider in providers:
-        if provider.provider_name == "ebay" and _provider_value(provider, "_access_token"):
+        if provider.provider_name == "ebay" and getattr(provider, "is_configured", False):
             configured.append(provider)
         elif (
             provider.provider_name == "tcgplayer"

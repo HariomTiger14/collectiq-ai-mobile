@@ -118,12 +118,15 @@ class Settings:
         os.getenv("AI_FALLBACK_CONFIDENCE_THRESHOLD", "70")
     )
     ebay_access_token: str = os.getenv("EBAY_ACCESS_TOKEN", "")
-    ebay_browse_api_url: str = os.getenv(
-        "EBAY_BROWSE_API_URL",
-        "https://api.ebay.com/buy/browse/v1/item_summary/search",
-    )
+    ebay_sold_comps_api_url: str = os.getenv("EBAY_SOLD_COMPS_API_URL", "")
+    ebay_browse_api_url: str = os.getenv("EBAY_BROWSE_API_URL", "")
     ebay_marketplace_id: str = os.getenv("EBAY_MARKETPLACE_ID", "EBAY_AU")
     ebay_timeout_seconds: float = float(os.getenv("EBAY_TIMEOUT_SECONDS", "10"))
+    ebay_min_sold_comps: int = int(os.getenv("EBAY_MIN_SOLD_COMPS", "3"))
+    ebay_title_similarity_threshold: float = float(
+        os.getenv("EBAY_TITLE_SIMILARITY_THRESHOLD", "0.45")
+    )
+    ebay_outlier_trim_ratio: float = float(os.getenv("EBAY_OUTLIER_TRIM_RATIO", "0.10"))
     tcgplayer_client_id: str = os.getenv("TCGPLAYER_CLIENT_ID", "")
     tcgplayer_client_secret: str = os.getenv("TCGPLAYER_CLIENT_SECRET", "")
     tcgplayer_api_base: str = os.getenv(
