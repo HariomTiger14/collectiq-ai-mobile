@@ -91,6 +91,9 @@ class ApiConstants {
   /// Pricing-only quote endpoint for user-confirmed scan details.
   static const pricingQuotePath = '/api/pricing/quote';
 
+  /// Pricing reprice endpoint for corrected item identity.
+  static const pricingRepricePath = '/api/pricing/reprice';
+
   /// Price/catalog search endpoint for Discover.
   static const pricingCatalogSearchPath = '/api/pricing/catalog/search';
 

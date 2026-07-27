@@ -9,6 +9,7 @@ from app.routers import (
     api_analyze,
     auth,
     health,
+    pricing,
     portfolio,
     push,
     scanner,
@@ -40,6 +41,7 @@ app.include_router(api_analyze.root_router)
 app.include_router(api_analyze.router)
 app.include_router(scanner.router)
 app.include_router(portfolio.router)
+app.include_router(pricing.router)
 app.include_router(search.router)
 app.include_router(push.router)
 app.include_router(admin_pricecharting.router)

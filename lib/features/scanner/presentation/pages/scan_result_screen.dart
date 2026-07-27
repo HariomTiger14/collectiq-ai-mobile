@@ -12,7 +12,6 @@ class ScanResultReviewEdits {
     required this.title,
     required this.category,
     required this.condition,
-    required this.estimatedValue,
     this.brand,
     this.setName,
     this.series,
@@ -26,7 +25,6 @@ class ScanResultReviewEdits {
   final String title;
   final String category;
   final String condition;
-  final double estimatedValue;
   final String? brand;
   final String? setName;
   final String? series;
@@ -922,7 +920,6 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
   late final TextEditingController _conditionController;
-  late final TextEditingController _valueController;
   late final TextEditingController _brandController;
   late final TextEditingController _setController;
   late final TextEditingController _seriesController;
@@ -939,11 +936,6 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
     _titleController = TextEditingController(text: result.title);
     _categoryController = TextEditingController(text: result.category);
     _conditionController = TextEditingController(text: result.condition);
-    _valueController = TextEditingController(
-      text: result.estimatedValue > 0
-          ? result.estimatedValue.toStringAsFixed(0)
-          : '',
-    );
     _brandController = TextEditingController(text: result.brand ?? '');
     _setController = TextEditingController(text: result.setName ?? '');
     _seriesController = TextEditingController(text: result.series ?? '');
@@ -961,7 +953,6 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
     _titleController.dispose();
     _categoryController.dispose();
     _conditionController.dispose();
-    _valueController.dispose();
     _brandController.dispose();
     _setController.dispose();
     _seriesController.dispose();
@@ -1024,7 +1015,7 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Correct the identifiers that affect matching and portfolio value.',
+                  'Correct the identifiers PackLox uses for trusted market matching.',
                   style: textTheme.bodyMedium?.copyWith(
                     color: ScannerVisualTheme.textSecondary,
                     fontWeight: FontWeight.w700,
@@ -1083,14 +1074,6 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
                   icon: Icons.health_and_safety_outlined,
                 ),
                 _ReviewTextField(
-                  controller: _valueController,
-                  label: 'Displayed value',
-                  icon: Icons.paid_outlined,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                ),
-                _ReviewTextField(
                   controller: _notesController,
                   label: 'Notes',
                   icon: Icons.sticky_note_2_outlined,
@@ -1117,9 +1100,6 @@ class _ResultReviewSheetState extends State<_ResultReviewSheet> {
         title: _titleController.text,
         category: _categoryController.text,
         condition: _conditionController.text,
-        estimatedValue:
-            double.tryParse(_valueController.text.replaceAll(',', '').trim()) ??
-            widget.result.estimatedValue,
         brand: _brandController.text,
         setName: _setController.text,
         series: _seriesController.text,
@@ -1138,14 +1118,12 @@ class _ReviewTextField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.icon,
-    this.keyboardType,
     this.maxLines = 1,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
-  final TextInputType? keyboardType;
   final int maxLines;
 
   @override
@@ -1154,7 +1132,6 @@ class _ReviewTextField extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: TextField(
         controller: controller,
-        keyboardType: keyboardType,
         maxLines: maxLines,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           color: ScannerVisualTheme.textPrimary,

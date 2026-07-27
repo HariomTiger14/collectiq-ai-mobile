@@ -1763,7 +1763,6 @@ class ScannerController extends Notifier<ScannerState> {
     required String title,
     required String category,
     required String condition,
-    required double estimatedValue,
     String? brand,
     String? setName,
     String? series,
@@ -1786,9 +1785,6 @@ class ScannerController extends Notifier<ScannerState> {
         condition: condition.trim().isEmpty
             ? result.condition
             : condition.trim(),
-        estimatedValue: estimatedValue < 0
-            ? result.estimatedValue
-            : estimatedValue,
         brand: _reviewEditValue(brand, result.brand),
         setName: _reviewEditValue(setName, result.setName),
         series: _reviewEditValue(series, result.series),
@@ -1808,7 +1804,7 @@ class ScannerController extends Notifier<ScannerState> {
     try {
       final quote = await ref
           .read(scanPricingQuoteServiceProvider)
-          .quote(editedResult);
+          .reprice(editedResult);
       if (state.scanResult?.id != editedResult.id) {
         return false;
       }

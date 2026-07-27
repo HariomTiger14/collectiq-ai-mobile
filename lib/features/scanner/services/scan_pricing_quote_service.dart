@@ -39,6 +39,15 @@ class ScanPricingQuoteService {
     return ScanPricingQuote.fromJson(payload);
   }
 
+  Future<ScanPricingQuote> reprice(ScanResult result) async {
+    final response = await _apiClient.post(
+      ApiConstants.pricingRepricePath,
+      data: _repriceRequestFor(result),
+    );
+    final payload = _unwrapResponse(response.data);
+    return ScanPricingQuote.fromRepriceJson(payload);
+  }
+
   Map<String, dynamic> _requestFor(ScanResult result) {
     return {
       'itemName': result.title,
@@ -76,6 +85,31 @@ class ScanPricingQuoteService {
       'edition': item.edition,
       'language': item.language,
       'notes': item.notes,
+    };
+  }
+
+  Map<String, dynamic> _repriceRequestFor(ScanResult result) {
+    return {
+      'itemId': result.id,
+      'previousValue': result.estimatedMarketValue ?? result.estimatedValue,
+      'previousCurrency': result.pricing.currency,
+      'correctionSource': 'scan_review',
+      'identity': {
+        'title': result.title,
+        'category': result.category,
+        'brand': result.brand,
+        'setName': result.setName,
+        'series': result.series,
+        'cardNumber': result.cardNumber,
+        'condition': result.condition,
+        'year': result.year,
+        'edition': result.edition,
+        'language': result.language,
+        'rarity': result.rarity,
+        'playerOrCharacter': result.playerOrCharacter,
+        'estimatedGrade': result.estimatedGrade,
+        'notes': result.notes,
+      },
     };
   }
 
@@ -147,6 +181,52 @@ class ScanPricingQuote {
         fallback: 'unknown',
       ),
       valuationConfidence: _normalizeConfidence(json['valuationConfidence']),
+    );
+  }
+
+  factory ScanPricingQuote.fromRepriceJson(Map<String, dynamic> json) {
+    final pricingJson = parseJsonMap(json['pricing']);
+    final sourceJson = parseJsonMap(pricingJson['pricingSource']);
+    final originalJson = parseJsonMap(pricingJson['originalMarketPayload']);
+    final matchJson = parseJsonMap(pricingJson['matchMetadata']);
+    final status = parseString(pricingJson['status']);
+    final isAvailable = status.toLowerCase() == 'available';
+    final pricingSource = parseString(
+      sourceJson['name'],
+      fallback: isAvailable ? 'Market provider' : 'market',
+    );
+    final pricing = PricingInfo.fromJson({
+      'estimatedMarketValue': pricingJson['estimatedMarketValue'],
+      'lowEstimate': pricingJson['lowEstimate'],
+      'highEstimate': pricingJson['highEstimate'],
+      'currency': pricingJson['currency'],
+      'pricingSource': pricingSource,
+      'pricingConfidence': pricingJson['confidenceScore'],
+      'lastUpdated': sourceJson['lastChecked'],
+      'valuationStatus': isAvailable ? 'market_estimated' : 'unavailable',
+      'valuationSource': pricingSource,
+      'pricingExplanation':
+          matchJson['reason'] ?? pricingJson['displayMessage'],
+      'reasonCode': pricingJson['reasonCode'],
+      'valuationStrategy': pricingJson['valuationStrategy'],
+      'attributionText': sourceJson['attributionText'],
+      'displayString': pricingJson['displayString'],
+      'originalPrice': originalJson['price'],
+      'originalCurrency': originalJson['currency'],
+      'exchangeRateUsed': originalJson['exchangeRateUsed'],
+      'exchangeRateDate': originalJson['exchangeRateDate'],
+    });
+    return ScanPricingQuote(
+      estimatedValue: pricing.estimatedMarketValue,
+      pricing: pricing,
+      marketSummary: null,
+      estimatedMarketValue: pricing.estimatedMarketValue > 0
+          ? pricing.estimatedMarketValue
+          : null,
+      aiEstimatedValue: null,
+      valuationStatus: pricing.valuationStatus,
+      valuationSource: pricing.valuationSource,
+      valuationConfidence: pricing.pricingConfidence,
     );
   }
 }

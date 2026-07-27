@@ -361,7 +361,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
           title: edits.title,
           category: edits.category,
           condition: edits.condition,
-          estimatedValue: edits.estimatedValue,
           brand: edits.brand,
           setName: edits.setName,
           series: edits.series,

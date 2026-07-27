@@ -1256,7 +1256,6 @@ class AiResultCard extends ConsumerWidget {
                             title: item,
                             category: category,
                             condition: condition,
-                            estimatedValue: rawEstimatedValue,
                             notes: notes,
                           ),
                     icon: const Icon(Icons.edit_outlined),
@@ -1952,7 +1951,6 @@ Future<void> _showEditResultSheet(
   required String title,
   required String category,
   required String condition,
-  required double estimatedValue,
   required String? notes,
 }) {
   return showModalBottomSheet<void>(
@@ -1963,14 +1961,12 @@ Future<void> _showEditResultSheet(
         title: title,
         category: category,
         condition: condition,
-        estimatedValue: estimatedValue,
         notes: notes,
         onApply:
             ({
               required title,
               required category,
               required condition,
-              required estimatedValue,
               required notes,
             }) {
               ref
@@ -1979,7 +1975,6 @@ Future<void> _showEditResultSheet(
                     title: title,
                     category: category,
                     condition: condition,
-                    estimatedValue: estimatedValue,
                     notes: notes,
                   );
               Navigator.of(sheetContext).pop();
@@ -1995,7 +1990,6 @@ class _EditResultSheet extends StatefulWidget {
     required this.title,
     required this.category,
     required this.condition,
-    required this.estimatedValue,
     required this.notes,
     required this.onApply,
   });
@@ -2003,13 +1997,11 @@ class _EditResultSheet extends StatefulWidget {
   final String title;
   final String category;
   final String condition;
-  final double estimatedValue;
   final String? notes;
   final void Function({
     required String title,
     required String category,
     required String condition,
-    required double estimatedValue,
     required String? notes,
   })
   onApply;
@@ -2022,7 +2014,6 @@ class _EditResultSheetState extends State<_EditResultSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
   late final TextEditingController _conditionController;
-  late final TextEditingController _valueController;
   late final TextEditingController _notesController;
 
   @override
@@ -2031,11 +2022,6 @@ class _EditResultSheetState extends State<_EditResultSheet> {
     _titleController = TextEditingController(text: widget.title);
     _categoryController = TextEditingController(text: widget.category);
     _conditionController = TextEditingController(text: widget.condition);
-    _valueController = TextEditingController(
-      text: widget.estimatedValue > 0
-          ? widget.estimatedValue.toStringAsFixed(0)
-          : '',
-    );
     _notesController = TextEditingController(text: widget.notes ?? '');
   }
 
@@ -2044,7 +2030,6 @@ class _EditResultSheetState extends State<_EditResultSheet> {
     _titleController.dispose();
     _categoryController.dispose();
     _conditionController.dispose();
-    _valueController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -2076,7 +2061,7 @@ class _EditResultSheetState extends State<_EditResultSheet> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Review the AI result before saving it to your portfolio.',
+              'Correct the identifiers PackLox uses for trusted market matching.',
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -2101,16 +2086,6 @@ class _EditResultSheetState extends State<_EditResultSheet> {
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
-              controller: _valueController,
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Estimated value',
-                prefixText: r'$',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
               controller: _notesController,
               minLines: 2,
               maxLines: 4,
@@ -2121,14 +2096,10 @@ class _EditResultSheetState extends State<_EditResultSheet> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: () {
-                  final parsedValue =
-                      double.tryParse(_valueController.text.trim()) ??
-                      widget.estimatedValue;
                   widget.onApply(
                     title: _titleController.text,
                     category: _categoryController.text,
                     condition: _conditionController.text,
-                    estimatedValue: parsedValue,
                     notes: _notesController.text,
                   );
                 },
