@@ -32,6 +32,7 @@ import UserNotifications
       switch call.method {
       case "initialize":
         UNUserNotificationCenter.current().delegate = self
+        UIApplication.shared.registerForRemoteNotifications()
         result(nil)
       case "getPermissionStatus":
         self?.getNotificationPermissionStatus(result: result)
@@ -58,6 +59,9 @@ import UserNotifications
       options: [.alert, .badge, .sound]
     ) { granted, _ in
       DispatchQueue.main.async {
+        if granted {
+          UIApplication.shared.registerForRemoteNotifications()
+        }
         result(granted ? "granted" : "denied")
       }
     }

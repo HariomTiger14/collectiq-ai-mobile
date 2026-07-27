@@ -30,16 +30,24 @@ class MethodChannelPriceAlertNotificationService
   Future<PushNotificationToken?> getPushToken() async {
     await _ensureFirebaseInitialized();
     if (!_firebaseReady) {
+      debugPrint('[Push] Firebase is not ready for push token registration.');
       return null;
     }
     try {
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.getNotificationSettings();
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        debugPrint('[Push] Notification permission denied.');
+        return null;
+      }
+      final apnsReady = await _waitForApnsTokenIfNeeded(messaging);
+      if (!apnsReady) {
+        debugPrint('[Push] APNs token unavailable; FCM token cannot be requested yet.');
         return null;
       }
       final token = await messaging.getToken();
       if (token == null || token.trim().isEmpty) {
+        debugPrint('[Push] Firebase returned an empty FCM token.');
         return null;
       }
       return PushNotificationToken(
@@ -48,7 +56,8 @@ class MethodChannelPriceAlertNotificationService
         platform: _platformLabel,
         createdAt: DateTime.now(),
       );
-    } on Object {
+    } on Object catch (error) {
+      debugPrint('[Push] Failed to get push token: $error');
       return null;
     }
   }
@@ -152,6 +161,20 @@ _requestFirebasePermission() async {
   } on Object {
     return PriceAlertNotificationPermissionStatus.notSupported;
   }
+}
+
+Future<bool> _waitForApnsTokenIfNeeded(FirebaseMessaging messaging) async {
+  if (defaultTargetPlatform != TargetPlatform.iOS) {
+    return true;
+  }
+  for (var attempt = 0; attempt < 6; attempt++) {
+    final token = await messaging.getAPNSToken();
+    if (token != null && token.trim().isNotEmpty) {
+      return true;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+  return false;
 }
 
 String get _platformLabel {
