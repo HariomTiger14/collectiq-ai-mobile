@@ -9,6 +9,7 @@ import 'package:collectiq_ai/features/search/data/repositories/api_catalog_searc
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1163,6 +1164,9 @@ class _CatalogResultCard extends StatelessWidget {
                               _CatalogValueBadge(
                                 value: value,
                                 hasValue: hasValue,
+                                unavailableLabel: pricingUnavailableCopy(
+                                  reasonCode: result.reasonCode,
+                                ).shortLabel,
                               ),
                               _CatalogMetaPill(label: sourceLabel),
                               if (result.confidence != null)
@@ -1193,10 +1197,15 @@ class _CatalogResultCard extends StatelessWidget {
 }
 
 class _CatalogValueBadge extends StatelessWidget {
-  const _CatalogValueBadge({required this.value, required this.hasValue});
+  const _CatalogValueBadge({
+    required this.value,
+    required this.hasValue,
+    this.unavailableLabel,
+  });
 
   final String value;
   final bool hasValue;
+  final String? unavailableLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1217,7 +1226,7 @@ class _CatalogValueBadge extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
           child: Text(
-            hasValue ? value : 'Unavailable',
+            hasValue ? value : unavailableLabel ?? 'Value unavailable',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -1707,10 +1716,13 @@ class _CatalogTrustPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasValue = _hasCatalogValue(result);
     final confidence = result.confidence;
+    final unavailableCopy = pricingUnavailableCopy(
+      reasonCode: result.reasonCode,
+    );
     final rows = [
       _CatalogDetailRowData(
         'Status',
-        hasValue ? 'Provider-backed catalog value' : 'Price unavailable',
+        hasValue ? 'Provider-backed catalog value' : unavailableCopy.title,
       ),
       _CatalogDetailRowData('Source', result.source),
       if (confidence != null)
@@ -1731,6 +1743,8 @@ class _CatalogTrustPanel extends StatelessWidget {
         ),
       if (_clean(result.attribution) != null)
         _CatalogDetailRowData('Attribution', result.attribution!.trim()),
+      if (!hasValue)
+        _CatalogDetailRowData('Next step', unavailableCopy.actionLabel),
     ];
 
     return _SurfaceCard(
@@ -1768,7 +1782,8 @@ class _CatalogTrustPanel extends StatelessWidget {
                 child: Text(
                   hasValue
                       ? 'This catalog value comes from saved provider data. PackLox saves it as a dated portfolio snapshot when you add the item.'
-                      : 'PackLox is not showing a value because this catalog result does not include trusted price data yet.',
+                      : _clean(result.displayMessage) ??
+                            unavailableCopy.message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: PackLoxTokens.textSecondary,
                     fontWeight: FontWeight.w700,

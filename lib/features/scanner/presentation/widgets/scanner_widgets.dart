@@ -13,6 +13,7 @@ import 'package:collectiq_ai/features/scanner/presentation/scan_flow_debug.dart'
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -2152,15 +2153,7 @@ String _valuationStatusLabel(ValuationStatus status) {
 }
 
 String _valuationStatusMessage(ValuationStatus status) {
-  return switch (status) {
-    ValuationStatus.providerNotConfigured =>
-      'Market value unavailable — pricing source not connected yet',
-    ValuationStatus.noMarketMatch => 'No reliable market match found yet',
-    ValuationStatus.lookupFailed => 'Value lookup failed — try again',
-    ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
-    ValuationStatus.marketEstimated => 'Value unavailable',
-    ValuationStatus.unavailable => 'Value unavailable',
-  };
+  return pricingUnavailableCopy(status: status).title;
 }
 
 class _MetadataDetail {

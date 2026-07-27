@@ -15,6 +15,8 @@ class CatalogSearchResult {
     this.confidence,
     this.lastUpdated,
     this.attribution,
+    this.reasonCode,
+    this.displayMessage,
     this.history = const <CatalogPriceHistoryPoint>[],
   });
 
@@ -57,6 +59,12 @@ class CatalogSearchResult {
   /// Required/desired attribution text.
   final String? attribution;
 
+  /// Backend reason code when trusted pricing is unavailable.
+  final String? reasonCode;
+
+  /// Backend/user-safe message when trusted pricing is unavailable.
+  final String? displayMessage;
+
   /// Observed catalog valuation history, newest first when supplied.
   final List<CatalogPriceHistoryPoint> history;
 
@@ -75,6 +83,8 @@ class CatalogSearchResult {
     double? confidence,
     DateTime? lastUpdated,
     String? attribution,
+    String? reasonCode,
+    String? displayMessage,
     List<CatalogPriceHistoryPoint>? history,
   }) {
     return CatalogSearchResult(
@@ -91,6 +101,8 @@ class CatalogSearchResult {
       confidence: confidence ?? this.confidence,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       attribution: attribution ?? this.attribution,
+      reasonCode: reasonCode ?? this.reasonCode,
+      displayMessage: displayMessage ?? this.displayMessage,
       history: history ?? this.history,
     );
   }
@@ -153,6 +165,15 @@ class CatalogSearchResult {
           DateTime.tryParse(_string(json['lastChecked']) ?? ''),
       attribution:
           _string(json['attribution']) ?? _string(pricing['attributionText']),
+      reasonCode:
+          _string(json['reasonCode']) ??
+          _string(json['reason_code']) ??
+          _string(pricing['reasonCode']),
+      displayMessage:
+          _string(json['displayMessage']) ??
+          _string(json['display_message']) ??
+          _string(pricing['displayMessage']) ??
+          _string(pricing['pricingExplanation']),
       history: _historyFromJson(json['history']),
     );
   }

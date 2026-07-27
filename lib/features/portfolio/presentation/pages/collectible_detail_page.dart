@@ -27,6 +27,7 @@ import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -2964,21 +2965,20 @@ String _pricingTrustMessage(CollectibleItem item) {
     return explanation;
   }
   final status = _effectiveValuationStatus(item);
-  final reason = _pricingUnavailableReason(item);
+  final unavailableCopy = pricingUnavailableCopy(
+    reasonCode: pricing?.reasonCode,
+    status: status,
+  );
   return switch (status) {
     ValuationStatus.marketEstimated =>
       'PackLox is showing a provider-backed value from saved market evidence, not an AI-only guess.',
     ValuationStatus.aiEstimated =>
       'This item has an AI estimate only. Reprice it before relying on portfolio value.',
-    ValuationStatus.providerNotConfigured =>
-      'PackLox does not have a connected pricing provider for this category yet.',
+    ValuationStatus.providerNotConfigured => unavailableCopy.message,
     ValuationStatus.noMarketMatch =>
-      '${reason ?? 'No trusted catalog or sold-comps match was found.'} Review identity fields and retry pricing.',
-    ValuationStatus.lookupFailed =>
-      'The pricing lookup did not complete. The last trusted value is preserved until a new value is found.',
-    ValuationStatus.unavailable =>
-      reason ??
-          'PackLox is not showing a value because trusted market evidence is unavailable.',
+      '${unavailableCopy.message} ${unavailableCopy.actionLabel}.',
+    ValuationStatus.lookupFailed => unavailableCopy.message,
+    ValuationStatus.unavailable => unavailableCopy.message,
   };
 }
 
@@ -2988,30 +2988,10 @@ String? _pricingUnavailableReason(CollectibleItem item) {
   if (status == ValuationStatus.marketEstimated) {
     return null;
   }
-  final reason = pricing?.reasonCode?.trim().toUpperCase();
-  return switch (reason) {
-    'PROVIDER_NOT_CONFIGURED' =>
-      'Pricing source not connected for this category',
-    'NO_MARKET_MATCH' => 'No trusted catalog or sold-comps match yet',
-    'INSUFFICIENT_TRUSTED_MARKET_DATA' =>
-      'Not enough trusted market evidence yet',
-    'WEAK_IDENTITY_MATCH' =>
-      'Identity match is too weak for a trusted valuation',
-    'LOW_PRICING_CONFIDENCE' => 'Pricing confidence is too low to show a value',
-    'SPECIALIST_SOURCE_NOT_CONNECTED' =>
-      'Specialist pricing source is not connected yet',
-    'LOOKUP_FAILED' => 'Pricing lookup did not complete',
-    null || '' => switch (status) {
-      ValuationStatus.noMarketMatch => 'No trusted market match yet',
-      ValuationStatus.providerNotConfigured =>
-        'Pricing source not connected for this category',
-      ValuationStatus.lookupFailed => 'Pricing lookup did not complete',
-      ValuationStatus.aiEstimated =>
-        'Market provider has not verified this value',
-      _ => null,
-    },
-    _ => _humanizeToken(reason),
-  };
+  return pricingUnavailableCopy(
+    reasonCode: pricing?.reasonCode,
+    status: status,
+  ).shortLabel;
 }
 
 String _pricingConfidenceBand(double confidence) {
@@ -4256,10 +4236,13 @@ Future<void> _showEditCollectibleDialog({
 }
 
 String _pricingRetryMessage(ValuationStatus? status) {
+  if (status != null && status != ValuationStatus.marketEstimated) {
+    final copy = pricingUnavailableCopy(status: status);
+    return 'Details saved. ${copy.shortLabel}.';
+  }
   return switch (status) {
     ValuationStatus.marketEstimated => 'Details saved and pricing refreshed',
-    ValuationStatus.noMarketMatch =>
-      'Details saved. No reliable market match yet.',
+    ValuationStatus.noMarketMatch ||
     ValuationStatus.providerNotConfigured ||
     ValuationStatus.lookupFailed ||
     ValuationStatus.unavailable ||
@@ -4269,9 +4252,13 @@ String _pricingRetryMessage(ValuationStatus? status) {
 }
 
 String _valueRefreshMessage(ValuationStatus? status) {
+  if (status != null && status != ValuationStatus.marketEstimated) {
+    final copy = pricingUnavailableCopy(status: status);
+    return '${copy.shortLabel}. ${copy.actionLabel}.';
+  }
   return switch (status) {
     ValuationStatus.marketEstimated => 'Portfolio value refreshed',
-    ValuationStatus.noMarketMatch => 'No reliable market match yet',
+    ValuationStatus.noMarketMatch ||
     ValuationStatus.providerNotConfigured ||
     ValuationStatus.lookupFailed ||
     ValuationStatus.unavailable ||

@@ -5,6 +5,7 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 
 class ScanResultReviewEdits {
@@ -1527,15 +1528,7 @@ String _formatMoneyAmount(double value) {
 }
 
 String _valuationStatusMessage(ValuationStatus status) {
-  return switch (status) {
-    ValuationStatus.providerNotConfigured =>
-      'Market value unavailable - pricing source not connected yet',
-    ValuationStatus.noMarketMatch => 'No reliable market match found yet',
-    ValuationStatus.lookupFailed => 'Value lookup failed - try again',
-    ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
-    ValuationStatus.marketEstimated => 'Market value unavailable',
-    ValuationStatus.unavailable => 'Trusted value unavailable',
-  };
+  return pricingUnavailableCopy(status: status).title;
 }
 
 String _rarityLabel(ScanResult result) {
@@ -1594,24 +1587,10 @@ String? _pricingReasonLabel(PricingInfo pricing) {
   if (pricing.valuationStatus == ValuationStatus.marketEstimated) {
     return null;
   }
-  final reason = pricing.reasonCode?.trim().toUpperCase();
-  return switch (reason) {
-    'PROVIDER_NOT_CONFIGURED' =>
-      'Pricing source not connected for this category',
-    'NO_MARKET_MATCH' => 'No trusted catalog or sold-comps match yet',
-    'INSUFFICIENT_TRUSTED_MARKET_DATA' =>
-      'Not enough trusted market evidence yet',
-    'LOW_PRICING_CONFIDENCE' => 'Pricing confidence is too low to show a value',
-    'LOOKUP_FAILED' => 'Pricing lookup did not complete',
-    null || '' => switch (pricing.valuationStatus) {
-      ValuationStatus.noMarketMatch => 'No trusted market match yet',
-      ValuationStatus.providerNotConfigured =>
-        'Pricing source not connected for this category',
-      ValuationStatus.lookupFailed => 'Pricing lookup did not complete',
-      _ => null,
-    },
-    _ => _humanizePricingToken(reason),
-  };
+  return pricingUnavailableCopy(
+    reasonCode: pricing.reasonCode,
+    status: pricing.valuationStatus,
+  ).shortLabel;
 }
 
 String _humanizePricingToken(String value) {

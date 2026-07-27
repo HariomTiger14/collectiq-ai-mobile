@@ -180,7 +180,9 @@ void main() {
     expect(find.text('Unavailable'), findsOneWidget);
     expect(find.text('No trusted match yet'), findsWidgets);
     expect(
-      find.text('No trusted catalog or sold-comps match yet'),
+      find.text(
+        'PackLox could not match this identity to trusted catalog or sold-comps evidence. Correct details and reprice.',
+      ),
       findsWidgets,
     );
     expect(find.text('Match basis'), findsOneWidget);
@@ -387,7 +389,10 @@ void main() {
     expect(updated.pricing?.pricingSource, 'Saved provider');
     expect(updated.valuationStatus, ValuationStatus.marketEstimated);
     expect(updated.valueAtScan, item.valueAtScan);
-    expect(find.text('No reliable market match yet'), findsOneWidget);
+    expect(
+      find.text('No trusted match. Correct details and reprice.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('correct and reprice uses backend reprice contract', (

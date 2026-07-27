@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/widgets/gradient_header.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
+import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 
 class PortfolioHeroHeader extends StatelessWidget {
@@ -818,13 +819,7 @@ String _portfolioValueLabel(CollectibleItem item) {
 }
 
 String _portfolioValueUnavailableLabel(ValuationStatus status) {
-  return switch (status) {
-    ValuationStatus.providerNotConfigured => 'Pricing coming soon',
-    ValuationStatus.noMarketMatch => 'No market match',
-    ValuationStatus.lookupFailed => 'Lookup failed',
-    ValuationStatus.aiEstimated => 'AI estimate pending',
-    _ => 'Value unavailable',
-  };
+  return pricingUnavailableCopy(status: status).shortLabel;
 }
 
 String? _sourceMarketValueLabel(PricingInfo? pricing) {
