@@ -1869,6 +1869,8 @@ class _DetailMarketSection extends StatelessWidget {
           _DetailAuthorityValueBlock(item: item),
           const SizedBox(height: AppSpacing.md),
           _DetailValueHistoryPanel(item: item),
+          const SizedBox(height: AppSpacing.md),
+          _PricingTrustPanel(item: item),
           if (catalogSnapshot != null) ...[
             const SizedBox(height: AppSpacing.md),
             _CatalogSnapshotPanel(snapshot: catalogSnapshot),
@@ -1886,6 +1888,93 @@ class _DetailMarketSection extends StatelessWidget {
                 ? 'No saved price-history series is available yet.'
                 : 'Saved market evidence is shown without fabricating price history.',
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PricingTrustPanel extends StatelessWidget {
+  const _PricingTrustPanel({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final pricing = item.pricing;
+    final status = _effectiveValuationStatus(item);
+    final trustColor = _pricingTrustColor(context, status);
+    final rows = _pricingTrustRows(item);
+    return Container(
+      key: const ValueKey('collectible-detail-pricing-trust-panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceRaised.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Pricing Trust',
+            icon: Icons.verified_user_outlined,
+            compact: true,
+            trailing: _pricingTrustTrailing(status),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: trustColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: trustColor.withValues(alpha: 0.32)),
+                ),
+                child: Icon(
+                  _pricingTrustIcon(status),
+                  color: trustColor,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _pricingTrustTitle(status),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _pricingTrustMessage(item),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        height: 1.32,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (rows.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _DetailAuthorityRows(rows: rows),
+          ],
+          if (pricing?.attributionText?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _DetailEmptyCopy(pricing!.attributionText!.trim()),
+          ],
         ],
       ),
     );
@@ -2786,6 +2875,191 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
       _DetailInfoRowData('Sources', market.sources.join(', ')),
     ],
   ];
+}
+
+List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
+  final pricing = item.pricing;
+  final market = item.marketSummary;
+  final status = _effectiveValuationStatus(item);
+  final confidence = pricing?.pricingConfidence ?? market?.confidence;
+  final rows = <_DetailInfoRowData>[
+    _DetailInfoRowData('Status', _pricingTrustTitle(status)),
+    if (pricing?.pricingSource.trim().isNotEmpty == true)
+      _DetailInfoRowData('Provider', pricing!.pricingSource),
+    if (confidence != null)
+      _DetailInfoRowData(
+        'Confidence',
+        '${_pricingConfidenceBand(confidence)} (${_confidencePercent(confidence)})',
+      ),
+    if (pricing?.valuationStrategy?.trim().isNotEmpty == true)
+      _DetailInfoRowData(
+        'Match basis',
+        _pricingStrategyLabel(pricing!.valuationStrategy!),
+      ),
+    if (_pricingUnavailableReason(item) != null)
+      _DetailInfoRowData('Reason', _pricingUnavailableReason(item)!),
+    if (_sourceMarketValue(pricing ?? _emptyPricingFor(item)) != null)
+      _DetailInfoRowData(
+        'Original value',
+        _sourceMarketValue(pricing ?? _emptyPricingFor(item))!,
+      ),
+    if (pricing?.lastUpdated != null)
+      _DetailInfoRowData(
+        'Last checked',
+        _formatPricingDate(pricing!.lastUpdated),
+      ),
+  ];
+  return rows;
+}
+
+ValuationStatus _effectiveValuationStatus(CollectibleItem item) {
+  if (item.valuationStatus != ValuationStatus.unavailable) {
+    return item.valuationStatus;
+  }
+  final pricingStatus = item.pricing?.valuationStatus;
+  if (pricingStatus != null && pricingStatus != ValuationStatus.unavailable) {
+    return pricingStatus;
+  }
+  return ValuationStatus.unavailable;
+}
+
+String _pricingTrustTitle(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => 'Trusted market valuation',
+    ValuationStatus.aiEstimated => 'Needs market verification',
+    ValuationStatus.providerNotConfigured => 'Provider not connected',
+    ValuationStatus.noMarketMatch => 'No trusted match yet',
+    ValuationStatus.lookupFailed => 'Lookup did not complete',
+    ValuationStatus.unavailable => 'Trusted value unavailable',
+  };
+}
+
+String _pricingTrustTrailing(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => 'Verified',
+    ValuationStatus.aiEstimated => 'Review',
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => 'Unavailable',
+  };
+}
+
+String _pricingTrustMessage(CollectibleItem item) {
+  final pricing = item.pricing;
+  final explanation = _clean(pricing?.pricingExplanation);
+  if (explanation != null) {
+    return explanation;
+  }
+  final status = _effectiveValuationStatus(item);
+  final reason = _pricingUnavailableReason(item);
+  return switch (status) {
+    ValuationStatus.marketEstimated =>
+      'PackLox is showing a provider-backed value from saved market evidence, not an AI-only guess.',
+    ValuationStatus.aiEstimated =>
+      'This item has an AI estimate only. Reprice it before relying on portfolio value.',
+    ValuationStatus.providerNotConfigured =>
+      'PackLox does not have a connected pricing provider for this category yet.',
+    ValuationStatus.noMarketMatch =>
+      '${reason ?? 'No trusted catalog or sold-comps match was found.'} Review identity fields and retry pricing.',
+    ValuationStatus.lookupFailed =>
+      'The pricing lookup did not complete. The last trusted value is preserved until a new value is found.',
+    ValuationStatus.unavailable =>
+      reason ??
+          'PackLox is not showing a value because trusted market evidence is unavailable.',
+  };
+}
+
+String? _pricingUnavailableReason(CollectibleItem item) {
+  final pricing = item.pricing;
+  final status = _effectiveValuationStatus(item);
+  if (status == ValuationStatus.marketEstimated) {
+    return null;
+  }
+  final reason = pricing?.reasonCode?.trim().toUpperCase();
+  return switch (reason) {
+    'PROVIDER_NOT_CONFIGURED' =>
+      'Pricing source not connected for this category',
+    'NO_MARKET_MATCH' => 'No trusted catalog or sold-comps match yet',
+    'INSUFFICIENT_TRUSTED_MARKET_DATA' =>
+      'Not enough trusted market evidence yet',
+    'WEAK_IDENTITY_MATCH' =>
+      'Identity match is too weak for a trusted valuation',
+    'LOW_PRICING_CONFIDENCE' => 'Pricing confidence is too low to show a value',
+    'SPECIALIST_SOURCE_NOT_CONNECTED' =>
+      'Specialist pricing source is not connected yet',
+    'LOOKUP_FAILED' => 'Pricing lookup did not complete',
+    null || '' => switch (status) {
+      ValuationStatus.noMarketMatch => 'No trusted market match yet',
+      ValuationStatus.providerNotConfigured =>
+        'Pricing source not connected for this category',
+      ValuationStatus.lookupFailed => 'Pricing lookup did not complete',
+      ValuationStatus.aiEstimated =>
+        'Market provider has not verified this value',
+      _ => null,
+    },
+    _ => _humanizeToken(reason),
+  };
+}
+
+String _pricingConfidenceBand(double confidence) {
+  if (confidence >= 0.85) {
+    return 'High';
+  }
+  if (confidence >= 0.70) {
+    return 'Medium';
+  }
+  if (confidence > 0) {
+    return 'Low';
+  }
+  return 'Not scored';
+}
+
+String _pricingStrategyLabel(String strategy) {
+  final normalized = strategy.trim().toLowerCase();
+  return switch (normalized) {
+    'catalog_lookup' => 'Catalog match',
+    'sold_completed' => 'Sold-comps market data',
+    'active_listing' => 'Active listing signal',
+    'unavailable' => 'Unavailable',
+    _ => _humanizeToken(strategy),
+  };
+}
+
+IconData _pricingTrustIcon(ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => Icons.verified_user_outlined,
+    ValuationStatus.aiEstimated => Icons.manage_search_outlined,
+    ValuationStatus.lookupFailed => Icons.sync_problem_outlined,
+    ValuationStatus.providerNotConfigured => Icons.extension_off_outlined,
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.unavailable => Icons.info_outline_rounded,
+  };
+}
+
+Color _pricingTrustColor(BuildContext context, ValuationStatus status) {
+  return switch (status) {
+    ValuationStatus.marketEstimated => HomeTokens.positive,
+    ValuationStatus.aiEstimated => HomeTokens.warning,
+    ValuationStatus.lookupFailed => Theme.of(context).colorScheme.error,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.unavailable => HomeTokens.accent,
+  };
+}
+
+PricingInfo _emptyPricingFor(CollectibleItem item) {
+  return PricingInfo(
+    estimatedMarketValue: 0,
+    lowEstimate: 0,
+    highEstimate: 0,
+    currency: item.pricing?.currency ?? 'AUD',
+    pricingSource: item.valuationSource,
+    pricingConfidence: 0,
+    lastUpdated: null,
+    valuationStatus: item.valuationStatus,
+    valuationSource: item.valuationSource,
+  );
 }
 
 class _CatalogSnapshotData {

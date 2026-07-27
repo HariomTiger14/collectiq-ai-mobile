@@ -73,7 +73,12 @@ void main() {
       expect(find.text('USD \$245'), findsWidgets);
       expect(find.text('+USD \$45'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
-      expect(find.text('Last refreshed 26/07/2026'), findsOneWidget);
+      await _revealText(tester, 'Pricing Trust');
+      expect(find.text('Pricing Trust'), findsOneWidget);
+      expect(find.text('Trusted market valuation'), findsWidgets);
+      expect(find.text('Verified'), findsOneWidget);
+      expect(find.text('Provider'), findsWidgets);
+      expect(find.text('Saved provider'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },
   );
@@ -137,6 +142,43 @@ void main() {
       expect(find.text('Estimated from saved market data'), findsWidgets);
     },
   );
+
+  testWidgets('pricing trust explains unavailable market values', (
+    tester,
+  ) async {
+    final item =
+        _authorityItem(
+          estimatedValue: 0,
+          valuationStatus: ValuationStatus.noMarketMatch,
+        ).copyWith(
+          pricing: const PricingInfo(
+            estimatedMarketValue: 0,
+            lowEstimate: 0,
+            highEstimate: 0,
+            currency: 'USD',
+            pricingSource: 'PriceCharting',
+            pricingConfidence: 0.42,
+            lastUpdated: null,
+            valuationStatus: ValuationStatus.noMarketMatch,
+            valuationSource: 'pricecharting',
+            reasonCode: 'NO_MARKET_MATCH',
+            valuationStrategy: 'catalog_lookup',
+          ),
+        );
+
+    await _pumpDetail(tester, item);
+    await _revealText(tester, 'Pricing Trust');
+
+    expect(find.text('Pricing Trust'), findsOneWidget);
+    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.text('No trusted match yet'), findsWidgets);
+    expect(
+      find.text('No trusted catalog or sold-comps match yet'),
+      findsWidgets,
+    );
+    expect(find.text('Match basis'), findsOneWidget);
+    expect(find.text('Catalog match'), findsOneWidget);
+  });
 
   testWidgets('favorite action persists wishlist status', (tester) async {
     final repository = _MemoryWishlistRepository();
@@ -335,7 +377,7 @@ void main() {
       item.pricing?.estimatedMarketValue,
     );
     expect(updated.pricing?.pricingSource, 'Saved provider');
-    expect(updated.valuationStatus, ValuationStatus.noMarketMatch);
+    expect(updated.valuationStatus, ValuationStatus.marketEstimated);
     expect(updated.valueAtScan, item.valueAtScan);
     expect(find.text('No reliable market match yet'), findsOneWidget);
   });
@@ -366,7 +408,7 @@ void main() {
     expect(find.text('Catalog ID'), findsOneWidget);
     expect(find.text('3666974'), findsOneWidget);
     expect(find.text('Attribution'), findsOneWidget);
-    expect(find.text('Pricing data by PriceCharting'), findsOneWidget);
+    expect(find.text('Pricing data by PriceCharting'), findsWidgets);
     expect(find.text('Strategy'), findsOneWidget);
     expect(find.text('Catalog Lookup'), findsOneWidget);
   });
