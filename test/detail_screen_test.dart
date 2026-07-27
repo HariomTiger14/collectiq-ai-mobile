@@ -13,6 +13,10 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/domain/repositories/wishlist_repository.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
@@ -325,6 +329,7 @@ void main() {
       portfolioRepository: repository,
       galleryService: galleryService,
       syncQueueRepository: syncQueueRepository,
+      planLimits: _premiumPlanLimits,
     );
 
     await _revealText(tester, 'Image Gallery');
@@ -679,6 +684,7 @@ Future<void> _pumpDetail(
   GalleryService? galleryService,
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
+  PlanLimits? planLimits,
 }) async {
   tester.view.physicalSize = const Size(900, 1200);
   tester.view.devicePixelRatio = 1;
@@ -705,6 +711,8 @@ Future<void> _pumpDetail(
           syncQueueRepositoryProvider.overrideWithValue(syncQueueRepository),
         ],
         if (apiClient != null) apiClientProvider.overrideWithValue(apiClient),
+        if (planLimits != null)
+          activePlanLimitsProvider.overrideWithValue(planLimits),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -716,6 +724,20 @@ Future<void> _pumpDetail(
   );
   await tester.pumpAndSettle();
 }
+
+const _premiumPlanLimits = PlanLimits(
+  plan: SubscriptionPlan.premium,
+  scanLimit: UsageLimit.unlimited,
+  maxPortfolioItems: 10000,
+  maxPhotosPerItem: 12,
+  maxActivePriceAlerts: 100,
+  monthlyPriceRefreshes: 1000,
+  canUseFullValueHistory: true,
+  canExportPortfolio: true,
+  canUseAdvancedFilters: true,
+  canBulkRefreshValues: true,
+  canUsePortfolioIntelligence: true,
+);
 
 class _MemoryPortfolioRepository implements PortfolioRepository {
   _MemoryPortfolioRepository(this.items);
