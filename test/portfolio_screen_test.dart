@@ -76,12 +76,6 @@ void main() {
 
     await _revealPortfolio(
       tester,
-      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
-    );
-    expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
-
-    await _revealPortfolio(
-      tester,
       find.byKey(const ValueKey('portfolio-intelligence-panel')),
     );
     expect(find.text('Portfolio intelligence'), findsOneWidget);
@@ -93,6 +87,12 @@ void main() {
     expect(find.text('2/3'), findsOneWidget);
     expect(find.text('Avg confidence'), findsOneWidget);
     expect(find.text('91%'), findsOneWidget);
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-card-1')),
+    );
+    expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
     expect(find.text('Add more collectibles'), findsOneWidget);
   });
 
@@ -349,7 +349,11 @@ void main() {
 
   testWidgets('opens combined filter and sort bottom sheet', (tester) async {
     _seedPortfolio([_item('sort-card', 'Pokemon Charizard', 1850)]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await _tapPortfolioToolbarButton(
       tester,
@@ -375,7 +379,11 @@ void main() {
       _item('low-card', 'Low Value Card', 12),
       _item('high-card', 'High Value Card', 240),
     ]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await _revealPortfolio(
       tester,
@@ -436,7 +444,11 @@ void main() {
         valuationStatus: 'provider_not_configured',
       ),
     ]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
@@ -587,16 +599,16 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
       findsNothing,
     );
+    expect(
+      _itemTop(tester, 'high-coin'),
+      lessThan(_itemTop(tester, 'low-coin')),
+    );
     await _revealToolbarControl(
       tester,
       const ValueKey('portfolio-action-filter'),
     );
     expect(find.text('Filter (1)'), findsOneWidget);
     expect(find.text('High value'), findsOneWidget);
-    expect(
-      _itemTop(tester, 'high-coin'),
-      lessThan(_itemTop(tester, 'low-coin')),
-    );
   });
 
   testWidgets('item rows open existing Detail route', (tester) async {
@@ -750,6 +762,15 @@ Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
       return;
     }
     await tester.drag(scroll.first, const Offset(0, -260));
+    await tester.pump();
+  }
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder.first);
+      await tester.pump();
+      return;
+    }
+    await tester.drag(scroll.first, const Offset(0, 260));
     await tester.pump();
   }
   expect(finder, findsOneWidget);

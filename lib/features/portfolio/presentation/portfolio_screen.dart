@@ -426,6 +426,18 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               : null,
                         ),
                       ),
+                    if (hasItems && !isFilteredEmpty)
+                      HomeSection(
+                        child: _PortfolioIntelligencePanel(
+                          analytics: portfolioAnalytics,
+                          valuedItemCount: _valuedItemCount(
+                            portfolioState.items,
+                          ),
+                          pendingItemCount: _pendingItemCount(
+                            portfolioState.items,
+                          ),
+                        ),
+                      ),
                     if (hasItems)
                       HomeSection(
                         child: _PortfolioExportPanel(
@@ -449,18 +461,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         onItemEdit: _editItem,
                       ),
                     ),
-                    if (hasItems && !isFilteredEmpty)
-                      HomeSection(
-                        child: _PortfolioIntelligencePanel(
-                          analytics: portfolioAnalytics,
-                          valuedItemCount: _valuedItemCount(
-                            portfolioState.items,
-                          ),
-                          pendingItemCount: _pendingItemCount(
-                            portfolioState.items,
-                          ),
-                        ),
-                      ),
                   ],
                 ],
               ),

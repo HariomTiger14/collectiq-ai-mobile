@@ -74,6 +74,10 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
   static void _noop() {}
 
   double get _scrollOffset {
+    final parsed = double.tryParse(scroll.trim());
+    if (parsed != null) {
+      return parsed;
+    }
     return switch (scroll) {
       'mid' || 'mid_scroll' => 720,
       'bottom' || 'bottom_scroll' => 2400,
