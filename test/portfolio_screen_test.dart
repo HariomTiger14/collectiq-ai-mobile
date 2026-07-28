@@ -67,7 +67,7 @@ void main() {
     expect(find.text('\$18'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
-    expect(find.text('1 pending'), findsOneWidget);
+    expect(find.text('1 pending'), findsWidgets);
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-action-filter')),
@@ -87,13 +87,56 @@ void main() {
     expect(find.text('2/3'), findsOneWidget);
     expect(find.text('Avg confidence'), findsOneWidget);
     expect(find.text('91%'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-locked-preview')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-attention-queue')),
+      findsNothing,
+    );
 
     await _revealPortfolio(
       tester,
       find.byKey(const ValueKey('portfolio-grid-item-card-1')),
     );
     expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
-    expect(find.text('Add more collectibles'), findsOneWidget);
+  });
+
+  testWidgets('paid plan unlocks full portfolio intelligence', (tester) async {
+    _seedPortfolio([
+      _item('paid-card', 'Pokemon Charizard', 1850),
+      _item(
+        'paid-pending',
+        'Hot Wheels Mystery',
+        0,
+        category: 'Toy Car',
+        valuationStatus: 'provider_not_configured',
+        confidence: 0.62,
+      ),
+    ]);
+
+    await _pumpPortfolio(tester, paidFeatures: true);
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-intelligence-panel')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-locked-preview')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-attention-queue')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-top-value')),
+      findsOneWidget,
+    );
+    expect(find.text('Attention queue'), findsOneWidget);
+    expect(find.text('Top value items'), findsOneWidget);
+    expect(find.text('Needs trusted value'), findsOneWidget);
   });
 
   testWidgets('free plan keeps advanced filters visibly locked', (
@@ -408,6 +451,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(12, 12));
     await tester.pumpAndSettle();
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-card')),
+    );
     expect(
       _itemTop(tester, 'low-card'),
       lessThan(_itemTop(tester, 'high-card')),
@@ -424,9 +475,21 @@ void main() {
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
     await tester.pumpAndSettle();
 
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-card')),
+    );
     expect(
       _itemTop(tester, 'high-card'),
       lessThan(_itemTop(tester, 'low-card')),
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-sort'),
     );
     expect(find.text('High value'), findsOneWidget);
   });
@@ -856,13 +919,14 @@ Map<String, Object?> _item(
   String category = 'Trading Card',
   String imagePath = 'sample://card',
   String valuationStatus = 'market_estimated',
+  double confidence = 0.91,
 }) {
   return {
     'id': id,
     'title': title,
     'category': category,
     'estimatedValue': value,
-    'confidence': 0.91,
+    'confidence': confidence,
     'condition': 'Near Mint',
     'recommendation': 'Keep protected.',
     'imagePath': imagePath,

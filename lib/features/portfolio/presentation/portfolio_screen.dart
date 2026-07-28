@@ -299,6 +299,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         portfolioState.isLoading && portfolioState.items.isEmpty;
     final showError =
         portfolioState.errorMessage != null && portfolioState.items.isEmpty;
+    final planLimits = ref.watch(activePlanLimitsProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -436,6 +437,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           pendingItemCount: _pendingItemCount(
                             portfolioState.items,
                           ),
+                          isUnlocked: planLimits.canUsePortfolioIntelligence,
                         ),
                       ),
                     if (hasItems)
@@ -1259,11 +1261,13 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
     required this.analytics,
     required this.valuedItemCount,
     required this.pendingItemCount,
+    required this.isUnlocked,
   });
 
   final CollectorDashboardAnalytics analytics;
   final int valuedItemCount;
   final int pendingItemCount;
+  final bool isUnlocked;
 
   @override
   Widget build(BuildContext context) {
@@ -1323,9 +1327,7 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        attentionCount == 0
-                            ? 'Your saved items have healthy valuation coverage and metadata.'
-                            : '$attentionCount review signals across pricing, confidence, photos, or metadata.',
+                        _summaryCopy(attentionCount),
                         style: textTheme.bodySmall?.copyWith(
                           color: HomeTokens.textSecondary,
                           fontWeight: FontWeight.w700,
@@ -1396,12 +1398,27 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                 );
               },
             ),
-            if (recommendations.isNotEmpty) ...[
+            if (!isUnlocked) ...[
               const SizedBox(height: AppSpacing.md),
-              for (final recommendation in recommendations) ...[
-                _PortfolioRecommendationRow(recommendation: recommendation),
-                if (recommendation != recommendations.last)
-                  const SizedBox(height: AppSpacing.sm),
+              const _PortfolioIntelligenceLockedPreview(),
+            ] else ...[
+              const SizedBox(height: AppSpacing.md),
+              _PortfolioAttentionQueue(
+                analytics: analytics,
+                pendingItemCount: pendingItemCount,
+                attentionCount: attentionCount,
+              ),
+              if (analytics.topHighestValue.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _PortfolioTopValueList(items: analytics.topHighestValue),
+              ],
+              if (recommendations.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                for (final recommendation in recommendations) ...[
+                  _PortfolioRecommendationRow(recommendation: recommendation),
+                  if (recommendation != recommendations.last)
+                    const SizedBox(height: AppSpacing.sm),
+                ],
               ],
             ],
           ],
@@ -1410,12 +1427,328 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
     );
   }
 
+  String _summaryCopy(int attentionCount) {
+    if (!isUnlocked) {
+      return 'Preview your collection health. Pro unlocks the full attention queue, top value items, and refresh priorities.';
+    }
+    if (attentionCount == 0) {
+      return 'Your saved items have healthy valuation coverage and metadata.';
+    }
+    return '$attentionCount review signals across pricing, confidence, photos, or metadata.';
+  }
+
   int get _attentionCount {
     return pendingItemCount +
         analytics.lowConfidenceItems.length +
         analytics.collectionHealth.stalePricingCount +
         analytics.collectionHealth.missingDataCount +
         analytics.collectionHealth.lowQualityCount;
+  }
+}
+
+class _PortfolioIntelligenceLockedPreview extends StatelessWidget {
+  const _PortfolioIntelligenceLockedPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('portfolio-intelligence-locked-preview'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: HomeTokens.accentStrong.withValues(alpha: .32),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: HomeTokens.accentStrong.withValues(alpha: .16),
+              border: Border.all(
+                color: HomeTokens.accentStrong.withValues(alpha: .34),
+              ),
+            ),
+            child: const Icon(
+              Icons.lock_outline,
+              color: HomeTokens.accentStrong,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pro intelligence preview',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Upgrade to see which items need photos, fresh pricing, confidence review, and the highest value records in your collection.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.32,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioAttentionQueue extends StatelessWidget {
+  const _PortfolioAttentionQueue({
+    required this.analytics,
+    required this.pendingItemCount,
+    required this.attentionCount,
+  });
+
+  final CollectorDashboardAnalytics analytics;
+  final int pendingItemCount;
+  final int attentionCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final health = analytics.collectionHealth;
+    final rows = [
+      _AttentionQueueRowData(
+        icon: Icons.price_check_outlined,
+        title: 'Needs trusted value',
+        value: pendingItemCount,
+        message: pendingItemCount == 0
+            ? 'All saved items have a displayable value.'
+            : 'Review unavailable or unsupported valuation states.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.refresh_outlined,
+        title: 'Refresh priority',
+        value: health.stalePricingCount,
+        message: health.stalePricingCount == 0
+            ? 'Pricing evidence is fresh.'
+            : 'Refresh stale values to create new snapshots.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.fact_check_outlined,
+        title: 'Metadata gaps',
+        value: health.missingDataCount,
+        message: health.missingDataCount == 0
+            ? 'Core identity fields look complete.'
+            : 'Add set, brand, year, notes, or identifiers.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.center_focus_strong_outlined,
+        title: 'Low confidence',
+        value: analytics.lowConfidenceItems.length,
+        message: analytics.lowConfidenceItems.isEmpty
+            ? 'Identification confidence is strong.'
+            : 'Correct details or rescan weak matches.',
+      ),
+    ];
+
+    return Container(
+      key: const ValueKey('portfolio-intelligence-attention-queue'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .62),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Attention queue',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                attentionCount == 0 ? 'Clear' : '$attentionCount signals',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: attentionCount == 0
+                      ? HomeTokens.positive
+                      : HomeTokens.warning,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final row in rows) ...[
+            _PortfolioAttentionRow(data: row),
+            if (row != rows.last) const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionQueueRowData {
+  const _AttentionQueueRowData({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final int value;
+  final String message;
+}
+
+class _PortfolioAttentionRow extends StatelessWidget {
+  const _PortfolioAttentionRow({required this.data});
+
+  final _AttentionQueueRowData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data.value == 0 ? HomeTokens.positive : HomeTokens.warning;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: HomeTokens.background.withValues(alpha: .36),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: HomeTokens.border.withValues(alpha: .72)),
+      ),
+      child: Row(
+        children: [
+          Icon(data.icon, color: color, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  data.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            '${data.value}',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioTopValueList extends StatelessWidget {
+  const _PortfolioTopValueList({required this.items});
+
+  final List<CollectibleItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = items.take(3).toList(growable: false);
+    return Container(
+      key: const ValueKey('portfolio-intelligence-top-value'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .62),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Top value items',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final item in visibleItems) ...[
+            _PortfolioTopValueRow(item: item),
+            if (item != visibleItems.last)
+              const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioTopValueRow extends StatelessWidget {
+  const _PortfolioTopValueRow({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          _formatAud(item.estimatedValue),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: HomeTokens.positive,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
   }
 }
 
