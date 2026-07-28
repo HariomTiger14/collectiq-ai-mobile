@@ -5,6 +5,8 @@ import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -288,6 +290,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final effectiveSearchQuery = _effectiveSearchQuery(previewScenario);
     final orderedItems = _orderedItems(portfolioState.items);
     final visibleItems = _visibleItems(orderedItems, effectiveSearchQuery);
+    final portfolioAnalytics = const CollectorDashboardAnalyticsService().build(
+      orderedItems,
+    );
     final hasItems = portfolioState.items.isNotEmpty;
     final isFilteredEmpty = hasItems && visibleItems.isEmpty;
     final showLoading =
@@ -444,6 +449,18 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         onItemEdit: _editItem,
                       ),
                     ),
+                    if (hasItems && !isFilteredEmpty)
+                      HomeSection(
+                        child: _PortfolioIntelligencePanel(
+                          analytics: portfolioAnalytics,
+                          valuedItemCount: _valuedItemCount(
+                            portfolioState.items,
+                          ),
+                          pendingItemCount: _pendingItemCount(
+                            portfolioState.items,
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               ),
@@ -1232,6 +1249,290 @@ class _PortfolioMetrics extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _PortfolioIntelligencePanel extends StatelessWidget {
+  const _PortfolioIntelligencePanel({
+    required this.analytics,
+    required this.valuedItemCount,
+    required this.pendingItemCount,
+  });
+
+  final CollectorDashboardAnalytics analytics;
+  final int valuedItemCount;
+  final int pendingItemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final health = analytics.collectionHealth;
+    final attentionCount = _attentionCount;
+    final recommendations = analytics.recommendations.take(2).toList();
+    final textTheme = Theme.of(context).textTheme;
+
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-intelligence-panel'),
+      child: HomeSectionSurface(
+        keySeed: 'portfolio-intelligence',
+        title: 'Portfolio intelligence',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        _healthColor(health).withValues(alpha: .95),
+                        HomeTokens.accentStrong.withValues(alpha: .84),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: _healthColor(health).withValues(alpha: .52),
+                    ),
+                  ),
+                  child: Text(
+                    '${health.score}',
+                    key: const ValueKey('portfolio-health-score'),
+                    style: textTheme.titleLarge?.copyWith(
+                      color: HomeTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        health.label,
+                        key: const ValueKey('portfolio-health-label'),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        attentionCount == 0
+                            ? 'Your saved items have healthy valuation coverage and metadata.'
+                            : '$attentionCount review signals across pricing, confidence, photos, or metadata.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.32,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
+                return Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Pricing coverage',
+                        value: '$valuedItemCount/${analytics.itemCount}',
+                        supportingText: '$pendingItemCount pending',
+                        color: pendingItemCount == 0
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Avg confidence',
+                        value:
+                            '${(analytics.averageConfidence * 100).round()}%',
+                        supportingText: analytics.lowConfidenceItems.isEmpty
+                            ? 'Strong signal'
+                            : '${analytics.lowConfidenceItems.length} low',
+                        color: analytics.lowConfidenceItems.isEmpty
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Stale values',
+                        value: '${health.stalePricingCount}',
+                        supportingText: 'Refresh queue',
+                        color: health.stalePricingCount == 0
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Missing details',
+                        value: '${health.missingDataCount}',
+                        supportingText: 'Metadata gaps',
+                        color: health.missingDataCount == 0
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            if (recommendations.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              for (final recommendation in recommendations) ...[
+                _PortfolioRecommendationRow(recommendation: recommendation),
+                if (recommendation != recommendations.last)
+                  const SizedBox(height: AppSpacing.sm),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  int get _attentionCount {
+    return pendingItemCount +
+        analytics.lowConfidenceItems.length +
+        analytics.collectionHealth.stalePricingCount +
+        analytics.collectionHealth.missingDataCount +
+        analytics.collectionHealth.lowQualityCount;
+  }
+}
+
+class _IntelligenceMetricTile extends StatelessWidget {
+  const _IntelligenceMetricTile({
+    required this.label,
+    required this.value,
+    required this.supportingText,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final String supportingText;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 86),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            supportingText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioRecommendationRow extends StatelessWidget {
+  const _PortfolioRecommendationRow({required this.recommendation});
+
+  final CollectionRecommendation recommendation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _recommendationIcon(recommendation.type),
+            color: _recommendationColor(recommendation.type),
+            size: 22,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  recommendation.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  recommendation.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2050,6 +2351,38 @@ bool _isPendingItem(CollectibleItem item) {
   return !_hasDisplayableValuation(item) ||
       item.syncStatus == CloudItemSyncStatus.pendingUpload ||
       item.syncStatus == CloudItemSyncStatus.failed;
+}
+
+Color _healthColor(CollectionHealthScore health) {
+  if (health.score >= 70) {
+    return HomeTokens.positive;
+  }
+  if (health.score >= 50) {
+    return HomeTokens.warning;
+  }
+  return const Color(0xFFFF7A9A);
+}
+
+IconData _recommendationIcon(CollectionRecommendationType type) {
+  return switch (type) {
+    CollectionRecommendationType.scanAgain => Icons.document_scanner_outlined,
+    CollectionRecommendationType.improvePhoto => Icons.add_a_photo_outlined,
+    CollectionRecommendationType.upgradePlan =>
+      Icons.workspace_premium_outlined,
+    CollectionRecommendationType.reviewLowConfidence =>
+      Icons.manage_search_outlined,
+    CollectionRecommendationType.addMoreCollectibles => Icons.add_box_outlined,
+  };
+}
+
+Color _recommendationColor(CollectionRecommendationType type) {
+  return switch (type) {
+    CollectionRecommendationType.scanAgain ||
+    CollectionRecommendationType.reviewLowConfidence => HomeTokens.warning,
+    CollectionRecommendationType.improvePhoto ||
+    CollectionRecommendationType.addMoreCollectibles => const Color(0xFF8BC7FF),
+    CollectionRecommendationType.upgradePlan => HomeTokens.positive,
+  };
 }
 
 int _statusSortRank(CollectibleItem item) {

@@ -79,6 +79,21 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-card-1')),
     );
     expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-intelligence-panel')),
+    );
+    expect(find.text('Portfolio intelligence'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-health-score')),
+      findsOneWidget,
+    );
+    expect(find.text('Pricing coverage'), findsOneWidget);
+    expect(find.text('2/3'), findsOneWidget);
+    expect(find.text('Avg confidence'), findsOneWidget);
+    expect(find.text('91%'), findsOneWidget);
+    expect(find.text('Add more collectibles'), findsOneWidget);
   });
 
   testWidgets('free plan keeps advanced filters visibly locked', (
@@ -246,6 +261,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-search-coin')),
       findsNothing,
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-search-clear'),
     );
     expect(
       find.byKey(const ValueKey('portfolio-search-clear')),
@@ -435,6 +454,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
       findsNothing,
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-filter'),
     );
     expect(find.text('Filter (1)'), findsOneWidget);
   });
