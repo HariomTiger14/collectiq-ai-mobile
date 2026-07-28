@@ -1273,7 +1273,14 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final health = analytics.collectionHealth;
     final attentionCount = _attentionCount;
-    final recommendations = analytics.recommendations.take(2).toList();
+    final recommendations = analytics.recommendations
+        .where(
+          (recommendation) =>
+              !isUnlocked ||
+              recommendation.type != CollectionRecommendationType.upgradePlan,
+        )
+        .take(2)
+        .toList();
     final textTheme = Theme.of(context).textTheme;
 
     return KeyedSubtree(

@@ -137,6 +137,7 @@ void main() {
     expect(find.text('Attention queue'), findsOneWidget);
     expect(find.text('Top value items'), findsOneWidget);
     expect(find.text('Needs trusted value'), findsOneWidget);
+    expect(find.text('Upgrade plan'), findsNothing);
   });
 
   testWidgets('free plan keeps advanced filters visibly locked', (
