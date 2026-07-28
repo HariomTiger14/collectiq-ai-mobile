@@ -85,7 +85,7 @@ void main() {
       expect(find.text('Saved provider'), findsWidgets);
       expect(find.text('Currency'), findsWidgets);
       expect(find.text('Value range'), findsWidgets);
-      expect(find.text('USD \$220 - USD \$270'), findsWidgets);
+      expect(find.text('USD \$220 - \$270'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },

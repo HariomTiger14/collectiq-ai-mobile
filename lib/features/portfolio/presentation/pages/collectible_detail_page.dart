@@ -2873,7 +2873,11 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
         ),
       _DetailInfoRowData(
         'Value range',
-        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+        _formatMoneyRange(
+          pricing.lowEstimate,
+          pricing.highEstimate,
+          pricing.currency,
+        ),
       ),
       _DetailInfoRowData('Source', pricing.pricingSource),
       _DetailInfoRowData(
@@ -2915,7 +2919,11 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
         (pricing.lowEstimate > 0 || pricing.highEstimate > 0))
       _DetailInfoRowData(
         'Value range',
-        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+        _formatMoneyRange(
+          pricing.lowEstimate,
+          pricing.highEstimate,
+          pricing.currency,
+        ),
       ),
     _DetailInfoRowData(
       'Portfolio record',
@@ -4938,8 +4946,11 @@ class _DetailSections extends StatelessWidget {
                   ),
                   AppMetadataItem(
                     label: 'Estimated Range',
-                    value:
-                        '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+                    value: _formatMoneyRange(
+                      item.pricing!.lowEstimate,
+                      item.pricing!.highEstimate,
+                      item.pricing!.currency,
+                    ),
                   ),
                   AppMetadataItem(
                     label: 'Pricing Source',
@@ -5448,8 +5459,11 @@ class _PriceHistorySection extends StatelessWidget {
           ),
         AppMetadataItem(
           label: 'Estimated range',
-          value:
-              '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+          value: _formatMoneyRange(
+            pricing.lowEstimate,
+            pricing.highEstimate,
+            pricing.currency,
+          ),
         ),
         AppMetadataItem(label: 'Pricing source', value: pricing.pricingSource),
         AppMetadataItem(
@@ -5953,13 +5967,7 @@ String _formatAud(double value) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final amount = _formatMoneyAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
+  final withCommas = _formatMoneyAmountWithCommas(value);
   return '\$$withCommas';
 }
 
@@ -6107,6 +6115,57 @@ String _formatMoney(double value, String currency) {
     return 'CAD \$$withCommas';
   }
   return '$normalizedCurrency $withCommas';
+}
+
+String _formatMoneyRange(double low, double high, String currency) {
+  if (low <= 0 && high <= 0) {
+    return 'Value unavailable';
+  }
+  final normalizedCurrency = currency.trim().toUpperCase();
+  final start = low > 0 ? _formatMoneyAmountWithCommas(low) : null;
+  final end = high > 0 ? _formatMoneyAmountWithCommas(high) : null;
+  if (start == null && end == null) {
+    return 'Value unavailable';
+  }
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '${_joinCurrencyRange(start, end, r'$')} AUD';
+  }
+  if (normalizedCurrency == 'USD') {
+    return 'USD ${_joinCurrencyRange(start, end, r'$')}';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return _joinCurrencyRange(start, end, '£');
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CAD ${_joinCurrencyRange(start, end, r'$')}';
+  }
+  final range = switch ((start, end)) {
+    (final String startValue, final String endValue) =>
+      '$startValue - $endValue',
+    (final String startValue, null) => startValue,
+    (null, final String endValue) => endValue,
+    _ => '',
+  };
+  return '$normalizedCurrency $range';
+}
+
+String _joinCurrencyRange(String? start, String? end, String symbol) {
+  return switch ((start, end)) {
+    (final String startValue, final String endValue) =>
+      '$symbol$startValue - $symbol$endValue',
+    (final String startValue, null) => '$symbol$startValue',
+    (null, final String endValue) => '$symbol$endValue',
+    _ => 'Value unavailable',
+  };
+}
+
+String _formatMoneyAmountWithCommas(double value) {
+  return _formatMoneyAmount(value).replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
+  );
 }
 
 String _formatMoneyAmount(double value) {
