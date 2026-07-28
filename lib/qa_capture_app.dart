@@ -29,6 +29,10 @@ import 'package:collectiq_ai/features/search/domain/entities/catalog_search_resu
 import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/foundation.dart';
@@ -44,6 +48,20 @@ const _qaScroll = String.fromEnvironment('PACKLOX_QA_SCROLL');
 
 const packloxQaCaptureActive =
     kDebugMode && _qaCaptureRequested && _qaAppEnvironment == 'sit';
+
+const _qaProPlanLimits = PlanLimits(
+  plan: SubscriptionPlan.pro,
+  scanLimit: UsageLimit(dailyFreeScanLimit: 250),
+  maxPortfolioItems: 1000,
+  maxPhotosPerItem: 6,
+  maxActivePriceAlerts: 25,
+  monthlyPriceRefreshes: 100,
+  canUseFullValueHistory: true,
+  canExportPortfolio: true,
+  canUseAdvancedFilters: true,
+  canBulkRefreshValues: false,
+  canUsePortfolioIntelligence: true,
+);
 
 class PackLoxQaCaptureApp extends StatelessWidget {
   const PackLoxQaCaptureApp({super.key});
@@ -213,6 +231,16 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
         onScanPressed: _noop,
         previewScenario: PortfolioPreviewScenario.defaultData,
         qaInitialScrollOffset: _scrollOffset,
+      ),
+      'portfolio_default_pro' => ProviderScope(
+        overrides: [
+          activePlanLimitsProvider.overrideWithValue(_qaProPlanLimits),
+        ],
+        child: PortfolioScreen(
+          onScanPressed: _noop,
+          previewScenario: PortfolioPreviewScenario.defaultData,
+          qaInitialScrollOffset: _scrollOffset,
+        ),
       ),
       'portfolio_empty' => PortfolioScreen(
         onScanPressed: _noop,
