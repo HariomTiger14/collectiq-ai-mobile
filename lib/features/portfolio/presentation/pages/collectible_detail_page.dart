@@ -2250,7 +2250,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               icon: Icons.lock_outline_rounded,
               title: 'Full history is a Pro tool',
               message:
-                  'Free shows value at scan and current value. Upgrade for trend charts and deeper valuation history.',
+                  'Free plan shows value at scan and current value. Upgrade for trend charts and deeper valuation history.',
             )
           else
             Container(
