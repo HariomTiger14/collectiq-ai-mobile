@@ -138,6 +138,54 @@ void main() {
     expect(find.text('Top value items'), findsOneWidget);
     expect(find.text('Needs trusted value'), findsOneWidget);
     expect(find.text('Upgrade plan'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-intelligence-action-trustedValue')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Needs trusted value view applied.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-paid-pending')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-paid-card')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('paid intelligence add-more recommendation opens scan flow', (
+    tester,
+  ) async {
+    var scanTapped = false;
+    _seedPortfolio([
+      _item('paid-card', 'Pokemon Charizard', 1850),
+      _item('paid-eagle', 'Silver Eagle 2015', 52, category: 'Coin'),
+    ]);
+
+    await _pumpPortfolio(
+      tester,
+      paidFeatures: true,
+      onScanPressed: () {
+        scanTapped = true;
+      },
+    );
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(
+        const ValueKey('portfolio-recommendation-action-addMoreCollectibles'),
+      ),
+    );
+    await tester.tap(
+      find.byKey(
+        const ValueKey('portfolio-recommendation-action-addMoreCollectibles'),
+      ),
+    );
+    await tester.pump();
+
+    expect(scanTapped, isTrue);
   });
 
   testWidgets('free plan keeps advanced filters visibly locked', (

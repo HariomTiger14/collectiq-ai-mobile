@@ -88,6 +88,17 @@ enum _PortfolioTrendFilter {
   final String label;
 }
 
+enum _PortfolioIntelligenceFocus {
+  trustedValue(label: 'Needs trusted value'),
+  refreshPriority(label: 'Refresh priority'),
+  metadataGaps(label: 'Metadata gaps'),
+  lowConfidence(label: 'Low confidence');
+
+  const _PortfolioIntelligenceFocus({required this.label});
+
+  final String label;
+}
+
 enum PortfolioPreviewScenario {
   defaultData(
     label: 'Default',
@@ -249,6 +260,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
   _PortfolioConfidenceFilter _confidenceFilter = _PortfolioConfidenceFilter.all;
   _PortfolioTrendFilter _trendFilter = _PortfolioTrendFilter.all;
+  _PortfolioIntelligenceFocus? _intelligenceFocus;
 
   @override
   void initState() {
@@ -438,6 +450,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             portfolioState.items,
                           ),
                           isUnlocked: planLimits.canUsePortfolioIntelligence,
+                          onAttentionFocus: _applyIntelligenceFocus,
+                          onAddMoreCollectibles: widget.onScanPressed,
                         ),
                       ),
                     if (hasItems)
@@ -568,11 +582,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
             _PortfolioTrendFilter.stable => trend.contains('stable'),
             _PortfolioTrendFilter.cooling => trend.contains('cooling'),
           };
+          final matchesIntelligenceFocus = switch (_intelligenceFocus) {
+            null => true,
+            _PortfolioIntelligenceFocus.trustedValue => _isPendingItem(item),
+            _PortfolioIntelligenceFocus.refreshPriority => _hasStalePricing(
+              item,
+            ),
+            _PortfolioIntelligenceFocus.metadataGaps =>
+              _hasMissingImportantData(item),
+            _PortfolioIntelligenceFocus.lowConfidence => item.confidence < .75,
+          };
           return matchesSearch &&
               matchesStatus &&
               matchesCategory &&
               matchesConfidence &&
-              matchesTrend;
+              matchesTrend &&
+              matchesIntelligenceFocus;
         })
         .toList(growable: false);
   }
@@ -589,6 +614,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       count += 1;
     }
     if (_trendFilter != _PortfolioTrendFilter.all) {
+      count += 1;
+    }
+    if (_intelligenceFocus != null) {
       count += 1;
     }
     return count;
@@ -609,7 +637,51 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       _categoryFilter = _PortfolioCategoryFilter.all;
       _confidenceFilter = _PortfolioConfidenceFilter.all;
       _trendFilter = _PortfolioTrendFilter.all;
+      _intelligenceFocus = null;
       _sortMode = _PortfolioSortMode.newest;
+    });
+  }
+
+  void _applyIntelligenceFocus(_PortfolioIntelligenceFocus focus) {
+    setState(() {
+      _searchQuery = '';
+      _filteredPreviewCleared = true;
+      _intelligenceFocus = focus;
+      _categoryFilter = _PortfolioCategoryFilter.all;
+      _trendFilter = _PortfolioTrendFilter.all;
+      switch (focus) {
+        case _PortfolioIntelligenceFocus.trustedValue:
+          _statusFilter = _PortfolioStatusFilter.pending;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.status;
+        case _PortfolioIntelligenceFocus.refreshPriority:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.status;
+        case _PortfolioIntelligenceFocus.metadataGaps:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.newest;
+        case _PortfolioIntelligenceFocus.lowConfidence:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.low;
+          _sortMode = _PortfolioSortMode.newest;
+      }
+    });
+    _showPortfolioSnackBar('${focus.label} view applied.');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      final target = (_scrollController.position.maxScrollExtent * .72).clamp(
+        _scrollController.position.minScrollExtent,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
     });
   }
 
@@ -914,6 +986,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             _categoryFilter = draft.categoryFilter;
                             _confidenceFilter = draft.confidenceFilter;
                             _trendFilter = draft.trendFilter;
+                            _intelligenceFocus = null;
                             _filteredPreviewCleared = true;
                           });
                           Navigator.of(context).pop();
@@ -1262,12 +1335,16 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
     required this.valuedItemCount,
     required this.pendingItemCount,
     required this.isUnlocked,
+    required this.onAttentionFocus,
+    required this.onAddMoreCollectibles,
   });
 
   final CollectorDashboardAnalytics analytics;
   final int valuedItemCount;
   final int pendingItemCount;
   final bool isUnlocked;
+  final ValueChanged<_PortfolioIntelligenceFocus> onAttentionFocus;
+  final VoidCallback? onAddMoreCollectibles;
 
   @override
   Widget build(BuildContext context) {
@@ -1414,6 +1491,7 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                 analytics: analytics,
                 pendingItemCount: pendingItemCount,
                 attentionCount: attentionCount,
+                onFocusSelected: onAttentionFocus,
               ),
               if (analytics.topHighestValue.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -1422,7 +1500,14 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
               if (recommendations.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
                 for (final recommendation in recommendations) ...[
-                  _PortfolioRecommendationRow(recommendation: recommendation),
+                  _PortfolioRecommendationRow(
+                    recommendation: recommendation,
+                    onTap:
+                        recommendation.type ==
+                            CollectionRecommendationType.addMoreCollectibles
+                        ? onAddMoreCollectibles
+                        : null,
+                  ),
                   if (recommendation != recommendations.last)
                     const SizedBox(height: AppSpacing.sm),
                 ],
@@ -1524,11 +1609,13 @@ class _PortfolioAttentionQueue extends StatelessWidget {
     required this.analytics,
     required this.pendingItemCount,
     required this.attentionCount,
+    required this.onFocusSelected,
   });
 
   final CollectorDashboardAnalytics analytics;
   final int pendingItemCount;
   final int attentionCount;
+  final ValueChanged<_PortfolioIntelligenceFocus> onFocusSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1536,6 +1623,7 @@ class _PortfolioAttentionQueue extends StatelessWidget {
     final rows = [
       _AttentionQueueRowData(
         icon: Icons.price_check_outlined,
+        focus: _PortfolioIntelligenceFocus.trustedValue,
         title: 'Needs trusted value',
         value: pendingItemCount,
         message: pendingItemCount == 0
@@ -1544,6 +1632,7 @@ class _PortfolioAttentionQueue extends StatelessWidget {
       ),
       _AttentionQueueRowData(
         icon: Icons.refresh_outlined,
+        focus: _PortfolioIntelligenceFocus.refreshPriority,
         title: 'Refresh priority',
         value: health.stalePricingCount,
         message: health.stalePricingCount == 0
@@ -1552,6 +1641,7 @@ class _PortfolioAttentionQueue extends StatelessWidget {
       ),
       _AttentionQueueRowData(
         icon: Icons.fact_check_outlined,
+        focus: _PortfolioIntelligenceFocus.metadataGaps,
         title: 'Metadata gaps',
         value: health.missingDataCount,
         message: health.missingDataCount == 0
@@ -1560,6 +1650,7 @@ class _PortfolioAttentionQueue extends StatelessWidget {
       ),
       _AttentionQueueRowData(
         icon: Icons.center_focus_strong_outlined,
+        focus: _PortfolioIntelligenceFocus.lowConfidence,
         title: 'Low confidence',
         value: analytics.lowConfidenceItems.length,
         message: analytics.lowConfidenceItems.isEmpty
@@ -1604,7 +1695,10 @@ class _PortfolioAttentionQueue extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           for (final row in rows) ...[
-            _PortfolioAttentionRow(data: row),
+            _PortfolioAttentionRow(
+              data: row,
+              onTap: () => onFocusSelected(row.focus),
+            ),
             if (row != rows.last) const SizedBox(height: AppSpacing.xs),
           ],
         ],
@@ -1616,72 +1710,94 @@ class _PortfolioAttentionQueue extends StatelessWidget {
 class _AttentionQueueRowData {
   const _AttentionQueueRowData({
     required this.icon,
+    required this.focus,
     required this.title,
     required this.value,
     required this.message,
   });
 
   final IconData icon;
+  final _PortfolioIntelligenceFocus focus;
   final String title;
   final int value;
   final String message;
 }
 
 class _PortfolioAttentionRow extends StatelessWidget {
-  const _PortfolioAttentionRow({required this.data});
+  const _PortfolioAttentionRow({required this.data, required this.onTap});
 
   final _AttentionQueueRowData data;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = data.value == 0 ? HomeTokens.positive : HomeTokens.warning;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: HomeTokens.background.withValues(alpha: .36),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('portfolio-intelligence-action-${data.focus.name}'),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: HomeTokens.border.withValues(alpha: .72)),
-      ),
-      child: Row(
-        children: [
-          Icon(data.icon, color: color, size: 20),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: HomeTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  data.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: HomeTokens.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-              ],
-            ),
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: HomeTokens.background.withValues(alpha: .36),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: HomeTokens.border.withValues(alpha: .72)),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            '${data.value}',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+          child: Row(
+            children: [
+              Icon(data.icon, color: color, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${data.value}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF8BC7FF),
+                    size: 20,
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1822,57 +1938,85 @@ class _IntelligenceMetricTile extends StatelessWidget {
 }
 
 class _PortfolioRecommendationRow extends StatelessWidget {
-  const _PortfolioRecommendationRow({required this.recommendation});
+  const _PortfolioRecommendationRow({required this.recommendation, this.onTap});
 
   final CollectionRecommendation recommendation;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: HomeTokens.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            _recommendationIcon(recommendation.type),
-            color: _recommendationColor(recommendation.type),
-            size: 22,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  recommendation.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: HomeTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
+    final content = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          _recommendationIcon(recommendation.type),
+          color: _recommendationColor(recommendation.type),
+          size: 22,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                recommendation.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  recommendation.message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: HomeTokens.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                recommendation.message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
+        if (onTap != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right, color: Color(0xFF8BC7FF), size: 22),
         ],
+      ],
+    );
+    if (onTap == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: content,
+      );
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey(
+          'portfolio-recommendation-action-${recommendation.type.name}',
+        ),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: content,
+        ),
       ),
     );
   }
@@ -2691,6 +2835,33 @@ bool _isPendingItem(CollectibleItem item) {
   return !_hasDisplayableValuation(item) ||
       item.syncStatus == CloudItemSyncStatus.pendingUpload ||
       item.syncStatus == CloudItemSyncStatus.failed;
+}
+
+bool _hasMissingImportantData(CollectibleItem item) {
+  final fields = [
+    item.year,
+    item.brand,
+    item.setName,
+    item.series,
+    item.cardNumber,
+    item.playerOrCharacter,
+    item.rarity,
+    item.condition,
+    item.notes,
+  ];
+  return fields
+          .where((value) => value != null && value.trim().isNotEmpty)
+          .length <
+      3;
+}
+
+bool _hasStalePricing(CollectibleItem item) {
+  final lastUpdated =
+      item.marketSummary?.lastUpdated ?? item.pricing?.lastUpdated;
+  if (lastUpdated == null) {
+    return true;
+  }
+  return collectibleDisplayTimestamp(item).difference(lastUpdated).inDays > 30;
 }
 
 Color _healthColor(CollectionHealthScore health) {
