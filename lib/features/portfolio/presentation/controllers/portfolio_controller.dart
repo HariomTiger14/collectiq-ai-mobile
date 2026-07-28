@@ -197,8 +197,12 @@ class PortfolioController extends Notifier<PortfolioState> {
   /// Updates [item] and records a cloud valuation snapshot when available.
   Future<void> updateItemWithValuationSnapshot(CollectibleItem item) async {
     await updateItem(item);
-    await ref.read(valuationSnapshotRepositoryProvider).recordSnapshot(item);
-    await _syncCloudValuationSnapshot(item);
+    final recorded = await ref
+        .read(valuationSnapshotRepositoryProvider)
+        .recordSnapshotIfValueChanged(item);
+    if (recorded) {
+      await _syncCloudValuationSnapshot(item);
+    }
   }
 
   /// Removes the item with [id] and refreshes portfolio state.

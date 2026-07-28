@@ -6312,6 +6312,69 @@ void main() {
       expect(snapshots.single.pricingProvider, 'PriceCharting');
       expect(snapshots.single.valuationStatus, ValuationStatus.marketEstimated);
     });
+
+    test('local valuation snapshots skip unchanged trusted values', () async {
+      final repository = SharedPreferencesValuationSnapshotRepository();
+      final baseItem = _analyticsItem(
+        id: 'card',
+        title: 'Charizard Holo',
+        category: 'Trading Card',
+        value: 150,
+        confidence: 0.9,
+        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+      ).copyWith(
+        pricing: PricingInfo(
+          estimatedMarketValue: 150,
+          lowEstimate: 120,
+          highEstimate: 180,
+          currency: 'AUD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.82,
+          lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'PriceCharting',
+        ),
+        valuationStatus: ValuationStatus.marketEstimated,
+        valuationSource: 'PriceCharting',
+        lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+      );
+      final unchangedItem = baseItem.copyWith(
+        lastValueRefreshedAt: DateTime.parse('2026-07-01T08:00:00Z'),
+      );
+      final changedItem = baseItem.copyWith(
+        estimatedValue: 165,
+        pricing: PricingInfo(
+          estimatedMarketValue: 165,
+          lowEstimate: 130,
+          highEstimate: 190,
+          currency: 'AUD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.82,
+          lastUpdated: DateTime.parse('2026-07-02T08:00:00Z'),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'PriceCharting',
+        ),
+        lastValueRefreshedAt: DateTime.parse('2026-07-02T08:00:00Z'),
+      );
+
+      final firstRecorded = await repository.recordSnapshotIfValueChanged(
+        baseItem,
+      );
+      final duplicateRecorded = await repository.recordSnapshotIfValueChanged(
+        unchangedItem,
+      );
+      final changedRecorded = await repository.recordSnapshotIfValueChanged(
+        changedItem,
+      );
+      final snapshots = await repository.getSnapshots('card');
+
+      expect(firstRecorded, isTrue);
+      expect(duplicateRecorded, isFalse);
+      expect(changedRecorded, isTrue);
+      expect(snapshots, hasLength(2));
+      expect(snapshots.first.valueAud, 150);
+      expect(snapshots.last.valueAud, 165);
+    });
   });
 
   group('PriceAlertEvaluator', () {

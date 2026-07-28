@@ -454,6 +454,65 @@ void main() {
     expect(find.text('Portfolio value refreshed'), findsOneWidget);
   });
 
+  testWidgets('refresh value skips duplicate history when value is unchanged', (
+    tester,
+  ) async {
+    final item = _authorityItem(
+      estimatedValue: 310,
+    ).copyWith(
+      pricing: const PricingInfo(
+        estimatedMarketValue: 310,
+        lowEstimate: 290,
+        highEstimate: 340,
+        currency: 'USD',
+        pricingSource: 'PriceCharting',
+        pricingConfidence: 0.88,
+        lastUpdated: null,
+        valuationStatus: ValuationStatus.marketEstimated,
+        valuationSource: 'PriceCharting',
+      ),
+      valuationStatus: ValuationStatus.marketEstimated,
+      valuationSource: 'PriceCharting',
+      lastValueRefreshedAt: DateTime(2026, 7, 26),
+    );
+    final repository = _MemoryPortfolioRepository([item]);
+    final apiClient = _SuccessfulRepriceApiClient(value: 310);
+    final valuationSnapshots = _RecordingValuationSnapshotRepository();
+    valuationSnapshots.snapshots.add(
+      PortfolioValuationSnapshot(
+        id: 'detail-authority-item-seeded',
+        portfolioItemId: 'detail-authority-item',
+        valueAud: 310,
+        lowEstimateAud: 290,
+        highEstimateAud: 340,
+        displayString: 'USD \$310.00',
+        valuationStatus: ValuationStatus.marketEstimated,
+        pricingProvider: 'PriceCharting',
+        confidenceScore: 0.88,
+        pricedAt: DateTime(2026, 7, 26),
+      ),
+    );
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: apiClient,
+      valuationSnapshotRepository: valuationSnapshots,
+    );
+
+    await _revealText(tester, 'Actions Menu');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-refresh-value-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.items.single.lastValueRefreshedAt, isNotNull);
+    expect(valuationSnapshots.recordedItems, isEmpty);
+    expect(valuationSnapshots.snapshots, hasLength(1));
+    expect(find.text('Portfolio value refreshed'), findsOneWidget);
+  });
+
   testWidgets('correct and reprice uses backend reprice contract', (
     tester,
   ) async {
@@ -1120,13 +1179,14 @@ class _UnavailablePricingApiClient extends ApiClient {
 }
 
 class _SuccessfulRepriceApiClient extends ApiClient {
-  _SuccessfulRepriceApiClient()
+  _SuccessfulRepriceApiClient({this.value = 310})
     : super(
         config: const EnvironmentConfig(
           environment: AppEnvironment.development,
         ),
       );
 
+  final double value;
   String? lastPath;
   Map<String, dynamic> lastPayload = const {};
 
@@ -1144,11 +1204,11 @@ class _SuccessfulRepriceApiClient extends ApiClient {
         'success': true,
         'pricing': {
           'status': 'available',
-          'estimatedMarketValue': 310,
-          'lowEstimate': 290,
-          'highEstimate': 340,
+          'estimatedMarketValue': value,
+          'lowEstimate': value - 20,
+          'highEstimate': value + 30,
           'currency': 'USD',
-          'displayString': 'USD \$310.00',
+          'displayString': 'USD \$${value.toStringAsFixed(2)}',
           'confidenceScore': 0.88,
           'pricingConfidence': 88,
           'valuationStrategy': 'catalog_lookup',
@@ -1157,7 +1217,7 @@ class _SuccessfulRepriceApiClient extends ApiClient {
             'attributionText': 'Pricing data powered by PriceCharting',
             'lastChecked': '2026-07-27T00:00:00Z',
           },
-          'originalMarketPayload': {'price': 310, 'currency': 'USD'},
+          'originalMarketPayload': {'price': value, 'currency': 'USD'},
           'matchMetadata': {
             'reason': 'Matched by corrected title, set, and card number.',
           },

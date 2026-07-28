@@ -60,6 +60,33 @@ class SharedPreferencesValuationSnapshotRepository {
       ],
     );
   }
+
+  Future<bool> recordSnapshotIfValueChanged(CollectibleItem item) async {
+    final snapshot = _snapshotForItem(item);
+    final value = snapshot.valueAud;
+    if (value == null || value <= 0) {
+      return false;
+    }
+
+    final itemSnapshots = await getSnapshots(item.id);
+    if (itemSnapshots.isNotEmpty) {
+      final latest = itemSnapshots.last;
+      final latestValue = latest.valueAud;
+      final latestProvider = latest.pricingProvider?.trim();
+      final nextProvider = snapshot.pricingProvider?.trim();
+      final latestStatus = latest.valuationStatus;
+      final sameValue =
+          latestValue != null && (latestValue - value).abs() <= 0.01;
+      final sameProvider = latestProvider == nextProvider;
+      final sameStatus = latestStatus == snapshot.valuationStatus;
+      if (sameValue && sameProvider && sameStatus) {
+        return false;
+      }
+    }
+
+    await recordSnapshot(item);
+    return true;
+  }
 }
 
 PortfolioValuationSnapshot _snapshotForItem(CollectibleItem item) {
