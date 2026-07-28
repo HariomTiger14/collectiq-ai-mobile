@@ -1919,7 +1919,7 @@ class _PricingTrustPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _DetailSectionTitle(
-            title: 'Pricing Trust',
+            title: 'Pricing evidence',
             icon: Icons.verified_user_outlined,
             compact: true,
             trailing: _pricingTrustTrailing(status),
@@ -2852,13 +2852,17 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
         'Value at scan',
         _formatMoney(item.valueAtScan ?? item.estimatedValue, pricing.currency),
       ),
+      _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
         _DetailInfoRowData(
           'Last refreshed',
           _formatPricingDate(item.lastValueRefreshedAt),
         ),
       if (_sourceMarketValue(pricing) != null)
-        _DetailInfoRowData('Source market value', _sourceMarketValue(pricing)!),
+        _DetailInfoRowData(
+          'Source currency value',
+          _sourceMarketValue(pricing)!,
+        ),
       _DetailInfoRowData(
         'Value range',
         '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
@@ -2887,6 +2891,8 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
     if (pricing?.pricingSource.trim().isNotEmpty == true)
       _DetailInfoRowData('Provider', pricing!.pricingSource),
+    if (pricing?.currency.trim().isNotEmpty == true)
+      _DetailInfoRowData('Currency', pricing!.currency.toUpperCase()),
     if (confidence != null)
       _DetailInfoRowData(
         'Confidence',
@@ -2913,7 +2919,7 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
       _DetailInfoRowData('Reason', _pricingUnavailableReason(item)!),
     if (_sourceMarketValue(pricing ?? _emptyPricingFor(item)) != null)
       _DetailInfoRowData(
-        'Original value',
+        'Source currency value',
         _sourceMarketValue(pricing ?? _emptyPricingFor(item))!,
       ),
     if (pricing?.lastUpdated != null)

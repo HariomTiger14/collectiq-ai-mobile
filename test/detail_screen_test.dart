@@ -77,12 +77,13 @@ void main() {
       expect(find.text('USD \$245'), findsWidgets);
       expect(find.text('+USD \$45'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
-      await _revealText(tester, 'Pricing Trust');
-      expect(find.text('Pricing Trust'), findsOneWidget);
+      await _revealText(tester, 'Pricing evidence');
+      expect(find.text('Pricing evidence'), findsOneWidget);
       expect(find.text('Trusted market valuation'), findsWidgets);
       expect(find.text('Verified'), findsOneWidget);
       expect(find.text('Provider'), findsWidgets);
       expect(find.text('Saved provider'), findsWidgets);
+      expect(find.text('Currency'), findsWidgets);
       expect(find.text('Value range'), findsWidgets);
       expect(find.text('USD \$220 - USD \$270'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
@@ -174,9 +175,9 @@ void main() {
         );
 
     await _pumpDetail(tester, item);
-    await _revealText(tester, 'Pricing Trust');
+    await _revealText(tester, 'Pricing evidence');
 
-    expect(find.text('Pricing Trust'), findsOneWidget);
+    expect(find.text('Pricing evidence'), findsOneWidget);
     expect(find.text('Unavailable'), findsOneWidget);
     expect(find.text('No trusted match yet'), findsWidgets);
     expect(
@@ -187,6 +188,7 @@ void main() {
     );
     expect(find.text('Match basis'), findsOneWidget);
     expect(find.text('Catalog match'), findsOneWidget);
+    expect(find.text('Reason'), findsWidgets);
   });
 
   testWidgets('favorite action persists wishlist status', (tester) async {

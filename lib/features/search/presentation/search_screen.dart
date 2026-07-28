@@ -1348,6 +1348,7 @@ class _CatalogResultDetailPageState
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),
       _CatalogDetailRowData('Source', result.source),
+      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
       _CatalogDetailRowData('Confidence', confidence),
       if (result.lastUpdated != null)
         _CatalogDetailRowData('Updated', _formatShortDate(result.lastUpdated!)),
@@ -1722,9 +1723,10 @@ class _CatalogTrustPanel extends StatelessWidget {
     final rows = [
       _CatalogDetailRowData(
         'Status',
-        hasValue ? 'Provider-backed catalog value' : unavailableCopy.title,
+        hasValue ? 'Trusted provider value' : unavailableCopy.title,
       ),
       _CatalogDetailRowData('Source', result.source),
+      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
       if (confidence != null)
         _CatalogDetailRowData(
           'Confidence',
@@ -1744,6 +1746,8 @@ class _CatalogTrustPanel extends StatelessWidget {
       if (_clean(result.attribution) != null)
         _CatalogDetailRowData('Attribution', result.attribution!.trim()),
       if (!hasValue)
+        _CatalogDetailRowData('Reason', unavailableCopy.shortLabel),
+      if (!hasValue)
         _CatalogDetailRowData('Next step', unavailableCopy.actionLabel),
     ];
 
@@ -1751,7 +1755,7 @@ class _CatalogTrustPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle('Pricing confidence'),
+          const _SectionTitle('Pricing evidence'),
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1781,7 +1785,7 @@ class _CatalogTrustPanel extends StatelessWidget {
               Expanded(
                 child: Text(
                   hasValue
-                      ? 'This catalog value comes from saved provider data. PackLox saves it as a dated portfolio snapshot when you add the item.'
+                      ? 'This value comes from provider-backed catalog evidence. PackLox saves it as a dated portfolio snapshot when you add the item.'
                       : _clean(result.displayMessage) ??
                             unavailableCopy.message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
