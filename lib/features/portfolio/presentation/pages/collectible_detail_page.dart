@@ -2162,11 +2162,17 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
         : null;
-    final footerLabel = snapshotsAsync.isLoading
-        ? 'Loading value history'
-        : snapshots.isNotEmpty
-        ? _snapshotHistoryLabel(snapshots)
-        : _lastRefreshedLabel(item);
+    final historyHint = _valueHistoryHint(
+      isLoading: snapshotsAsync.isLoading,
+      snapshots: snapshots,
+      hasMovement: hasMovement,
+      hasTrustedValue: scanValue > 0 || currentValue > 0,
+    );
+    final footerLabel = _valueHistoryFooterLabel(
+      isLoading: snapshotsAsync.isLoading,
+      snapshots: snapshots,
+      item: item,
+    );
 
     return Container(
       key: const ValueKey('collectible-detail-value-history-panel'),
@@ -2214,7 +2220,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               ],
             ],
           ),
-          if (!hasMovement) ...[
+          if (historyHint.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
@@ -2226,7 +2232,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Trend begins after next refresh.',
+                    historyHint,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -3196,13 +3202,51 @@ String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
     ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
   final latest = sortedSnapshots.last;
   final count = sortedSnapshots.length;
-  return '$count valuation snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
+  return '$count trusted snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
+}
+
+String _valueHistoryHint({
+  required bool isLoading,
+  required List<PortfolioValuationSnapshot> snapshots,
+  required bool hasMovement,
+  required bool hasTrustedValue,
+}) {
+  if (isLoading) {
+    return 'Loading saved valuation snapshots.';
+  }
+  if (!hasTrustedValue) {
+    return 'History starts when a trusted value is available.';
+  }
+  if (hasMovement) {
+    return '';
+  }
+  if (snapshots.isEmpty) {
+    return 'Refresh value to save the first trusted history point.';
+  }
+  if (snapshots.length == 1) {
+    return 'One trusted snapshot saved. Next refresh builds the trend.';
+  }
+  return 'No value movement across saved trusted snapshots.';
+}
+
+String _valueHistoryFooterLabel({
+  required bool isLoading,
+  required List<PortfolioValuationSnapshot> snapshots,
+  required CollectibleItem item,
+}) {
+  if (isLoading) {
+    return 'Loading history';
+  }
+  if (snapshots.isNotEmpty) {
+    return _snapshotHistoryLabel(snapshots);
+  }
+  return _lastRefreshedLabel(item);
 }
 
 String _lastRefreshedLabel(CollectibleItem item) {
   final refreshedAt = item.lastValueRefreshedAt;
   if (refreshedAt != null) {
-    return 'Last refreshed ${_formatPricingDate(refreshedAt)}';
+    return 'Last refreshed ${_formatPricingDate(refreshedAt)} · no saved history yet';
   }
   return 'Refresh value to start history';
 }

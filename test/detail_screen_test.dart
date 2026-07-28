@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/api_client.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart';
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -8,6 +9,7 @@ import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_ta
 import 'package:collectiq_ai/features/image_sync/domain/entities/sync_queue_snapshot.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -403,12 +405,14 @@ void main() {
     final item = _authorityItem();
     final repository = _MemoryPortfolioRepository([item]);
     final apiClient = _SuccessfulRepriceApiClient();
+    final valuationSnapshots = _RecordingValuationSnapshotRepository();
 
     await _pumpDetail(
       tester,
       item,
       portfolioRepository: repository,
       apiClient: apiClient,
+      valuationSnapshotRepository: valuationSnapshots,
     );
 
     await _revealText(tester, 'Actions Menu');
@@ -436,6 +440,14 @@ void main() {
     expect(updated.pricing?.pricingSource, 'PriceCharting');
     expect(updated.valueAtScan, item.valueAtScan);
     expect(updated.lastValueRefreshedAt, isNotNull);
+    expect(valuationSnapshots.recordedItems, hasLength(1));
+    expect(valuationSnapshots.recordedItems.single.id, item.id);
+    expect(valuationSnapshots.snapshots, hasLength(1));
+    expect(valuationSnapshots.snapshots.single.valueAud, 310);
+    expect(
+      valuationSnapshots.snapshots.single.pricingProvider,
+      'PriceCharting',
+    );
     expect(find.text('Portfolio value refreshed'), findsOneWidget);
   });
 
@@ -516,7 +528,10 @@ void main() {
     expect(find.text('Snapshot value'), findsOneWidget);
     expect(find.text('USD \$161'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
-    expect(find.text('Trend begins after next refresh.'), findsOneWidget);
+    expect(
+      find.text('Refresh value to save the first trusted history point.'),
+      findsOneWidget,
+    );
     expect(find.text('+Value unavailable'), findsNothing);
     expect(find.text('Source'), findsWidgets);
     expect(find.text('PriceCharting'), findsWidgets);
@@ -795,6 +810,7 @@ Future<void> _pumpDetail(
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
   PlanLimits? planLimits,
+  SharedPreferencesValuationSnapshotRepository? valuationSnapshotRepository,
 }) async {
   tester.view.physicalSize = const Size(900, 1200);
   tester.view.devicePixelRatio = 1;
@@ -823,6 +839,10 @@ Future<void> _pumpDetail(
         if (apiClient != null) apiClientProvider.overrideWithValue(apiClient),
         if (planLimits != null)
           activePlanLimitsProvider.overrideWithValue(planLimits),
+        if (valuationSnapshotRepository != null)
+          valuationSnapshotRepositoryProvider.overrideWithValue(
+            valuationSnapshotRepository,
+          ),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -833,6 +853,40 @@ Future<void> _pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _RecordingValuationSnapshotRepository
+    extends SharedPreferencesValuationSnapshotRepository {
+  final List<CollectibleItem> recordedItems = [];
+  final List<PortfolioValuationSnapshot> snapshots = [];
+
+  @override
+  Future<List<PortfolioValuationSnapshot>> getSnapshots(String itemId) async {
+    return snapshots
+        .where((snapshot) => snapshot.portfolioItemId == itemId)
+        .toList();
+  }
+
+  @override
+  Future<void> recordSnapshot(CollectibleItem item) async {
+    recordedItems.add(item);
+    final pricing = item.pricing;
+    final value = pricing?.estimatedMarketValue;
+    snapshots.add(
+      PortfolioValuationSnapshot(
+        id: '${item.id}-${snapshots.length + 1}',
+        portfolioItemId: item.id,
+        valueAud: value,
+        lowEstimateAud: pricing?.lowEstimate,
+        highEstimateAud: pricing?.highEstimate,
+        displayString: pricing?.displayString,
+        valuationStatus: item.valuationStatus,
+        pricingProvider: pricing?.pricingSource,
+        confidenceScore: pricing?.pricingConfidence,
+        pricedAt: item.lastValueRefreshedAt ?? DateTime(2026, 7, 27),
+      ),
+    );
+  }
 }
 
 const _premiumPlanLimits = PlanLimits(
