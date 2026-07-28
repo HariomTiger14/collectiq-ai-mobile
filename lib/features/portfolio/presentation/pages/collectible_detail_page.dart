@@ -560,10 +560,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     if (mounted) {
       _showDetailSnackBar(
         context,
-        _valueRefreshMessage(
-          refreshedStatus,
-          reasonCode: refreshedReasonCode,
-        ),
+        _valueRefreshMessage(refreshedStatus, reasonCode: refreshedReasonCode),
       );
     }
   }
@@ -1339,6 +1336,13 @@ class _DetailInlineContent extends StatelessWidget {
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
         _DetailOverviewSection(item: item),
+        const SizedBox(height: AppSpacing.sm),
+        _DetailIntelligenceActionPanel(
+          item: item,
+          isRefreshingValue: isRefreshingValue,
+          onEdit: onEdit,
+          onRefreshValue: onRefreshValue,
+        ),
         if (_usesCatalogPlaceholderImage(item)) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
@@ -1814,6 +1818,154 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
                   side: const BorderSide(color: HomeTokens.border),
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailIntelligenceActionPanel extends StatelessWidget {
+  const _DetailIntelligenceActionPanel({
+    required this.item,
+    required this.isRefreshingValue,
+    required this.onEdit,
+    required this.onRefreshValue,
+  });
+
+  final CollectibleItem item;
+  final bool isRefreshingValue;
+  final VoidCallback onEdit;
+  final VoidCallback onRefreshValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final missingLabels = _missingDetailLabels(item);
+    final status = _effectiveValuationStatus(item);
+    final hasTrustedValue = status == ValuationStatus.marketEstimated;
+    final hasLowConfidence = item.confidence < 0.75;
+    final hasStalePricing = _hasStaleDetailPricing(item);
+    final needsPricingReview = !hasTrustedValue;
+    final accent = needsPricingReview
+        ? HomeTokens.warning
+        : hasLowConfidence || missingLabels.isNotEmpty || hasStalePricing
+        ? HomeTokens.accent
+        : HomeTokens.positive;
+    final title = needsPricingReview
+        ? 'Trusted value needs review'
+        : hasLowConfidence
+        ? 'Identity confidence needs review'
+        : missingLabels.isNotEmpty
+        ? 'Metadata gaps found'
+        : hasStalePricing
+        ? 'Value refresh recommended'
+        : 'Evidence looks healthy';
+    final message = needsPricingReview
+        ? '${_pricingTrustMessage(item)} Review the identity fields, then save and reprice.'
+        : hasLowConfidence
+        ? 'PackLox is less confident about this identification. Check the title, category, condition, and identifiers before relying on the value.'
+        : missingLabels.isNotEmpty
+        ? 'Missing: ${missingLabels.join(', ')}. Complete these fields to improve future repricing and portfolio intelligence.'
+        : hasStalePricing
+        ? 'This valuation has not been refreshed recently. Refreshing saves a new dated snapshot when a trusted provider match exists.'
+        : 'This item has provider-backed pricing evidence and enough saved identity detail for current portfolio intelligence.';
+
+    return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-intelligence-panel'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Portfolio intelligence',
+            icon: Icons.auto_awesome_outlined,
+            trailing: hasTrustedValue ? 'Trusted' : 'Review',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: accent.withValues(alpha: 0.32)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(_intelligenceIconFor(item), color: accent, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.28,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey(
+                    'collectible-detail-intelligence-review-details-action',
+                  ),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Review details'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: HomeTokens.textPrimary,
+                    side: const BorderSide(color: HomeTokens.border),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton.icon(
+                  key: const ValueKey(
+                    'collectible-detail-intelligence-refresh-value-action',
+                  ),
+                  onPressed: isRefreshingValue ? null : onRefreshValue,
+                  icon: Icon(
+                    isRefreshingValue
+                        ? Icons.hourglass_top_rounded
+                        : Icons.refresh_rounded,
+                    size: 18,
+                  ),
+                  label: Text(isRefreshingValue ? 'Refreshing' : 'Refresh'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: HomeTokens.accentStrong,
+                    foregroundColor: HomeTokens.textPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
                 ),
               ),
             ],
@@ -3329,6 +3481,79 @@ bool _isValuationPending(CollectibleItem item) {
   };
 }
 
+List<String> _missingDetailLabels(CollectibleItem item) {
+  final missing = <String>[];
+  void requireField(String label, String? value) {
+    if (_clean(value) == null) {
+      missing.add(label);
+    }
+  }
+
+  requireField('condition', item.condition);
+  final category = item.category.toLowerCase();
+  final isCard =
+      category.contains('card') ||
+      category.contains('pokemon') ||
+      category.contains('magic') ||
+      category.contains('yugioh') ||
+      category.contains('one piece');
+  final isToyVehicle =
+      category.contains('toy') ||
+      category.contains('hot wheel') ||
+      category.contains('car');
+  final isGame = category.contains('game');
+  final isSneaker = category.contains('sneaker') || category.contains('shoe');
+
+  if (isCard) {
+    requireField('set', item.setName);
+    requireField('card number', item.cardNumber);
+    requireField('rarity', item.rarity);
+  } else if (isToyVehicle || isSneaker) {
+    requireField('brand', item.brand);
+    requireField('series', item.series);
+    requireField('year', item.year);
+  } else if (isGame) {
+    requireField('series', item.series);
+    requireField('year', item.year);
+  } else {
+    requireField('brand', item.brand);
+    requireField('year', item.year);
+  }
+
+  if (item.effectiveGalleryImages.isEmpty &&
+      _clean(item.cloudImageUrl) == null) {
+    missing.add('photos');
+  }
+  return missing;
+}
+
+bool _hasStaleDetailPricing(CollectibleItem item) {
+  if (_effectiveValuationStatus(item) != ValuationStatus.marketEstimated) {
+    return false;
+  }
+  final checkedAt = item.lastValueRefreshedAt ?? item.pricing?.lastUpdated;
+  if (checkedAt == null) {
+    return true;
+  }
+  return DateTime.now().difference(checkedAt) > const Duration(days: 30);
+}
+
+IconData _intelligenceIconFor(CollectibleItem item) {
+  if (_effectiveValuationStatus(item) != ValuationStatus.marketEstimated) {
+    return Icons.manage_search_outlined;
+  }
+  if (item.confidence < 0.75) {
+    return Icons.fact_check_outlined;
+  }
+  if (_missingDetailLabels(item).isNotEmpty) {
+    return Icons.tune_outlined;
+  }
+  if (_hasStaleDetailPricing(item)) {
+    return Icons.update_rounded;
+  }
+  return Icons.verified_user_outlined;
+}
+
 String _detailFallbackAssetFor(CollectibleItem item) {
   if (_isValuationPending(item)) {
     return PackLoxAssets.portfolioDetailPendingValuation;
@@ -4366,15 +4591,11 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
   late final TextEditingController _editionController;
   late final TextEditingController _yearController;
   late final TextEditingController _countryController;
-  late final TextEditingController _lowValueController;
-  late final TextEditingController _highValueController;
   late final TextEditingController _notesController;
 
   @override
   void initState() {
     super.initState();
-    final pricing = widget.item.pricing;
-    final fallbackValue = widget.item.estimatedValue;
     _titleController = TextEditingController(text: widget.item.title);
     _categoryController = TextEditingController(text: widget.item.category);
     _manufacturerController = TextEditingController(
@@ -4393,12 +4614,6 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _editionController = TextEditingController(text: widget.item.edition ?? '');
     _yearController = TextEditingController(text: widget.item.year ?? '');
     _countryController = TextEditingController(text: widget.item.country ?? '');
-    _lowValueController = TextEditingController(
-      text: _decimalText(pricing?.lowEstimate ?? fallbackValue),
-    );
-    _highValueController = TextEditingController(
-      text: _decimalText(pricing?.highEstimate ?? fallbackValue),
-    );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
   }
 
@@ -4416,8 +4631,6 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _editionController.dispose();
     _yearController.dispose();
     _countryController.dispose();
-    _lowValueController.dispose();
-    _highValueController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -4619,22 +4832,6 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
-                              'edit-collectible-low-value-field',
-                            ),
-                            controller: _lowValueController,
-                            label: 'Estimated value low',
-                            keyboardType: TextInputType.number,
-                          ),
-                          _EditTextField(
-                            fieldKey: const ValueKey(
-                              'edit-collectible-high-value-field',
-                            ),
-                            controller: _highValueController,
-                            label: 'Estimated value high',
-                            keyboardType: TextInputType.number,
-                          ),
-                          _EditTextField(
-                            fieldKey: const ValueKey(
                               'edit-collectible-notes-field',
                             ),
                             controller: _notesController,
@@ -4717,31 +4914,13 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       return;
     }
 
-    final low = _parseMoney(_lowValueController.text);
-    final high = _parseMoney(_highValueController.text);
-    final normalizedLow = low <= high ? low : high;
-    final normalizedHigh = high >= low ? high : low;
-    final estimatedValue = (normalizedLow + normalizedHigh) / 2;
     Navigator.of(context).pop(
       _EditCollectibleResult(
         retryPricing: retryPricing,
         item: widget.item.copyWith(
           title: _titleController.text.trim(),
           category: _categoryController.text.trim(),
-          estimatedValue: estimatedValue,
           condition: _conditionController.text.trim(),
-          pricing: _updatedPricing(
-            widget.item,
-            normalizedLow,
-            normalizedHigh,
-            estimatedValue,
-          ),
-          marketSummary: _updatedMarketSummary(
-            widget.item.marketSummary,
-            normalizedLow,
-            normalizedHigh,
-            estimatedValue,
-          ),
           year: _yearController.text.trim(),
           brand: _manufacturerController.text.trim(),
           setName: _setController.text.trim(),
@@ -6031,77 +6210,6 @@ Color _confidenceMeterColor(BuildContext context, double confidence) {
     return const Color(0xFFEAB308);
   }
   return Theme.of(context).colorScheme.error;
-}
-
-double _parseMoney(String value) {
-  final normalized = value.replaceAll(',', '').replaceAll(r'$', '').trim();
-  return double.tryParse(normalized) ?? 0;
-}
-
-String _decimalText(double value) {
-  if (value % 1 == 0) {
-    return value.toStringAsFixed(0);
-  }
-  return value.toStringAsFixed(2);
-}
-
-PricingInfo _updatedPricing(
-  CollectibleItem item,
-  double low,
-  double high,
-  double estimatedValue,
-) {
-  final pricing = item.pricing;
-  return PricingInfo(
-    estimatedMarketValue: estimatedValue,
-    lowEstimate: low,
-    highEstimate: high,
-    currency: pricing?.currency ?? 'AUD',
-    pricingSource: pricing?.pricingSource ?? 'Local edit',
-    pricingConfidence: pricing?.pricingConfidence ?? 0,
-    lastUpdated: pricing?.lastUpdated,
-    valuationStatus: pricing?.valuationStatus ?? item.valuationStatus,
-    valuationSource: pricing?.valuationSource ?? item.valuationSource,
-    aiEstimatedValue: pricing?.aiEstimatedValue ?? item.aiEstimatedValue,
-    pricingExplanation: pricing?.pricingExplanation,
-    reasonCode: pricing?.reasonCode,
-    valuationStrategy: pricing?.valuationStrategy,
-    attributionText: pricing?.attributionText,
-    displayString: pricing?.displayString,
-    originalPrice: pricing?.originalPrice,
-    originalCurrency: pricing?.originalCurrency,
-    exchangeRateUsed: pricing?.exchangeRateUsed,
-    exchangeRateDate: pricing?.exchangeRateDate,
-    lowEstimateAud: pricing?.lowEstimateAud,
-    highEstimateAud: pricing?.highEstimateAud,
-    cacheTtlSeconds: pricing?.cacheTtlSeconds,
-    cacheExpiresAt: pricing?.cacheExpiresAt,
-    cachePolicyReason: pricing?.cachePolicyReason,
-  );
-}
-
-MarketSummary? _updatedMarketSummary(
-  MarketSummary? summary,
-  double low,
-  double high,
-  double estimatedValue,
-) {
-  if (summary == null) {
-    return null;
-  }
-
-  return MarketSummary(
-    averagePrice: estimatedValue,
-    medianPrice: estimatedValue,
-    lowPrice: low,
-    highPrice: high,
-    salesCount: summary.salesCount,
-    trendLabel: summary.trendLabel,
-    confidence: summary.confidence,
-    lastUpdated: summary.lastUpdated,
-    sources: summary.sources,
-    comps: summary.comps,
-  );
 }
 
 String _formatDate(DateTime date) {

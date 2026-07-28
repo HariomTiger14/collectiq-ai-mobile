@@ -43,6 +43,11 @@ void main() {
       await _pumpDetail(tester, _authorityItem());
 
       expect(
+        find.byKey(const ValueKey('collectible-detail-intelligence-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('Evidence looks healthy'), findsOneWidget);
+      expect(
         find.byKey(const ValueKey('collectible-detail-authority-header')),
         findsOneWidget,
       );
@@ -399,9 +404,7 @@ void main() {
     );
   });
 
-  testWidgets('refresh value uses backend reprice contract', (
-    tester,
-  ) async {
+  testWidgets('refresh value uses backend reprice contract', (tester) async {
     final item = _authorityItem();
     final repository = _MemoryPortfolioRepository([item]);
     final apiClient = _SuccessfulRepriceApiClient();
@@ -708,7 +711,11 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('edit-collectible-low-value-field')),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('edit-collectible-high-value-field')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('edit-collectible-save-button')),
@@ -783,12 +790,8 @@ void main() {
       'Trading Card',
     );
     await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-low-value-field')),
-      '260',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-high-value-field')),
-      '300',
+      find.byKey(const ValueKey('edit-collectible-set-field')),
+      'Edited Set',
     );
     await tester.tap(
       find.byKey(const ValueKey('edit-collectible-save-button')),
@@ -797,6 +800,61 @@ void main() {
 
     expect(find.byKey(const ValueKey('edit-collectible-sheet')), findsNothing);
     expect(find.text('Collectible updated'), findsOneWidget);
+  });
+
+  testWidgets('detail intelligence review opens correction sheet', (
+    tester,
+  ) async {
+    final item =
+        _authorityItem(
+          estimatedValue: 0,
+          valuationStatus: ValuationStatus.noMarketMatch,
+          imagePath: '',
+          galleryImages: const [],
+        ).copyWith(
+          category: 'Pokemon Card',
+          setName: '',
+          cardNumber: '',
+          rarity: '',
+          pricing: const PricingInfo(
+            estimatedMarketValue: 0,
+            lowEstimate: 0,
+            highEstimate: 0,
+            currency: 'USD',
+            pricingSource: 'PriceCharting',
+            pricingConfidence: 0.42,
+            lastUpdated: null,
+            valuationStatus: ValuationStatus.noMarketMatch,
+            valuationSource: 'pricecharting',
+            reasonCode: 'NO_MARKET_MATCH',
+            valuationStrategy: 'catalog_lookup',
+          ),
+        );
+
+    await _pumpDetail(tester, item);
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-intelligence-panel')),
+      findsOneWidget,
+    );
+    expect(find.text('Trusted value needs review'), findsOneWidget);
+    expect(find.textContaining('Review the identity fields'), findsOneWidget);
+    await tester.tap(
+      find.byKey(
+        const ValueKey('collectible-detail-intelligence-review-details-action'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('edit-collectible-sheet')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('edit-collectible-card-number-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Save & reprice'), findsOneWidget);
   });
 }
 
@@ -1042,8 +1100,7 @@ class _UnavailablePricingApiClient extends ApiClient {
         'pricing': {
           'status': 'unavailable',
           'reasonCode': 'NO_MARKET_MATCH',
-          'displayMessage':
-              'No trusted market match found for this identity.',
+          'displayMessage': 'No trusted market match found for this identity.',
           'estimatedMarketValue': 0,
           'lowEstimate': 0,
           'highEstimate': 0,
@@ -1055,9 +1112,7 @@ class _UnavailablePricingApiClient extends ApiClient {
             'attributionText': 'Pricing data powered by PriceCharting',
             'lastChecked': '2026-07-27T00:00:00Z',
           },
-          'matchMetadata': {
-            'reason': 'No trusted match found.',
-          },
+          'matchMetadata': {'reason': 'No trusted match found.'},
         },
       },
     );
