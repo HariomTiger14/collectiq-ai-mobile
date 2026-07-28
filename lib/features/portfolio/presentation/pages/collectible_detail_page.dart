@@ -1894,7 +1894,7 @@ class _DetailMarketSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           _DetailEmptyCopy(
             item.marketSummary == null
-                ? 'No saved price-history series is available yet.'
+                ? 'History starts after the first trusted valuation snapshot.'
                 : 'Saved market evidence is shown without fabricating price history.',
           ),
         ],
@@ -5543,7 +5543,7 @@ class _PriceHistorySection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
+            'Stored pricing evidence only. Refresh value to add trusted valuation snapshots over time.',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
