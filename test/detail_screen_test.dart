@@ -397,6 +397,48 @@ void main() {
     );
   });
 
+  testWidgets('refresh value uses backend reprice contract', (
+    tester,
+  ) async {
+    final item = _authorityItem();
+    final repository = _MemoryPortfolioRepository([item]);
+    final apiClient = _SuccessfulRepriceApiClient();
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: apiClient,
+    );
+
+    await _revealText(tester, 'Actions Menu');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-refresh-value-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(apiClient.lastPath, ApiConstants.pricingRepricePath);
+    final payload = apiClient.lastPayload;
+    expect(payload['itemId'], item.id);
+    expect(payload['previousValue'], item.pricing?.estimatedMarketValue);
+    expect(payload['previousCurrency'], item.pricing?.currency);
+    expect(payload['correctionSource'], 'portfolio_manual_correction');
+    final identity = payload['identity'] as Map<String, dynamic>;
+    expect(identity['title'], item.title);
+    expect(identity['category'], item.category);
+    expect(identity['setName'], item.setName);
+    expect(identity['cardNumber'], item.cardNumber);
+
+    final updated = repository.items.single;
+    expect(updated.estimatedValue, 310);
+    expect(updated.valuationStatus, ValuationStatus.marketEstimated);
+    expect(updated.valuationSource, 'PriceCharting');
+    expect(updated.pricing?.pricingSource, 'PriceCharting');
+    expect(updated.valueAtScan, item.valueAtScan);
+    expect(updated.lastValueRefreshedAt, isNotNull);
+    expect(find.text('Portfolio value refreshed'), findsOneWidget);
+  });
+
   testWidgets('correct and reprice uses backend reprice contract', (
     tester,
   ) async {
@@ -943,24 +985,24 @@ class _UnavailablePricingApiClient extends ApiClient {
       requestOptions: dio.RequestOptions(path: path),
       data: {
         'success': true,
-        'data': {
-          'estimatedValue': 0,
+        'pricing': {
+          'status': 'unavailable',
+          'reasonCode': 'NO_MARKET_MATCH',
+          'displayMessage':
+              'No trusted market match found for this identity.',
           'estimatedMarketValue': 0,
+          'lowEstimate': 0,
+          'highEstimate': 0,
           'currency': 'USD',
-          'valuationStatus': 'no_market_match',
-          'valuationSource': 'catalog_lookup',
-          'valuationConfidence': 0,
-          'pricing': {
-            'estimatedMarketValue': 0,
-            'lowEstimate': 0,
-            'highEstimate': 0,
-            'currency': 'USD',
-            'pricingSource': 'PriceCharting',
-            'pricingConfidence': 0,
-            'valuationStatus': 'no_market_match',
-            'valuationSource': 'catalog_lookup',
-            'reasonCode': 'NO_MARKET_MATCH',
-            'valuationStrategy': 'catalog_lookup',
+          'confidenceScore': 0,
+          'valuationStrategy': 'catalog_lookup',
+          'pricingSource': {
+            'name': 'PriceCharting',
+            'attributionText': 'Pricing data powered by PriceCharting',
+            'lastChecked': '2026-07-27T00:00:00Z',
+          },
+          'matchMetadata': {
+            'reason': 'No trusted match found.',
           },
         },
       },

@@ -506,11 +506,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
 
     setState(() => _isRefreshingValue = true);
     ValuationStatus? refreshedStatus;
+    String? refreshedReasonCode;
     try {
       final quote = await ref
           .read(scanPricingQuoteServiceProvider)
-          .quoteItem(item);
+          .repriceItem(item);
       refreshedStatus = quote.valuationStatus;
+      refreshedReasonCode = quote.pricing.reasonCode;
       final refreshedAt = DateTime.now();
       final hasRefreshedValue =
           quote.valuationStatus == ValuationStatus.marketEstimated &&
@@ -556,7 +558,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     }
 
     if (mounted) {
-      _showDetailSnackBar(context, _valueRefreshMessage(refreshedStatus));
+      _showDetailSnackBar(
+        context,
+        _valueRefreshMessage(
+          refreshedStatus,
+          reasonCode: refreshedReasonCode,
+        ),
+      );
     }
   }
 }
@@ -4257,9 +4265,9 @@ String _pricingRetryMessage(ValuationStatus? status) {
   };
 }
 
-String _valueRefreshMessage(ValuationStatus? status) {
+String _valueRefreshMessage(ValuationStatus? status, {String? reasonCode}) {
   if (status != null && status != ValuationStatus.marketEstimated) {
-    final copy = pricingUnavailableCopy(status: status);
+    final copy = pricingUnavailableCopy(status: status, reasonCode: reasonCode);
     return '${copy.shortLabel}. ${copy.actionLabel}.';
   }
   return switch (status) {
