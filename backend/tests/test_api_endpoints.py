@@ -640,6 +640,74 @@ class ApiEndpointsTest(unittest.TestCase):
             ),
         )
 
+    def test_api_analyze_auto_provider_reports_gemini_model_unavailable(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        response=_FakeOpenAIResponse(
+                            status_code=404,
+                            body={
+                                "error": {
+                                    "code": 404,
+                                    "message": (
+                                        "models/gemini-2.5-flash-l is not found "
+                                        "for API version v1beta, or is not supported "
+                                        "for generateContent."
+                                    ),
+                                    "status": "NOT_FOUND",
+                                }
+                            },
+                        )
+                    ),
+                ),
+            ],
+            allow_mock_fallback=False,
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 503)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "AI_PROVIDER_MODEL_UNAVAILABLE")
+        self.assertFalse(error["retryable"])
+        self.assertIn("model", error["message"].lower())
+
+    def test_api_analyze_auto_provider_reports_gemini_timeout(self) -> None:
+        provider = AutoAnalyzerProvider(
+            providers=[
+                GeminiRecognitionProvider(
+                    api_key="gemini-key",
+                    client=_FakeGeminiClient(
+                        exception=httpx.TimeoutException("read operation timed out")
+                    ),
+                ),
+            ],
+            allow_mock_fallback=False,
+        )
+
+        with patch(
+            "app.services.analyzer.backend_analyzer_service.BackendAnalyzerService._resolve_provider",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                "/analyze",
+                json=_api_analyze_payload(base64_image=True),
+            )
+
+        self.assertEqual(response.status_code, 504)
+        error = response.json()["error"]
+        self.assertEqual(error["code"], "AI_PROVIDER_TIMEOUT")
+        self.assertTrue(error["retryable"])
+
     def test_api_analyze_auto_provider_can_fallback_to_mock_when_explicit(self) -> None:
         provider = AutoAnalyzerProvider(
             providers=[

@@ -3595,6 +3595,51 @@ void main() {
     );
 
     test(
+      'portfolio_items row parser restores valued status from Supabase pricing columns',
+      () {
+        final item = itemFromSupabaseRow({
+          'id': 'scan-priced-row',
+          'user_id': 'user-1',
+          'title': 'Cloud Priced Card',
+          'category': 'Trading Card',
+          'manufacturer': null,
+          'series': null,
+          'year': null,
+          'country': null,
+          'estimated_value_low': 80,
+          'estimated_value_high': 120,
+          'image_local_path': 'sample://card',
+          'image_storage_path': null,
+          'cloud_image_url': null,
+          'sync_status': 'synced',
+          'last_synced_at': null,
+          'raw_json': {
+            'id': 'scan-priced-row',
+            'title': 'Cloud Priced Card',
+            'category': 'Trading Card',
+            'estimatedValue': 0,
+            'confidence': .72,
+            'condition': 'Review needed',
+            'recommendation': 'Review this synced collectible.',
+            'imagePath': 'sample://card',
+            'createdAt': '2026-07-30T00:00:00Z',
+            'valuationStatus': 'unavailable',
+            'valuationSource': 'unknown',
+          },
+          'created_at': '2026-07-30T00:00:00Z',
+          'updated_at': null,
+        });
+
+        expect(item, isNotNull);
+        final parsedItem = item!;
+        expect(parsedItem.estimatedValue, 120);
+        expect(parsedItem.valuationStatus, ValuationStatus.marketEstimated);
+        expect(parsedItem.pricing?.lowEstimate, 80);
+        expect(parsedItem.pricing?.highEstimate, 120);
+      },
+    );
+
+    test(
       'Supabase storage service is disabled when config is missing',
       () async {
         final service = SupabaseCloudStorageService(
@@ -6274,70 +6319,78 @@ void main() {
       expect(snapshots, hasLength(3));
     });
 
-    test('local valuation snapshot repository records refreshed item value', () async {
-      final repository = SharedPreferencesValuationSnapshotRepository();
-      final item = _analyticsItem(
-        id: 'card',
-        title: 'Charizard Holo',
-        category: 'Trading Card',
-        value: 150,
-        confidence: 0.9,
-        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
-      ).copyWith(
-        pricing: PricingInfo(
-          estimatedMarketValue: 150,
-          lowEstimate: 120,
-          highEstimate: 180,
-          currency: 'AUD',
-          pricingSource: 'PriceCharting',
-          pricingConfidence: 0.82,
-          lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
-          valuationStatus: ValuationStatus.marketEstimated,
-          valuationSource: 'PriceCharting',
-        ),
-        valuationStatus: ValuationStatus.marketEstimated,
-        valuationSource: 'PriceCharting',
-        lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
-      );
+    test(
+      'local valuation snapshot repository records refreshed item value',
+      () async {
+        final repository = SharedPreferencesValuationSnapshotRepository();
+        final item =
+            _analyticsItem(
+              id: 'card',
+              title: 'Charizard Holo',
+              category: 'Trading Card',
+              value: 150,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+            ).copyWith(
+              pricing: PricingInfo(
+                estimatedMarketValue: 150,
+                lowEstimate: 120,
+                highEstimate: 180,
+                currency: 'AUD',
+                pricingSource: 'PriceCharting',
+                pricingConfidence: 0.82,
+                lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+                valuationStatus: ValuationStatus.marketEstimated,
+                valuationSource: 'PriceCharting',
+              ),
+              valuationStatus: ValuationStatus.marketEstimated,
+              valuationSource: 'PriceCharting',
+              lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+            );
 
-      await repository.recordSnapshot(item);
-      final snapshots = await repository.getSnapshots('card');
+        await repository.recordSnapshot(item);
+        final snapshots = await repository.getSnapshots('card');
 
-      expect(snapshots, hasLength(1));
-      expect(snapshots.single.portfolioItemId, 'card');
-      expect(snapshots.single.valueAud, 150);
-      expect(snapshots.single.lowEstimateAud, 120);
-      expect(snapshots.single.highEstimateAud, 180);
-      expect(snapshots.single.displayString, 'AUD 150.00');
-      expect(snapshots.single.pricingProvider, 'PriceCharting');
-      expect(snapshots.single.valuationStatus, ValuationStatus.marketEstimated);
-    });
+        expect(snapshots, hasLength(1));
+        expect(snapshots.single.portfolioItemId, 'card');
+        expect(snapshots.single.valueAud, 150);
+        expect(snapshots.single.lowEstimateAud, 120);
+        expect(snapshots.single.highEstimateAud, 180);
+        expect(snapshots.single.displayString, 'AUD 150.00');
+        expect(snapshots.single.pricingProvider, 'PriceCharting');
+        expect(
+          snapshots.single.valuationStatus,
+          ValuationStatus.marketEstimated,
+        );
+      },
+    );
 
     test('local valuation snapshots skip unchanged trusted values', () async {
       final repository = SharedPreferencesValuationSnapshotRepository();
-      final baseItem = _analyticsItem(
-        id: 'card',
-        title: 'Charizard Holo',
-        category: 'Trading Card',
-        value: 150,
-        confidence: 0.9,
-        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
-      ).copyWith(
-        pricing: PricingInfo(
-          estimatedMarketValue: 150,
-          lowEstimate: 120,
-          highEstimate: 180,
-          currency: 'AUD',
-          pricingSource: 'PriceCharting',
-          pricingConfidence: 0.82,
-          lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
-          valuationStatus: ValuationStatus.marketEstimated,
-          valuationSource: 'PriceCharting',
-        ),
-        valuationStatus: ValuationStatus.marketEstimated,
-        valuationSource: 'PriceCharting',
-        lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
-      );
+      final baseItem =
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ).copyWith(
+            pricing: PricingInfo(
+              estimatedMarketValue: 150,
+              lowEstimate: 120,
+              highEstimate: 180,
+              currency: 'AUD',
+              pricingSource: 'PriceCharting',
+              pricingConfidence: 0.82,
+              lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+              valuationSource: 'PriceCharting',
+            ),
+            valuationStatus: ValuationStatus.marketEstimated,
+            valuationSource: 'PriceCharting',
+            lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+          );
       final unchangedItem = baseItem.copyWith(
         lastValueRefreshedAt: DateTime.parse('2026-07-01T08:00:00Z'),
       );

@@ -402,16 +402,13 @@ class HomeActionRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                key: ValueKey('home-action-$keySeed-chevron'),
-                color: enabled
-                    ? const Color(0xFF8BC7FF)
-                    : informational
-                    ? HomeTokens.textSecondary
-                    : HomeTokens.textMuted,
-                size: 26,
-              ),
+              if (enabled)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  key: ValueKey('home-action-$keySeed-chevron'),
+                  color: const Color(0xFF8BC7FF),
+                  size: 26,
+                ),
             ],
           ),
         ),
@@ -668,6 +665,7 @@ class HomeStateContainer extends StatelessWidget {
   const HomeStateContainer({
     required this.sections,
     this.controller,
+    this.storageKey = 'home-scroll-position',
     this.topPadding = AppSpacing.xs,
     this.bottomClearance = HomeTokens.bottomContentClearance,
     super.key,
@@ -675,6 +673,7 @@ class HomeStateContainer extends StatelessWidget {
 
   final List<Widget> sections;
   final ScrollController? controller;
+  final String storageKey;
   final double topPadding;
   final double bottomClearance;
 
@@ -697,7 +696,7 @@ class HomeStateContainer extends StatelessWidget {
       builder: (context, constraints) {
         final gutter = gutterForWidth(constraints.maxWidth);
         return CustomScrollView(
-          key: const PageStorageKey<String>('home-scroll-position'),
+          key: PageStorageKey<String>(storageKey),
           controller: controller,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),

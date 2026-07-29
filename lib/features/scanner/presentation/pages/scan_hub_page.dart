@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scanner_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/scan_hub_presentation.dart';
@@ -12,14 +11,8 @@ const _showSampleScan = bool.fromEnvironment('PACKLOX_SHOW_SAMPLE_SCAN');
 
 /// Design Bible Volume 03, S01 scanner entry hub behavior coordinator.
 class ScanHubPage extends ConsumerStatefulWidget {
-  const ScanHubPage({
-    this.onViewPortfolio,
-    this.onNotifications,
-    this.now = DateTime.now,
-    super.key,
-  });
+  const ScanHubPage({this.onViewPortfolio, this.now = DateTime.now, super.key});
   final VoidCallback? onViewPortfolio;
-  final VoidCallback? onNotifications;
   final DateTime Function() now;
 
   @override
@@ -57,46 +50,41 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
       return ScannerScreen(onViewPortfolio: widget.onViewPortfolio);
     }
 
-    final greeting = _scanHubGreeting(
-      ref.watch(authControllerProvider),
-      widget.now(),
-    );
     return ScannerPageScaffold(
-      period: greeting.period,
-      firstName: greeting.firstName,
-      onNotifications: widget.onNotifications,
-      cameraTile: PackLoxEntryTile(
+      cameraTile: KeyedSubtree(
         key: const ValueKey('scan-hub-capture-button'),
-        compatibilityKey: const ValueKey('scan-primary-Scan with Camera'),
-        semanticLabel: 'Take a photo. Use your camera to scan an item.',
-        icon: Icons.photo_camera_outlined,
-        title: 'Take a photo',
-        supportingText: 'Use your camera to scan an item',
-        variant: PackLoxEntryTileVariant.scanner,
-        onTap: () => unawaited(_startCameraScan(context)),
+        child: HomeActionRow(
+          keySeed: 'scan-take-photo',
+          icon: Icons.photo_camera_outlined,
+          title: 'Take a photo',
+          subtitle: 'Use your camera to scan an item.',
+          onTap: () => unawaited(_startCameraScan(context)),
+        ),
       ),
-      galleryTile: PackLoxEntryTile(
+      galleryTile: KeyedSubtree(
         key: const ValueKey('scan-hub-gallery-button'),
-        compatibilityKey: const ValueKey('scan-secondary-Gallery'),
-        semanticLabel: 'Choose from gallery. Select an existing photo.',
-        icon: Icons.image_outlined,
-        title: 'Choose from gallery',
-        supportingText: 'Select an existing photo',
-        variant: PackLoxEntryTileVariant.scanner,
-        onTap: () => unawaited(_pickFromGallery(context)),
+        child: HomeActionRow(
+          keySeed: 'scan-gallery',
+          icon: Icons.image_outlined,
+          title: 'Choose from gallery',
+          subtitle: 'Select an existing photo.',
+          iconColor: HomeTokens.categoryMore,
+          onTap: () => unawaited(_pickFromGallery(context)),
+        ),
       ),
       sampleTile: _showSampleScan
-          ? PackLoxEntryTile(
+          ? KeyedSubtree(
               key: const ValueKey('scan-hub-sample-button'),
-              compatibilityKey: const ValueKey(
-                'scan-secondary-Use Sample Scan',
+              child: HomeActionRow(
+                keySeed: 'scan-sample',
+                icon: Icons.science_outlined,
+                title: 'Try a sample scan',
+                subtitle: 'See how PackLox works.',
+                iconColor: HomeTokens.categoryCoins,
+                onTap: ref
+                    .read(scannerControllerProvider.notifier)
+                    .useSampleScan,
               ),
-              semanticLabel: 'Try a sample scan. See how PackLox works.',
-              icon: Icons.science_outlined,
-              title: 'Try a sample scan',
-              supportingText: 'See how PackLox works',
-              variant: PackLoxEntryTileVariant.scanner,
-              onTap: ref.read(scannerControllerProvider.notifier).useSampleScan,
             )
           : null,
     );
@@ -108,23 +96,4 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
   Future<void> _pickFromGallery(BuildContext context) => ref
       .read(scannerControllerProvider.notifier)
       .pickImageFromGallery(context: context, imageRole: 'front');
-}
-
-({String period, String firstName}) _scanHubGreeting(
-  AuthState authState,
-  DateTime now,
-) {
-  final displayName = authState.isSignedIn
-      ? authState.user?.displayName.trim() ?? ''
-      : '';
-  final safeDisplayName = displayName.contains('@') ? '' : displayName;
-  final firstName = safeDisplayName.isEmpty
-      ? 'Collector'
-      : safeDisplayName.split(RegExp(r'\s+')).first;
-  final period = switch (now.hour) {
-    < 12 => 'Good morning',
-    < 18 => 'Good afternoon',
-    _ => 'Good evening',
-  };
-  return (period: period, firstName: firstName);
 }

@@ -75,8 +75,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final catalogQuickFilters = const [
       'Charizard 4/102',
       'Pokemon Cards',
-      'Nintendo 64',
       'Magic Cards',
+      'Comics',
+      'Coins',
+      'Nike Air Force 1',
+      'Video Games',
     ];
     final hasQuery = query.isNotEmpty;
     final hasResults = results.isNotEmpty;
@@ -263,7 +266,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   List<String> _quickFilters(List<CollectibleItem> items) {
     if (items.isEmpty) {
-      return const ['Cards', 'Coins', 'Figures', 'Games'];
+      return const ['Cards', 'Video Games', 'Sneakers', 'Comics', 'Coins'];
     }
 
     final counts = <String, int>{};
@@ -2714,6 +2717,18 @@ _PlaceholderStyle _placeholderStyle(
           'assets/packlox/icons/categories/3d/packlox_category_placeholder_watch_v1.png',
     );
   }
+  if (text.contains('funko') ||
+      text.contains('vinyl figure') ||
+      text.contains('vinyl collectible')) {
+    return const _PlaceholderStyle(
+      label: 'FUNKO',
+      mark: _PlaceholderMark.toy,
+      accent: PackLoxTokens.blue,
+      background: Color(0xFF111827),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_toy_v1.png',
+    );
+  }
   if (text.contains('shoe') || text.contains('sneaker')) {
     return const _PlaceholderStyle(
       label: 'SHOE',
@@ -2736,6 +2751,18 @@ _PlaceholderStyle _placeholderStyle(
       background: Color(0xFF101C22),
       assetPath:
           'assets/packlox/icons/categories/3d/packlox_category_placeholder_game_v1.png',
+    );
+  }
+  if (text.contains('lego') ||
+      text.contains('building set') ||
+      text.contains('brick set')) {
+    return const _PlaceholderStyle(
+      label: 'LEGO',
+      mark: _PlaceholderMark.collectible,
+      accent: PackLoxTokens.cyan,
+      background: Color(0xFF101A20),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_item_v1.png',
     );
   }
   if (text.contains('toy') ||

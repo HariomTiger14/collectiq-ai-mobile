@@ -67,7 +67,7 @@ void main() {
     expect(find.text('\$18'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
-    expect(find.text('1 pending'), findsWidgets);
+    expect(find.text('1 need value'), findsWidgets);
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-action-filter')),
@@ -239,7 +239,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-unavailable-card')),
-        matching: find.text('Pending'),
+        matching: find.text('No match'),
       ),
       findsWidgets,
     );
@@ -284,20 +284,73 @@ void main() {
     expect(find.byKey(const ValueKey('portfolio-retry')), findsOneWidget);
   });
 
-  testWidgets('partial state uses amber pending and green confirmed status', (
+  testWidgets(
+    'partial state uses amber needs value and green confirmed status',
+    (tester) async {
+      await _pumpPortfolio(
+        tester,
+        previewScenario: PortfolioPreviewScenario.partial,
+      );
+
+      await _revealPortfolio(tester, find.text('Needs value'));
+      final pendingText = tester.widget<Text>(
+        find
+            .descendant(
+              of: find.byKey(
+                const ValueKey('portfolio-grid-item-partial-comic'),
+              ),
+              matching: find.text('Needs value'),
+            )
+            .first,
+      );
+      expect(pendingText.style?.color, HomeTokens.warning);
+
+      final valuedText = tester.widget<Text>(find.text('Valued').first);
+      expect(valuedText.style?.color, HomeTokens.positive);
+    },
+  );
+
+  testWidgets('cloud upload state does not hide a displayable valuation', (
     tester,
   ) async {
-    await _pumpPortfolio(
+    _seedPortfolio([
+      _item(
+        'uploading-card',
+        'Uploading Charizard',
+        350,
+        syncStatus: 'pendingUpload',
+      ),
+      _item(
+        'needs-value-card',
+        'Needs Value Card',
+        0,
+        valuationStatus: 'no_market_match',
+      ),
+    ]);
+
+    await _pumpPortfolio(tester);
+
+    await _revealPortfolio(
       tester,
-      previewScenario: PortfolioPreviewScenario.partial,
+      find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+        matching: find.text('Valued'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+        matching: find.text('\$350'),
+      ),
+      findsOneWidget,
     );
 
-    await _revealPortfolio(tester, find.text('Needs value'));
-    final pendingText = tester.widget<Text>(find.text('Needs value').first);
-    expect(pendingText.style?.color, HomeTokens.warning);
-
-    final valuedText = tester.widget<Text>(find.text('Valued').first);
-    expect(valuedText.style?.color, HomeTokens.positive);
+    await _revealPortfolio(tester, find.text('1 need value'));
+    expect(find.text('1 need value'), findsWidgets);
   });
 
   testWidgets('filtered empty keeps portfolio context and clears filters', (
@@ -494,8 +547,9 @@ void main() {
       const ValueKey('portfolio-action-filter'),
     );
 
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(12, 12));
@@ -517,8 +571,9 @@ void main() {
       tester,
       const ValueKey('portfolio-action-sort'),
     );
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
@@ -646,8 +701,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-category-filter-coins'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
@@ -675,12 +731,14 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-category-filter-coins'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
@@ -968,6 +1026,7 @@ Map<String, Object?> _item(
   String category = 'Trading Card',
   String imagePath = 'sample://card',
   String valuationStatus = 'market_estimated',
+  String syncStatus = 'synced',
   double confidence = 0.91,
 }) {
   return {
@@ -981,6 +1040,7 @@ Map<String, Object?> _item(
     'imagePath': imagePath,
     'galleryImages': <Object>[],
     'createdAt': '2026-07-01T00:00:00.000Z',
+    'syncStatus': syncStatus,
     'valuationStatus': valuationStatus,
     'valuationSource': valuationStatus,
     'marketSummary': {

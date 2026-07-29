@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
@@ -46,7 +47,7 @@ enum _PortfolioSortMode {
 enum _PortfolioStatusFilter {
   all(label: 'All'),
   valued(label: 'Valued'),
-  pending(label: 'Pending'),
+  pending(label: 'Needs value'),
   needsAttention(label: 'Needs attention');
 
   const _PortfolioStatusFilter({required this.label});
@@ -57,9 +58,11 @@ enum _PortfolioStatusFilter {
 enum _PortfolioCategoryFilter {
   all(label: 'All'),
   cards(label: 'Cards'),
-  coins(label: 'Coins'),
+  videoGames(label: 'Video Games'),
+  sneakers(label: 'Sneakers'),
   comics(label: 'Comics'),
-  memorabilia(label: 'Memorabilia'),
+  coins(label: 'Coins'),
+  figures(label: 'LEGO / Funko'),
   other(label: 'Other');
 
   const _PortfolioCategoryFilter({required this.label});
@@ -102,7 +105,7 @@ enum _PortfolioIntelligenceFocus {
 enum PortfolioPreviewScenario {
   defaultData(
     label: 'Default',
-    subtitle: 'Saved items with values and pending work.',
+    subtitle: 'Saved items with trusted values and review work.',
   ),
   empty(
     label: 'Empty',
@@ -115,7 +118,7 @@ enum PortfolioPreviewScenario {
   error(label: 'Error', subtitle: 'Retry state for a failed portfolio load.'),
   partial(
     label: 'Partial',
-    subtitle: 'Confirmed values plus pending valuations in amber.',
+    subtitle: 'Confirmed values plus missing valuations in amber.',
   ),
   filteredEmpty(
     label: 'Filtered empty',
@@ -170,6 +173,7 @@ class PortfolioStatePreviewScreen extends ConsumerWidget {
           foregroundColor: HomeTokens.textPrimary,
         ),
         body: HomeStateContainer(
+          storageKey: 'portfolio-preview-scroll-position',
           sections: [
             const HomeSection(child: HomeBrandLockup()),
             HomeSection(
@@ -267,7 +271,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     super.initState();
     _searchQuery = _initialSearchQuery(widget.qaSearchPreview);
     if (widget.qaSearchPreview == PortfolioSearchPreview.filterEmpty) {
-      _categoryFilter = _PortfolioCategoryFilter.coins;
+      _categoryFilter = _PortfolioCategoryFilter.other;
     }
     _scrollController = ScrollController(
       initialScrollOffset: widget.qaInitialScrollOffset,
@@ -278,6 +282,13 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         return;
       }
       ref.read(portfolioControllerProvider.notifier).ensureLoaded();
+      if (widget.previewScenario == null) {
+        unawaited(
+          ref
+              .read(portfolioControllerProvider.notifier)
+              .syncCloudPortfolioNow(),
+        );
+      }
       if (widget.qaInitialSheet != null) {
         _showSortFilterSheet(context, preview: widget.qaInitialSheet);
       }
@@ -334,6 +345,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               key: const ValueKey('portfolio-screen-surface'),
               color: HomeTokens.background,
               child: HomeStateContainer(
+                storageKey: 'portfolio-scroll-position',
                 controller: _scrollController,
                 bottomClearance: GlassBottomNavBar.scrollContentClearance(
                   context,
@@ -548,17 +560,55 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               condition.contains(query);
           final matchesCategory = switch (_categoryFilter) {
             _PortfolioCategoryFilter.all => true,
-            _PortfolioCategoryFilter.cards => category.contains('card'),
-            _PortfolioCategoryFilter.coins => category.contains('coin'),
-            _PortfolioCategoryFilter.comics => category.contains('comic'),
-            _PortfolioCategoryFilter.memorabilia =>
-              category.contains('memorabilia') || category.contains('sport'),
+            _PortfolioCategoryFilter.cards =>
+              category.contains('card') ||
+                  category.contains('pokemon') ||
+                  category.contains('magic') ||
+                  category.contains('yugioh') ||
+                  category.contains('yu-gi-oh') ||
+                  category.contains('one piece'),
+            _PortfolioCategoryFilter.videoGames =>
+              category.contains('video game') || category.contains('game'),
+            _PortfolioCategoryFilter.sneakers =>
+              category.contains('sneaker') ||
+                  category.contains('shoe') ||
+                  category.contains('streetwear'),
+            _PortfolioCategoryFilter.comics =>
+              category.contains('comic') || category.contains('manga'),
+            _PortfolioCategoryFilter.coins =>
+              category.contains('coin') ||
+                  category.contains('numismatic') ||
+                  category.contains('penny') ||
+                  category.contains('cent'),
+            _PortfolioCategoryFilter.figures =>
+              category.contains('lego') ||
+                  category.contains('building set') ||
+                  category.contains('funko') ||
+                  category.contains('pop') ||
+                  category.contains('vinyl figure'),
             _PortfolioCategoryFilter.other =>
               !category.contains('card') &&
-                  !category.contains('coin') &&
+                  !category.contains('pokemon') &&
+                  !category.contains('magic') &&
+                  !category.contains('yugioh') &&
+                  !category.contains('yu-gi-oh') &&
+                  !category.contains('one piece') &&
+                  !category.contains('video game') &&
+                  !category.contains('game') &&
+                  !category.contains('sneaker') &&
+                  !category.contains('shoe') &&
+                  !category.contains('streetwear') &&
                   !category.contains('comic') &&
-                  !category.contains('memorabilia') &&
-                  !category.contains('sport'),
+                  !category.contains('manga') &&
+                  !category.contains('coin') &&
+                  !category.contains('numismatic') &&
+                  !category.contains('penny') &&
+                  !category.contains('cent') &&
+                  !category.contains('lego') &&
+                  !category.contains('building set') &&
+                  !category.contains('funko') &&
+                  !category.contains('pop') &&
+                  !category.contains('vinyl figure'),
           };
           final matchesStatus = switch (_statusFilter) {
             _PortfolioStatusFilter.all => true,
@@ -865,7 +915,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         ? const _PortfolioSheetSelection(
             sortMode: _PortfolioSortMode.valueHigh,
             statusFilter: _PortfolioStatusFilter.pending,
-            categoryFilter: _PortfolioCategoryFilter.coins,
+            categoryFilter: _PortfolioCategoryFilter.other,
             confidenceFilter: _PortfolioConfidenceFilter.low,
             trendFilter: _PortfolioTrendFilter.cooling,
           )
@@ -1287,7 +1337,7 @@ class _PortfolioMetrics extends StatelessWidget {
         value: _formatAud(totalValue),
         supportingText: pendingItemCount == 0
             ? 'Estimated'
-            : '$pendingItemCount pending',
+            : '$pendingItemCount need value',
         supportingColor: pendingItemCount == 0
             ? HomeTokens.positive
             : HomeTokens.warning,
@@ -1298,7 +1348,7 @@ class _PortfolioMetrics extends StatelessWidget {
         supportingText: '$valuedItemCount valued',
       ),
       HomeMetricTile(
-        label: filteredCount == null ? 'Pending' : 'Filtered',
+        label: filteredCount == null ? 'Needs value' : 'Filtered',
         value: filteredCount == null ? '$pendingItemCount' : '$filteredCount',
         supportingText: filteredCount == null
             ? (pendingItemCount == 0 ? 'Healthy' : 'Review')
@@ -1436,7 +1486,7 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                       child: _IntelligenceMetricTile(
                         label: 'Pricing coverage',
                         value: '$valuedItemCount/${analytics.itemCount}',
-                        supportingText: '$pendingItemCount pending',
+                        supportingText: '$pendingItemCount need value',
                         color: pendingItemCount == 0
                             ? HomeTokens.positive
                             : HomeTokens.warning,
@@ -1628,7 +1678,7 @@ class _PortfolioAttentionQueue extends StatelessWidget {
         value: pendingItemCount,
         message: pendingItemCount == 0
             ? 'All saved items have a displayable value.'
-            : 'Review unavailable or unsupported valuation states.',
+            : 'Correct item identity and retry trusted pricing.',
       ),
       _AttentionQueueRowData(
         icon: Icons.refresh_outlined,
@@ -2095,14 +2145,12 @@ class _PortfolioItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasValue = _hasDisplayableValuation(item);
-    final pending = _isPendingItem(item);
-    final statusColor = pending ? HomeTokens.warning : HomeTokens.positive;
-    final statusLabel = pending
-        ? item.syncStatus == CloudItemSyncStatus.failed
-              ? 'Sync issue'
-              : 'Needs value'
-        : 'Valued';
-    final valueLabel = hasValue ? _formatAud(item.estimatedValue) : 'Pending';
+    final needsValue = !hasValue;
+    final statusColor = needsValue ? HomeTokens.warning : HomeTokens.positive;
+    final statusLabel = needsValue ? 'Needs value' : 'Valued';
+    final valueLabel = hasValue
+        ? _formatAud(item.estimatedValue)
+        : _valuationDisplayLabel(item);
 
     return MotionTapScale(
       onTap: onTap,
@@ -2198,11 +2246,17 @@ class _PortfolioItemRow extends StatelessWidget {
                         child: IconButton(
                           key: ValueKey('portfolio-grid-item-edit-${item.id}'),
                           onPressed: onEdit,
-                          tooltip: 'Edit item',
+                          tooltip: needsValue
+                              ? 'Correct details and reprice'
+                              : 'Edit item',
                           padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.edit_outlined,
-                            color: Color(0xFF8BC7FF),
+                          icon: Icon(
+                            needsValue
+                                ? Icons.manage_search_outlined
+                                : Icons.edit_outlined,
+                            color: needsValue
+                                ? HomeTokens.warning
+                                : const Color(0xFF8BC7FF),
                             size: 18,
                           ),
                         ),
@@ -2660,7 +2714,7 @@ String _heroTitle({
     return 'Start your portfolio';
   }
   if (isPartialState) {
-    return 'Review pending values';
+    return 'Review items needing value';
   }
   return 'Your collection at a glance';
 }
@@ -2685,7 +2739,7 @@ String _heroBody({
     return 'Scan your first collectible to start building a saved portfolio.';
   }
   if (isPartialState) {
-    return 'Confirmed values stay visible while pending items are marked for review.';
+    return 'Confirmed values stay visible while no-value items are marked for review.';
   }
   return 'Review saved collectibles, values, and items that need attention.';
 }
@@ -2832,9 +2886,7 @@ bool _hasDisplayableValuation(CollectibleItem item) {
 }
 
 bool _isPendingItem(CollectibleItem item) {
-  return !_hasDisplayableValuation(item) ||
-      item.syncStatus == CloudItemSyncStatus.pendingUpload ||
-      item.syncStatus == CloudItemSyncStatus.failed;
+  return !_hasDisplayableValuation(item);
 }
 
 bool _hasMissingImportantData(CollectibleItem item) {
@@ -2918,7 +2970,25 @@ String _formatAud(double value) {
 
 String _trendLabel(CollectibleItem item) {
   if (!_hasDisplayableValuation(item)) {
-    return 'Pending';
+    return switch (item.valuationStatus) {
+      ValuationStatus.noMarketMatch => 'No market match',
+      ValuationStatus.providerNotConfigured => 'Source unavailable',
+      ValuationStatus.lookupFailed => 'Retry value',
+      ValuationStatus.unavailable => 'Review value',
+      ValuationStatus.marketEstimated ||
+      ValuationStatus.aiEstimated => 'Stable',
+    };
   }
   return 'Stable';
+}
+
+String _valuationDisplayLabel(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.noMarketMatch => 'No match',
+    ValuationStatus.providerNotConfigured => 'No source',
+    ValuationStatus.lookupFailed => 'Retry',
+    ValuationStatus.unavailable => 'No value',
+    ValuationStatus.marketEstimated ||
+    ValuationStatus.aiEstimated => _formatAud(item.estimatedValue),
+  };
 }

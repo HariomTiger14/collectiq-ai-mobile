@@ -178,6 +178,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
               color: HomeTokens.background,
               child: HomeStateContainer(
                 key: const ValueKey('collectible-detail-scroll-view'),
+                storageKey: 'collectible-detail-scroll-position',
                 controller: _scrollController,
                 sections: [
                   const HomeSection(child: HomeBrandLockup()),

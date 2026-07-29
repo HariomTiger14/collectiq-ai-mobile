@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
@@ -263,6 +264,26 @@ class _HomePageState extends ConsumerState<HomePage> {
         data: AppTheme.dark,
         child: Scaffold(
           backgroundColor: HomeTokens.background,
+          floatingActionButton: widget.onScanPressed == null
+              ? null
+              : Padding(
+                  padding: EdgeInsets.only(
+                    bottom: GlassBottomNavBar.bodyContentInset(context),
+                  ),
+                  child: FloatingActionButton(
+                    key: const ValueKey('home-floating-scan-button'),
+                    heroTag: 'home-floating-scan',
+                    tooltip: 'Add item',
+                    onPressed: _handleScanPressed,
+                    backgroundColor: HomeTokens.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: const Icon(Icons.photo_camera_outlined),
+                  ),
+                ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           body: SafeArea(
             bottom: false,
             child: HomeStateContainer(
@@ -313,40 +334,37 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   HomeSection(
                     topPadding: AppSpacing.xl,
-                    child: _HomeActionStack(
-                      actions: [
-                        HomeActionRow(
-                          keySeed: 'start-first-item',
-                          icon: Icons.photo_camera_outlined,
-                          title: 'Start with your first item',
-                          subtitle: 'Scan or add a collectible to begin.',
-                          onTap: widget.onScanPressed == null
-                              ? null
-                              : _handleScanPressed,
-                        ),
-                        HomeActionRow(
-                          keySeed: 'guided-scan',
-                          icon: Icons.add_rounded,
-                          title: 'Try a guided scan',
-                          subtitle:
-                              'Use the scanner to capture details clearly.',
-                          iconColor: HomeTokens.categoryMore,
-                          onTap:
-                              widget.onSampleScanPressed ??
-                              (widget.onScanPressed == null
-                                  ? null
-                                  : _handleScanPressed),
-                        ),
-                        const HomeActionRow(
-                          keySeed: 'supported-categories',
-                          icon: Icons.category_outlined,
-                          title: 'Browse supported categories',
-                          subtitle: 'Cards, coins, figures, and more.',
-                          iconColor: HomeTokens.categoryCoins,
-                          informational: true,
-                        ),
-                      ],
+                    child: _CategoryExplorer(
+                      onCategoryTap: (category) => _openCategoryOverview(
+                        context,
+                        category,
+                        onScanPressed: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                      ),
                     ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _RecentItemsPreview(
+                      data: homeData,
+                      onOpenPortfolio: widget.onPortfolioPressed,
+                      onScanPressed: widget.onScanPressed == null
+                          ? null
+                          : _handleScanPressed,
+                    ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _InsightsPreview(
+                      data: homeData,
+                      onOpenInsights: widget.onPortfolioPressed,
+                    ),
+                  ),
+                  const HomeSection(
+                    topPadding: AppSpacing.xl,
+                    bottomPadding: AppSpacing.xxl,
+                    child: _ProviderFooter(),
                   ),
                 ] else ...[
                   HomeSection(
@@ -365,14 +383,34 @@ class _HomePageState extends ConsumerState<HomePage> {
                           : _handleScanPressed,
                     ),
                   ),
-                  if (homeData.hasRealMetrics)
-                    HomeSection(
-                      topPadding: AppSpacing.xl,
-                      child: _MetricGrid(data: homeData),
-                    ),
                   HomeSection(
                     topPadding: AppSpacing.xl,
-                    bottomPadding: AppSpacing.xxl,
+                    child: _CategoryExplorer(
+                      onCategoryTap: (category) => _openCategoryOverview(
+                        context,
+                        category,
+                        onScanPressed: widget.onScanPressed == null
+                            ? null
+                            : _handleScanPressed,
+                      ),
+                    ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _RecentItemsPreview(
+                      data: homeData,
+                      onOpenPortfolio: widget.onPortfolioPressed,
+                    ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _InsightsPreview(
+                      data: homeData,
+                      onOpenInsights: widget.onPortfolioPressed,
+                    ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
                     child: _HomeActionStack(
                       actions: [
                         HomeActionRow(
@@ -420,6 +458,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ],
                     ),
                   ),
+                  const HomeSection(
+                    topPadding: AppSpacing.xl,
+                    bottomPadding: AppSpacing.xxl,
+                    child: _ProviderFooter(),
+                  ),
                 ],
               ],
             ),
@@ -446,53 +489,503 @@ String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
   return 'Your collection overview, recent scans, and next actions.';
 }
 
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.data});
+class _CategoryExplorer extends StatelessWidget {
+  const _CategoryExplorer({required this.onCategoryTap});
 
-  final _HomeViewData data;
+  final ValueChanged<_SupportedCategory> onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 300 ? 2 : 1;
-        final compact = columns > 1;
-        final metrics = <Widget>[
-          if (data.hasValuedItems)
-            HomeMetricTile(
-              label: 'Collection value',
-              value: _formatCurrency(data.totalValuedAmount),
-              supportingText: data.hasPartialValuation
-                  ? 'Partial valuation'
-                  : 'Estimated trend',
-              supportingColor: data.hasPartialValuation
-                  ? HomeTokens.warning
-                  : HomeTokens.positive,
-              compact: compact,
+    return HomeSectionSurface(
+      keySeed: 'category-explorer',
+      title: 'Supported categories',
+      child: HomeCategoryGrid(
+        categories: [
+          for (final category in _supportedCategories)
+            HomeCategoryTile(
+              label: category.shortLabel,
+              icon: category.icon,
+              semanticMeaning: category.description,
+              iconColor: category.color,
+              assetPath: category.assetPath,
+              onTap: () => onCategoryTap(category),
             ),
-          HomeMetricTile(
-            label: 'Collection items',
-            value: '${data.itemCount}',
-            supportingText: data.hasPartialValuation
-                ? '${data.valuedItemCount} valued'
-                : 'Verified items',
-            compact: compact,
-          ),
-        ];
-        final width = columns == 1
-            ? constraints.maxWidth
-            : (constraints.maxWidth - HomeTokens.cardGap) / 2;
-        return Wrap(
-          spacing: HomeTokens.cardGap,
-          runSpacing: HomeTokens.cardGap,
-          children: [
-            for (final metric in metrics) SizedBox(width: width, child: metric),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
+
+class _RecentItemsPreview extends StatelessWidget {
+  const _RecentItemsPreview({
+    required this.data,
+    this.onOpenPortfolio,
+    this.onScanPressed,
+  });
+
+  final _HomeViewData data;
+  final VoidCallback? onOpenPortfolio;
+  final VoidCallback? onScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentItems = data.recentItems.take(3).toList(growable: false);
+    return HomeSectionSurface(
+      keySeed: 'recent-items-preview',
+      title: 'Recent items',
+      actionLabel: data.isEmpty ? null : 'View all',
+      onAction: data.isEmpty ? null : onOpenPortfolio,
+      child: recentItems.isEmpty
+          ? HomeActionRow(
+              keySeed: 'recent-items-empty',
+              icon: Icons.photo_camera_outlined,
+              title: 'No items yet',
+              subtitle: 'Start with your first scan.',
+              onTap: onScanPressed,
+            )
+          : Column(
+              children: [
+                for (var index = 0; index < recentItems.length; index++) ...[
+                  if (index > 0) const SizedBox(height: HomeTokens.cardGap),
+                  HomeRecentItemCard(
+                    id: recentItems[index].id,
+                    title: recentItems[index].title,
+                    category: recentItems[index].category,
+                    imagePath:
+                        recentItems[index].cloudImageUrl ??
+                        recentItems[index].imagePath,
+                    valueLabel: _valueLabelFor(recentItems[index]),
+                    valueUnavailable: !_hasDisplayValue(recentItems[index]),
+                    condition: recentItems[index].condition,
+                    addedLabel: _confidenceLabel(recentItems[index]),
+                    onTap: () =>
+                        _openCollectibleDetail(context, recentItems[index]),
+                  ),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _InsightsPreview extends StatelessWidget {
+  const _InsightsPreview({required this.data, this.onOpenInsights});
+
+  final _HomeViewData data;
+  final VoidCallback? onOpenInsights;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeSectionSurface(
+      keySeed: 'insights-preview',
+      title: 'Insights preview',
+      actionLabel: data.isEmpty ? null : 'Open',
+      onAction: onOpenInsights,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 330 ? 3 : 1;
+          final compact = columns > 1;
+          final width = columns == 1
+              ? constraints.maxWidth
+              : (constraints.maxWidth - HomeTokens.cardGap * (columns - 1)) /
+                    columns;
+          final topCategory = data.topCategories.isEmpty
+              ? 'No category'
+              : data.topCategories.first.label;
+          final attentionLabel = data.unvaluedCount > 0
+              ? '${data.unvaluedCount} pending'
+              : data.itemCount > 0
+              ? 'Healthy'
+              : 'No items';
+          return Wrap(
+            spacing: HomeTokens.cardGap,
+            runSpacing: HomeTokens.cardGap,
+            children: [
+              SizedBox(
+                width: width,
+                child: HomeMetricTile(
+                  label: 'Collection value',
+                  value: data.hasValuedItems
+                      ? _formatCurrency(data.totalValuedAmount)
+                      : 'Pending',
+                  supportingText: data.hasValuedItems
+                      ? '${data.valuedItemCount} valued'
+                      : 'Add valued items',
+                  compact: compact,
+                ),
+              ),
+              SizedBox(
+                width: width,
+                child: HomeMetricTile(
+                  label: 'Top category',
+                  value: topCategory,
+                  supportingText: data.topCategories.length > 1
+                      ? '${data.topCategories.length} active'
+                      : 'Category mix',
+                  supportingColor: HomeTokens.categoryCards,
+                  compact: compact,
+                ),
+              ),
+              SizedBox(
+                width: width,
+                child: HomeMetricTile(
+                  label: 'Collection health',
+                  value: attentionLabel,
+                  supportingText: data.hasPartialValuation
+                      ? 'Needs valuation'
+                      : 'Ready to build',
+                  supportingColor: data.hasPartialValuation
+                      ? HomeTokens.warning
+                      : HomeTokens.positive,
+                  compact: compact,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProviderFooter extends StatelessWidget {
+  const _ProviderFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return HomeSectionSurface(
+      keySeed: 'provider-footer',
+      title: 'Pricing sources',
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          _ProviderPill(label: 'PriceCharting', tone: HomeTokens.accent),
+          _ProviderPill(label: 'KicksDB', tone: HomeTokens.categoryMore),
+          _ProviderPill(
+            label: 'WatchCharts future',
+            tone: HomeTokens.categoryCoins,
+          ),
+          Text(
+            'No AI-invented values.',
+            style: textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProviderPill extends StatelessWidget {
+  const _ProviderPill({required this.label, required this.tone});
+
+  final String label;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: tone.withValues(alpha: .34)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: HomeTokens.textPrimary,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryOverviewScreen extends StatelessWidget {
+  const _CategoryOverviewScreen({required this.category, this.onScanPressed});
+
+  final _SupportedCategory category;
+  final VoidCallback? onScanPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: HomeTokens.background,
+        systemNavigationBarDividerColor: HomeTokens.background,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Theme(
+        data: AppTheme.dark,
+        child: Scaffold(
+          backgroundColor: HomeTokens.background,
+          body: SafeArea(
+            bottom: false,
+            child: HomeStateContainer(
+              storageKey: 'category-overview-${category.key}',
+              sections: [
+                HomeSection(
+                  child: Row(
+                    children: [
+                      IconButton(
+                        key: const ValueKey('category-overview-back'),
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        color: HomeTokens.textPrimary,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      const HomeBrandLockup(),
+                    ],
+                  ),
+                ),
+                HomeSection(
+                  topPadding: AppSpacing.lg,
+                  child: HomeAuthorityHero(
+                    eyebrow: 'Category overview',
+                    title: category.label,
+                    body: category.description,
+                    ctaLabel: 'Scan ${category.shortLabel}',
+                    icon: category.icon,
+                    onPressed: onScanPressed == null
+                        ? null
+                        : () {
+                            Navigator.of(context).maybePop();
+                            onScanPressed?.call();
+                          },
+                  ),
+                ),
+                HomeSection(
+                  topPadding: AppSpacing.xl,
+                  child: HomeSectionSurface(
+                    keySeed: 'category-provider-${category.key}',
+                    title: 'Supported providers',
+                    child: Text(
+                      category.providers,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ),
+                HomeSection(
+                  topPadding: AppSpacing.xl,
+                  bottomPadding: AppSpacing.xxl,
+                  child: HomeSectionSurface(
+                    keySeed: 'category-examples-${category.key}',
+                    title: 'Example items',
+                    child: Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        for (final example in category.examples)
+                          _ProviderPill(label: example, tone: category.color),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportedCategory {
+  const _SupportedCategory({
+    required this.key,
+    required this.label,
+    required this.shortLabel,
+    required this.description,
+    required this.providers,
+    required this.examples,
+    required this.icon,
+    required this.assetPath,
+    required this.color,
+  });
+
+  final String key;
+  final String label;
+  final String shortLabel;
+  final String description;
+  final String providers;
+  final List<String> examples;
+  final IconData icon;
+  final String assetPath;
+  final Color color;
+}
+
+class _CategoryCount {
+  const _CategoryCount(this.label, this.count);
+
+  final String label;
+  final int count;
+}
+
+const _supportedCategories = [
+  _SupportedCategory(
+    key: 'cards',
+    label: 'Trading Cards',
+    shortLabel: 'Cards',
+    description:
+        'PackLox supports trading card categories where trusted catalog data is connected.',
+    providers:
+        'PriceCharting is connected for Pokémon, MTG, Yu-Gi-Oh, and One Piece card catalogs.',
+    examples: ['Pokémon', 'MTG', 'Yu-Gi-Oh'],
+    icon: Icons.style_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'pokemon',
+    label: 'Pokémon Cards',
+    shortLabel: 'Pokémon',
+    description: 'Cards matched against trusted catalog data where available.',
+    providers: 'PriceCharting is connected. TCGplayer is a future provider.',
+    examples: ['Pikachu', 'Charizard', 'Trainer cards'],
+    icon: Icons.style_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'mtg',
+    label: 'Magic: The Gathering',
+    shortLabel: 'MTG',
+    description: 'Trading cards with deterministic catalog matching.',
+    providers:
+        'PriceCharting is connected. Specialist trading card sources may be added later.',
+    examples: ['Set cards', 'Foils', 'Promos'],
+    icon: Icons.auto_awesome_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'yugioh',
+    label: 'Yu-Gi-Oh! Cards',
+    shortLabel: 'Yu-Gi-Oh',
+    description: 'Card identity, set, and number driven pricing checks.',
+    providers: 'PriceCharting is connected for catalog-backed valuations.',
+    examples: ['Monsters', 'Spells', 'Collector rares'],
+    icon: Icons.style_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'one-piece',
+    label: 'One Piece Cards',
+    shortLabel: 'One Piece',
+    description: 'Modern card catalog matching with clear unavailable states.',
+    providers: 'PriceCharting is connected for supported catalog entries.',
+    examples: ['Leaders', 'Alt arts', 'Promos'],
+    icon: Icons.style_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'video-games',
+    label: 'Video Games',
+    shortLabel: 'Video Games',
+    description: 'Games and editions with catalog-backed PriceCharting values.',
+    providers: 'PriceCharting is connected for video games.',
+    examples: ['Cartridges', 'Discs', 'Complete editions'],
+    icon: Icons.sports_esports_outlined,
+    assetPath: PackLoxAssets.categoryMore,
+    color: HomeTokens.categoryMore,
+  ),
+  _SupportedCategory(
+    key: 'comics',
+    label: 'Comics',
+    shortLabel: 'Comics',
+    description:
+        'Comic values use stricter identity checks for series, issue, and title confidence.',
+    providers:
+        'PriceCharting API is connected. Weak issue or homage-style matches are rejected.',
+    examples: ['Issue number', 'Series title', 'Cover year'],
+    icon: Icons.menu_book_outlined,
+    assetPath: PackLoxAssets.categoryMore,
+    color: HomeTokens.categoryFigures,
+  ),
+  _SupportedCategory(
+    key: 'lego',
+    label: 'LEGO',
+    shortLabel: 'LEGO',
+    description:
+        'Building sets can be valued when PackLox can identify the exact set.',
+    providers:
+        'PriceCharting API is connected with set identity checks before showing a value.',
+    examples: ['75192 Falcon', 'Retired sets', 'Sealed sets'],
+    icon: Icons.extension_outlined,
+    assetPath: PackLoxAssets.categoryMore,
+    color: HomeTokens.categoryMore,
+  ),
+  _SupportedCategory(
+    key: 'funko-pop',
+    label: 'Funko Pop',
+    shortLabel: 'Funko',
+    description:
+        'Vinyl figures can be priced when PackLox can distinguish the exact variant.',
+    providers:
+        'PriceCharting API is connected. Variant-sensitive matches use stricter trust checks.',
+    examples: ['Spider-Man', 'Metallic variants', 'Numbered figures'],
+    icon: Icons.smart_toy_outlined,
+    assetPath: PackLoxAssets.categoryFigures,
+    color: HomeTokens.categoryFigures,
+  ),
+  _SupportedCategory(
+    key: 'coins',
+    label: 'Coins',
+    shortLabel: 'Coins',
+    description:
+        'Numismatic items can be valued when year, mint, and coin identity are clear.',
+    providers:
+        'PriceCharting API is connected. PackLox avoids values when identity evidence is weak.',
+    examples: ['Lincoln cents', 'Morgan dollars', 'Graded coins'],
+    icon: Icons.album_outlined,
+    assetPath: PackLoxAssets.categoryCoins,
+    color: HomeTokens.categoryCoins,
+  ),
+  _SupportedCategory(
+    key: 'sports-cards',
+    label: 'Sports Cards',
+    shortLabel: 'Sports',
+    description:
+        'Sports card pricing needs player, year, set, or card number evidence.',
+    providers:
+        'PriceCharting API is connected with stricter identity checks for sports card matches.',
+    examples: ['Player', 'Set/year', 'Card number'],
+    icon: Icons.sports_basketball_outlined,
+    assetPath: PackLoxAssets.categoryCards,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'sneakers',
+    label: 'Sneakers / Streetwear',
+    shortLabel: 'Sneakers',
+    description:
+        'Sneaker and streetwear values are checked against specialist sneaker market data.',
+    providers:
+        'KicksDB is connected for sneaker and streetwear pricing where a trusted market match is found.',
+    examples: ['Nike', 'Jordan', 'StockX-backed comps'],
+    icon: Icons.directions_walk_outlined,
+    assetPath: PackLoxAssets.categoryFigures,
+    color: HomeTokens.categoryFigures,
+  ),
+];
 
 class _HomeActionStack extends StatelessWidget {
   const _HomeActionStack({required this.actions});
@@ -536,6 +1029,24 @@ class _HomeViewData {
   bool get hasStateAlert => hasPartialValuation;
   CollectibleItem? get mostRecentItem =>
       recentItems.isEmpty ? null : recentItems.first;
+  List<_CategoryCount> get topCategories {
+    final counts = <String, int>{};
+    for (final item in items) {
+      final label = item.category.trim().isEmpty
+          ? 'Uncategorised'
+          : item.category;
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) {
+        final countCompare = b.value.compareTo(a.value);
+        return countCompare == 0 ? a.key.compareTo(b.key) : countCompare;
+      });
+    return [
+      for (final entry in sorted.take(3))
+        _CategoryCount(entry.key, entry.value),
+    ];
+  }
 
   factory _HomeViewData.fromInsights(CollectorDashboardAnalytics insights) {
     final items = insights.items;
@@ -561,10 +1072,40 @@ void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
   ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
 }
 
+void _openCategoryOverview(
+  BuildContext context,
+  _SupportedCategory category, {
+  VoidCallback? onScanPressed,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => _CategoryOverviewScreen(
+        category: category,
+        onScanPressed: onScanPressed,
+      ),
+    ),
+  );
+}
+
 bool _hasDisplayValue(CollectibleItem item) {
   return item.estimatedValue > 0 ||
       item.valuationStatus == ValuationStatus.marketEstimated ||
       item.valuationStatus == ValuationStatus.aiEstimated;
+}
+
+String _valueLabelFor(CollectibleItem item) {
+  if (!_hasDisplayValue(item)) {
+    return 'No price';
+  }
+  return _formatCurrency(item.estimatedValue);
+}
+
+String _confidenceLabel(CollectibleItem item) {
+  final confidence = (item.confidence * 100).round().clamp(0, 100);
+  if (confidence <= 0) {
+    return 'Confidence pending';
+  }
+  return 'Confidence $confidence%';
 }
 
 String _formatCurrency(double value) {

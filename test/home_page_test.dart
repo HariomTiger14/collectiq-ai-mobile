@@ -38,10 +38,43 @@ void main() {
     expect(find.byKey(const ValueKey('home-authority-hero')), findsOneWidget);
     expect(find.text('Know what your collection is worth'), findsOneWidget);
     expect(find.text('Scan next item'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-category-explorer')),
+    );
+    expect(find.text('Supported categories'), findsOneWidget);
+    expect(find.text('Cards'), findsOneWidget);
+    expect(find.text('Pokémon'), findsOneWidget);
+    expect(find.text('MTG'), findsOneWidget);
+    expect(find.text('Yu-Gi-Oh'), findsOneWidget);
+    expect(find.text('One Piece'), findsOneWidget);
+    expect(find.text('Video Games'), findsOneWidget);
+    expect(find.text('Sneakers'), findsOneWidget);
+    expect(find.text('Comics'), findsOneWidget);
+    expect(find.text('LEGO'), findsOneWidget);
+    expect(find.text('Funko'), findsOneWidget);
+    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('Sports'), findsOneWidget);
+    expect(find.text('Watches'), findsNothing);
+    expect(find.text('Toys'), findsNothing);
+    expect(find.text('Memorabilia'), findsNothing);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-recent-items-preview')),
+    );
+    expect(find.text('Recent items'), findsOneWidget);
+    expect(find.text('Premium Charizard'), findsWidgets);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-insights-preview')),
+    );
     expect(find.text('Collection value'), findsOneWidget);
     expect(find.text('\$2,275'), findsOneWidget);
-    expect(find.text('Collection items'), findsOneWidget);
-    expect(find.text('5'), findsOneWidget);
+    expect(find.text('Top category'), findsOneWidget);
+    expect(find.text('Collection health'), findsOneWidget);
     await _scrollUntilVisible(
       tester,
       find.byKey(const ValueKey('home-action-scan-collectible')),
@@ -78,49 +111,82 @@ void main() {
       expect(find.text('Add first item'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('home-action-start-first-item')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('home-action-guided-scan')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(
-        find.byKey(const ValueKey('home-action-supported-categories')),
-        findsOneWidget,
-      );
-      final firstItemChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-start-first-item-chevron')),
-      );
-      expect(firstItemChevron.color, const Color(0xFF8BC7FF));
-      final guidedScanChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-guided-scan-chevron')),
-      );
-      expect(guidedScanChevron.color, const Color(0xFF8BC7FF));
-      final categoriesChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
-      );
-      expect(categoriesChevron.color, HomeTokens.textSecondary);
-      expect(find.text('Collection value'), findsNothing);
-      expect(find.text('Collection items'), findsNothing);
-      expect(find.text('\$0'), findsNothing);
-      expect(find.text('REPRESENTATIVE DESIGN DATA'), findsNothing);
-      expect(find.text('READY FOR REVIEW / NOT FROZEN'), findsNothing);
-      expect(find.text('HOME FLOW AUTHORITY'), findsNothing);
-      expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
-
       await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
       await tester.pump();
 
       expect(scanTaps, 1);
+      expect(
+        find.byKey(const ValueKey('home-floating-scan-button')),
+        findsOneWidget,
+      );
 
       await _scrollUntilVisible(
         tester,
-        find.byKey(const ValueKey('home-action-guided-scan')),
+        find.byKey(const ValueKey('home-section-category-explorer')),
       );
-      await tester.tap(find.byKey(const ValueKey('home-action-guided-scan')));
+      expect(
+        find.byKey(const ValueKey('home-section-category-explorer')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-popular-category-pokémon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-recent-items-preview')),
+      );
+      expect(find.text('No items yet'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('home-action-recent-items-empty')),
+      );
       await tester.pump();
-
       expect(scanTaps, 2);
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-insights-preview')),
+      );
+      expect(find.text('Collection value'), findsOneWidget);
+      expect(find.text('Pending'), findsWidgets);
+      expect(find.text('\$0'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-recent-items-empty-chevron')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      expect(find.text('REPRESENTATIVE DESIGN DATA'), findsNothing);
+      expect(find.text('READY FOR REVIEW / NOT FROZEN'), findsNothing);
+      expect(find.text('HOME FLOW AUTHORITY'), findsNothing);
+      expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
     },
   );
 
@@ -146,17 +212,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 120));
 
       expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-insights-preview')),
+      );
       expect(find.text('\$50'), findsOneWidget);
-      expect(find.text('2'), findsOneWidget);
       expect(find.text('1 valued'), findsOneWidget);
       final valueSupportingText = tester.widget<Text>(
         find.byKey(const ValueKey('home-metric-supporting-collection-value')),
       );
-      expect(valueSupportingText.style?.color, HomeTokens.warning);
-      final itemSupportingText = tester.widget<Text>(
-        find.byKey(const ValueKey('home-metric-supporting-collection-items')),
+      expect(valueSupportingText.style?.color, HomeTokens.positive);
+      final healthSupportingText = tester.widget<Text>(
+        find.byKey(const ValueKey('home-metric-supporting-collection-health')),
       );
-      expect(itemSupportingText.style?.color, HomeTokens.positive);
+      expect(healthSupportingText.style?.color, HomeTokens.warning);
       await _scrollUntilVisible(
         tester,
         find.byKey(const ValueKey('home-action-partial-valuation')),
@@ -185,11 +254,16 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.text('Collection items'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('Collection value'), findsNothing);
-    expect(find.text('\$0'), findsNothing);
     expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-insights-preview')),
+    );
+    expect(find.text('Collection health'), findsOneWidget);
+    expect(find.text('1 pending'), findsOneWidget);
+    expect(find.text('Collection value'), findsOneWidget);
+    expect(find.text('Pending'), findsWidgets);
+    expect(find.text('\$0'), findsNothing);
   });
 
   testWidgets('loading state renders v0.3 skeletons without sample values', (
@@ -340,6 +414,10 @@ void main() {
       find.byKey(const ValueKey('home-preview-scenario-picker')),
       findsNothing,
     );
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-insights-preview')),
+    );
     expect(find.text('Collection value'), findsOneWidget);
     expect(find.text('\$2,275'), findsOneWidget);
     expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
@@ -375,6 +453,11 @@ void main() {
     );
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.guest));
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('home-scroll-position')),
+      const Offset(0, 900),
+    );
     await tester.pump(const Duration(milliseconds: 120));
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });

@@ -149,7 +149,7 @@ class _AppShellState extends ConsumerState<AppShell>
       await ref.read(portfolioControllerProvider.notifier).loadItems();
       await ref
           .read(portfolioControllerProvider.notifier)
-          .syncPendingCloudItems();
+          .syncCloudPortfolioNow();
       await ref.read(syncControllerProvider.notifier).loadStatus();
       unawaited(
         ref
@@ -206,7 +206,7 @@ class _AppShellState extends ConsumerState<AppShell>
       return;
     }
 
-    await ref.read(portfolioControllerProvider.notifier).loadItems();
+    await ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow();
     if (!mounted) {
       return;
     }

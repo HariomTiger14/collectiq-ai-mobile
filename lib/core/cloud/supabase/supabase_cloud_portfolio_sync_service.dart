@@ -392,6 +392,7 @@ CollectibleItem? itemFromSupabaseRow(Map<String, dynamic> row) {
       );
       return CollectibleItem.fromJson({
         ...typedRawJson,
+        ..._valuationOverridesFromSupabaseRow(typedRawJson, row),
         'id': row['id'] ?? typedRawJson['id'],
         'imageStoragePath':
             row['image_storage_path'] ?? typedRawJson['imageStoragePath'],
@@ -425,6 +426,62 @@ CollectibleItem? itemFromSupabaseRow(Map<String, dynamic> row) {
   } on Object {
     return null;
   }
+}
+
+Map<String, dynamic> _valuationOverridesFromSupabaseRow(
+  Map<String, dynamic> rawJson,
+  Map<String, dynamic> row,
+) {
+  final lowEstimate = _number(row['estimated_value_low'])?.toDouble();
+  final highEstimate = _number(row['estimated_value_high'])?.toDouble();
+  final rowValue = highEstimate ?? lowEstimate;
+  if (rowValue == null || rowValue <= 0) {
+    return const {};
+  }
+
+  final rawValue = _number(rawJson['estimatedValue'])?.toDouble() ?? 0;
+  final rawStatus = ValuationStatus.fromJson(rawJson['valuationStatus']);
+  final rawPricing = rawJson['pricing'] is Map
+      ? (rawJson['pricing'] as Map).map(
+          (key, value) => MapEntry(key.toString(), value),
+        )
+      : <String, dynamic>{};
+  final pricingValue =
+      _number(rawPricing['estimatedMarketValue'])?.toDouble() ?? 0;
+  final hasDisplayableRawValue =
+      rawStatus == ValuationStatus.marketEstimated ||
+      rawStatus == ValuationStatus.aiEstimated;
+
+  if (hasDisplayableRawValue && (rawValue > 0 || pricingValue > 0)) {
+    return const {};
+  }
+
+  final estimatedValue = pricingValue > 0
+      ? pricingValue
+      : rawValue > 0
+      ? rawValue
+      : rowValue;
+  final pricingSource =
+      rawPricing['pricingSource'] ?? rawJson['valuationSource'];
+
+  return {
+    'estimatedValue': estimatedValue,
+    'valuationStatus': ValuationStatus.marketEstimated.wireValue,
+    'valuationSource': pricingSource ?? 'synced_market_value',
+    'pricing': {
+      ...rawPricing,
+      'estimatedMarketValue': estimatedValue,
+      'lowEstimate': lowEstimate ?? rawPricing['lowEstimate'] ?? estimatedValue,
+      'highEstimate':
+          highEstimate ?? rawPricing['highEstimate'] ?? estimatedValue,
+      'currency': rawPricing['currency'] ?? 'AUD',
+      'pricingSource': pricingSource ?? 'Synced market value',
+      'pricingConfidence': rawPricing['pricingConfidence'] ?? 0,
+      'lastUpdated': rawPricing['lastUpdated'],
+      'valuationStatus': ValuationStatus.marketEstimated.wireValue,
+      'valuationSource': pricingSource ?? 'synced_market_value',
+    },
+  };
 }
 
 int? _parseYear(String? value) {

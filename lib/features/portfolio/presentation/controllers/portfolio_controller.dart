@@ -283,6 +283,23 @@ class PortfolioController extends Notifier<PortfolioState> {
     await _syncPendingCloudItems();
   }
 
+  /// Pulls signed-in cloud portfolio items into the local portfolio cache.
+  Future<int> syncCloudPortfolioNow() async {
+    try {
+      final mergedCount = await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).syncNow();
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+      return mergedCount;
+    } catch (_) {
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+      return 0;
+    }
+  }
+
   Future<void> _syncPendingCloudItems() async {
     try {
       await CloudPortfolioSyncCoordinator(
