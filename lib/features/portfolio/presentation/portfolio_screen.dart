@@ -11,6 +11,7 @@ import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_a
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -273,6 +274,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     if (widget.qaSearchPreview == PortfolioSearchPreview.filterEmpty) {
       _categoryFilter = _PortfolioCategoryFilter.other;
     }
+    // One-shot focus intent from another surface (e.g. the Home "N items need
+    // a valuation" strip) — open pre-filtered to "Needs value". Read the value
+    // here (mutating a provider during initState is not allowed); it is cleared
+    // in the post-frame callback below so it fires only once.
+    final focus = ref.read(portfolioFocusProvider);
+    if (focus == PortfolioFocus.needsValuation) {
+      _statusFilter = _PortfolioStatusFilter.pending;
+    }
     _scrollController = ScrollController(
       initialScrollOffset: widget.qaInitialScrollOffset,
       keepScrollOffset: false,
@@ -280,6 +289,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
+      }
+      // Consume the one-shot focus intent now that we're past build.
+      if (focus != null) {
+        ref.read(portfolioFocusProvider.notifier).clear();
       }
       ref.read(portfolioControllerProvider.notifier).ensureLoaded();
       if (widget.previewScenario == null) {

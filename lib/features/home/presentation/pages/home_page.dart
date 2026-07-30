@@ -10,6 +10,7 @@ import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboa
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -401,7 +402,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                       topPadding: AppSpacing.lg,
                       child: _AttentionStrip(
                         data: homeData,
-                        onTap: widget.onPortfolioPressed,
+                        onTap: widget.onPortfolioPressed == null
+                            ? null
+                            : () {
+                                if (homeData.unvaluedCount > 0) {
+                                  ref
+                                      .read(portfolioFocusProvider.notifier)
+                                      .request(PortfolioFocus.needsValuation);
+                                }
+                                widget.onPortfolioPressed!();
+                              },
                       ),
                     ),
                   if (homeData.hasMovers)
@@ -432,21 +442,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                     topPadding: AppSpacing.xl,
                     child: _CollectionHealthSection(data: homeData),
                   ),
-                  HomeSection(
-                    topPadding: AppSpacing.xl,
-                    child: _HomeActionStack(
-                      actions: [
-                        HomeActionRow(
-                          keySeed: 'market-insights',
-                          icon: Icons.trending_up_rounded,
-                          title: 'Market insights',
-                          subtitle: homeData.hasValuedItems
-                              ? 'Review recent changes across your collection.'
-                              : 'Add valuations before insights appear.',
-                          iconColor: HomeTokens.categoryFigures,
-                          onTap: widget.onPortfolioPressed,
-                        ),
-                        if (homeData.mostRecentItem != null)
+                  if (homeData.mostRecentItem != null)
+                    HomeSection(
+                      topPadding: AppSpacing.xl,
+                      child: _HomeActionStack(
+                        actions: [
                           HomeActionRow(
                             keySeed: 'recent-scan',
                             icon: Icons.monitor_heart_outlined,
@@ -458,9 +458,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                               homeData.mostRecentItem!,
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   const HomeSection(
                     topPadding: AppSpacing.xl,
                     bottomPadding: AppSpacing.xxl,
@@ -488,9 +488,9 @@ String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
   }
   if (data.hasPartialValuation) {
     if (data.hasValuedItems) {
-      return '${data.valuedItemCount} of ${data.itemCount} items have a trusted value.';
+      return 'Here\'s how your collection is tracking.';
     }
-    return '${data.itemCount} saved ${data.itemCount == 1 ? 'item needs' : 'items need'} a trusted value.';
+    return 'Add a valuation to start tracking value.';
   }
   return 'All ${data.itemCount} ${data.itemCount == 1 ? 'item is' : 'items are'} valued and protected.';
 }
@@ -643,7 +643,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
               ),
               if (review > 0)
                 Text(
-                  '$review need review',
+                  '$review need value',
                   style: textTheme.labelMedium?.copyWith(
                     color: HomeTokens.warning,
                     fontWeight: FontWeight.w900,

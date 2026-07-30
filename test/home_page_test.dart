@@ -30,7 +30,10 @@ void main() {
     expect(find.byKey(const ValueKey('home-brand-wordmark')), findsOneWidget);
     expect(find.text('Pack  Lox'), findsNothing);
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('3 of 5 items have a trusted value.'), findsOneWidget);
+    expect(
+      find.text('Here\'s how your collection is tracking.'),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('home-portfolio-value-hero')),
       findsOneWidget,
@@ -38,7 +41,7 @@ void main() {
     expect(find.text('Portfolio value'), findsOneWidget);
     expect(find.text('\$2,275'), findsOneWidget);
     expect(find.text('3 of 5 items trusted'), findsOneWidget);
-    expect(find.text('2 need review'), findsOneWidget);
+    expect(find.text('2 need value'), findsOneWidget);
     expect(find.text('Review portfolio'), findsOneWidget);
     // No persisted value history yet, so the trend chart + period tabs are not
     // shown and the card reports the building-history state.
@@ -82,7 +85,7 @@ void main() {
     expect(find.text('Cards'), findsWidgets);
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-market-insights')),
+      find.byKey(const ValueKey('home-action-recent-scan')),
     );
     expect(
       find.byKey(const ValueKey('home-action-scan-collectible')),
@@ -90,7 +93,7 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('home-action-market-insights')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('home-action-recent-scan')),
@@ -448,11 +451,10 @@ void main() {
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.guest));
     await tester.pump(const Duration(milliseconds: 120));
-    await tester.drag(
-      find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, 900),
+    await _scrollUntilVisible(
+      tester,
+      find.text('Your collection is waiting'),
     );
-    await tester.pump(const Duration(milliseconds: 120));
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 }
@@ -486,7 +488,11 @@ Widget _previewHomeApp(HomePreviewScenario scenario) {
   return MaterialApp(
     theme: AppTheme.light,
     darkTheme: AppTheme.dark,
+    // Key per scenario so swapping scenarios recreates the HomePage state
+    // (fresh scroll controller at offset 0) rather than reusing the previous
+    // scenario's scroll position.
     home: HomePage(
+      key: ValueKey(scenario),
       previewScenario: scenario,
       onScanPressed: () {},
       onSampleScanPressed: () {},
