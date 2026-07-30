@@ -26,6 +26,7 @@ class HomeTokens {
   static const textMuted = Color(0xFF6F8295);
   static const positive = Color(0xFF00D88A);
   static const warning = Color(0xFFF4B740);
+  static const negative = Color(0xFFFF5C5C);
 
   static const pageGutter = 16.0;
   static const cardPadding = 14.0;
@@ -1218,6 +1219,7 @@ class HomeValueMetricCard extends StatelessWidget {
     required this.value,
     this.isUnavailable = false,
     this.changeLabel,
+    this.changeColor = HomeTokens.positive,
     this.trendValues = const [],
     super.key,
   });
@@ -1226,6 +1228,7 @@ class HomeValueMetricCard extends StatelessWidget {
   final String value;
   final bool isUnavailable;
   final String? changeLabel;
+  final Color changeColor;
   final List<double> trendValues;
 
   @override
@@ -1261,7 +1264,7 @@ class HomeValueMetricCard extends StatelessWidget {
             Text(
               changeLabel!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: HomeTokens.positive,
+                color: changeColor,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1326,6 +1329,101 @@ class _HomeSparklinePainter extends CustomPainter {
   }
 }
 
+class HomeSparkline extends StatelessWidget {
+  const HomeSparkline({
+    required this.values,
+    this.color = HomeTokens.accent,
+    this.height = 52,
+    super.key,
+  });
+
+  final List<double> values;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (values.length < 2) {
+      return SizedBox(height: height);
+    }
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _HomeAreaSparklinePainter(values: values, color: color),
+      ),
+    );
+  }
+}
+
+class _HomeAreaSparklinePainter extends CustomPainter {
+  const _HomeAreaSparklinePainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) {
+      return;
+    }
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final span = maxValue - minValue;
+    const topInset = 6.0;
+    const bottomInset = 4.0;
+    final usableHeight = size.height - topInset - bottomInset;
+    final points = <Offset>[];
+    for (var i = 0; i < values.length; i++) {
+      final x = size.width * i / (values.length - 1);
+      final normalized = span == 0 ? 0.5 : (values[i] - minValue) / span;
+      final y = topInset + usableHeight * (1 - normalized);
+      points.add(Offset(x, y));
+    }
+
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      linePath.lineTo(point.dx, point.dy);
+    }
+
+    final fillPath = Path.from(linePath)
+      ..lineTo(points.last.dx, size.height)
+      ..lineTo(points.first.dx, size.height)
+      ..close();
+    canvas.drawPath(
+      fillPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0)],
+        ).createShader(Offset.zero & size),
+    );
+
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 2.5,
+    );
+
+    canvas.drawCircle(points.last, 3.5, Paint()..color = color);
+    canvas.drawCircle(
+      points.last,
+      6,
+      Paint()..color = color.withValues(alpha: 0.22),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HomeAreaSparklinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
+  }
+}
+
 enum HomeCategoryKind { cards, coins, figures, more }
 
 class HomeCategoryTile extends StatelessWidget {
@@ -1343,7 +1441,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Cards',
       icon: Icons.style_outlined,
-      assetPath: PackLoxAssets.categoryCards,
+      assetPath: PackLoxAssets.categoryColorCards,
       semanticMeaning: 'trading cards',
       iconColor: HomeTokens.categoryCards,
       onTap: onTap,
@@ -1354,7 +1452,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Coins',
       icon: Icons.album_outlined,
-      assetPath: PackLoxAssets.categoryCoins,
+      assetPath: PackLoxAssets.categoryColorCoins,
       semanticMeaning: 'collectible coins and medallions',
       iconColor: HomeTokens.categoryCoins,
       onTap: onTap,
@@ -1365,7 +1463,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'Figures',
       icon: Icons.smart_toy_outlined,
-      assetPath: PackLoxAssets.categoryFigures,
+      assetPath: PackLoxAssets.categoryColorFunko,
       semanticMeaning: 'figurines and action figures',
       iconColor: HomeTokens.categoryFigures,
       onTap: onTap,
@@ -1376,7 +1474,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'More',
       icon: Icons.grid_view_outlined,
-      assetPath: PackLoxAssets.categoryMore,
+      assetPath: PackLoxAssets.categoryColorLego,
       semanticMeaning: 'more categories grid',
       iconColor: HomeTokens.categoryMore,
       onTap: onTap,
@@ -1412,16 +1510,14 @@ class HomeCategoryTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset(
+              _CategoryTileArtwork(
                 key: ValueKey(
                   'home-popular-category-${label.toLowerCase()}-icon',
                 ),
-                assetPath,
-                width: 30,
-                height: 30,
-                colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                assetPath: assetPath,
+                iconColor: iconColor,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 label,
                 maxLines: 1,
@@ -1435,6 +1531,55 @@ class HomeCategoryTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CategoryTileArtwork extends StatelessWidget {
+  const _CategoryTileArtwork({
+    required this.assetPath,
+    required this.iconColor,
+    super.key,
+  });
+
+  final String assetPath;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    if (assetPath.endsWith('.svg')) {
+      return SizedBox(
+        width: 44,
+        height: 44,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: iconColor.withValues(alpha: 0.16),
+                blurRadius: 18,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: SvgPicture.asset(assetPath, fit: BoxFit.contain),
+        ),
+      );
+    }
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: iconColor.withValues(alpha: 0.18),
+            blurRadius: 18,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Image.asset(assetPath, fit: BoxFit.contain),
     );
   }
 }

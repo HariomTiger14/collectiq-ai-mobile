@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Adventure card</title>
+  <defs>
+    <linearGradient id="frame" x1="16" y1="8" x2="48" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/><stop offset=".5" stop-color="#FACC15"/><stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="20" y1="20" x2="45" y2="41" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/><stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="18" ry="5" fill="#020617" opacity=".42"/>
+  <rect x="17" y="10" width="30" height="42" rx="6" fill="#10243A" stroke="url(#frame)" stroke-width="3"/>
+  <path d="M22 28c6-5 13 5 21 0v15H22V28Z" fill="url(#sea)"/>
+  <path d="M25 33c4-2.5 9 2.5 15 0" stroke="#BAE6FD" stroke-width="2" stroke-linecap="round"/>
+  <path d="M32 17l6 9H26l6-9Z" fill="#FACC15"/>
+  <circle cx="42" cy="18" r="4" fill="#EF4444"/>
+</svg>

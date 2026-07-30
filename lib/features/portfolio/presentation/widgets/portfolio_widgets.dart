@@ -944,11 +944,31 @@ class _PortfolioImagePlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Center(
-      child: Icon(
-        Icons.image_not_supported_outlined,
-        color: colorScheme.primary,
-        size: 32,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.18),
+            colorScheme.primary.withValues(alpha: 0.04),
+          ],
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final iconSize = (constraints.biggest.shortestSide * 0.4).clamp(
+            16.0,
+            44.0,
+          );
+          return Center(
+            child: Icon(
+              Icons.inventory_2_outlined,
+              color: colorScheme.primary.withValues(alpha: 0.72),
+              size: iconSize,
+            ),
+          );
+        },
       ),
     );
   }

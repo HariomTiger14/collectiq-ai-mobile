@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Trading cards</title>
+  <defs>
+    <linearGradient id="cardA" x1="16" y1="9" x2="44" y2="50" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/><stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="cardB" x1="23" y1="13" x2="48" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/><stop offset=".55" stop-color="#BAE6FD"/><stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="24" y1="15" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".9"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".08"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="33" cy="53" rx="20" ry="5" fill="#020617" opacity=".45"/>
+  <rect x="14" y="12" width="28" height="40" rx="5" transform="rotate(-9 14 12)" fill="url(#cardA)"/>
+  <rect x="20" y="10" width="30" height="42" rx="6" transform="rotate(7 20 10)" fill="#10233A"/>
+  <rect x="24" y="15" width="22" height="31" rx="4" transform="rotate(7 24 15)" fill="url(#cardB)"/>
+  <circle cx="35" cy="29" r="7" fill="#0284C7"/>
+  <path d="M28 39c5-6 9-3 14-10l2 13-17-2Z" fill="#7DD3FC"/>
+  <path d="M27 17 44 19" stroke="url(#shine)" stroke-width="2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Creature card</title>
+  <defs>
+    <linearGradient id="frame" x1="16" y1="8" x2="48" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE047"/><stop offset=".45" stop-color="#38BDF8"/><stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="art" x1="21" y1="17" x2="43" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FEF3C7"/><stop offset=".6" stop-color="#7DD3FC"/><stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="18" ry="5" fill="#020617" opacity=".42"/>
+  <rect x="17" y="9" width="30" height="43" rx="6" transform="rotate(-4 17 9)" fill="url(#frame)"/>
+  <rect x="21" y="16" width="21" height="26" rx="4" transform="rotate(-4 21 16)" fill="url(#art)"/>
+  <path d="M31 20c5 0 9 4 9 9s-4 9-9 9-9-4-9-9 4-9 9-9Z" fill="#FACC15"/>
+  <path d="M25 30c4-7 8-7 13 0" stroke="#0F172A" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="28" cy="28" r="1.8" fill="#0F172A"/><circle cx="35" cy="28" r="1.8" fill="#0F172A"/>
+  <path d="M23 45h18" stroke="#F8FAFC" stroke-width="2.2" stroke-linecap="round" opacity=".86"/>
+</svg>

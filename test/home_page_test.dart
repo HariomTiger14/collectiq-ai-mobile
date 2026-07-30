@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
-import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -31,13 +30,20 @@ void main() {
     expect(find.byKey(const ValueKey('home-brand-wordmark')), findsOneWidget);
     expect(find.text('Pack  Lox'), findsNothing);
     expect(find.text('Home'), findsOneWidget);
+    expect(find.text('3 of 5 items have a trusted value.'), findsOneWidget);
     expect(
-      find.text('Some collection values are still pending.'),
+      find.byKey(const ValueKey('home-portfolio-value-hero')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('home-authority-hero')), findsOneWidget);
-    expect(find.text('Know what your collection is worth'), findsOneWidget);
-    expect(find.text('Scan next item'), findsOneWidget);
+    expect(find.text('Portfolio value'), findsOneWidget);
+    expect(find.text('\$2,275'), findsOneWidget);
+    expect(find.text('3 of 5 items trusted'), findsOneWidget);
+    expect(find.text('2 need review'), findsOneWidget);
+    expect(find.text('Review portfolio'), findsOneWidget);
+    // No persisted value history yet, so the trend chart + period tabs are not
+    // shown and the card reports the building-history state.
+    expect(find.text('Building value history'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-value-hero-trend')), findsNothing);
 
     await _scrollUntilVisible(
       tester,
@@ -69,19 +75,18 @@ void main() {
 
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-section-insights-preview')),
+      find.byKey(const ValueKey('home-section-collection-health')),
     );
-    expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$2,275'), findsOneWidget);
-    expect(find.text('Top category'), findsOneWidget);
     expect(find.text('Collection health'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
+    expect(find.text('Cards'), findsWidgets);
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-scan-collectible')),
+      find.byKey(const ValueKey('home-action-market-insights')),
     );
     expect(
       find.byKey(const ValueKey('home-action-scan-collectible')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('home-action-market-insights')),
@@ -214,27 +219,19 @@ void main() {
       expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
       await _scrollUntilVisible(
         tester,
-        find.byKey(const ValueKey('home-section-insights-preview')),
-      );
-      expect(find.text('\$50'), findsOneWidget);
-      expect(find.text('1 valued'), findsOneWidget);
-      final valueSupportingText = tester.widget<Text>(
-        find.byKey(const ValueKey('home-metric-supporting-collection-value')),
-      );
-      expect(valueSupportingText.style?.color, HomeTokens.positive);
-      final healthSupportingText = tester.widget<Text>(
-        find.byKey(const ValueKey('home-metric-supporting-collection-health')),
-      );
-      expect(healthSupportingText.style?.color, HomeTokens.warning);
-      await _scrollUntilVisible(
-        tester,
-        find.byKey(const ValueKey('home-action-partial-valuation')),
+        find.byKey(const ValueKey('home-surface-attention-strip')),
       );
       expect(
-        find.byKey(const ValueKey('home-action-partial-valuation')),
+        find.byKey(const ValueKey('home-surface-attention-strip')),
         findsOneWidget,
       );
-      expect(find.text('1 item needs a real valuation.'), findsOneWidget);
+      expect(find.text('1 item needs a valuation'), findsOneWidget);
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-collection-health')),
+      );
+      expect(find.text('Collection health'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
       expect(find.text('Value unavailable'), findsNothing);
     },
   );
@@ -257,12 +254,10 @@ void main() {
     expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-section-insights-preview')),
+      find.byKey(const ValueKey('home-section-collection-health')),
     );
     expect(find.text('Collection health'), findsOneWidget);
-    expect(find.text('1 pending'), findsOneWidget);
-    expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('Pending'), findsWidgets);
+    expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
     expect(find.text('\$0'), findsNothing);
   });
 
@@ -416,10 +411,9 @@ void main() {
     );
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-section-insights-preview')),
+      find.byKey(const ValueKey('home-section-collection-health')),
     );
-    expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$2,275'), findsOneWidget);
+    expect(find.text('Collection health'), findsOneWidget);
     expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.loading));
@@ -445,10 +439,10 @@ void main() {
     expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-partial-valuation')),
+      find.byKey(const ValueKey('home-surface-attention-strip')),
     );
     expect(
-      find.byKey(const ValueKey('home-action-partial-valuation')),
+      find.byKey(const ValueKey('home-surface-attention-strip')),
       findsOneWidget,
     );
 

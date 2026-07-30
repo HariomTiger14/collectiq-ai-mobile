@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Duel card</title>
+  <defs>
+    <linearGradient id="frame" x1="16" y1="8" x2="49" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FB7185"/><stop offset=".45" stop-color="#F97316"/><stop offset="1" stop-color="#7C2D12"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="27" y1="18" x2="41" y2="39" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE68A"/><stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="18" ry="5" fill="#020617" opacity=".42"/>
+  <path d="M20 9h25l4 7v36H16V16l4-7Z" fill="url(#frame)"/>
+  <path d="M21 18h22v29H21V18Z" fill="#1F1020" opacity=".78"/>
+  <path d="M32 18l8 11-8 11-8-11 8-11Z" fill="url(#gem)"/>
+  <path d="M23 16h20M23 47h20" stroke="#FED7AA" stroke-width="2" stroke-linecap="round"/>
+  <path d="M32 22v14M26 29h12" stroke="#FFF7ED" stroke-width="1.8" stroke-linecap="round" opacity=".78"/>
+</svg>

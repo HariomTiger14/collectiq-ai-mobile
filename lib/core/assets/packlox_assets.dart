@@ -22,6 +22,46 @@ class PackLoxAssets {
       'assets/packlox/icons/categories/packlox_icon_category_figures_v1.svg';
   static const categoryMore =
       'assets/packlox/icons/categories/packlox_icon_category_more_v1.svg';
+  static const category3dCard =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_card_v1.png';
+  static const category3dCoin =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_coin_v1.png';
+  static const category3dComic =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_comic_v1.png';
+  static const category3dGame =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_game_v1.png';
+  static const category3dItem =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_item_v1.png';
+  static const category3dShoe =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_shoe_v1.png';
+  static const category3dToy =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_toy_v1.png';
+  static const category3dWatch =
+      'assets/packlox/icons/categories/3d/packlox_category_placeholder_watch_v1.png';
+  static const categoryColorCards =
+      'assets/packlox/icons/categories/colorful/packlox_category_cards_v2.svg';
+  static const categoryColorPokemon =
+      'assets/packlox/icons/categories/colorful/packlox_category_pokemon_v2.svg';
+  static const categoryColorMtg =
+      'assets/packlox/icons/categories/colorful/packlox_category_mtg_v2.svg';
+  static const categoryColorYugioh =
+      'assets/packlox/icons/categories/colorful/packlox_category_yugioh_v2.svg';
+  static const categoryColorOnePiece =
+      'assets/packlox/icons/categories/colorful/packlox_category_one_piece_v2.svg';
+  static const categoryColorGames =
+      'assets/packlox/icons/categories/colorful/packlox_category_games_v2.svg';
+  static const categoryColorComics =
+      'assets/packlox/icons/categories/colorful/packlox_category_comics_v2.svg';
+  static const categoryColorLego =
+      'assets/packlox/icons/categories/colorful/packlox_category_lego_v2.svg';
+  static const categoryColorFunko =
+      'assets/packlox/icons/categories/colorful/packlox_category_funko_v2.svg';
+  static const categoryColorCoins =
+      'assets/packlox/icons/categories/colorful/packlox_category_coins_v2.svg';
+  static const categoryColorSports =
+      'assets/packlox/icons/categories/colorful/packlox_category_sports_v2.svg';
+  static const categoryColorSneakers =
+      'assets/packlox/icons/categories/colorful/packlox_category_sneakers_v2.svg';
 
   static const notificationBell =
       'assets/packlox/icons/actions/packlox_icon_notification_bell_v1.svg';
@@ -44,6 +84,26 @@ class PackLoxAssets {
     categoryCoins,
     categoryFigures,
     categoryMore,
+    category3dCard,
+    category3dCoin,
+    category3dComic,
+    category3dGame,
+    category3dItem,
+    category3dShoe,
+    category3dToy,
+    category3dWatch,
+    categoryColorCards,
+    categoryColorPokemon,
+    categoryColorMtg,
+    categoryColorYugioh,
+    categoryColorOnePiece,
+    categoryColorGames,
+    categoryColorComics,
+    categoryColorLego,
+    categoryColorFunko,
+    categoryColorCoins,
+    categoryColorSports,
+    categoryColorSneakers,
     notificationBell,
     portfolioDetailValuedItem,
     portfolioDetailPendingValuation,

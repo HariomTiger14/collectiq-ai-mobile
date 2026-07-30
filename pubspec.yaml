@@ -87,6 +87,7 @@ flutter:
     - assets/packlox/icons/categories/packlox_icon_category_coins_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_figures_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_more_v1.svg
+    - assets/packlox/icons/categories/colorful/
     - assets/packlox/icons/categories/3d/
     - assets/packlox/icons/navigation/packlox_icon_nav_home_v1.svg
     - assets/packlox/icons/navigation/packlox_icon_nav_portfolio_v1.svg

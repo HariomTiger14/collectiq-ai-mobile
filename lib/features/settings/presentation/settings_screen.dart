@@ -21,6 +21,8 @@ import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_comp
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
@@ -396,6 +398,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final count = await ref
           .read(portfolioControllerProvider.notifier)
           .seedDemoItems();
+      // Backfill ~30 days of value history so the Home trend/delta render now.
+      final portfolio = ref.read(portfolioControllerProvider);
+      await const DemoValueHistorySeedService().seed(
+        repository: ref.read(portfolioHistoryRepositoryProvider),
+        currentTotalValue: portfolio.totalValue,
+        itemCount: portfolio.itemCount,
+      );
       if (mounted) {
         _showSettingsSnackBar('Seeded $count demo/mock collectibles locally.');
       }
@@ -415,6 +424,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final count = await ref
           .read(portfolioControllerProvider.notifier)
           .clearDemoItems();
+      await const DemoValueHistorySeedService().clear(
+        ref.read(portfolioHistoryRepositoryProvider),
+      );
       if (mounted) {
         _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
       }

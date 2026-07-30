@@ -239,7 +239,7 @@ void main() {
   testWidgets('Recent item renders missing-image fallback', (tester) async {
     await tester.pumpHomeComponent(_recentItem(imagePath: ''));
 
-    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
   });
 
   testWidgets('Recent item keeps unavailable value unavailable', (
