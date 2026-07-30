@@ -119,27 +119,23 @@ void main() {
   });
 
   testWidgets(
-    'collection snapshot shows real count value and top collectible',
+    'portfolio valuation card consolidates value, trend, and review trust',
     (tester) async {
       await tester.pumpWidget(_homeApp());
       await tester.pumpAndSettle();
 
-      await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+      await _scrollUntilVisible(tester, find.text('Portfolio value'));
 
-      expect(find.text('Collection snapshot'), findsOneWidget);
-      expect(find.text('\$2,275 estimated value'), findsOneWidget);
-      expect(find.text('5 collectibles'), findsOneWidget);
-      expect(find.text('3 categories'), findsOneWidget);
-      expect(find.text('Top collectible'), findsOneWidget);
-      expect(find.text('Premium Charizard'), findsWidgets);
-
-      final topThumbnail = tester.widget<PortfolioThumbnail>(
-        find.descendant(
-          of: find.byKey(const ValueKey('home-top-collectible-home-test-card')),
-          matching: find.byType(PortfolioThumbnail),
-        ),
+      expect(
+        find.byKey(const ValueKey('home-portfolio-valuation-card')),
+        findsOneWidget,
       );
-      expect(topThumbnail.size, 72);
+      expect(find.text('Portfolio value'), findsOneWidget);
+      expect(find.text('Trusted pricing'), findsOneWidget);
+      expect(find.text('\$2,275'), findsOneWidget);
+      expect(find.text('3 of 5 items trusted'), findsOneWidget);
+      expect(find.text('2 need review'), findsOneWidget);
+      expect(find.text('Review 2 items'), findsOneWidget);
     },
   );
 
@@ -158,7 +154,7 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pumpAndSettle();
 
-    await _scrollUntilVisible(tester, find.text('Collection snapshot'));
+    await _scrollUntilVisible(tester, find.text('Portfolio value'));
 
     expect(find.text('Value unavailable'), findsWidgets);
     expect(find.text('\$0 estimated value'), findsNothing);
@@ -170,21 +166,8 @@ void main() {
     expect(find.byKey(const ValueKey('home-grounded-insight')), findsOneWidget);
   });
 
-  testWidgets('top collectible and recent rows open detail', (tester) async {
+  testWidgets('recent rows open detail', (tester) async {
     await tester.pumpWidget(_homeApp());
-    await tester.pumpAndSettle();
-
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-top-collectible-home-test-card')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('home-top-collectible-home-test-card')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(CollectibleDetailPage), findsOneWidget);
-    await tester.pageBack();
     await tester.pumpAndSettle();
 
     await _scrollUntilVisible(

@@ -93,7 +93,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     topPadding: AppSpacing.lg,
                     child: _CollectionSnapshotSection(
                       data: homeData,
+                      dailySnapshots: homeData.dailySnapshots,
                       onScanPressed: widget.onScanPressed,
+                      onReviewPressed: widget.onPortfolioPressed,
                     ),
                   ),
                 ),
@@ -142,6 +144,7 @@ class _HomeViewData {
     required this.lastScanAt,
     required this.topCollectible,
     required this.recentItems,
+    required this.dailySnapshots,
   });
 
   final List<CollectibleItem> items;
@@ -153,9 +156,14 @@ class _HomeViewData {
   final DateTime? lastScanAt;
   final CollectibleItem? topCollectible;
   final List<CollectibleItem> recentItems;
+  final List<TrendSnapshot> dailySnapshots;
 
   bool get isEmpty => itemCount == 0;
   bool get hasValuedItems => valuedItemCount > 0;
+
+  int get trustedPricingCount => items.where(_hasTrustedPricing).length;
+
+  int get needsReviewCount => itemCount - trustedPricingCount;
 
   String get heroSupport {
     if (isEmpty) {
@@ -212,6 +220,7 @@ class _HomeViewData {
       lastScanAt: insights.mostRecentItem?.createdAt,
       topCollectible: topCollectible,
       recentItems: items,
+      dailySnapshots: insights.dailySnapshots,
     );
   }
 }
@@ -523,177 +532,170 @@ class _SecondaryActionCard extends StatelessWidget {
 }
 
 class _CollectionSnapshotSection extends StatelessWidget {
-  const _CollectionSnapshotSection({required this.data, this.onScanPressed});
+  const _CollectionSnapshotSection({
+    required this.data,
+    required this.dailySnapshots,
+    this.onScanPressed,
+    this.onReviewPressed,
+  });
 
   final _HomeViewData data;
+  final List<TrendSnapshot> dailySnapshots;
   final VoidCallback? onScanPressed;
+  final VoidCallback? onReviewPressed;
 
   @override
   Widget build(BuildContext context) {
-    return _SectionSurface(
-      title: 'Collection snapshot',
-      child: data.isEmpty
-          ? _EmptySnapshot(onScanPressed: onScanPressed)
-          : _SnapshotContent(data: data),
-    );
+    return data.isEmpty
+        ? _SectionSurface(
+            title: 'Collection snapshot',
+            child: _EmptySnapshot(onScanPressed: onScanPressed),
+          )
+        : _PortfolioValuationCard(
+            data: data,
+            dailySnapshots: dailySnapshots,
+            onReviewPressed: onReviewPressed,
+          );
   }
 }
 
-class _SnapshotContent extends StatelessWidget {
-  const _SnapshotContent({required this.data});
+class _PortfolioValuationCard extends StatelessWidget {
+  const _PortfolioValuationCard({
+    required this.data,
+    required this.dailySnapshots,
+    this.onReviewPressed,
+  });
 
   final _HomeViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      data.itemMetric,
-      if (data.categoryMetric != null) data.categoryMetric!,
-      if (data.lastScanMetric != null) data.lastScanMetric!,
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          data.snapshotValue,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            for (final metric in metrics) _SnapshotPill(label: metric),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _TopCollectiblePreview(item: data.topCollectible),
-      ],
-    );
-  }
-}
-
-class _SnapshotPill extends StatelessWidget {
-  const _SnapshotPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _TopCollectiblePreview extends StatelessWidget {
-  const _TopCollectiblePreview({required this.item});
-
-  final CollectibleItem? item;
+  final List<TrendSnapshot> dailySnapshots;
+  final VoidCallback? onReviewPressed;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final trustedCount = data.trustedPricingCount;
+    final reviewCount = data.needsReviewCount;
+    final totalCount = data.itemCount;
+    final delta = _portfolioThirtyDayDelta(dailySnapshots);
+    final deltaColor = delta == null
+        ? colorScheme.onSurfaceVariant
+        : delta.absoluteChange >= 0
+        ? AppColors.success
+        : AppColors.danger;
 
-    if (item == null) {
-      return const SizedBox.shrink();
-    }
-
-    return MotionTapScale(
-      onTap: () => _openCollectibleDetail(context, item!),
+    return MotionReveal(
       child: Container(
-        key: ValueKey('home-top-collectible-${item!.id}'),
-        padding: const EdgeInsets.all(AppSpacing.md),
+        key: const ValueKey('home-portfolio-valuation-card'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.48),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.52),
           ),
+          boxShadow: AppElevation.level1,
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: PortfolioThumbnail(imagePath: item!.imagePath, size: 72),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Portfolio value',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const _TrustedPricingBadge(),
+              ],
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _hasDisplayValue(item!)
-                        ? 'Top collectible'
-                        : 'Latest collectible',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  data.hasValuedItems
+                      ? _formatCurrency(data.totalValuedAmount)
+                      : 'Value unavailable',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineMedium?.copyWith(
+                    color: data.hasValuedItems
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    item!.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w900,
-                      height: 1.12,
-                    ),
+                ),
+                Text(
+                  data.hasValuedItems
+                      ? (delta == null
+                            ? 'History building'
+                            : _formatDelta(delta))
+                      : 'Review needed',
+                  style: textTheme.titleSmall?.copyWith(
+                    color: deltaColor,
+                    fontWeight: FontWeight.w900,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    item!.category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              delta == null
+                  ? '30-day trend starts after enough daily snapshots'
+                  : 'past 30 days',
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Flexible(
-              child: Text(
-                _formatItemValue(item!),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: textTheme.titleSmall?.copyWith(
-                  color: _hasDisplayValue(item!)
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w900,
+            const SizedBox(height: AppSpacing.lg),
+            _PortfolioValueSparkline(snapshots: dailySnapshots),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$trustedCount of $totalCount items trusted',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$reviewCount need review',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: _warningAmber,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _TrustSegmentBar(
+              trustedCount: trustedCount,
+              reviewCount: reviewCount,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: reviewCount == 0 ? null : onReviewPressed,
+                icon: const Icon(Icons.rate_review_outlined),
+                label: Text(
+                  'Review $reviewCount ${reviewCount == 1 ? 'item' : 'items'}',
                 ),
               ),
             ),
@@ -702,6 +704,197 @@ class _TopCollectiblePreview extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TrustedPricingBadge extends StatelessWidget {
+  const _TrustedPricingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 14,
+            color: AppColors.success,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Trusted pricing',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.success,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioValueSparkline extends StatelessWidget {
+  const _PortfolioValueSparkline({required this.snapshots});
+
+  final List<TrendSnapshot> snapshots;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final ordered = [...snapshots]..sort((a, b) => a.date.compareTo(b.date));
+    final values = ordered
+        .map((snapshot) => snapshot.totalValue)
+        .toList(growable: false);
+
+    return Container(
+      height: 104,
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
+      ),
+      child: values.length < 2
+          ? Center(
+              child: Text(
+                'No value history yet',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : CustomPaint(
+              painter: _HomeSparklinePainter(
+                values: values,
+                color: colorScheme.primary,
+              ),
+            ),
+    );
+  }
+}
+
+class _TrustSegmentBar extends StatelessWidget {
+  const _TrustSegmentBar({
+    required this.trustedCount,
+    required this.reviewCount,
+  });
+
+  final int trustedCount;
+  final int reviewCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final total = trustedCount + reviewCount;
+    final trustedFlex = total == 0 ? 1 : trustedCount.clamp(0, total);
+    final reviewFlex = total == 0 ? 1 : reviewCount.clamp(0, total);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Container(
+        height: 12,
+        color: colorScheme.outlineVariant.withValues(alpha: 0.32),
+        child: Row(
+          children: [
+            if (trustedFlex > 0)
+              Expanded(
+                flex: trustedFlex,
+                child: Container(color: AppColors.success),
+              ),
+            if (reviewFlex > 0)
+              Expanded(
+                flex: reviewFlex,
+                child: Container(color: _warningAmber),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeSparklinePainter extends CustomPainter {
+  const _HomeSparklinePainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) {
+      return;
+    }
+
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final span = maxValue - minValue;
+    final points = <Offset>[];
+    for (var index = 0; index < values.length; index++) {
+      final x = values.length == 1
+          ? size.width / 2
+          : size.width * index / (values.length - 1);
+      final normalized = span == 0 ? 0.5 : (values[index] - minValue) / span;
+      final y = size.height - (size.height * normalized);
+      points.add(Offset(x, y.clamp(6, size.height - 6)));
+    }
+
+    final fillPath = Path()
+      ..moveTo(points.first.dx, size.height)
+      ..lineTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      fillPath.lineTo(point.dx, point.dy);
+    }
+    fillPath
+      ..lineTo(points.last.dx, size.height)
+      ..close();
+
+    canvas.drawPath(fillPath, Paint()..color = color.withValues(alpha: 0.12));
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke,
+    );
+
+    canvas.drawCircle(points.last, 4, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HomeSparklinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
+  }
+}
+
+class _ThirtyDayDelta {
+  const _ThirtyDayDelta({
+    required this.absoluteChange,
+    required this.percentageChange,
+  });
+
+  final double absoluteChange;
+  final double percentageChange;
 }
 
 class _EmptySnapshot extends StatelessWidget {
@@ -965,6 +1158,54 @@ class _SectionSurface extends StatelessWidget {
     );
   }
 }
+
+_ThirtyDayDelta? _portfolioThirtyDayDelta(List<TrendSnapshot> snapshots) {
+  if (snapshots.length < 2) {
+    return null;
+  }
+  final ordered = [...snapshots]..sort((a, b) => a.date.compareTo(b.date));
+  final latest = ordered.last;
+  final cutoff = latest.date.subtract(const Duration(days: 30));
+  TrendSnapshot? baseline;
+  for (final snapshot in ordered) {
+    if (!snapshot.date.isAfter(cutoff)) {
+      baseline = snapshot;
+    }
+  }
+  baseline ??= ordered.first;
+  if (baseline.date == latest.date) {
+    return null;
+  }
+  final previousValue = baseline.totalValue;
+  final absoluteChange = latest.totalValue - previousValue;
+  final percentageChange = previousValue == 0
+      ? (latest.totalValue == 0 ? 0.0 : 1.0)
+      : absoluteChange / previousValue;
+  return _ThirtyDayDelta(
+    absoluteChange: absoluteChange,
+    percentageChange: percentageChange,
+  );
+}
+
+String _formatDelta(_ThirtyDayDelta delta) {
+  final percent = (delta.percentageChange.abs() * 100).toStringAsFixed(1);
+  return '${_formatSignedCurrency(delta.absoluteChange)} · $percent%';
+}
+
+String _formatSignedCurrency(double value) {
+  if (value == 0) {
+    return '\$0';
+  }
+  final prefix = value > 0 ? '+' : '-';
+  return '$prefix${_formatCurrency(value.abs())}';
+}
+
+bool _hasTrustedPricing(CollectibleItem item) {
+  return item.valuationStatus == ValuationStatus.marketEstimated &&
+      item.estimatedValue > 0;
+}
+
+const _warningAmber = Color(0xFFF59E0B);
 
 void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
   Navigator.of(
