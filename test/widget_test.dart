@@ -5152,12 +5152,8 @@ void main() {
       'United States',
     );
     await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-low-value-field')),
-      '250',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-high-value-field')),
-      '350',
+      find.byKey(const ValueKey('edit-collectible-user-value-field')),
+      '300',
     );
     await tester.enterText(
       find.byKey(const ValueKey('edit-collectible-notes-field')),
@@ -5188,6 +5184,9 @@ void main() {
     expect(savedItem['year'], '2001');
     expect(savedItem['country'], 'United States');
     expect(savedItem['notes'], 'Edited local notes.');
+    final savedPricing = savedItem['pricing'] as Map<String, dynamic>;
+    expect(savedPricing['pricingSource'], 'Owner estimate');
+    expect(savedPricing['valuationStatus'], 'user_estimated');
 
     await tester.pageBack();
     await tester.pumpAndSettle();

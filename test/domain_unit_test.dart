@@ -3097,7 +3097,7 @@ void main() {
       await expectLater(
         repository.signInWithEmailPassword(
           email: 'harry@example.com',
-          password: 'bad-password',
+          password: 'WrongPassword123!',
         ),
         throwsA(
           isA<SupabaseAuthException>().having(
@@ -4351,7 +4351,7 @@ void main() {
           .read(authControllerProvider.notifier)
           .signInWithEmailPassword(
             email: 'harry@example.com',
-            password: 'bad-password',
+            password: 'WrongPassword123!',
           );
 
       final state = container.read(authControllerProvider);

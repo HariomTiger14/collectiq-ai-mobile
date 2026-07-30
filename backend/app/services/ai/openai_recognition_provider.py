@@ -165,6 +165,7 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             "fileName": image_payload.get("fileName") or "unknown",
             "mimeType": image_payload.get("mimeType") or "application/octet-stream",
             "appVersion": request_metadata.get("appVersion") or "unknown",
+            "imageEvidence": _image_evidence_summary(image_payload),
         }
         return self._build_payload_for_data_url(
             image_data_url=image_data_url,
@@ -354,25 +355,48 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             "for <70. If confidence is not High, explain why. Evaluate image "
             "quality for blurry image, glare/reflections, cropped edges, dark "
             "image, low resolution, and multiple collectibles in one photo. "
-            "Return actionable scan recommendations. Launch categories are "
-            "Pokemon/TCG cards, sports cards, coins, comics, memorabilia, "
-            "toys/figures, and other collectibles. Use conservative "
+            "Return actionable scan recommendations. Launch pricing categories "
+            "are Pokemon/TCG cards, sports cards, video games, game consoles, "
+            "LEGO sets, comics, Funko/pop culture figures, coins, toys, "
+            "memorabilia, and other collectibles. For video games, identify "
+            "the exact title, platform, publisher, region/edition, and whether "
+            "the image shows a case, cartridge/disc, cover art, or sealed item. "
+            "For LEGO, identify the set name and visible set number. Use conservative "
             "Australian-dollar estimates. Prefer uncertainty over overclaiming. "
+            "If a retail cover, box, card face, comic cover, or packaging front "
+            "shows readable product title text, use that visible title as the "
+            "main title even when condition, barcode, region, edition, or contents "
+            "are not fully confirmed. Do not return 'Unknown collectible' when "
+            "the product title or franchise title is clearly visible; instead "
+            "return the visible title with lower confidence and explain which "
+            "specific identifiers are missing. Read large logo/title text with "
+            "OCR before deciding the title is unknown. Example: if a Nintendo "
+            "Switch cover visibly says 'MARIOKART 8 DELUXE', return title "
+            "'Mario Kart 8 Deluxe', category 'Video Game', brand 'Nintendo', "
+            "platform/series 'Nintendo Switch', and confidence based on image "
+            "clarity even if barcode or cartridge photos are missing. "
             "Return strict JSON that matches the provided schema only and "
             "include exactly three plausible alternative matches. Context: "
             f"imageSource={context.get('imageSource')}; "
             f"requestedCategory={context.get('requestedCategory')}; "
             f"fileName={context.get('fileName')}; "
             f"mimeType={context.get('mimeType')}; "
-            f"appVersion={context.get('appVersion')}."
+            f"appVersion={context.get('appVersion')}; "
+            f"imageEvidence={context.get('imageEvidence')}. "
+            "Use the imageEvidence roles as ground truth for what each photo "
+            "is meant to show. If a barcode, size tag, serial, set number, "
+            "or condition detail is missing, say so in scanRecommendations "
+            "instead of guessing."
         )
 
     def _image_data_url_from_api_payload(self, image_payload: dict) -> str:
         mime_type = str(image_payload.get("mimeType") or "application/octet-stream")
-        local_path = Path(str(image_payload.get("localFilePath") or ""))
-        if str(local_path).strip() and local_path.exists():
-            encoded_image = base64.b64encode(local_path.read_bytes()).decode("ascii")
-            return f"data:{mime_type};base64,{encoded_image}"
+        local_path_value = str(image_payload.get("localFilePath") or "").strip()
+        if local_path_value:
+            local_path = Path(local_path_value)
+            if local_path.exists() and local_path.is_file():
+                encoded_image = base64.b64encode(local_path.read_bytes()).decode("ascii")
+                return f"data:{mime_type};base64,{encoded_image}"
 
         encoded_image = image_payload.get("base64Image") or image_payload.get(
             "base64Preview"
@@ -507,6 +531,9 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             scanRecommendations=self._parse_string_list(
                 payload.get("scanRecommendations")
             ),
+            faceValue=self._optional_int(payload, "faceValue"),
+            askingPriceWarning=self._optional_string(payload, "askingPriceWarning"),
+            valuationConfidence=self._optional_int(payload, "valuationConfidence"),
         )
 
     def _optional_string(self, payload: dict[str, Any], field: str) -> str | None:
@@ -519,6 +546,17 @@ class OpenAIRecognitionProvider(AIRecognitionProvider):
             )
         normalized = value.strip()
         return normalized or None
+
+    def _optional_int(self, payload: dict[str, Any], field: str) -> int | None:
+        value = payload.get(field)
+        if value is None or value == "":
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise OpenAIInvalidResponseError(
+                f"OpenAI structured output field '{field}' must be an integer or null."
+            ) from exc
 
     def _parse_alternative_matches(
         self,
@@ -619,6 +657,22 @@ def _estimate_tokens(text: str) -> int:
     if not normalized:
         return 0
     return max(1, len(normalized) // 4)
+
+
+def _image_evidence_summary(image_payload: dict[str, Any]) -> str:
+    raw_images = image_payload.get("images")
+    images = raw_images if isinstance(raw_images, list) and raw_images else [image_payload]
+    summaries: list[str] = []
+    for index, payload in enumerate(images, start=1):
+        if not isinstance(payload, dict):
+            continue
+        summaries.append(
+            "image"
+            f"{index}(role={payload.get('imageRole') or 'unknown'}, "
+            f"slotType={payload.get('slotType') or 'unknown'}, "
+            f"systemTag={payload.get('systemTag') or 'unknown'})"
+        )
+    return "; ".join(summaries) or "none"
 
 
 # Product-facing provider alias used by the backend analyze endpoint roadmap.

@@ -775,12 +775,14 @@ def _diagnostics_response(
     confidence_level: str,
     total_processing_time_ms: int,
 ) -> ApiAnalyzeDiagnosticsResponse:
+    provider_selection = getattr(provider, "selection_diagnostics", {}) or {}
+    selected_ai_provider = provider_selection.get("selectedProvider") or getattr(
+        provider,
+        "provider_name",
+        getattr(recognition, "aiProvider", "unknown"),
+    )
     return ApiAnalyzeDiagnosticsResponse(
-        aiProvider=getattr(
-            provider,
-            "provider_name",
-            getattr(recognition, "aiProvider", "unknown"),
-        ),
+        aiProvider=selected_ai_provider,
         aiModel=getattr(provider, "_model", "mock"),
         aiLatencyMs=_parse_int(
             getattr(recognition, "processingTimeMs", total_processing_time_ms),

@@ -2164,6 +2164,7 @@ String _valuationStatusLabel(ValuationStatus status) {
     ValuationStatus.providerNotConfigured => 'Pricing source not connected',
     ValuationStatus.noMarketMatch => 'No market match',
     ValuationStatus.lookupFailed => 'Lookup failed',
+    ValuationStatus.userEstimated => 'Owner estimate',
     ValuationStatus.unavailable => 'Unavailable',
   };
 }
@@ -2174,6 +2175,7 @@ String _valuationStatusMessage(ValuationStatus status) {
       'Market value unavailable — pricing source not connected yet',
     ValuationStatus.noMarketMatch => 'No reliable market match found yet',
     ValuationStatus.lookupFailed => 'Value lookup failed — try again',
+    ValuationStatus.userEstimated => 'Owner-estimated value',
     ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
     ValuationStatus.marketEstimated => 'Value unavailable',
     ValuationStatus.unavailable => 'Value unavailable',

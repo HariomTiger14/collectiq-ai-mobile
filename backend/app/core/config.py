@@ -1,7 +1,7 @@
 import os
 import subprocess
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,6 +26,10 @@ def _first_env_value(*names: str) -> str | None:
     return None
 
 
+def _env_flag(name: str, default: str = "") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def resolve_app_version() -> str:
     return _first_env_value("APP_VERSION", "BACKEND_VERSION") or "0.1.0"
 
@@ -45,7 +49,7 @@ def resolve_commit_sha() -> str:
 
 def resolve_build_time() -> str:
     return _first_env_value("BUILD_TIME", "CF_PAGES_COMMIT_TIME") or datetime.now(
-        UTC
+        timezone.utc
     ).isoformat()
 
 
@@ -100,11 +104,42 @@ class Settings:
         "",
     ).strip().lower() in {"1", "true", "yes", "required"}
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
+    allow_mock_analyzer: bool = os.getenv("ALLOW_MOCK_ANALYZER", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     pricing_provider: str = os.getenv("PRICING_PROVIDER", "mock")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     openai_timeout_seconds: float = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "60"))
+    ai_fallback_provider: str = os.getenv("AI_FALLBACK_PROVIDER", "openai")
+    ai_fallback_confidence_threshold: int = int(
+        os.getenv("AI_FALLBACK_CONFIDENCE_THRESHOLD", "70")
+    )
     ebay_access_token: str = os.getenv("EBAY_ACCESS_TOKEN", "")
+    ebay_client_id: str = os.getenv("EBAY_CLIENT_ID", "")
+    ebay_client_secret: str = os.getenv("EBAY_CLIENT_SECRET", "")
+    ebay_oauth_token_url: str = os.getenv(
+        "EBAY_OAUTH_TOKEN_URL",
+        "https://api.ebay.com/identity/v1/oauth2/token",
+    )
+    ebay_oauth_scope: str = os.getenv(
+        "EBAY_OAUTH_SCOPE",
+        "https://api.ebay.com/oauth/api_scope",
+    )
+    ebay_marketplace_insights_api_url: str = os.getenv(
+        "EBAY_MARKETPLACE_INSIGHTS_API_URL",
+        "",
+    )
+    ebay_partner_access_granted: bool = (
+        os.getenv("EBAY_PARTNER_ACCESS_GRANTED", "false").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     ebay_browse_api_url: str = os.getenv(
         "EBAY_BROWSE_API_URL",
         "https://api.ebay.com/buy/browse/v1/item_summary/search",
@@ -120,6 +155,14 @@ class Settings:
     tcgplayer_timeout_seconds: float = float(
         os.getenv("TCGPLAYER_TIMEOUT_SECONDS", "10")
     )
+    kicksdb_api_key: str = os.getenv("KICKSDB_API_KEY", "")
+    kicksdb_api_base: str = os.getenv(
+        "KICKSDB_API_BASE",
+        "https://api.kicks.dev",
+    )
+    kicksdb_timeout_seconds: float = float(
+        os.getenv("KICKSDB_TIMEOUT_SECONDS", "10")
+    )
     pricecharting_api_key: str = os.getenv("PRICECHARTING_API_KEY", "")
     pricecharting_api_base: str = os.getenv(
         "PRICECHARTING_API_BASE",
@@ -128,10 +171,26 @@ class Settings:
     pricecharting_timeout_seconds: float = float(
         os.getenv("PRICECHARTING_TIMEOUT_SECONDS", "10")
     )
+    pricecharting_provider_min_interval_ms: int = int(
+        os.getenv("PRICECHARTING_PROVIDER_MIN_INTERVAL_MS", "1000")
+    )
+    pricecharting_shared_throttle_enabled: bool = _env_flag(
+        "PRICECHARTING_SHARED_THROTTLE_ENABLED",
+        "true",
+    )
     pricing_cache_ttl_seconds: int = int(os.getenv("PRICING_CACHE_TTL_SECONDS", "900"))
     pricing_provider_min_interval_ms: int = int(
         os.getenv("PRICING_PROVIDER_MIN_INTERVAL_MS", "250")
     )
+    default_display_currency: str = os.getenv("DEFAULT_DISPLAY_CURRENCY", "AUD")
+    fx_usd_to_aud: float = float(os.getenv("FX_USD_TO_AUD", "1.52"))
+    fx_usd_to_cad: float = float(os.getenv("FX_USD_TO_CAD", "1.37"))
+    fx_usd_to_gbp: float = float(os.getenv("FX_USD_TO_GBP", "0.78"))
+    admin_import_token: str = os.getenv("ADMIN_IMPORT_TOKEN", "")
+    admin_job_token: str = os.getenv("ADMIN_JOB_TOKEN", os.getenv("ADMIN_IMPORT_TOKEN", ""))
+    firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    firebase_service_account_json: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+    firebase_access_token: str = os.getenv("FIREBASE_ACCESS_TOKEN", "")
 
 
 settings = Settings()

@@ -581,8 +581,11 @@ class _FakeBackendClient implements AiBackendClient {
       },
       'alternatives': const [],
       'recommendation': 'Review before saving.',
-      'selectedProvider': 'gemini',
-      'requestedProvider': 'auto',
+      'rawProviderPayload': {
+        'selectedProvider': 'gemini',
+        'requestedProvider': 'auto',
+        'backendResponseSource': 'gemini',
+      },
       'timestamp': '2026-07-05T10:00:00Z',
     });
   }

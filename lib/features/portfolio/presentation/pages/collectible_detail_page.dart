@@ -1,8 +1,10 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
+import 'package:collectiq_ai/core/network/api_result.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_comp.dart';
 import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/portfolio/data/api/portfolio_api.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
@@ -1745,26 +1747,32 @@ Future<void> _showEditCollectibleDialog({
   }
 }
 
-class _EditCollectibleDialog extends StatefulWidget {
+class _EditCollectibleDialog extends ConsumerStatefulWidget {
   const _EditCollectibleDialog({required this.item});
 
   final CollectibleItem item;
 
   @override
-  State<_EditCollectibleDialog> createState() => _EditCollectibleDialogState();
+  ConsumerState<_EditCollectibleDialog> createState() =>
+      _EditCollectibleDialogState();
 }
 
-class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
+class _EditCollectibleDialogState
+    extends ConsumerState<_EditCollectibleDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
   late final TextEditingController _manufacturerController;
+  late final TextEditingController _setNameController;
   late final TextEditingController _seriesController;
+  late final TextEditingController _cardNumberController;
+  late final TextEditingController _conditionController;
   late final TextEditingController _yearController;
+  late final TextEditingController _rarityController;
   late final TextEditingController _countryController;
-  late final TextEditingController _lowValueController;
-  late final TextEditingController _highValueController;
+  late final TextEditingController _userValueController;
   late final TextEditingController _notesController;
+  bool _isRepricing = false;
 
   @override
   void initState() {
@@ -1776,14 +1784,21 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _manufacturerController = TextEditingController(
       text: widget.item.brand ?? '',
     );
+    _setNameController = TextEditingController(text: widget.item.setName ?? '');
     _seriesController = TextEditingController(text: widget.item.series ?? '');
-    _yearController = TextEditingController(text: widget.item.year ?? '');
-    _countryController = TextEditingController(text: widget.item.country ?? '');
-    _lowValueController = TextEditingController(
-      text: _decimalText(pricing?.lowEstimate ?? fallbackValue),
+    _cardNumberController = TextEditingController(
+      text: widget.item.cardNumber ?? '',
     );
-    _highValueController = TextEditingController(
-      text: _decimalText(pricing?.highEstimate ?? fallbackValue),
+    _conditionController = TextEditingController(text: widget.item.condition);
+    _yearController = TextEditingController(text: widget.item.year ?? '');
+    _rarityController = TextEditingController(text: widget.item.rarity ?? '');
+    _countryController = TextEditingController(text: widget.item.country ?? '');
+    _userValueController = TextEditingController(
+      text: _decimalText(
+        pricing?.valuationStatus == ValuationStatus.userEstimated
+            ? pricing?.estimatedMarketValue ?? fallbackValue
+            : fallbackValue,
+      ),
     );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
   }
@@ -1793,11 +1808,14 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _titleController.dispose();
     _categoryController.dispose();
     _manufacturerController.dispose();
+    _setNameController.dispose();
     _seriesController.dispose();
+    _cardNumberController.dispose();
+    _conditionController.dispose();
     _yearController.dispose();
+    _rarityController.dispose();
     _countryController.dispose();
-    _lowValueController.dispose();
-    _highValueController.dispose();
+    _userValueController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -1837,10 +1855,30 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                   label: 'Series',
                 ),
                 _EditTextField(
+                  key: const ValueKey('edit-collectible-set-name-field'),
+                  controller: _setNameController,
+                  label: 'Set',
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-card-number-field'),
+                  controller: _cardNumberController,
+                  label: 'Card number / SKU',
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-condition-field'),
+                  controller: _conditionController,
+                  label: 'Condition',
+                ),
+                _EditTextField(
                   key: const ValueKey('edit-collectible-year-field'),
                   controller: _yearController,
                   label: 'Year',
                   keyboardType: TextInputType.number,
+                ),
+                _EditTextField(
+                  key: const ValueKey('edit-collectible-rarity-field'),
+                  controller: _rarityController,
+                  label: 'Rarity',
                 ),
                 _EditTextField(
                   key: const ValueKey('edit-collectible-country-field'),
@@ -1848,18 +1886,15 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                   label: 'Country',
                 ),
                 _EditTextField(
-                  key: const ValueKey('edit-collectible-low-value-field'),
-                  controller: _lowValueController,
-                  label: 'Estimated value low',
+                  key: const ValueKey('edit-collectible-user-value-field'),
+                  controller: _userValueController,
+                  label: 'Your value',
                   keyboardType: TextInputType.number,
                   validator: _requiredMoney,
                 ),
-                _EditTextField(
-                  key: const ValueKey('edit-collectible-high-value-field'),
-                  controller: _highValueController,
-                  label: 'Estimated value high',
-                  keyboardType: TextInputType.number,
-                  validator: _requiredMoney,
+                const _EditHelperText(
+                  text:
+                      'Your value is saved as an owner estimate. PackLox trusted market value is refreshed separately from provider data.',
                 ),
                 _EditTextField(
                   key: const ValueKey('edit-collectible-notes-field'),
@@ -1874,14 +1909,25 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isRepricing ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('edit-collectible-reprice-button'),
+          onPressed: _isRepricing ? null : _reprice,
+          icon: _isRepricing
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.verified_outlined),
+          label: Text(_isRepricing ? 'Repricing' : 'Reprice'),
         ),
         FilledButton.icon(
           key: const ValueKey('edit-collectible-save-button'),
-          onPressed: _save,
+          onPressed: _isRepricing ? null : _save,
           icon: const Icon(Icons.save_outlined),
-          label: const Text('Save'),
+          label: const Text('Save value'),
         ),
       ],
     );
@@ -1892,34 +1938,81 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       return;
     }
 
-    final low = _parseMoney(_lowValueController.text);
-    final high = _parseMoney(_highValueController.text);
-    final normalizedLow = low <= high ? low : high;
-    final normalizedHigh = high >= low ? high : low;
-    final estimatedValue = (normalizedLow + normalizedHigh) / 2;
-    Navigator.of(context).pop(
-      widget.item.copyWith(
-        title: _titleController.text.trim(),
-        category: _categoryController.text.trim(),
-        estimatedValue: estimatedValue,
-        pricing: _updatedPricing(
-          widget.item,
-          normalizedLow,
-          normalizedHigh,
-          estimatedValue,
-        ),
-        marketSummary: _updatedMarketSummary(
-          widget.item.marketSummary,
-          normalizedLow,
-          normalizedHigh,
-          estimatedValue,
-        ),
-        year: _yearController.text.trim(),
-        brand: _manufacturerController.text.trim(),
-        series: _seriesController.text.trim(),
-        country: _countryController.text.trim(),
-        notes: _notesController.text.trim(),
+    Navigator.of(context).pop(_ownerValueItem());
+  }
+
+  Future<void> _reprice() async {
+    if (_formKey.currentState?.validate() != true) {
+      return;
+    }
+
+    setState(() => _isRepricing = true);
+    final correctedItem = _ownerValueItem();
+    final result = await ref
+        .read(portfolioApiProvider)
+        .repriceItem(correctedItem);
+    if (!mounted) {
+      return;
+    }
+
+    switch (result) {
+      case ApiSuccess<PortfolioRepriceResult>(data: final reprice):
+        if (reprice.isAvailable) {
+          Navigator.of(context).pop(
+            correctedItem.copyWith(
+              estimatedValue: reprice.pricing.estimatedMarketValue,
+              pricing: reprice.pricing,
+              marketSummary: reprice.marketSummary,
+              valuationStatus: ValuationStatus.marketEstimated,
+              valuationSource: reprice.pricing.valuationSource,
+            ),
+          );
+          return;
+        }
+        setState(() => _isRepricing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              reprice.displayMessage ??
+                  'Trusted value unavailable for this corrected identity.',
+            ),
+          ),
+        );
+      case ApiFailure<PortfolioRepriceResult>(message: final message):
+        setState(() => _isRepricing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+    }
+  }
+
+  CollectibleItem _ownerValueItem() {
+    final userValue = _parseMoney(_userValueController.text);
+    return widget.item.copyWith(
+      title: _titleController.text.trim(),
+      category: _categoryController.text.trim(),
+      estimatedValue: userValue,
+      condition: _conditionController.text.trim().isEmpty
+          ? 'Unknown'
+          : _conditionController.text.trim(),
+      pricing: _updatedPricing(
+        widget.item,
+        userValue,
       ),
+      marketSummary: _updatedMarketSummary(
+        widget.item.marketSummary,
+        userValue,
+      ),
+      year: _yearController.text.trim(),
+      brand: _manufacturerController.text.trim(),
+      setName: _setNameController.text.trim(),
+      series: _seriesController.text.trim(),
+      cardNumber: _cardNumberController.text.trim(),
+      rarity: _rarityController.text.trim(),
+      country: _countryController.text.trim(),
+      notes: _notesController.text.trim(),
+      valuationStatus: ValuationStatus.userEstimated,
+      valuationSource: 'owner_estimate',
     );
   }
 
@@ -1933,6 +2026,38 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       return 'Enter a value above 0';
     }
     return null;
+  }
+}
+
+class _EditHelperText extends StatelessWidget {
+  const _EditHelperText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.verified_user_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -2118,34 +2243,44 @@ class _DetailSections extends StatelessWidget {
       children: [
         if (item.pricing != null) ...[
           _DetailExpansionSection(
-            title: 'Market Evidence',
+            title: _pricingSectionTitle(item.pricing!),
             icon: Icons.paid_outlined,
             children: [
               AppCompactMetadata(
                 items: [
                   AppMetadataItem(
-                    label: 'Market Value',
+                    label: _pricingValueLabel(item.pricing!),
                     value: _formatMoney(
                       item.pricing!.estimatedMarketValue,
                       item.pricing!.currency,
                     ),
                   ),
+                  if (item.pricing!.valuationStatus !=
+                      ValuationStatus.userEstimated)
+                    AppMetadataItem(
+                      label: 'Estimated Range',
+                      value:
+                          '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+                    ),
                   AppMetadataItem(
-                    label: 'Estimated Range',
-                    value:
-                        '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
-                  ),
-                  AppMetadataItem(
-                    label: 'Pricing Source',
+                    label: item.pricing!.valuationStatus ==
+                            ValuationStatus.userEstimated
+                        ? 'Value Source'
+                        : 'Pricing Source',
                     value: item.pricing!.pricingSource,
                   ),
+                  if (item.pricing!.valuationStatus !=
+                      ValuationStatus.userEstimated)
+                    AppMetadataItem(
+                      label: 'Pricing Confidence',
+                      value:
+                          '${(item.pricing!.pricingConfidence * 100).toStringAsFixed(0)}%',
+                    ),
                   AppMetadataItem(
-                    label: 'Pricing Confidence',
-                    value:
-                        '${(item.pricing!.pricingConfidence * 100).toStringAsFixed(0)}%',
-                  ),
-                  AppMetadataItem(
-                    label: 'Last Updated',
+                    label: item.pricing!.valuationStatus ==
+                            ValuationStatus.userEstimated
+                        ? 'Saved'
+                        : 'Last Updated',
                     value: _formatPricingDate(item.pricing!.lastUpdated),
                   ),
                 ],
@@ -3393,6 +3528,20 @@ String _formatPortfolioValue(BuildContext context, double value) {
   return '${_currencySymbolForLocale(Localizations.localeOf(context))}$withCommas';
 }
 
+String _pricingSectionTitle(PricingInfo pricing) {
+  if (pricing.valuationStatus == ValuationStatus.userEstimated) {
+    return 'Owner Value';
+  }
+  return 'Market Evidence';
+}
+
+String _pricingValueLabel(PricingInfo pricing) {
+  if (pricing.valuationStatus == ValuationStatus.userEstimated) {
+    return 'Your Value';
+  }
+  return 'Market Value';
+}
+
 String _currencySymbolForLocale(Locale locale) {
   final countryCode = locale.countryCode?.toUpperCase();
   if (countryCode == 'GB') {
@@ -3449,43 +3598,41 @@ String _decimalText(double value) {
 
 PricingInfo _updatedPricing(
   CollectibleItem item,
-  double low,
-  double high,
-  double estimatedValue,
+  double userValue,
 ) {
   final pricing = item.pricing;
   return PricingInfo(
-    estimatedMarketValue: estimatedValue,
-    lowEstimate: low,
-    highEstimate: high,
+    estimatedMarketValue: userValue,
+    lowEstimate: userValue,
+    highEstimate: userValue,
     currency: pricing?.currency ?? 'AUD',
-    pricingSource: pricing?.pricingSource ?? 'Local edit',
-    pricingConfidence: pricing?.pricingConfidence ?? 0,
-    lastUpdated: pricing?.lastUpdated,
+    pricingSource: 'Owner estimate',
+    pricingConfidence: 0,
+    lastUpdated: DateTime.now(),
+    valuationStatus: ValuationStatus.userEstimated,
+    valuationSource: 'owner_estimate',
   );
 }
 
 MarketSummary? _updatedMarketSummary(
   MarketSummary? summary,
-  double low,
-  double high,
-  double estimatedValue,
+  double userValue,
 ) {
   if (summary == null) {
     return null;
   }
 
   return MarketSummary(
-    averagePrice: estimatedValue,
-    medianPrice: estimatedValue,
-    lowPrice: low,
-    highPrice: high,
+    averagePrice: userValue,
+    medianPrice: userValue,
+    lowPrice: userValue,
+    highPrice: userValue,
     salesCount: summary.salesCount,
     trendLabel: summary.trendLabel,
-    confidence: summary.confidence,
-    lastUpdated: summary.lastUpdated,
-    sources: summary.sources,
-    comps: summary.comps,
+    confidence: 0,
+    lastUpdated: DateTime.now(),
+    sources: const ['Owner estimate'],
+    comps: const [],
   );
 }
 

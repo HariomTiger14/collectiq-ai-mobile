@@ -455,6 +455,7 @@ String _valuationStatusMessage(ValuationStatus status) {
       'Market value unavailable - pricing source not connected yet',
     ValuationStatus.noMarketMatch => 'No reliable market match found yet',
     ValuationStatus.lookupFailed => 'Value lookup failed - try again',
+    ValuationStatus.userEstimated => 'Owner-estimated value',
     ValuationStatus.aiEstimated => 'AI-estimated value unavailable',
     ValuationStatus.marketEstimated => 'Market value unavailable',
     ValuationStatus.unavailable => 'Value unavailable',

@@ -1,0 +1,702 @@
+import base64
+import json
+import logging
+import re
+import time
+from pathlib import Path
+from typing import Any
+
+import httpx
+
+from app.core.config import settings
+from app.services.ai.openai_recognition_provider import (
+    AIProviderNotConfiguredError,
+    OpenAIInvalidResponseError,
+    OpenAIProviderError,
+    OpenAIRecognitionProvider,
+    OpenAITimeoutError,
+)
+from app.services.analyzer.errors import AnalyzerPipelineError
+
+logger = logging.getLogger("collectiq.ai.gemini")
+
+
+class GeminiProviderError(OpenAIProviderError):
+    """Raised when Gemini recognition cannot complete."""
+
+
+class GeminiInvalidResponseError(OpenAIInvalidResponseError):
+    """Raised when Gemini returns output that cannot be parsed."""
+
+
+class GeminiTimeoutError(OpenAITimeoutError):
+    """Raised when the Gemini request times out."""
+
+
+class GeminiRecognitionProvider(OpenAIRecognitionProvider):
+    provider_name = "gemini"
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout_seconds: float | None = None,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self._api_key = settings.gemini_api_key if api_key is None else api_key
+        self._model = model or settings.gemini_model
+        self._timeout_seconds = (
+            settings.gemini_timeout_seconds
+            if timeout_seconds is None
+            else timeout_seconds
+        )
+        self._client = client or httpx.Client(timeout=self._timeout_seconds)
+
+    def recognize(self, image_path: Path):
+        if not self._api_key.strip():
+            raise AIProviderNotConfiguredError(
+                "GEMINI_API_KEY is required when AI_PROVIDER=gemini."
+            )
+
+        encoded_image = base64.b64encode(image_path.read_bytes()).decode("ascii")
+        payload = self._build_gemini_payload(
+            image_base64=encoded_image,
+            mime_type=self._media_type_for(image_path),
+            prompt_context={
+                "imageSource": "uploaded file",
+                "fileName": image_path.name,
+                "mimeType": self._media_type_for(image_path),
+                "requestedCategory": "none",
+                "appVersion": "unknown",
+            },
+        )
+        return self._recognize_with_gemini_payload(payload, time.perf_counter())
+
+    def recognize_api_payload(
+        self,
+        *,
+        request_metadata: dict,
+        image_payload: dict,
+    ):
+        if not self._api_key.strip():
+            raise AIProviderNotConfiguredError(
+                "GEMINI_API_KEY is required when AI_PROVIDER=gemini."
+            )
+
+        image_parts = self._image_parts_from_payload(image_payload)
+        payload = self._build_gemini_payload(
+            image_parts=image_parts,
+            prompt_context={
+                "imageSource": request_metadata.get("imageSource")
+                or image_payload.get("imageSource")
+                or "unknown",
+                "requestedCategory": request_metadata.get("requestedCategory")
+                or "none",
+                "fileName": image_payload.get("fileName") or "unknown",
+                "mimeType": image_payload.get("mimeType") or "application/octet-stream",
+                "appVersion": request_metadata.get("appVersion") or "unknown",
+                "imageEvidence": _image_evidence_summary(image_payload),
+            },
+        )
+        return self._recognize_with_gemini_payload(payload, time.perf_counter())
+
+    def _recognize_with_gemini_payload(
+        self,
+        payload: dict[str, Any],
+        started_at: float,
+    ):
+        try:
+            response = self._client.post(
+                self._generate_content_url(),
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=self._timeout_seconds,
+            )
+        except httpx.TimeoutException as exc:
+            raise GeminiTimeoutError("Gemini recognition request timed out.") from exc
+        except httpx.HTTPError as exc:
+            raise GeminiProviderError(
+                f"Gemini recognition request failed: {exc}"
+            ) from exc
+
+        if response.status_code >= 400 and _gemini_payload_has_structured_schema(payload):
+            retry_payload = _gemini_payload_without_structured_schema(payload)
+            response = self._client.post(
+                self._generate_content_url(),
+                headers={"Content-Type": "application/json"},
+                json=retry_payload,
+                timeout=self._timeout_seconds,
+            )
+
+        if response.status_code >= 400:
+            raise GeminiProviderError(
+                "Gemini recognition request failed with "
+                f"status {response.status_code}: {response.text}"
+            )
+
+        try:
+            response_body = response.json()
+        except ValueError as exc:
+            raise GeminiInvalidResponseError(
+                "Gemini response body was not valid JSON."
+            ) from exc
+
+        output_text = self._extract_gemini_text(response_body)
+        try:
+            result_payload = self._parse_json_object(output_text)
+        except OpenAIInvalidResponseError:
+            if not _gemini_payload_has_structured_schema(payload):
+                raise
+            retry_payload = _gemini_payload_without_structured_schema(payload)
+            result_payload = self._request_schema_free_json(retry_payload)
+        result_payload = self._rescue_unknown_title(payload, result_payload)
+        processing_time_ms = int((time.perf_counter() - started_at) * 1000)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Gemini recognition provider=%s model=%s latencyMs=%s",
+                self.provider_name,
+                self._model,
+                processing_time_ms,
+            )
+        return self._to_recognition_result(
+            _gemini_payload_with_safe_defaults(result_payload),
+            processing_time_ms,
+        )
+
+    def _request_schema_free_json(self, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            response = self._client.post(
+                self._generate_content_url(),
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=self._timeout_seconds,
+            )
+        except httpx.TimeoutException as exc:
+            raise GeminiTimeoutError("Gemini recognition retry timed out.") from exc
+        except httpx.HTTPError as exc:
+            raise GeminiProviderError(
+                f"Gemini recognition retry failed: {exc}"
+            ) from exc
+
+        if response.status_code >= 400:
+            raise GeminiProviderError(
+                "Gemini recognition retry failed with "
+                f"status {response.status_code}: {response.text}"
+            )
+        try:
+            response_body = response.json()
+        except ValueError as exc:
+            raise GeminiInvalidResponseError(
+                "Gemini retry response body was not valid JSON."
+            ) from exc
+
+        output_text = self._extract_gemini_text(response_body)
+        return self._parse_json_object(output_text)
+
+    def _parse_json_object(self, output_text: str) -> dict[str, Any]:
+        candidate_texts = [output_text, *_json_object_candidates(output_text)]
+        seen: set[str] = set()
+        for candidate in candidate_texts:
+            normalized = candidate.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            try:
+                parsed = json.loads(normalized)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+            if isinstance(parsed, list):
+                first_object = next((item for item in parsed if isinstance(item, dict)), None)
+                if first_object is not None:
+                    return first_object
+        raise GeminiInvalidResponseError(
+            "Gemini structured output was not a JSON object."
+        )
+
+    def _rescue_unknown_title(
+        self,
+        original_payload: dict[str, Any],
+        result_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        title = str(result_payload.get("title") or "").strip().lower()
+        confidence = _int(result_payload.get("confidence"), 0)
+        if title and title not in {"unknown", "unknown collectible"} and confidence > 0:
+            return result_payload
+
+        rescue_payload = _gemini_title_rescue_payload(original_payload)
+        try:
+            response = self._client.post(
+                self._generate_content_url(),
+                headers={"Content-Type": "application/json"},
+                json=rescue_payload,
+                timeout=self._timeout_seconds,
+            )
+            if response.status_code >= 400:
+                return result_payload
+            rescue_body = response.json()
+            rescue_text = self._extract_gemini_text(rescue_body)
+            rescue = self._parse_json_object(rescue_text)
+        except (GeminiProviderError, GeminiInvalidResponseError, ValueError, httpx.HTTPError):
+            return result_payload
+
+        rescued_title = _text(rescue.get("title"), "Unknown collectible")
+        if rescued_title.lower() in {"unknown", "unknown collectible"}:
+            return result_payload
+
+        rescued_category = _text(rescue.get("category"), _text(result_payload.get("category"), "Other"))
+        rescued_confidence = max(_int(rescue.get("confidence"), 55), 55)
+        merged = dict(result_payload)
+        merged.update(
+            {
+                "title": rescued_title,
+                "category": rescued_category,
+                "confidence": rescued_confidence,
+                "primaryMatch": rescued_title,
+                "description": _text(
+                    result_payload.get("description"),
+                    f"Visible packaging or cover title: {rescued_title}.",
+                ),
+                "confidenceExplanation": _text(
+                    rescue.get("reason"),
+                    "Recovered title from visible package or cover text.",
+                ),
+                "detectionQuality": _text(result_payload.get("detectionQuality"), "Partial"),
+                "aiReasoning": _text(
+                    rescue.get("reason"),
+                    "A focused second pass recovered the visible title text.",
+                ),
+            }
+        )
+        if isinstance(rescue.get("brand"), str) and rescue["brand"].strip():
+            merged["brand"] = rescue["brand"].strip()
+        if isinstance(rescue.get("series"), str) and rescue["series"].strip():
+            merged["series"] = rescue["series"].strip()
+        return merged
+
+    def _build_gemini_payload(
+        self,
+        *,
+        image_parts: list[dict[str, Any]] | None = None,
+        image_base64: str | None = None,
+        mime_type: str | None = None,
+        prompt_context: dict[str, Any],
+    ) -> dict[str, Any]:
+        parts: list[dict[str, Any]] = [{"text": self._prompt_text(prompt_context)}]
+        if image_parts is not None:
+            parts.extend(image_parts)
+        elif image_base64 is not None and mime_type is not None:
+            parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": image_base64,
+                    },
+                }
+            )
+        return {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": parts,
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "responseFormat": {
+                    "text": {
+                        "mimeType": "application/json",
+                        "schema": _gemini_recognition_schema(),
+                    }
+                },
+            },
+        }
+
+    def _generate_content_url(self) -> str:
+        return (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self._model}:generateContent?key={self._api_key}"
+        )
+
+    def _extract_gemini_text(self, response_body: dict[str, Any]) -> str:
+        candidates = response_body.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            raise GeminiInvalidResponseError(
+                "Gemini response did not include candidates."
+            )
+
+        content = candidates[0].get("content")
+        if not isinstance(content, dict):
+            raise GeminiInvalidResponseError(
+                "Gemini response candidate did not include content."
+            )
+
+        parts = content.get("parts")
+        if not isinstance(parts, list):
+            raise GeminiInvalidResponseError(
+                "Gemini response content did not include parts."
+            )
+
+        for part in parts:
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
+                text = part["text"].strip()
+                if text:
+                    return text
+
+        raise GeminiInvalidResponseError(
+            "Gemini response did not include structured output text."
+        )
+
+    def _split_data_url(self, data_url: str) -> tuple[str, str]:
+        prefix, _, encoded_image = data_url.partition(",")
+        if not encoded_image:
+            raise GeminiProviderError("Gemini image payload was empty.")
+
+        mime_type = "application/octet-stream"
+        if prefix.startswith("data:") and ";base64" in prefix:
+            mime_type = prefix.removeprefix("data:").split(";", 1)[0]
+        return mime_type, encoded_image
+
+    def _image_parts_from_payload(self, image_payload: dict) -> list[dict[str, Any]]:
+        raw_images = image_payload.get("images")
+        payloads = raw_images if isinstance(raw_images, list) and raw_images else [image_payload]
+        parts: list[dict[str, Any]] = []
+        for payload in payloads:
+            if not isinstance(payload, dict):
+                continue
+            try:
+                image_data_url = self._image_data_url_from_api_payload(payload)
+            except OpenAIProviderError as exc:
+                raise AnalyzerPipelineError(
+                    status_code=422,
+                    code="INVALID_IMAGE_PAYLOAD",
+                    message=(
+                        "Gemini analysis requires backend-readable image bytes. "
+                        "Provide a stored file path or base64Image in the backend payload."
+                    ),
+                    retryable=False,
+                ) from exc
+            mime_type, image_base64 = self._split_data_url(image_data_url)
+            parts.append(
+                {
+                    "text": (
+                        "Next image evidence: "
+                        f"role={payload.get('imageRole') or 'unknown'}, "
+                        f"slotType={payload.get('slotType') or 'unknown'}, "
+                        f"systemTag={payload.get('systemTag') or 'unknown'}."
+                    )
+                }
+            )
+            parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": image_base64,
+                    },
+                }
+            )
+        return parts
+
+
+def _gemini_payload_has_structured_schema(payload: dict[str, Any]) -> bool:
+    generation_config = payload.get("generationConfig")
+    if not isinstance(generation_config, dict):
+        return False
+    if "response_schema" in generation_config:
+        return True
+    response_format = generation_config.get("responseFormat")
+    return isinstance(response_format, dict) and bool(response_format.get("text"))
+
+
+def _gemini_payload_without_structured_schema(payload: dict[str, Any]) -> dict[str, Any]:
+    retry_payload = dict(payload)
+    generation_config = dict(retry_payload.get("generationConfig") or {})
+    generation_config.pop("response_schema", None)
+    generation_config.pop("responseFormat", None)
+    generation_config["response_mime_type"] = "application/json"
+    retry_payload["generationConfig"] = generation_config
+    return retry_payload
+
+
+def _gemini_title_rescue_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    retry_payload = _gemini_payload_without_structured_schema(payload)
+    contents = retry_payload.get("contents")
+    if not isinstance(contents, list) or not contents:
+        return retry_payload
+    first_content = contents[0]
+    if not isinstance(first_content, dict):
+        return retry_payload
+    parts = first_content.get("parts")
+    if not isinstance(parts, list) or not parts:
+        return retry_payload
+    rescue_prompt = (
+        "Look only at visible text/logo/cover art in the image. If a product, "
+        "game, card, toy, shoe, or collectible title is readable, return JSON "
+        "with title, category, brand, series, confidence, and reason. Do not "
+        "price the item. If the visible title says MARIOKART 8 DELUXE, return "
+        "title Mario Kart 8 Deluxe and category Video Game. Use Unknown only "
+        "when no title or franchise text can be read."
+    )
+    parts[0] = {"text": rescue_prompt}
+    return retry_payload
+
+
+def _gemini_payload_with_safe_defaults(payload: dict[str, Any]) -> dict[str, Any]:
+    title = _text(payload.get("title"), "Unknown collectible")
+    category = _text(payload.get("category"), "Other")
+    confidence = _int(payload.get("confidence"), 0)
+    return {
+        "title": title,
+        "category": category,
+        "confidence": confidence,
+        "estimatedValue": _int(_first_present(payload, "estimatedValue", "estimated_value"), 0),
+        "condition": _text(payload.get("condition"), "Unknown"),
+        "recommendation": _text(payload.get("recommendation"), "Review before saving."),
+        "description": _text(payload.get("description"), title),
+        "detectedObjects": _string_list(payload.get("detectedObjects")) or [category],
+        "primaryMatch": _text(payload.get("primaryMatch"), title),
+        "alternativeMatches": _alternative_matches(payload, title, category, confidence),
+        "confidenceExplanation": _text(
+            payload.get("confidenceExplanation"),
+            "Gemini returned partial collectible details.",
+        ),
+        "detectionQuality": _text(payload.get("detectionQuality"), "Unknown"),
+        "aiReasoning": _text(payload.get("aiReasoning"), "Partial Gemini output normalized safely."),
+        "fieldConfidence": payload.get("fieldConfidence") if isinstance(payload.get("fieldConfidence"), dict) else {},
+        "confidenceLevel": _text(payload.get("confidenceLevel"), _confidence_level(confidence)),
+        "lowConfidenceReasons": _string_list(payload.get("lowConfidenceReasons")),
+        "imageQualityIssues": _string_list(payload.get("imageQualityIssues")),
+        "scanRecommendations": _string_list(payload.get("scanRecommendations")),
+        **_optional_collectible_fields(payload),
+    }
+
+
+def _optional_collectible_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    fields = {
+        key: payload.get(key)
+        for key in [
+            "year",
+            "brand",
+            "setName",
+            "series",
+            "cardNumber",
+            "playerOrCharacter",
+            "rarity",
+            "estimatedGrade",
+            "language",
+            "edition",
+            "country",
+            "mint",
+            "material",
+            "notes",
+            "faceValue",
+            "askingPriceWarning",
+            "valuationConfidence",
+        ]
+        if key in payload
+    }
+    aliases = {
+        "faceValue": "face_value",
+        "askingPriceWarning": "asking_price_warning",
+        "valuationConfidence": "valuation_confidence",
+    }
+    for target, source in aliases.items():
+        if target not in fields and source in payload:
+            fields[target] = payload.get(source)
+    return fields
+
+
+def _first_present(payload: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in payload:
+            return payload.get(key)
+    return None
+
+
+def _gemini_recognition_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": [
+            "title",
+            "category",
+            "confidence",
+            "condition",
+            "description",
+            "detectedObjects",
+            "primaryMatch",
+            "alternativeMatches",
+            "confidenceExplanation",
+            "detectionQuality",
+            "aiReasoning",
+        ],
+        "properties": {
+            "title": {"type": "string"},
+            "category": {"type": "string"},
+            "confidence": {"type": "integer"},
+            "estimatedValue": {"type": "integer"},
+            "condition": {"type": "string"},
+            "recommendation": {"type": "string"},
+            "description": {"type": "string"},
+            "detectedObjects": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "primaryMatch": {"type": "string"},
+            "alternativeMatches": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["title", "category", "confidence", "reason"],
+                    "properties": {
+                        "title": {"type": "string"},
+                        "category": {"type": "string"},
+                        "confidence": {"type": "integer"},
+                        "reason": {"type": "string"},
+                    },
+                },
+            },
+            "confidenceExplanation": {"type": "string"},
+            "detectionQuality": {"type": "string"},
+            "aiReasoning": {"type": "string"},
+            "fieldConfidence": {"type": "object"},
+            "confidenceLevel": {"type": "string"},
+            "lowConfidenceReasons": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "imageQualityIssues": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "scanRecommendations": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "year": {"type": "string"},
+            "brand": {"type": "string"},
+            "setName": {"type": "string"},
+            "series": {"type": "string"},
+            "cardNumber": {"type": "string"},
+            "playerOrCharacter": {"type": "string"},
+            "rarity": {"type": "string"},
+            "estimatedGrade": {"type": "string"},
+            "language": {"type": "string"},
+            "edition": {"type": "string"},
+            "country": {"type": "string"},
+            "mint": {"type": "string"},
+            "material": {"type": "string"},
+            "notes": {"type": "string"},
+        },
+    }
+
+
+def _json_object_candidates(output_text: str) -> list[str]:
+    candidates: list[str] = []
+    fenced = re.findall(r"```(?:json)?\s*(.*?)```", output_text, flags=re.DOTALL | re.IGNORECASE)
+    candidates.extend(fenced)
+
+    first_brace = output_text.find("{")
+    last_brace = output_text.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        candidates.append(output_text[first_brace : last_brace + 1])
+
+    first_bracket = output_text.find("[")
+    last_bracket = output_text.rfind("]")
+    if first_bracket != -1 and last_bracket > first_bracket:
+        candidates.append(output_text[first_bracket : last_bracket + 1])
+    return candidates
+
+
+def _text(value, fallback: str) -> str:
+    return value.strip() if isinstance(value, str) and value.strip() else fallback
+
+
+def _int(value, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _string_list(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _alternative_matches(
+    payload: dict[str, Any],
+    title: str,
+    category: str,
+    confidence: int,
+) -> list[dict[str, object]]:
+    fallback_matches = [
+        {
+            "title": title,
+            "category": category,
+            "confidence": max(0, confidence - 10),
+            "reason": "Fallback match generated from partial Gemini output.",
+        },
+        {
+            "title": f"{category} collectible",
+            "category": category,
+            "confidence": max(0, confidence - 20),
+            "reason": "Category-level fallback match.",
+        },
+        {
+            "title": "Unknown collectible",
+            "category": "Other",
+            "confidence": max(0, confidence - 30),
+            "reason": "Low-confidence fallback match.",
+        },
+    ]
+    matches = payload.get("alternativeMatches")
+    if not isinstance(matches, list):
+        return fallback_matches
+
+    normalized_matches: list[dict[str, object]] = []
+    for index, match in enumerate(matches[:3]):
+        fallback = fallback_matches[index]
+        if not isinstance(match, dict):
+            normalized_matches.append(fallback)
+            continue
+
+        normalized_matches.append(
+            {
+                "title": _text(match.get("title"), str(fallback["title"])),
+                "category": _text(match.get("category"), str(fallback["category"])),
+                "confidence": _int(match.get("confidence"), int(fallback["confidence"])),
+                "reason": _text(match.get("reason"), str(fallback["reason"])),
+            }
+        )
+
+    while len(normalized_matches) < 3:
+        normalized_matches.append(fallback_matches[len(normalized_matches)])
+
+    return normalized_matches
+
+
+def _confidence_level(confidence: int) -> str:
+    if confidence >= 90:
+        return "High"
+    if confidence >= 70:
+        return "Medium"
+    return "Low"
+
+
+def _image_evidence_summary(image_payload: dict[str, Any]) -> str:
+    raw_images = image_payload.get("images")
+    images = raw_images if isinstance(raw_images, list) and raw_images else [image_payload]
+    summaries: list[str] = []
+    for index, payload in enumerate(images, start=1):
+        if not isinstance(payload, dict):
+            continue
+        summaries.append(
+            "image"
+            f"{index}(role={payload.get('imageRole') or 'unknown'}, "
+            f"slotType={payload.get('slotType') or 'unknown'}, "
+            f"systemTag={payload.get('systemTag') or 'unknown'})"
+        )
+    return "; ".join(summaries) or "none"

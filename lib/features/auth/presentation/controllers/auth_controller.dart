@@ -381,7 +381,11 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() {
     _repository = ref.watch(authRepositoryProvider);
-    Future.microtask(loadCurrentUser);
+    Future.microtask(() {
+      if (state.status == AuthFlowStatus.sessionRestoring && !state.isLoading) {
+        unawaited(loadCurrentUser());
+      }
+    });
     return const AuthState();
   }
 

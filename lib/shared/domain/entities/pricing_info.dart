@@ -6,6 +6,7 @@ enum ValuationStatus {
   providerNotConfigured('provider_not_configured'),
   noMarketMatch('no_market_match'),
   lookupFailed('lookup_failed'),
+  userEstimated('user_estimated'),
   unavailable('unavailable');
 
   const ValuationStatus(this.wireValue);
@@ -20,6 +21,7 @@ enum ValuationStatus {
       'provider_not_configured' => ValuationStatus.providerNotConfigured,
       'no_market_match' => ValuationStatus.noMarketMatch,
       'lookup_failed' => ValuationStatus.lookupFailed,
+      'user_estimated' => ValuationStatus.userEstimated,
       _ => ValuationStatus.unavailable,
     };
   }
