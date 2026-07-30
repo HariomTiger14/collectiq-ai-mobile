@@ -114,44 +114,37 @@
         <section class="glass-card quick-actions" aria-labelledby="quick-actions-title">
           <div class="section-heading">
             <p class="eyebrow">Operations</p>
-            <h2 id="quick-actions-title">Quick Actions</h2>
+            <h2 id="quick-actions-title">Control Center</h2>
+          </div>
+          <div class="admin-token-row">
+            <label for="admin-token">Admin token</label>
+            <input id="admin-token" type="password" autocomplete="off" placeholder="Required for protected actions" data-admin-token>
+            <button class="secondary-action" type="button" data-save-admin-token>Save locally</button>
           </div>
           <div class="action-grid">
+            <button class="action-button" type="button" data-action="refresh-health">
+              <span>Refresh Health</span>
+              <small>Live</small>
+            </button>
+            <button class="action-button" type="button" data-action="pricing-health">
+              <span>Pricing Health</span>
+              <small>Protected</small>
+            </button>
+            <button class="action-button" type="button" data-action="dry-run-import">
+              <span>Catalog Dry Run</span>
+              <small>Protected</small>
+            </button>
+            <button class="action-button" type="button" data-action="open-health">
+              <span>Open API Health</span>
+              <small>Public</small>
+            </button>
             <button class="action-button" type="button" data-module="Users">
               <span>Users</span>
-              <small>Coming Soon</small>
+              <small>Planned</small>
             </button>
-            <button class="action-button" type="button" data-module="Collectibles">
-              <span>Collectibles</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="Validation Queue">
-              <span>Validation Queue</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="Dataset">
-              <span>Dataset</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="Analytics">
-              <span>Analytics</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="AI Models">
-              <span>AI Models</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="Jobs">
-              <span>Jobs</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="Logs">
-              <span>Logs</span>
-              <small>Coming Soon</small>
-            </button>
-            <button class="action-button" type="button" data-module="System Settings">
-              <span>System Settings</span>
-              <small>Coming Soon</small>
+            <button class="action-button" type="button" data-module="Audit Logs">
+              <span>Audit Logs</span>
+              <small>Planned</small>
             </button>
           </div>
         </section>
@@ -188,6 +181,139 @@
             </div>
           </dl>
         </aside>
+      </section>
+
+      <section class="ops-grid" aria-label="Administration workbench">
+        <section class="glass-card ops-card" id="pricing" aria-labelledby="pricing-title">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="eyebrow">Pricing</p>
+              <h2 id="pricing-title">Pricing Control Center</h2>
+            </div>
+            <span class="status-pill loading" data-pricing-health-status>Not checked</span>
+          </div>
+          <div class="metric-row">
+            <div>
+              <span class="metric-label">Provider</span>
+              <strong data-pricing-field="provider">Unknown</strong>
+            </div>
+            <div>
+              <span class="metric-label">Cache</span>
+              <strong data-pricing-field="cache">Unknown</strong>
+            </div>
+            <div>
+              <span class="metric-label">Fallback</span>
+              <strong data-pricing-field="fallback">Unknown</strong>
+            </div>
+          </div>
+          <pre class="result-box" data-pricing-health-output>Run pricing health to inspect provider readiness.</pre>
+        </section>
+
+        <section class="glass-card ops-card" id="pricecharting" aria-labelledby="pricecharting-title">
+          <div class="section-heading">
+            <p class="eyebrow">Catalog</p>
+            <h2 id="pricecharting-title">PriceCharting Import</h2>
+          </div>
+          <form class="stack-form" data-pricecharting-form>
+            <label>
+              Source
+              <select data-pricecharting-source>
+                <option value="">All sources</option>
+                <option value="pokemon">Pokemon</option>
+                <option value="video_games">Video games</option>
+              </select>
+            </label>
+            <label class="inline-check">
+              <input type="checkbox" data-pricecharting-dry-run checked>
+              Dry run only
+            </label>
+            <button class="primary-action" type="submit">Run import</button>
+          </form>
+          <pre class="result-box" data-pricecharting-output>Dry run first, then run a real import only when counts look right.</pre>
+        </section>
+
+        <section class="glass-card ops-card" id="catalog" aria-labelledby="catalog-title">
+          <div class="section-heading">
+            <p class="eyebrow">Catalog</p>
+            <h2 id="catalog-title">Catalog Search</h2>
+          </div>
+          <form class="stack-form" data-catalog-search-form>
+            <label>
+              Search query
+              <input type="search" placeholder="Charizard, Pokemon, Mario..." data-catalog-query>
+            </label>
+            <button class="primary-action" type="submit">Search catalog</button>
+          </form>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Source</th>
+                  <th>Price</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody data-catalog-results>
+                <tr><td colspan="4">Search the pricing catalog.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="glass-card ops-card" id="analyzer" aria-labelledby="analyzer-title">
+          <div class="section-heading">
+            <p class="eyebrow">AI</p>
+            <h2 id="analyzer-title">Analyzer & Pricing Lab</h2>
+          </div>
+          <form class="stack-form" data-pricing-quote-form>
+            <div class="form-grid">
+              <label>
+                Item name
+                <input type="text" data-quote-name placeholder="Premium Charizard" required>
+              </label>
+              <label>
+                Category
+                <input type="text" data-quote-category placeholder="Trading Card" required>
+              </label>
+              <label>
+                Condition
+                <input type="text" data-quote-condition placeholder="Near Mint">
+              </label>
+              <label>
+                Currency
+                <select data-quote-currency>
+                  <option value="AUD">AUD</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+            </div>
+            <button class="primary-action" type="submit">Quote pricing</button>
+          </form>
+          <pre class="result-box" data-pricing-quote-output>Use confirmed item details to test the backend pricing quote flow.</pre>
+        </section>
+
+        <section class="glass-card ops-card" id="validation" aria-labelledby="validation-title">
+          <div class="section-heading">
+            <p class="eyebrow">Validation</p>
+            <h2 id="validation-title">Validation Lab</h2>
+          </div>
+          <ul class="readiness-list">
+            <li><span>Dataset importer</span><strong>Backend script ready</strong></li>
+            <li><span>Real-provider validation</span><strong>Manual workflow</strong></li>
+            <li><span>Latest report endpoint</span><strong>Not exposed yet</strong></li>
+          </ul>
+        </section>
+
+        <section class="glass-card ops-card" id="settings" aria-labelledby="settings-title">
+          <div class="section-heading">
+            <p class="eyebrow">Configuration</p>
+            <h2 id="settings-title">Environment Checks</h2>
+          </div>
+          <div class="check-list" data-health-checks>
+            <p>Health checks will appear after the next refresh.</p>
+          </div>
+        </section>
       </section>
 
       <section class="glass-card developer-tools" aria-labelledby="developer-tools-title">

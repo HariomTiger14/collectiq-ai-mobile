@@ -522,6 +522,216 @@ main {
   box-shadow: var(--shadow);
 }
 
+.admin-token-row,
+.stack-form,
+.form-grid,
+.metric-row,
+.readiness-list,
+.check-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.admin-token-row {
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.admin-token-row label,
+.stack-form label,
+.metric-label {
+  color: var(--subtle);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  color: var(--text);
+  background: var(--surface-strong);
+  outline: none;
+}
+
+input:focus,
+select:focus {
+  border-color: color-mix(in srgb, var(--brand) 70%, #fff 30%);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.primary-action,
+.secondary-action {
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-action {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+}
+
+.secondary-action {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.ops-card {
+  min-width: 0;
+  padding: 1.25rem;
+  border-radius: var(--radius);
+}
+
+.split-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.metric-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 1rem 0;
+}
+
+.metric-row > div,
+.check-row,
+.readiness-list li {
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+}
+
+.metric-row strong {
+  display: block;
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.result-box {
+  min-height: 8rem;
+  max-height: 22rem;
+  overflow: auto;
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 78%, #000 22%);
+  font: 0.82rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.stack-form {
+  margin-top: 0.75rem;
+}
+
+.stack-form label:not(.inline-check) {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.inline-check input {
+  width: 1rem;
+  min-height: 1rem;
+}
+
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.table-shell {
+  overflow: auto;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 34rem;
+}
+
+th,
+td {
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--subtle);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.readiness-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readiness-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.readiness-list span,
+.check-row span,
+.check-row small {
+  color: var(--muted);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.check-row strong,
+.check-row span {
+  display: block;
+}
+
+.check-row[data-state="online"] {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+}
+
+.check-row[data-state="offline"] {
+  border-color: color-mix(in srgb, #dc2626 52%, var(--border));
+}
+
 [hidden] {
   display: none;
 }
@@ -568,7 +778,11 @@ main {
   }
 
   .hero-section,
-  .content-grid {
+  .content-grid,
+  .ops-grid,
+  .admin-token-row,
+  .form-grid,
+  .metric-row {
     grid-template-columns: 1fr;
   }
 
@@ -593,6 +807,7 @@ main {
   .quick-actions,
   .environment-card,
   .developer-tools,
+  .ops-card,
   .hero-panel {
     border-radius: 1rem;
   }

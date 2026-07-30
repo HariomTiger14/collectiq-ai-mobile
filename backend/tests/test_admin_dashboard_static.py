@@ -16,6 +16,11 @@ class AdminDashboardStaticTest(unittest.TestCase):
         self.assertIn('data-service-status="analyzer"', html)
         self.assertIn('data-service-status="cloudflare"', html)
         self.assertIn('data-env-field="commit"', html)
+        self.assertIn('data-admin-token', html)
+        self.assertIn('data-pricing-health-status', html)
+        self.assertIn('data-pricecharting-form', html)
+        self.assertIn('data-catalog-search-form', html)
+        self.assertIn('data-pricing-quote-form', html)
         self.assertIn('config.js', html)
         self.assertIn('dashboard.js', html)
 
@@ -39,6 +44,16 @@ class AdminDashboardStaticTest(unittest.TestCase):
         self.assertIn("services.supabase ? \"Healthy\" : \"Offline\"", script)
         self.assertIn("services.analyzer ? \"Healthy\" : \"Unavailable\"", script)
         self.assertIn("window.setInterval(() => refreshHealth(client), config.refreshIntervalMs)", script)
+
+    def test_dashboard_wires_existing_admin_backend_actions(self) -> None:
+        script = (WEB_ROOT / "admin" / "dashboard.js").read_text(encoding="utf-8")
+
+        self.assertIn("/admin/pricing/health", script)
+        self.assertIn("/admin/pricecharting/import", script)
+        self.assertIn("/api/pricing/catalog/search", script)
+        self.assertIn("/api/pricing/quote", script)
+        self.assertIn('"X-Admin-Token"', script)
+        self.assertIn("packlox-admin-token", script)
 
     def test_dashboard_config_points_to_sit_backend(self) -> None:
         config = (WEB_ROOT / "admin" / "config.js").read_text(encoding="utf-8")
