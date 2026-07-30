@@ -21,6 +21,8 @@ class AdminDashboardStaticTest(unittest.TestCase):
         self.assertIn('data-pricecharting-form', html)
         self.assertIn('data-catalog-search-form', html)
         self.assertIn('data-pricing-quote-form', html)
+        self.assertIn('data-action="ops-summary"', html)
+        self.assertIn('data-validation-output', html)
         self.assertIn('config.js', html)
         self.assertIn('dashboard.js', html)
 
@@ -49,11 +51,13 @@ class AdminDashboardStaticTest(unittest.TestCase):
         script = (WEB_ROOT / "admin" / "dashboard.js").read_text(encoding="utf-8")
 
         self.assertIn("/admin/pricing/health", script)
+        self.assertIn("/admin/ops/summary", script)
         self.assertIn("/admin/pricecharting/import", script)
         self.assertIn("/api/pricing/catalog/search", script)
         self.assertIn("/api/pricing/quote", script)
         self.assertIn('"X-Admin-Token"', script)
         self.assertIn("packlox-admin-token", script)
+        self.assertIn("renderOpsSummary", script)
 
     def test_dashboard_config_points_to_sit_backend(self) -> None:
         config = (WEB_ROOT / "admin" / "config.js").read_text(encoding="utf-8")

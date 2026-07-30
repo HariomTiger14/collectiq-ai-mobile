@@ -130,6 +130,10 @@
               <span>Pricing Health</span>
               <small>Protected</small>
             </button>
+            <button class="action-button" type="button" data-action="ops-summary">
+              <span>Ops Summary</span>
+              <small>Protected</small>
+            </button>
             <button class="action-button" type="button" data-action="dry-run-import">
               <span>Catalog Dry Run</span>
               <small>Protected</small>
@@ -299,10 +303,11 @@
             <h2 id="validation-title">Validation Lab</h2>
           </div>
           <ul class="readiness-list">
-            <li><span>Dataset importer</span><strong>Backend script ready</strong></li>
-            <li><span>Real-provider validation</span><strong>Manual workflow</strong></li>
-            <li><span>Latest report endpoint</span><strong>Not exposed yet</strong></li>
+            <li><span>Dataset importer</span><strong data-validation-field="datasetImporter">Backend script ready</strong></li>
+            <li><span>Real-provider validation</span><strong data-validation-field="realProviderValidation">Manual workflow</strong></li>
+            <li><span>Latest report</span><strong data-validation-field="latestReportAvailable">Not checked</strong></li>
           </ul>
+          <pre class="result-box" data-validation-output>Load ops summary to inspect validation report availability.</pre>
         </section>
 
         <section class="glass-card ops-card" id="settings" aria-labelledby="settings-title">

@@ -50,6 +50,14 @@
       return this.parseJsonResponse(response);
     }
 
+    async getOpsSummary(token) {
+      const response = await fetch(`${this.baseUrl}/admin/ops/summary`, {
+        headers: this.adminHeaders(token),
+        cache: "no-store",
+      });
+      return this.parseJsonResponse(response);
+    }
+
     async importPriceCharting({ token, source, dryRun }) {
       const params = new URLSearchParams({
         dryRun: String(dryRun),
@@ -249,6 +257,77 @@
     setOutput("[data-pricing-health-output]", payload);
   };
 
+  const renderOpsSummary = (payload) => {
+    if (payload.health) {
+      renderHealth({
+        payload: payload.health,
+        ok: payload.health.status === "healthy",
+        latencyMs: Number(payload.health.latency?.api || 0),
+      });
+    }
+    if (payload.pricing) {
+      renderPricingHealth(payload.pricing);
+    }
+    if (payload.validation) {
+      renderValidation(payload.validation);
+    }
+    if (payload.readiness) {
+      renderReadiness(payload.readiness);
+    }
+    if (payload.environment) {
+      renderVersion(
+        {
+          environment: payload.environment.name,
+          version: payload.environment.version,
+          commit: payload.environment.commit,
+          buildTime: payload.environment.buildTime,
+        },
+        {
+          apiBaseUrl: payload.environment.publicApiUrl || getConfig().apiBaseUrl,
+          frontendUrl: payload.environment.publicFrontendUrl || getConfig().frontendUrl,
+        },
+      );
+    }
+  };
+
+  const renderValidation = (validation) => {
+    setText(
+      '[data-validation-field="datasetImporter"]',
+      validation.workflows?.datasetImporter || "Unknown",
+    );
+    setText(
+      '[data-validation-field="realProviderValidation"]',
+      validation.workflows?.realProviderValidation || "Unknown",
+    );
+    setText(
+      '[data-validation-field="latestReportAvailable"]',
+      validation.latestReportAvailable ? "Available" : "Not run",
+    );
+    setOutput("[data-validation-output]", validation);
+  };
+
+  const renderReadiness = (items) => {
+    const container = document.querySelector("[data-health-checks]");
+    if (!container) {
+      return;
+    }
+    container.innerHTML = items
+      .map((item) => {
+        const state = item.configured ? "online" : item.required ? "offline" : "placeholder";
+        const label = item.configured ? "Configured" : item.required ? "Missing" : "Optional";
+        return `
+          <article class="check-row" data-state="${state}">
+            <div>
+              <strong>${escapeHtml(item.label || item.key || "Configuration")}</strong>
+              <span>${escapeHtml(item.status || "unknown")}</span>
+            </div>
+            <small>${label}</small>
+          </article>
+        `;
+      })
+      .join("");
+  };
+
   const renderCatalogResults = (payload) => {
     const body = document.querySelector("[data-catalog-results]");
     if (!body) {
@@ -392,6 +471,17 @@
       } catch (error) {
         console.warn("Pricing health failed", error);
         setOutput("[data-pricing-health-output]", error.payload || error.message);
+        showToast(error.message, toast);
+      }
+    });
+
+    document.querySelector('[data-action="ops-summary"]')?.addEventListener("click", async () => {
+      try {
+        renderOpsSummary(await client.getOpsSummary(requireAdminToken(toast)));
+        showToast("Operations summary loaded.", toast);
+      } catch (error) {
+        console.warn("Ops summary failed", error);
+        setOutput("[data-validation-output]", error.payload || error.message);
         showToast(error.message, toast);
       }
     });
