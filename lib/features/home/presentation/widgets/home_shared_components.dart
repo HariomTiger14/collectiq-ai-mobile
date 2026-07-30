@@ -41,11 +41,17 @@ class HomeTokens {
 class HomeBrandLockup extends StatelessWidget {
   const HomeBrandLockup({
     this.showAlert = false,
+    this.alertCount = 0,
     this.onAlertPressed,
     super.key,
   });
 
   final bool showAlert;
+
+  /// Number of items/alerts needing attention. When > 0 a small count badge
+  /// is shown on the alert button so it reads at a glance instead of a bare
+  /// indicator.
+  final int alertCount;
   final VoidCallback? onAlertPressed;
 
   @override
@@ -73,20 +79,57 @@ class HomeBrandLockup extends StatelessWidget {
           ),
         ),
         if (showAlert)
-          IconButton(
-            key: const ValueKey('home-alert-button'),
-            tooltip: 'Collection alert',
-            onPressed: onAlertPressed,
-            icon: const Icon(Icons.priority_high_rounded),
-            color: HomeTokens.warning,
-            style: IconButton.styleFrom(
-              backgroundColor: HomeTokens.surfaceRaised,
-              side: const BorderSide(color: HomeTokens.border),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                key: const ValueKey('home-alert-button'),
+                tooltip: alertCount > 0
+                    ? '$alertCount ${alertCount == 1 ? 'item needs' : 'items need'} attention'
+                    : 'Collection alert',
+                onPressed: onAlertPressed,
+                icon: const Icon(Icons.priority_high_rounded),
+                color: HomeTokens.warning,
+                style: IconButton.styleFrom(
+                  backgroundColor: HomeTokens.surfaceRaised,
+                  side: const BorderSide(color: HomeTokens.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  fixedSize: const Size.square(54),
+                ),
               ),
-              fixedSize: const Size.square(54),
-            ),
+              if (alertCount > 0)
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    key: const ValueKey('home-alert-badge'),
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 22,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: HomeTokens.warning,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: HomeTokens.background,
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      alertCount > 99 ? '99+' : '$alertCount',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: HomeTokens.background,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
       ],
     );
@@ -112,7 +155,7 @@ class HomeTitleBlock extends StatelessWidget {
             height: 1.05,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 10),
         Text(
           subtitle,
           key: const ValueKey('home-state-subtitle'),

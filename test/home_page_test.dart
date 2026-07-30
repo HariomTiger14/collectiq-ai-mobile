@@ -41,7 +41,9 @@ void main() {
     expect(find.text('Portfolio value'), findsOneWidget);
     expect(find.text('\$2,275'), findsOneWidget);
     expect(find.text('3 of 5 items trusted'), findsOneWidget);
-    expect(find.text('2 need value'), findsOneWidget);
+    // The "needs value" count is no longer duplicated as a chip in the card;
+    // the attention strip below is the single actionable surface for it.
+    expect(find.text('2 need value'), findsNothing);
     expect(find.text('Review portfolio'), findsOneWidget);
     // No persisted value history yet, so the trend chart + period tabs are not
     // shown and the card reports the building-history state.

@@ -313,7 +313,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               sections: [
                 HomeSection(
                   topPadding: AppSpacing.sm,
-                  child: HomeBrandLockup(showAlert: homeData.hasStateAlert),
+                  child: HomeBrandLockup(
+                    showAlert: homeData.hasStateAlert,
+                    alertCount: homeData.attentionCount,
+                  ),
                 ),
                 HomeSection(
                   topPadding: AppSpacing.lg,
@@ -387,7 +390,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ] else ...[
                   HomeSection(
-                    topPadding: AppSpacing.xl,
+                    topPadding: AppSpacing.lg,
                     child: _PortfolioValueHero(
                       data: homeData,
                       onReview:
@@ -542,19 +545,24 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     final isUp = change >= 0;
 
     final String deltaText;
+    // The period ("1M") renders as a quiet suffix so the change reads first.
+    final String? deltaPeriodLabel;
     final Color deltaColor;
     final IconData deltaIcon;
     if (!hasValue) {
       deltaText = 'Awaiting first valuation';
+      deltaPeriodLabel = null;
       deltaColor = HomeTokens.textSecondary;
       deltaIcon = Icons.timeline_rounded;
     } else if (!showChart) {
       deltaText = 'Building value history';
+      deltaPeriodLabel = null;
       deltaColor = HomeTokens.textSecondary;
       deltaIcon = Icons.timeline_rounded;
     } else {
       deltaText =
-          '${_signedCurrency(change)} · ${(percent.abs() * 100).toStringAsFixed(1)}% · ${effectivePeriod.label}';
+          '${_signedCurrency(change)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
+      deltaPeriodLabel = effectivePeriod.label;
       deltaColor = isUp ? HomeTokens.positive : HomeTokens.negative;
       deltaIcon = isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded;
     }
@@ -599,14 +607,27 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
               Icon(deltaIcon, size: 16, color: deltaColor),
               const SizedBox(width: 6),
               Flexible(
-                child: Text(
-                  deltaText,
+                child: Text.rich(
+                  TextSpan(
+                    text: deltaText,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: deltaColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    children: deltaPeriodLabel == null
+                        ? null
+                        : [
+                            TextSpan(
+                              text: '  $deltaPeriodLabel',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: HomeTokens.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: deltaColor,
-                    fontWeight: FontWeight.w800,
-                  ),
                 ),
               ),
             ],
@@ -628,32 +649,18 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
           const SizedBox(height: 18),
           const Divider(height: 1, thickness: 1, color: HomeTokens.border),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '$trusted of $total items trusted',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: HomeTokens.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (review > 0)
-                Text(
-                  '$review need value',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: HomeTokens.warning,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-            ],
+          Text(
+            '$trusted of $total items trusted',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 10),
           _TrustBar(trusted: trusted, review: review),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           SizedBox(
             key: const ValueKey('home-value-hero-cta'),
             width: double.infinity,
@@ -702,10 +709,10 @@ class _GainLossChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (values.length < 2) {
-      return const SizedBox(height: 96);
+      return const SizedBox(height: 84);
     }
     return SizedBox(
-      height: 96,
+      height: 84,
       width: double.infinity,
       child: CustomPaint(
         painter: _GainLossPainter(values: values, baseline: baseline),
@@ -1854,6 +1861,7 @@ class _HomeViewData {
   bool get hasPartialValuation => itemCount > 0 && unvaluedCount > 0;
   bool get hasRealMetrics => itemCount > 0;
   bool get hasStateAlert => hasPartialValuation;
+  int get attentionCount => unvaluedCount + triggeredAlertCount;
   bool get hasMovers => topGainer != null || topLoser != null;
   bool get hasAttention =>
       itemCount > 0 && (unvaluedCount > 0 || triggeredAlertCount > 0);
