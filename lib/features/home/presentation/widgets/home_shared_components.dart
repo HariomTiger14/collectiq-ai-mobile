@@ -88,8 +88,8 @@ class HomeBrandLockup extends StatelessWidget {
                     ? '$alertCount ${alertCount == 1 ? 'item needs' : 'items need'} attention'
                     : 'Collection alert',
                 onPressed: onAlertPressed,
-                icon: const Icon(Icons.priority_high_rounded),
-                color: HomeTokens.warning,
+                icon: const Icon(Icons.notifications_none_rounded),
+                color: HomeTokens.textPrimary,
                 style: IconButton.styleFrom(
                   backgroundColor: HomeTokens.surfaceRaised,
                   side: const BorderSide(color: HomeTokens.border),

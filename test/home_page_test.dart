@@ -459,6 +459,18 @@ void main() {
     );
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
+
+  testWidgets('alert bell opens the needs-attention sheet', (tester) async {
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.partial));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.byKey(const ValueKey('home-attention-sheet')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('home-alert-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home-attention-sheet')), findsOneWidget);
+    expect(find.text('Needs attention'), findsOneWidget);
+  });
 }
 
 Widget _homeApp({

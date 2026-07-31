@@ -238,6 +238,34 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
+  void _openFilteredPortfolio() {
+    ref
+        .read(portfolioFocusProvider.notifier)
+        .request(PortfolioFocus.needsValuation);
+    widget.onPortfolioPressed?.call();
+  }
+
+  void _showAttentionSheet(BuildContext context, _HomeViewData data) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      isScrollControlled: true,
+      builder: (sheetContext) => _AttentionSheet(
+        data: data,
+        canReviewPortfolio: widget.onPortfolioPressed != null,
+        onReviewValuations: () {
+          Navigator.of(sheetContext).pop();
+          _openFilteredPortfolio();
+        },
+        onReviewAlerts: () {
+          Navigator.of(sheetContext).pop();
+          widget.onPortfolioPressed?.call();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activePreviewScenario =
@@ -316,6 +344,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                   child: HomeBrandLockup(
                     showAlert: homeData.hasStateAlert,
                     alertCount: homeData.attentionCount,
+                    onAlertPressed: () =>
+                        _showAttentionSheet(context, homeData),
                   ),
                 ),
                 HomeSection(
@@ -1597,6 +1627,177 @@ class _AttentionStrip extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             const Icon(Icons.chevron_right, color: HomeTokens.textSecondary),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet opened from the brand alert bell — lists what currently needs
+/// attention, with rows that jump to the relevant Portfolio view.
+class _AttentionSheet extends StatelessWidget {
+  const _AttentionSheet({
+    required this.data,
+    required this.canReviewPortfolio,
+    required this.onReviewValuations,
+    required this.onReviewAlerts,
+  });
+
+  final _HomeViewData data;
+  final bool canReviewPortfolio;
+  final VoidCallback onReviewValuations;
+  final VoidCallback onReviewAlerts;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final unvalued = data.unvaluedCount;
+    final alerts = data.triggeredAlertCount;
+    final total = data.attentionCount;
+
+    return Theme(
+      data: AppTheme.dark,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Container(
+            key: const ValueKey('home-attention-sheet'),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            decoration: BoxDecoration(
+              color: HomeTokens.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: HomeTokens.border),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: HomeTokens.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Needs attention',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  total == 1
+                      ? '1 thing to review in your collection.'
+                      : '$total things to review in your collection.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: HomeTokens.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (unvalued > 0)
+                  _AttentionSheetRow(
+                    icon: Icons.error_outline,
+                    iconColor: HomeTokens.warning,
+                    title:
+                        '$unvalued ${unvalued == 1 ? 'item needs' : 'items need'} a valuation',
+                    subtitle:
+                        'Add trusted values so your total reflects them.',
+                    onTap: canReviewPortfolio ? onReviewValuations : null,
+                  ),
+                if (alerts > 0) ...[
+                  if (unvalued > 0) const SizedBox(height: 10),
+                  _AttentionSheetRow(
+                    icon: Icons.notifications_active_outlined,
+                    iconColor: HomeTokens.negative,
+                    title:
+                        '$alerts price ${alerts == 1 ? 'alert' : 'alerts'} triggered',
+                    subtitle: 'Review items that hit your target price.',
+                    onTap: canReviewPortfolio ? onReviewAlerts : null,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttentionSheetRow extends StatelessWidget {
+  const _AttentionSheetRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: HomeTokens.surfaceRaised,
+      borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                const Icon(
+                  Icons.chevron_right,
+                  color: HomeTokens.textSecondary,
+                ),
+            ],
+          ),
         ),
       ),
     );
