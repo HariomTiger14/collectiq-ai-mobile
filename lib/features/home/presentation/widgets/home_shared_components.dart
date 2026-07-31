@@ -1542,7 +1542,10 @@ class HomeCategoryTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-          constraints: const BoxConstraints(minHeight: 74, minWidth: 48),
+          // Taller floor reserves room for two-line labels (e.g. "Video Games",
+          // "One Piece") so long names wrap instead of truncating, while short
+          // ones still sit on a uniform tile height.
+          constraints: const BoxConstraints(minHeight: 92, minWidth: 48),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -1563,11 +1566,13 @@ class HomeCategoryTile extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 label,
-                maxLines: 1,
+                maxLines: 2,
+                textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: HomeTokens.textPrimary,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
                 ),
               ),
             ],
