@@ -441,6 +441,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   HomeSection(
                     topPadding: AppSpacing.xl,
+                    child: _RecentItemsPreview(
+                      data: homeData,
+                      onOpenPortfolio: widget.onPortfolioPressed,
+                    ),
+                  ),
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
+                    child: _CollectionHealthSection(data: homeData),
+                  ),
+                  // Supported categories is a discovery/reference surface, so it
+                  // sits in the bottom zone rather than competing with the
+                  // personal data (and its own category mix) higher up.
+                  HomeSection(
+                    topPadding: AppSpacing.xl,
                     child: _CategoryExplorer(
                       onCategoryTap: (category) => _openCategoryOverview(
                         context,
@@ -451,36 +465,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
                   ),
-                  HomeSection(
-                    topPadding: AppSpacing.xl,
-                    child: _RecentItemsPreview(
-                      data: homeData,
-                      onOpenPortfolio: widget.onPortfolioPressed,
-                    ),
-                  ),
-                  HomeSection(
-                    topPadding: AppSpacing.xl,
-                    child: _CollectionHealthSection(data: homeData),
-                  ),
-                  if (homeData.mostRecentItem != null)
-                    HomeSection(
-                      topPadding: AppSpacing.xl,
-                      child: _HomeActionStack(
-                        actions: [
-                          HomeActionRow(
-                            keySeed: 'recent-scan',
-                            icon: Icons.monitor_heart_outlined,
-                            title: 'Recent scan',
-                            subtitle: homeData.mostRecentItem!.title,
-                            iconColor: HomeTokens.categoryMore,
-                            onTap: () => _openCollectibleDetail(
-                              context,
-                              homeData.mostRecentItem!,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   const HomeSection(
                     topPadding: AppSpacing.xl,
                     bottomPadding: AppSpacing.xxl,
@@ -1467,24 +1451,6 @@ const _supportedCategories = [
     color: HomeTokens.categoryFigures,
   ),
 ];
-
-class _HomeActionStack extends StatelessWidget {
-  const _HomeActionStack({required this.actions});
-
-  final List<Widget> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(height: HomeTokens.cardGap),
-          actions[i],
-        ],
-      ],
-    );
-  }
-}
 
 class _PortfolioMoversSection extends StatelessWidget {
   const _PortfolioMoversSection({required this.data});

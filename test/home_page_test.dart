@@ -52,27 +52,6 @@ void main() {
 
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-section-category-explorer')),
-    );
-    expect(find.text('Supported categories'), findsOneWidget);
-    expect(find.text('Cards'), findsOneWidget);
-    expect(find.text('Pokémon'), findsOneWidget);
-    expect(find.text('MTG'), findsOneWidget);
-    expect(find.text('Yu-Gi-Oh'), findsOneWidget);
-    expect(find.text('One Piece'), findsOneWidget);
-    expect(find.text('Video Games'), findsOneWidget);
-    expect(find.text('Sneakers'), findsOneWidget);
-    expect(find.text('Comics'), findsOneWidget);
-    expect(find.text('LEGO'), findsOneWidget);
-    expect(find.text('Funko'), findsOneWidget);
-    expect(find.text('Coins'), findsOneWidget);
-    expect(find.text('Sports'), findsOneWidget);
-    expect(find.text('Watches'), findsNothing);
-    expect(find.text('Toys'), findsNothing);
-    expect(find.text('Memorabilia'), findsNothing);
-
-    await _scrollUntilVisible(
-      tester,
       find.byKey(const ValueKey('home-section-recent-items-preview')),
     );
     expect(find.text('Recent items'), findsOneWidget);
@@ -85,23 +64,34 @@ void main() {
     expect(find.text('Collection health'), findsOneWidget);
     expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
     expect(find.text('Cards'), findsWidgets);
+
+    // Supported categories is demoted to the bottom reference zone.
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-recent-scan')),
+      find.byKey(const ValueKey('home-section-category-explorer')),
     );
+    expect(find.text('Supported categories'), findsOneWidget);
+    // Assert the labels unique to the grid (the rest also appear in the
+    // collection-health mix above, which is still built at this scroll).
+    expect(find.text('Pokémon'), findsOneWidget);
+    expect(find.text('MTG'), findsOneWidget);
+    expect(find.text('Yu-Gi-Oh'), findsOneWidget);
+    expect(find.text('One Piece'), findsOneWidget);
+    expect(find.text('Funko'), findsOneWidget);
+    expect(find.text('Sports'), findsOneWidget);
+    expect(find.text('Watches'), findsNothing);
+    expect(find.text('Toys'), findsNothing);
+    expect(find.text('Memorabilia'), findsNothing);
+
+    // Recent scan was removed (it duplicated the top of Recent items).
     expect(
-      find.byKey(const ValueKey('home-action-scan-collectible')),
+      find.byKey(const ValueKey('home-action-recent-scan')),
       findsNothing,
     );
     expect(
       find.byKey(const ValueKey('home-action-market-insights')),
       findsNothing,
     );
-    expect(
-      find.byKey(const ValueKey('home-action-recent-scan')),
-      findsOneWidget,
-    );
-    expect(find.text('Premium Charizard'), findsWidgets);
   });
 
   testWidgets(
@@ -327,7 +317,7 @@ void main() {
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
-  testWidgets('recent scan row opens the existing collectible detail route', (
+  testWidgets('recent item card opens the existing collectible detail route', (
     tester,
   ) async {
     await tester.pumpWidget(_homeApp());
@@ -335,9 +325,9 @@ void main() {
 
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-recent-scan')),
+      find.byKey(const ValueKey('home-section-recent-items-preview')),
     );
-    await tester.tap(find.byKey(const ValueKey('home-action-recent-scan')));
+    await tester.tap(find.text('Premium Charizard').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(CollectibleDetailPage), findsOneWidget);
