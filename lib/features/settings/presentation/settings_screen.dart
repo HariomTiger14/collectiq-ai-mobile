@@ -23,7 +23,8 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/demo_price_alert_seed_service.dart';
-import 'package:collectiq_ai/features/notifications/data/notification_seen_store.dart';
+import 'package:collectiq_ai/features/notifications/data/notification_event_store.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
 import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -408,11 +409,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         currentTotalValue: portfolio.totalValue,
         itemCount: portfolio.itemCount,
       );
-      // Seed a few triggered price alerts so the notification inbox has content.
-      await const DemoPriceAlertSeedService().seed(
+      // Seed a few triggered price alerts and mirror them into the notification
+      // event log so the inbox has content.
+      final seededAlerts = await const DemoPriceAlertSeedService().seed(
         repository: ref.read(priceAlertRepositoryProvider),
         items: portfolio.items,
       );
+      const eventStore = NotificationEventStore();
+      for (final alert in seededAlerts) {
+        await eventStore.append(NotificationEvent.fromPriceAlert(alert));
+      }
       if (mounted) {
         _showSettingsSnackBar('Seeded $count demo/mock collectibles locally.');
       }
@@ -438,7 +444,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await const DemoPriceAlertSeedService().clear(
         ref.read(priceAlertRepositoryProvider),
       );
-      await const NotificationSeenStore().clear();
+      await const NotificationEventStore().clear();
       if (mounted) {
         _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
       }

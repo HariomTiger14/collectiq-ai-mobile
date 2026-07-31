@@ -10,7 +10,9 @@ class DemoPriceAlertSeedService {
 
   static const _demoPrefix = 'packlox-demo-alert-';
 
-  Future<void> seed({
+  /// Seeds triggered alerts and returns them so callers can mirror them into
+  /// the notification event log.
+  Future<List<PriceAlert>> seed({
     required PriceAlertRepository repository,
     required List<CollectibleItem> items,
     DateTime? now,
@@ -19,7 +21,7 @@ class DemoPriceAlertSeedService {
         .where((item) => item.estimatedValue > 0)
         .toList(growable: false);
     if (valued.isEmpty) {
-      return;
+      return const [];
     }
     final today = now ?? DateTime.now();
     final ranked = [...valued]
@@ -47,34 +49,36 @@ class DemoPriceAlertSeedService {
       ),
     ];
 
+    final created = <PriceAlert>[];
     for (var index = 0; index < picks.length; index++) {
       final item = picks[index];
       final spec = specs[index % specs.length];
       final triggeredAt = today.subtract(Duration(hours: spec.hoursAgo));
-      await repository.saveAlert(
-        PriceAlert(
-          id: '$_demoPrefix${item.id}',
-          itemId: item.id,
-          itemTitle: item.title,
-          rule: PriceAlertRule(
-            type: spec.rule,
-            amount: spec.rule == PriceAlertRuleType.priceRisesAboveAmount
-                ? item.estimatedValue * 0.9
-                : null,
-            percentage: spec.rule == PriceAlertRuleType.percentageIncrease
-                ? 10
-                : null,
-            staleAfterDays:
-                spec.rule == PriceAlertRuleType.stalePricingReminder ? 30 : null,
-          ),
-          status: PriceAlertStatus.triggered,
-          createdAt: triggeredAt.subtract(const Duration(days: 4)),
-          updatedAt: triggeredAt,
-          triggeredAt: triggeredAt,
-          message: spec.message(item),
+      final alert = PriceAlert(
+        id: '$_demoPrefix${item.id}',
+        itemId: item.id,
+        itemTitle: item.title,
+        rule: PriceAlertRule(
+          type: spec.rule,
+          amount: spec.rule == PriceAlertRuleType.priceRisesAboveAmount
+              ? item.estimatedValue * 0.9
+              : null,
+          percentage: spec.rule == PriceAlertRuleType.percentageIncrease
+              ? 10
+              : null,
+          staleAfterDays:
+              spec.rule == PriceAlertRuleType.stalePricingReminder ? 30 : null,
         ),
+        status: PriceAlertStatus.triggered,
+        createdAt: triggeredAt.subtract(const Duration(days: 4)),
+        updatedAt: triggeredAt,
+        triggeredAt: triggeredAt,
+        message: spec.message(item),
       );
+      await repository.saveAlert(alert);
+      created.add(alert);
     }
+    return created;
   }
 
   Future<void> clear(PriceAlertRepository repository) async {

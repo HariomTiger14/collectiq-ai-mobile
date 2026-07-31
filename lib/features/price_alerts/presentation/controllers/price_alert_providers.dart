@@ -8,6 +8,8 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.d
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
+import 'package:collectiq_ai/features/notifications/presentation/controllers/notification_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,6 +58,13 @@ final priceAlertSummaryProvider =
             previousAlert.message != evaluation.alert.message ||
             previousAlert.triggeredAt != evaluation.alert.triggeredAt) {
           await repository.saveAlert(evaluation.alert);
+        }
+        // Log a notification event on a fresh trigger. The event store dedupes
+        // by alertId@triggeredAt, so re-evaluations never double-log.
+        if (evaluation.triggered && evaluation.alert.isTriggered) {
+          await ref
+              .read(notificationEventStoreProvider)
+              .append(NotificationEvent.fromPriceAlert(evaluation.alert));
         }
       }
       unawaited(

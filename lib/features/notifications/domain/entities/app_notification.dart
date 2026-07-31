@@ -1,13 +1,7 @@
-import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
 
-/// Visual grouping for a notification, driving its icon and tone.
-enum NotificationKind { priceUp, priceDown, stale, generic }
-
-/// A single, event-shaped notification shown in the inbox.
-///
-/// Today these are derived from triggered [PriceAlert]s, but the shape is
-/// deliberately alert-agnostic so future event sources (valuation-ready,
-/// portfolio milestones, …) can map into the same inbox.
+/// UI view-model for a single inbox notification, built from a persisted
+/// [NotificationEvent].
 class AppNotification {
   const AppNotification({
     required this.id,
@@ -16,6 +10,7 @@ class AppNotification {
     required this.body,
     required this.createdAt,
     required this.kind,
+    required this.isRead,
   });
 
   final String id;
@@ -26,44 +21,17 @@ class AppNotification {
   final String body;
   final DateTime createdAt;
   final NotificationKind kind;
+  final bool isRead;
 
-  /// Stable key for a single trigger *event*. Keyed by id + timestamp so a
-  /// dismissed notification stays dismissed, but a later re-trigger of the
-  /// same alert (new timestamp) surfaces again.
-  String get dismissKey => '$id@${createdAt.toIso8601String()}';
-
-  factory AppNotification.fromPriceAlert(PriceAlert alert) {
-    final kind = switch (alert.rule.type) {
-      PriceAlertRuleType.priceRisesAboveAmount ||
-      PriceAlertRuleType.percentageIncrease => NotificationKind.priceUp,
-      PriceAlertRuleType.priceDropsBelowAmount ||
-      PriceAlertRuleType.percentageDecrease => NotificationKind.priceDown,
-      PriceAlertRuleType.stalePricingReminder => NotificationKind.stale,
-    };
+  factory AppNotification.fromEvent(NotificationEvent event) {
     return AppNotification(
-      id: alert.id,
-      itemId: alert.itemId,
-      title: alert.itemTitle,
-      body: (alert.message != null && alert.message!.trim().isNotEmpty)
-          ? alert.message!
-          : _defaultBody(alert.rule.type),
-      createdAt: alert.triggeredAt ?? alert.updatedAt,
-      kind: kind,
+      id: event.id,
+      itemId: event.itemId,
+      title: event.title,
+      body: event.body,
+      createdAt: event.createdAt,
+      kind: event.kind,
+      isRead: event.isRead,
     );
-  }
-
-  static String _defaultBody(PriceAlertRuleType type) {
-    return switch (type) {
-      PriceAlertRuleType.priceRisesAboveAmount =>
-        'Price rose above your target.',
-      PriceAlertRuleType.priceDropsBelowAmount =>
-        'Price dropped below your target.',
-      PriceAlertRuleType.percentageIncrease =>
-        'Value climbed past your alert threshold.',
-      PriceAlertRuleType.percentageDecrease =>
-        'Value fell past your alert threshold.',
-      PriceAlertRuleType.stalePricingReminder =>
-        'Pricing looks stale — refresh to keep the value accurate.',
-    };
   }
 }

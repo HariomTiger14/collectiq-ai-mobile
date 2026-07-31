@@ -1,5 +1,6 @@
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/notifications/domain/entities/app_notification.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
 import 'package:collectiq_ai/features/notifications/presentation/controllers/notification_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -7,9 +8,10 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Inbox of event-shaped notifications (triggered price alerts). Each row
-/// deep-links to the relevant item's detail page. The list is a rolling window
-/// (see [notificationInboxProvider]) with swipe-to-dismiss and Clear all.
+/// Inbox of notification events (from the persistent log). Rows deep-link to
+/// the relevant item; supports per-row swipe-to-dismiss and Clear all. The
+/// list is held in local state so dismissals remove rows synchronously (a
+/// Dismissible must leave the tree the same frame it is dismissed).
 class NotificationInboxScreen extends ConsumerStatefulWidget {
   const NotificationInboxScreen({super.key});
 
@@ -20,49 +22,70 @@ class NotificationInboxScreen extends ConsumerStatefulWidget {
 
 class _NotificationInboxScreenState
     extends ConsumerState<NotificationInboxScreen> {
-  // Captured before we mark the inbox seen, so this visit still shows which
-  // notifications are new (unread) since the previous visit.
-  DateTime? _lastSeen;
-  bool _seenCaptured = false;
+  List<AppNotification>? _items;
+  final Set<String> _unreadAtOpen = <String>{};
+  bool _errored = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _captureThenMarkSeen());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _captureThenMarkSeen() async {
-    final store = ref.read(notificationSeenStoreProvider);
-    final last = await store.lastSeenAt();
-    if (!mounted) {
-      return;
+  Future<void> _load() async {
+    try {
+      final items = await ref.read(notificationInboxProvider.future);
+      if (!mounted) {
+        return;
+      }
+      final unreadIds = items
+          .where((i) => !i.isRead)
+          .map((i) => i.id)
+          .toList();
+      setState(() {
+        _items = items;
+        _unreadAtOpen
+          ..clear()
+          ..addAll(unreadIds);
+      });
+      // Opening the inbox marks everything read and clears the badge.
+      if (unreadIds.isNotEmpty) {
+        await ref
+            .read(notificationEventStoreProvider)
+            .markRead(unreadIds, DateTime.now());
+        if (!mounted) {
+          return;
+        }
+        ref.invalidate(unreadNotificationCountProvider);
+        ref.invalidate(notificationInboxProvider);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errored = true);
+      }
     }
-    setState(() {
-      _lastSeen = last;
-      _seenCaptured = true;
-    });
-    // Opening the inbox clears the unread badge for next time.
-    await store.markSeen(DateTime.now());
-    if (!mounted) {
-      return;
-    }
-    ref.invalidate(unreadNotificationCountProvider);
   }
 
-  bool _isUnread(AppNotification n) {
-    if (!_seenCaptured) {
-      return false;
-    }
-    return _lastSeen == null || n.createdAt.isAfter(_lastSeen!);
-  }
-
-  Future<void> _dismiss(Iterable<String> keys) async {
-    await ref.read(notificationSeenStoreProvider).dismiss(keys);
+  Future<void> _persistDelete(Iterable<String> ids) async {
+    await ref.read(notificationEventStoreProvider).delete(ids);
     if (!mounted) {
       return;
     }
     ref.invalidate(notificationInboxProvider);
     ref.invalidate(unreadNotificationCountProvider);
+  }
+
+  void _dismiss(AppNotification notification) {
+    setState(() {
+      _items = _items!.where((i) => i.id != notification.id).toList();
+    });
+    _persistDelete([notification.id]);
+  }
+
+  void _clearAll() {
+    final ids = _items!.map((i) => i.id).toList();
+    setState(() => _items = <AppNotification>[]);
+    _persistDelete(ids);
   }
 
   void _openItem(AppNotification notification) {
@@ -88,8 +111,7 @@ class _NotificationInboxScreenState
 
   @override
   Widget build(BuildContext context) {
-    final inbox = ref.watch(notificationInboxProvider);
-    final items = inbox.asData?.value ?? const <AppNotification>[];
+    final items = _items;
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
@@ -104,10 +126,10 @@ class _NotificationInboxScreenState
             style: TextStyle(fontWeight: FontWeight.w900),
           ),
           actions: [
-            if (items.isNotEmpty)
+            if (items != null && items.isNotEmpty)
               TextButton(
                 key: const ValueKey('notification-clear-all'),
-                onPressed: () => _dismiss(items.map((n) => n.dismissKey)),
+                onPressed: _clearAll,
                 child: const Text(
                   'Clear all',
                   style: TextStyle(
@@ -118,44 +140,47 @@ class _NotificationInboxScreenState
               ),
           ],
         ),
-        body: inbox.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const _InboxMessage(
-            icon: Icons.cloud_off_rounded,
-            title: 'Couldn\'t load notifications',
-            body: 'Check your connection and try again.',
-          ),
-          data: (notifications) {
-            if (notifications.isEmpty) {
-              return const _InboxMessage(
-                icon: Icons.notifications_none_rounded,
-                title: 'You\'re all caught up',
-                body:
-                    'Price-alert notifications for your items will show up here.',
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, index) {
-                final notification = notifications[index];
-                return Dismissible(
-                  key: ValueKey('notification-${notification.dismissKey}'),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) => _dismiss([notification.dismissKey]),
-                  background: const _DismissBackground(),
-                  child: _NotificationRow(
-                    notification: notification,
-                    unread: _isUnread(notification),
-                    onTap: () => _openItem(notification),
-                  ),
-                );
-              },
-            );
-          },
-        ),
+        body: _buildBody(items),
       ),
+    );
+  }
+
+  Widget _buildBody(List<AppNotification>? items) {
+    if (_errored) {
+      return const _InboxMessage(
+        icon: Icons.cloud_off_rounded,
+        title: 'Couldn\'t load notifications',
+        body: 'Check your connection and try again.',
+      );
+    }
+    if (items == null) {
+      return const SizedBox.shrink();
+    }
+    if (items.isEmpty) {
+      return const _InboxMessage(
+        icon: Icons.notifications_none_rounded,
+        title: 'You\'re all caught up',
+        body: 'Price-alert notifications for your items will show up here.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, index) {
+        final notification = items[index];
+        return Dismissible(
+          key: ValueKey('notification-${notification.id}'),
+          direction: DismissDirection.endToStart,
+          onDismissed: (_) => _dismiss(notification),
+          background: const _DismissBackground(),
+          child: _NotificationRow(
+            notification: notification,
+            unread: _unreadAtOpen.contains(notification.id),
+            onTap: () => _openItem(notification),
+          ),
+        );
+      },
     );
   }
 }
