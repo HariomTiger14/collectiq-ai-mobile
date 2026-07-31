@@ -414,12 +414,14 @@ void main() {
       find.byKey(const ValueKey('home-preview-scenario-picker')),
       findsNothing,
     );
+    // The bell is a persistent inbox entry point whenever a collection exists
+    // (checked at the top before scrolling it out of the lazy list).
+    expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
     await _scrollUntilVisible(
       tester,
       find.byKey(const ValueKey('home-section-collection-health')),
     );
     expect(find.text('Collection health'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.loading));
     await tester.pump(const Duration(milliseconds: 120));
@@ -460,16 +462,22 @@ void main() {
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
-  testWidgets('alert bell opens the needs-attention sheet', (tester) async {
+  testWidgets('alert bell opens the notification inbox', (tester) async {
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.partial));
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.byKey(const ValueKey('home-attention-sheet')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('notification-inbox-screen')),
+      findsNothing,
+    );
     await tester.tap(find.byKey(const ValueKey('home-alert-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('home-attention-sheet')), findsOneWidget);
-    expect(find.text('Needs attention'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-inbox-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Notifications'), findsOneWidget);
   });
 }
 
@@ -499,18 +507,23 @@ Widget _homeApp({
 }
 
 Widget _previewHomeApp(HomePreviewScenario scenario) {
-  return MaterialApp(
-    theme: AppTheme.light,
-    darkTheme: AppTheme.dark,
-    // Key per scenario so swapping scenarios recreates the HomePage state
-    // (fresh scroll controller at offset 0) rather than reusing the previous
-    // scenario's scroll position.
-    home: HomePage(
-      key: ValueKey(scenario),
-      previewScenario: scenario,
-      onScanPressed: () {},
-      onSampleScanPressed: () {},
-      onPortfolioPressed: () {},
+  // ProviderScope so routes pushed from Home (e.g. the notification inbox,
+  // which always reads providers) resolve a container. HomePage itself
+  // short-circuits ref access in preview mode.
+  return ProviderScope(
+    child: MaterialApp(
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      // Key per scenario so swapping scenarios recreates the HomePage state
+      // (fresh scroll controller at offset 0) rather than reusing the previous
+      // scenario's scroll position.
+      home: HomePage(
+        key: ValueKey(scenario),
+        previewScenario: scenario,
+        onScanPressed: () {},
+        onSampleScanPressed: () {},
+        onPortfolioPressed: () {},
+      ),
     ),
   );
 }

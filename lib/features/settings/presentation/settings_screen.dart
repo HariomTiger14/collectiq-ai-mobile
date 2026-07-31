@@ -21,6 +21,8 @@ import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_comp
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/services/demo_price_alert_seed_service.dart';
 import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -405,6 +407,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         currentTotalValue: portfolio.totalValue,
         itemCount: portfolio.itemCount,
       );
+      // Seed a few triggered price alerts so the notification inbox has content.
+      await const DemoPriceAlertSeedService().seed(
+        repository: ref.read(priceAlertRepositoryProvider),
+        items: portfolio.items,
+      );
       if (mounted) {
         _showSettingsSnackBar('Seeded $count demo/mock collectibles locally.');
       }
@@ -426,6 +433,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           .clearDemoItems();
       await const DemoValueHistorySeedService().clear(
         ref.read(portfolioHistoryRepositoryProvider),
+      );
+      await const DemoPriceAlertSeedService().clear(
+        ref.read(priceAlertRepositoryProvider),
       );
       if (mounted) {
         _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
