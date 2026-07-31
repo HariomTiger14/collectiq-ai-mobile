@@ -23,6 +23,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/demo_price_alert_seed_service.dart';
+import 'package:collectiq_ai/features/notifications/data/notification_seen_store.dart';
 import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -437,6 +438,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await const DemoPriceAlertSeedService().clear(
         ref.read(priceAlertRepositoryProvider),
       );
+      await const NotificationSeenStore().clear();
       if (mounted) {
         _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
       }

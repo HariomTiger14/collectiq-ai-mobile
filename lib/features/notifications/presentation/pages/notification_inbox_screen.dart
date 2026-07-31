@@ -8,7 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Inbox of event-shaped notifications (triggered price alerts). Each row
-/// deep-links to the relevant item's detail page.
+/// deep-links to the relevant item's detail page. The list is a rolling window
+/// (see [notificationInboxProvider]) with swipe-to-dismiss and Clear all.
 class NotificationInboxScreen extends ConsumerStatefulWidget {
   const NotificationInboxScreen({super.key});
 
@@ -19,18 +20,48 @@ class NotificationInboxScreen extends ConsumerStatefulWidget {
 
 class _NotificationInboxScreenState
     extends ConsumerState<NotificationInboxScreen> {
+  // Captured before we mark the inbox seen, so this visit still shows which
+  // notifications are new (unread) since the previous visit.
+  DateTime? _lastSeen;
+  bool _seenCaptured = false;
+
   @override
   void initState() {
     super.initState();
-    // Opening the inbox clears the unread badge.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _markSeen());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _captureThenMarkSeen());
   }
 
-  Future<void> _markSeen() async {
-    await ref.read(notificationSeenStoreProvider).markSeen(DateTime.now());
+  Future<void> _captureThenMarkSeen() async {
+    final store = ref.read(notificationSeenStoreProvider);
+    final last = await store.lastSeenAt();
     if (!mounted) {
       return;
     }
+    setState(() {
+      _lastSeen = last;
+      _seenCaptured = true;
+    });
+    // Opening the inbox clears the unread badge for next time.
+    await store.markSeen(DateTime.now());
+    if (!mounted) {
+      return;
+    }
+    ref.invalidate(unreadNotificationCountProvider);
+  }
+
+  bool _isUnread(AppNotification n) {
+    if (!_seenCaptured) {
+      return false;
+    }
+    return _lastSeen == null || n.createdAt.isAfter(_lastSeen!);
+  }
+
+  Future<void> _dismiss(Iterable<String> keys) async {
+    await ref.read(notificationSeenStoreProvider).dismiss(keys);
+    if (!mounted) {
+      return;
+    }
+    ref.invalidate(notificationInboxProvider);
     ref.invalidate(unreadNotificationCountProvider);
   }
 
@@ -58,6 +89,7 @@ class _NotificationInboxScreenState
   @override
   Widget build(BuildContext context) {
     final inbox = ref.watch(notificationInboxProvider);
+    final items = inbox.asData?.value ?? const <AppNotification>[];
     return Theme(
       data: AppTheme.dark,
       child: Scaffold(
@@ -71,10 +103,24 @@ class _NotificationInboxScreenState
             'Notifications',
             style: TextStyle(fontWeight: FontWeight.w900),
           ),
+          actions: [
+            if (items.isNotEmpty)
+              TextButton(
+                key: const ValueKey('notification-clear-all'),
+                onPressed: () => _dismiss(items.map((n) => n.dismissKey)),
+                child: const Text(
+                  'Clear all',
+                  style: TextStyle(
+                    color: HomeTokens.accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
         ),
         body: inbox.when(
           loading: () => const SizedBox.shrink(),
-          error: (_, _) => _InboxMessage(
+          error: (_, _) => const _InboxMessage(
             icon: Icons.cloud_off_rounded,
             title: 'Couldn\'t load notifications',
             body: 'Check your connection and try again.',
@@ -92,10 +138,20 @@ class _NotificationInboxScreenState
               padding: const EdgeInsets.all(16),
               itemCount: notifications.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, index) => _NotificationRow(
-                notification: notifications[index],
-                onTap: () => _openItem(notifications[index]),
-              ),
+              itemBuilder: (_, index) {
+                final notification = notifications[index];
+                return Dismissible(
+                  key: ValueKey('notification-${notification.dismissKey}'),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => _dismiss([notification.dismissKey]),
+                  background: const _DismissBackground(),
+                  child: _NotificationRow(
+                    notification: notification,
+                    unread: _isUnread(notification),
+                    onTap: () => _openItem(notification),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -104,10 +160,32 @@ class _NotificationInboxScreenState
   }
 }
 
+class _DismissBackground extends StatelessWidget {
+  const _DismissBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 24),
+      decoration: BoxDecoration(
+        color: HomeTokens.negative.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(HomeTokens.cardRadius),
+      ),
+      child: const Icon(Icons.close_rounded, color: HomeTokens.negative),
+    );
+  }
+}
+
 class _NotificationRow extends StatelessWidget {
-  const _NotificationRow({required this.notification, required this.onTap});
+  const _NotificationRow({
+    required this.notification,
+    required this.unread,
+    required this.onTap,
+  });
 
   final AppNotification notification;
+  final bool unread;
   final VoidCallback onTap;
 
   @override
@@ -115,7 +193,7 @@ class _NotificationRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final (icon, color) = _visualFor(notification.kind);
     return Material(
-      color: HomeTokens.surface,
+      color: unread ? HomeTokens.surfaceRaised : HomeTokens.surface,
       borderRadius: BorderRadius.circular(HomeTokens.cardRadius),
       child: InkWell(
         onTap: onTap,
@@ -141,14 +219,29 @@ class _NotificationRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+                        if (unread)
+                          Container(
+                            key: const ValueKey('notification-unread-dot'),
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: const BoxDecoration(
+                              color: HomeTokens.accent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                         Expanded(
                           child: Text(
                             notification.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: textTheme.titleSmall?.copyWith(
-                              color: HomeTokens.textPrimary,
-                              fontWeight: FontWeight.w800,
+                              color: unread
+                                  ? HomeTokens.textPrimary
+                                  : HomeTokens.textSecondary,
+                              fontWeight: unread
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
                             ),
                           ),
                         ),
@@ -173,10 +266,7 @@ class _NotificationRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
-                Icons.chevron_right,
-                color: HomeTokens.textSecondary,
-              ),
+              const Icon(Icons.chevron_right, color: HomeTokens.textSecondary),
             ],
           ),
         ),

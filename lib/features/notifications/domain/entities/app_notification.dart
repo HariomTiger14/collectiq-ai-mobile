@@ -27,6 +27,11 @@ class AppNotification {
   final DateTime createdAt;
   final NotificationKind kind;
 
+  /// Stable key for a single trigger *event*. Keyed by id + timestamp so a
+  /// dismissed notification stays dismissed, but a later re-trigger of the
+  /// same alert (new timestamp) surfaces again.
+  String get dismissKey => '$id@${createdAt.toIso8601String()}';
+
   factory AppNotification.fromPriceAlert(PriceAlert alert) {
     final kind = switch (alert.rule.type) {
       PriceAlertRuleType.priceRisesAboveAmount ||
