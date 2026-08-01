@@ -712,6 +712,7 @@ class HomeStateContainer extends StatelessWidget {
     this.storageKey = 'home-scroll-position',
     this.topPadding = AppSpacing.xs,
     this.bottomClearance = HomeTokens.bottomContentClearance,
+    this.onRefresh,
     super.key,
   });
 
@@ -720,6 +721,10 @@ class HomeStateContainer extends StatelessWidget {
   final String storageKey;
   final double topPadding;
   final double bottomClearance;
+
+  /// Pull-to-refresh handler. When set, wraps the scroll view in a
+  /// [RefreshIndicator] so Home can re-sync the portfolio on demand.
+  final Future<void> Function()? onRefresh;
 
   static double gutterForWidth(double width) {
     if (width < 360) {
@@ -739,7 +744,7 @@ class HomeStateContainer extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final gutter = gutterForWidth(constraints.maxWidth);
-        return CustomScrollView(
+        final scrollView = CustomScrollView(
           key: PageStorageKey<String>(storageKey),
           controller: controller,
           physics: const BouncingScrollPhysics(
@@ -757,6 +762,15 @@ class HomeStateContainer extends StatelessWidget {
               ),
             ),
           ],
+        );
+        if (onRefresh == null) {
+          return scrollView;
+        }
+        return RefreshIndicator(
+          onRefresh: onRefresh!,
+          color: HomeTokens.accent,
+          backgroundColor: HomeTokens.surfaceRaised,
+          child: scrollView,
         );
       },
     );

@@ -244,6 +244,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  Future<void> _handleHomeRefresh() async {
+    // Pull-to-refresh: re-sync the portfolio from the cloud so server-side
+    // changes (e.g. admin re-pricing) surface on Home. The controller reloads
+    // its item state, which cascades to the value, movers, and recent items.
+    await ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow();
+  }
+
   void _openMover(PortfolioValueMover mover) {
     final matches = ref
         .read(portfolioControllerProvider)
@@ -326,6 +333,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               bottomClearance: GlassBottomNavBar.scrollContentClearance(
                 context,
               ),
+              onRefresh: isPreview ? null : _handleHomeRefresh,
               sections: [
                 HomeSection(
                   topPadding: AppSpacing.sm,

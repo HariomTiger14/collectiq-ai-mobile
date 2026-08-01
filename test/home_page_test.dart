@@ -469,6 +469,13 @@ void main() {
     );
     expect(find.text('Notifications'), findsOneWidget);
   });
+
+  testWidgets('home is pull-to-refresh enabled', (tester) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+  });
 }
 
 Widget _homeApp({
