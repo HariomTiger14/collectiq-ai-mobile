@@ -82,21 +82,6 @@ class _AppShellState extends ConsumerState<AppShell>
     _selectTab(_scanTabIndex, reason: 'start-new-scan');
   }
 
-  void _startGalleryImport() {
-    ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
-    _selectTab(_scanTabIndex, reason: 'home-import-photo');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        ref
-            .read(scannerControllerProvider.notifier)
-            .pickImageFromGallery(context: context),
-      );
-    });
-  }
-
   void _openPortfolio() {
     _selectTab(AppShellTabController.portfolioTab, reason: 'home-portfolio');
   }
@@ -274,7 +259,6 @@ class _AppShellState extends ConsumerState<AppShell>
       iconAsset: PackLoxAssets.navHome,
       builder: (_) => HomeScreen(
         onScanPressed: _startNewScan,
-        onImportPhotoPressed: _startGalleryImport,
         onPortfolioPressed: _openPortfolio,
       ),
     ),

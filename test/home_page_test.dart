@@ -473,8 +473,6 @@ void main() {
 
 Widget _homeApp({
   VoidCallback? onScanPressed,
-  VoidCallback? onSampleScanPressed,
-  VoidCallback? onImportPhotoPressed,
   VoidCallback? onPortfolioPressed,
   PortfolioRepository? repository,
 }) {
@@ -488,8 +486,6 @@ Widget _homeApp({
       darkTheme: AppTheme.dark,
       home: HomePage(
         onScanPressed: onScanPressed,
-        onSampleScanPressed: onSampleScanPressed,
-        onImportPhotoPressed: onImportPhotoPressed,
         onPortfolioPressed: onPortfolioPressed,
       ),
     ),
@@ -511,7 +507,6 @@ Widget _previewHomeApp(HomePreviewScenario scenario) {
         key: ValueKey(scenario),
         previewScenario: scenario,
         onScanPressed: () {},
-        onSampleScanPressed: () {},
         onPortfolioPressed: () {},
       ),
     ),

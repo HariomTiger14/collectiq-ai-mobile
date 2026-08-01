@@ -189,8 +189,6 @@ class _HomePreviewClearTile extends StatelessWidget {
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     this.onScanPressed,
-    this.onSampleScanPressed,
-    this.onImportPhotoPressed,
     this.onPortfolioPressed,
     this.previewScenario,
     this.qaInitialScrollOffset = 0,
@@ -198,8 +196,6 @@ class HomePage extends ConsumerStatefulWidget {
   });
 
   final VoidCallback? onScanPressed;
-  final VoidCallback? onSampleScanPressed;
-  final VoidCallback? onImportPhotoPressed;
   final VoidCallback? onPortfolioPressed;
   final HomePreviewScenario? previewScenario;
   final double qaInitialScrollOffset;
@@ -246,6 +242,16 @@ class _HomePageState extends ConsumerState<HomePage> {
         builder: (_) => const NotificationInboxScreen(),
       ),
     );
+  }
+
+  void _openMover(PortfolioValueMover mover) {
+    final matches = ref
+        .read(portfolioControllerProvider)
+        .items
+        .where((candidate) => candidate.id == mover.itemId);
+    if (matches.isNotEmpty) {
+      _openCollectibleDetail(context, matches.first);
+    }
   }
 
   @override
@@ -437,7 +443,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                   if (homeData.hasMovers)
                     HomeSection(
                       topPadding: AppSpacing.xl,
-                      child: _PortfolioMoversSection(data: homeData),
+                      child: _PortfolioMoversSection(
+                        data: homeData,
+                        onMoverTap: isPreview ? null : _openMover,
+                      ),
                     ),
                   HomeSection(
                     topPadding: AppSpacing.xl,
@@ -1453,9 +1462,10 @@ const _supportedCategories = [
 ];
 
 class _PortfolioMoversSection extends StatelessWidget {
-  const _PortfolioMoversSection({required this.data});
+  const _PortfolioMoversSection({required this.data, this.onMoverTap});
 
   final _HomeViewData data;
+  final void Function(PortfolioValueMover mover)? onMoverTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1493,12 +1503,20 @@ class _PortfolioMoversSection extends StatelessWidget {
   }
 
   Widget _moverTile(PortfolioValueMover mover, {required bool positive}) {
-    return HomeMetricTile(
+    final tile = HomeMetricTile(
       label: positive ? 'Top gainer' : 'Top loser',
       value: mover.title,
       supportingText: _signedCurrency(mover.absoluteChange),
       supportingColor: positive ? HomeTokens.positive : HomeTokens.negative,
       compact: true,
+    );
+    if (onMoverTap == null) {
+      return tile;
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onMoverTap!(mover),
+      child: tile,
     );
   }
 }
