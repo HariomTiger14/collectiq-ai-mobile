@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
@@ -205,6 +207,8 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  static const _autoSyncThrottle = Duration(minutes: 2);
+
   late final ScrollController _scrollController;
   bool _scanRequestPending = false;
 
@@ -214,6 +218,29 @@ class _HomePageState extends ConsumerState<HomePage> {
     _scrollController = ScrollController(
       initialScrollOffset: widget.qaInitialScrollOffset,
       keepScrollOffset: false,
+    );
+    // Silent, throttled background refresh when Home appears — never blocks the
+    // UI or shows a loader (Home renders from cache; values update in place if
+    // the sync finds changes). Explicit pull-to-refresh is separate.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _maybeAutoSync();
+      }
+    });
+  }
+
+  void _maybeAutoSync() {
+    if (widget.previewScenario != null) {
+      return;
+    }
+    final last = ref.read(homeLastAutoSyncProvider);
+    final now = DateTime.now();
+    if (last != null && now.difference(last) < _autoSyncThrottle) {
+      return;
+    }
+    ref.read(homeLastAutoSyncProvider.notifier).mark(now);
+    unawaited(
+      ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow(),
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -487,6 +488,9 @@ Widget _homeApp({
     overrides: [
       if (repository != null)
         portfolioRepositoryProvider.overrideWithValue(repository),
+      // Mark Home as recently auto-synced so the throttled on-appear background
+      // sync stays out of these deterministic tests.
+      homeLastAutoSyncProvider.overrideWith(_AlreadyAutoSyncedController.new),
     ],
     child: MaterialApp(
       theme: AppTheme.light,
@@ -497,6 +501,11 @@ Widget _homeApp({
       ),
     ),
   );
+}
+
+class _AlreadyAutoSyncedController extends HomeLastAutoSyncController {
+  @override
+  DateTime? build() => DateTime.now();
 }
 
 Widget _previewHomeApp(HomePreviewScenario scenario) {

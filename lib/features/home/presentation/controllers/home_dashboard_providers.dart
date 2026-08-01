@@ -12,3 +12,17 @@ final homeTriggeredAlertCountProvider = FutureProvider.autoDispose<int>((
   final alerts = await repository.getAlerts();
   return alerts.where((alert) => alert.isTriggered).length;
 });
+
+/// Timestamp of the last silent Home auto-sync. App-scoped (survives HomePage
+/// rebuilds/navigation) so the on-appear background refresh can be throttled.
+final homeLastAutoSyncProvider =
+    NotifierProvider<HomeLastAutoSyncController, DateTime?>(
+      HomeLastAutoSyncController.new,
+    );
+
+class HomeLastAutoSyncController extends Notifier<DateTime?> {
+  @override
+  DateTime? build() => null;
+
+  void mark(DateTime at) => state = at;
+}
