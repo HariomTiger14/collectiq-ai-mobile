@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -455,6 +456,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       HomeSection(
                         child: _PortfolioMetrics(
                           totalValue: _displayTotalValue(portfolioState.items),
+                          displayCurrency: dominantDisplayCurrency(
+                            portfolioState.items,
+                          ),
                           itemCount: portfolioState.items.length,
                           valuedItemCount: _valuedItemCount(
                             portfolioState.items,
@@ -1333,6 +1337,7 @@ class _ToolbarButton extends StatelessWidget {
 class _PortfolioMetrics extends StatelessWidget {
   const _PortfolioMetrics({
     required this.totalValue,
+    required this.displayCurrency,
     required this.itemCount,
     required this.valuedItemCount,
     required this.pendingItemCount,
@@ -1340,6 +1345,7 @@ class _PortfolioMetrics extends StatelessWidget {
   });
 
   final double totalValue;
+  final String displayCurrency;
   final int itemCount;
   final int valuedItemCount;
   final int pendingItemCount;
@@ -1350,7 +1356,7 @@ class _PortfolioMetrics extends StatelessWidget {
     final metrics = <Widget>[
       HomeMetricTile(
         label: 'Collection value',
-        value: _formatAud(totalValue),
+        value: _formatAud(totalValue, displayCurrency),
         supportingText: pendingItemCount == 0
             ? 'Estimated'
             : '$pendingItemCount need value',
@@ -1911,7 +1917,7 @@ class _PortfolioTopValueRow extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(
-          _formatAud(item.estimatedValue),
+          _formatAud(item.estimatedValue, currencyForItem(item)),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: HomeTokens.positive,
             fontWeight: FontWeight.w900,
@@ -2146,7 +2152,7 @@ class _PortfolioItemRow extends StatelessWidget {
     final statusColor = needsValue ? HomeTokens.warning : HomeTokens.positive;
     final statusLabel = needsValue ? 'Needs value' : 'Valued';
     final valueLabel = hasValue
-        ? _formatAud(item.estimatedValue)
+        ? _formatAud(item.estimatedValue, currencyForItem(item))
         : _valuationDisplayLabel(item);
 
     return MotionTapScale(
@@ -2950,13 +2956,8 @@ int _statusSortRank(CollectibleItem item) {
   return 2;
 }
 
-String _formatAud(double value) {
-  final rounded = value.round();
-  final formatted = rounded.toString().replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  return '\$$formatted';
+String _formatAud(double value, [String currencyCode = 'AUD']) {
+  return formatCollectionValue(value, currencyCode: currencyCode);
 }
 
 String _trendLabel(CollectibleItem item) {
@@ -2980,6 +2981,6 @@ String _valuationDisplayLabel(CollectibleItem item) {
     ValuationStatus.lookupFailed => 'Retry',
     ValuationStatus.unavailable => 'No value',
     ValuationStatus.marketEstimated ||
-    ValuationStatus.aiEstimated => _formatAud(item.estimatedValue),
+    ValuationStatus.aiEstimated => _formatAud(item.estimatedValue, currencyForItem(item)),
   };
 }

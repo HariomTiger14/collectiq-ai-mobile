@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
@@ -590,7 +591,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       deltaIcon = Icons.timeline_rounded;
     } else {
       deltaText =
-          '${_signedCurrency(change)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
+          '${_signedCurrency(change, data.displayCurrency)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
       deltaPeriodLabel = effectivePeriod.label;
       deltaColor = isUp ? HomeTokens.positive : HomeTokens.negative;
       deltaIcon = isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded;
@@ -600,7 +601,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       keyPrefix: 'home',
       keySeed: 'portfolio-value-hero',
       semanticLabel: hasValue
-          ? 'Portfolio value ${_formatCurrency(data.totalValuedAmount)}'
+          ? 'Portfolio value ${_formatCurrency(data.totalValuedAmount, data.displayCurrency)}'
           : 'Portfolio value pending',
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
       radius: 24,
@@ -618,7 +619,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
           const SizedBox(height: 10),
           Text(
             hasValue
-                ? _formatCurrency(data.totalValuedAmount)
+                ? _formatCurrency(data.totalValuedAmount, data.displayCurrency)
                 : 'Add valued items',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1100,7 +1101,7 @@ class _InsightsPreview extends StatelessWidget {
                 child: HomeMetricTile(
                   label: 'Collection value',
                   value: data.hasValuedItems
-                      ? _formatCurrency(data.totalValuedAmount)
+                      ? _formatCurrency(data.totalValuedAmount, data.displayCurrency)
                       : 'Pending',
                   supportingText: data.hasValuedItems
                       ? '${data.valuedItemCount} valued'
@@ -1429,7 +1430,7 @@ class _PortfolioMoversSection extends StatelessWidget {
     final tile = HomeMetricTile(
       label: positive ? 'Top gainer' : 'Top loser',
       value: mover.title,
-      supportingText: _signedCurrency(mover.absoluteChange),
+      supportingText: _signedCurrency(mover.absoluteChange, data.displayCurrency),
       supportingColor: positive ? HomeTokens.positive : HomeTokens.negative,
       compact: true,
     );
@@ -1780,6 +1781,10 @@ class _HomeViewData {
     ];
   }
 
+  /// Honest currency for the aggregate total: the dominant currency among the
+  /// valued items (never a fabricated conversion). AUD when nothing is valued.
+  String get displayCurrency => dominantDisplayCurrency(items);
+
   bool get isEmpty => itemCount == 0;
   bool get hasValuedItems => valuedItemCount > 0;
   bool get hasPartialValuation => itemCount > 0 && unvaluedCount > 0;
@@ -1933,12 +1938,12 @@ String _titleCase(String value) {
       .join(' ');
 }
 
-String _signedCurrency(double value) {
+String _signedCurrency(double value, [String currencyCode = 'AUD']) {
   if (value == 0) {
-    return '\$0';
+    return formatCollectionValue(0, currencyCode: currencyCode);
   }
   final prefix = value > 0 ? '+' : '-';
-  return '$prefix${_formatCurrency(value.abs())}';
+  return '$prefix${_formatCurrency(value.abs(), currencyCode)}';
 }
 
 /// Real persisted daily value history (dated, oldest→newest). Empty until at
@@ -2012,16 +2017,11 @@ String _valueLabelFor(CollectibleItem item) {
   if (!_hasDisplayValue(item)) {
     return 'No price';
   }
-  return _formatCurrency(item.estimatedValue);
+  return _formatCurrency(item.estimatedValue, currencyForItem(item));
 }
 
-String _formatCurrency(double value) {
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  return '\$$withCommas';
+String _formatCurrency(double value, [String currencyCode = 'AUD']) {
+  return formatCollectionValue(value, currencyCode: currencyCode);
 }
 
 List<CollectibleItem> _previewItems({required bool includeUnvalued}) {
