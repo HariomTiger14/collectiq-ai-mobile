@@ -41,39 +41,46 @@ final priceAlertSummaryProvider =
       ref,
       items,
     ) async {
-      final repository = ref.watch(priceAlertRepositoryProvider);
-      final evaluator = ref.watch(priceAlertEvaluatorProvider);
-      final alerts = await repository.getAlerts();
-      final evaluations = evaluator.evaluateAlerts(
-        alerts: alerts,
-        items: items,
-      );
-      for (final evaluation in evaluations) {
-        final previous = alerts.where(
-          (alert) => alert.id == evaluation.alert.id,
-        );
-        final previousAlert = previous.isEmpty ? null : previous.first;
-        if (previousAlert == null ||
-            previousAlert.status != evaluation.alert.status ||
-            previousAlert.message != evaluation.alert.message ||
-            previousAlert.triggeredAt != evaluation.alert.triggeredAt) {
-          await repository.saveAlert(evaluation.alert);
-        }
-        // Log a notification event on a fresh trigger. The event store dedupes
-        // by alertId@triggeredAt, so re-evaluations never double-log.
-        if (evaluation.triggered && evaluation.alert.isTriggered) {
-          await ref
-              .read(notificationEventStoreProvider)
-              .append(NotificationEvent.fromPriceAlert(evaluation.alert));
-        }
-      }
-      unawaited(
-        ref
-            .read(priceAlertNotificationDispatcherProvider)
-            .dispatchTriggeredAlerts(evaluations),
-      );
-      return evaluator.summaryFromEvaluations(evaluations);
+      return evaluateAndDispatchPriceAlerts(ref, items);
     });
+
+/// Evaluates saved price alerts against the current portfolio values, flips any
+/// that meet their condition to `triggered`, logs a notification event, and
+/// dispatches the local notification. Extracted from [priceAlertSummaryProvider]
+/// so it can also be invoked imperatively when the portfolio loads/syncs —
+/// previously the summary provider had no watchers, so alerts never fired.
+Future<PriceAlertSummary> evaluateAndDispatchPriceAlerts(
+  Ref ref,
+  List<CollectibleItem> items,
+) async {
+  final repository = ref.read(priceAlertRepositoryProvider);
+  final evaluator = ref.read(priceAlertEvaluatorProvider);
+  final alerts = await repository.getAlerts();
+  final evaluations = evaluator.evaluateAlerts(alerts: alerts, items: items);
+  for (final evaluation in evaluations) {
+    final previous = alerts.where((alert) => alert.id == evaluation.alert.id);
+    final previousAlert = previous.isEmpty ? null : previous.first;
+    if (previousAlert == null ||
+        previousAlert.status != evaluation.alert.status ||
+        previousAlert.message != evaluation.alert.message ||
+        previousAlert.triggeredAt != evaluation.alert.triggeredAt) {
+      await repository.saveAlert(evaluation.alert);
+    }
+    // Log a notification event on a fresh trigger. The event store dedupes by
+    // alertId@triggeredAt, so re-evaluations never double-log.
+    if (evaluation.triggered && evaluation.alert.isTriggered) {
+      await ref
+          .read(notificationEventStoreProvider)
+          .append(NotificationEvent.fromPriceAlert(evaluation.alert));
+    }
+  }
+  unawaited(
+    ref
+        .read(priceAlertNotificationDispatcherProvider)
+        .dispatchTriggeredAlerts(evaluations),
+  );
+  return evaluator.summaryFromEvaluations(evaluations);
+}
 
 PriceAlert buildPriceAlert({
   required CollectibleItem item,

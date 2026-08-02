@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
@@ -90,6 +93,19 @@ class PortfolioController extends Notifier<PortfolioState> {
   }
 
   /// Loads all portfolio items from the repository.
+  // Evaluates saved price alerts against the current portfolio values and fires
+  // any that meet their condition. Best-effort; runs whenever values may have
+  // changed (load / cloud sync) so alerts actually trigger.
+  void _evaluatePriceAlerts() {
+    final items = state.items;
+    if (items.isEmpty) {
+      return;
+    }
+    unawaited(
+      evaluateAndDispatchPriceAlerts(ref, items).then((_) {}, onError: (_) {}),
+    );
+  }
+
   Future<void> loadItems() async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
@@ -98,6 +114,7 @@ class PortfolioController extends Notifier<PortfolioState> {
         items: collectiblesNewestFirst(items),
         isLoading: false,
       );
+      _evaluatePriceAlerts();
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -292,6 +309,7 @@ class PortfolioController extends Notifier<PortfolioState> {
       ).syncNow();
       final items = collectiblesNewestFirst(await _repository.getItems());
       state = state.copyWith(items: items, isLoading: false);
+      _evaluatePriceAlerts();
       return mergedCount;
     } catch (_) {
       final items = collectiblesNewestFirst(await _repository.getItems());
