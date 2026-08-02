@@ -182,10 +182,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.inventory_2_outlined,
         title: 'Collection & Backup',
-        subtitle: canRunCloudSync
-            ? syncState.errorMessage ?? syncState.status.message
-            : 'Sign in to save and sync your collection.',
-        trailing: canRunCloudSync ? syncState.status.statusLabel : 'Sign in',
+        // Labels key off sign-in state, never off cloud-feature flags, so a
+        // signed-in user is never told to "Sign in".
+        subtitle: !authState.isSignedIn
+            ? 'Sign in to save and sync your collection.'
+            : canRunCloudSync
+            ? (syncState.errorMessage ?? syncState.status.message)
+            : 'Your collection is saved on this device.',
+        trailing: !authState.isSignedIn
+            ? 'Sign in'
+            : canRunCloudSync
+            ? syncState.status.statusLabel
+            : 'On device',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
         ),
@@ -197,11 +205,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         trailing: notificationState.settingsStatusLabel,
       ),
       _SettingsRow(
-        icon: Icons.palette_outlined,
+        icon: Icons.dark_mode_outlined,
         title: 'Appearance',
-        subtitle: 'PackLox follows your device theme.',
-        trailing: 'System',
-        message: 'Theme follows your device setting.',
+        subtitle: 'PackLox uses a dark collector theme.',
+        trailing: 'Dark',
       ),
     ];
 
@@ -1595,26 +1602,20 @@ class IdentityBlock extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 112,
-                height: 112,
+                width: 84,
+                height: 84,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      HomeTokens.accentStrong.withValues(alpha: 0.95),
-                      HomeTokens.accent.withValues(alpha: 0.70),
+                      HomeTokens.accentStrong.withValues(alpha: 0.85),
+                      HomeTokens.accent.withValues(alpha: 0.58),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: HomeTokens.accent.withValues(alpha: 0.24),
-                      blurRadius: 34,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
+                  border: Border.all(color: HomeTokens.border, width: 2),
                 ),
                 child: avatarFile != null && avatarFile.existsSync()
                     ? Image.file(
@@ -1637,7 +1638,7 @@ class IdentityBlock extends StatelessWidget {
                                 key: const ValueKey(
                                   'settings-profile-avatar-initial',
                                 ),
-                                style: textTheme.displaySmall?.copyWith(
+                                style: textTheme.headlineSmall?.copyWith(
                                   color: HomeTokens.textPrimary,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -1684,29 +1685,45 @@ class IdentityBlock extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: HomeTokens.textPrimary,
-                size: 26,
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                isSignedIn ? Icons.check_circle : Icons.radio_button_checked,
-                color: statusColor,
-                size: 18,
+                Icons.edit_outlined,
+                color: HomeTokens.textMuted,
+                size: 17,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          isSignedIn
-              ? 'Cloud identity connected'
-              : 'Local-first access is active',
-          style: textTheme.bodyMedium?.copyWith(
-            color: HomeTokens.textSecondary,
-            fontWeight: FontWeight.w700,
+        const SizedBox(height: 10),
+        // One consolidated status chip (replaces the redundant check icon +
+        // "Cloud identity connected" line).
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: statusColor.withValues(alpha: 0.34)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                isSignedIn ? 'Signed in' : 'Local access',
+                style: textTheme.labelMedium?.copyWith(
+                  color: statusColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -2416,7 +2433,6 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
-    this.message,
     this.onTap,
   });
 
@@ -2424,7 +2440,6 @@ class _SettingsRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final String trailing;
-  final String? message;
   final VoidCallback? onTap;
 
   @override
@@ -2434,30 +2449,7 @@ class _SettingsRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       trailingText: trailing,
-      onTap: onTap ?? (message == null ? null : () => _showRowMessage(context)),
+      onTap: onTap,
     );
-  }
-
-  void _showRowMessage(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message ?? _defaultMessage)));
-  }
-
-  String get _defaultMessage {
-    final normalizedTrailing = trailing.toLowerCase();
-    final normalizedSubtitle = subtitle.toLowerCase();
-    if (normalizedTrailing.contains('soon')) {
-      return '$title is coming soon.';
-    }
-    if (normalizedTrailing.contains('requires setup') ||
-        normalizedSubtitle.contains('requires') ||
-        normalizedSubtitle.contains('cloud')) {
-      return '$title requires cloud setup in a dev or staging build.';
-    }
-    if (normalizedTrailing.contains('not configured')) {
-      return '$title is not configured for this local build.';
-    }
-    return '$title: $trailing';
   }
 }

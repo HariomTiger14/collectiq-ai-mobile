@@ -192,13 +192,23 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       ),
                     ),
                     if (trailing != null) ...[
-                      SizedBox(width: dense ? AppSpacing.sm : AppSpacing.md),
+                      SizedBox(width: dense ? AppSpacing.xs : AppSpacing.sm),
                       SizedBox(
-                        width: dense ? 78 : 104,
+                        width: dense ? 68 : 88,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: trailing,
                         ),
+                      ),
+                    ],
+                    // A chevron appears only when the row navigates, so trailing
+                    // text can be read as status (not a fake "tap me" affordance).
+                    if (widget.onTap != null) ...[
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: HomeTokens.textMuted,
+                        size: dense ? 18 : 20,
                       ),
                     ],
                   ],
@@ -218,13 +228,16 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
     }
     final textTheme = Theme.of(context).textTheme;
 
+    // Accent only when the row is actionable; muted when it's a status value so
+    // blue never implies tappable on an inert row.
+    final isActionable = widget.onTap != null;
     return Text(
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
       style: textTheme.labelMedium?.copyWith(
-        color: HomeTokens.accent,
+        color: isActionable ? HomeTokens.accent : HomeTokens.textSecondary,
         fontSize: 12.5,
         fontWeight: FontWeight.w800,
       ),
