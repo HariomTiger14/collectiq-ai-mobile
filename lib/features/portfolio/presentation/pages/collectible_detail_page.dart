@@ -181,13 +181,10 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                 storageKey: 'collectible-detail-scroll-position',
                 controller: _scrollController,
                 sections: [
-                  const HomeSection(child: HomeBrandLockup()),
-                  HomeSection(
-                    child: _DetailTitleBlock(
-                      item: currentItem,
-                      valuationStateLabel: _detailValueStatusLabel(currentItem),
-                    ),
-                  ),
+                  // Lead straight with the item: the action bar + hero + name +
+                  // value. The old repeated brand lockup and generic "Portfolio
+                  // Detail" title block duplicated what the item block already
+                  // shows, so they were removed.
                   HomeSection(
                     child: _DetailAuthorityHeader(
                       item: currentItem,
@@ -917,48 +914,6 @@ void _showImageViewer(
   );
 }
 
-class _DetailTitleBlock extends StatelessWidget {
-  const _DetailTitleBlock({
-    required this.item,
-    required this.valuationStateLabel,
-  });
-
-  final CollectibleItem item;
-  final String valuationStateLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Portfolio Detail',
-          key: const ValueKey('collectible-detail-packlox-title'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            color: HomeTokens.textPrimary,
-            fontWeight: FontWeight.w900,
-            height: 1.05,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${_fallback(item.category)} / $valuationStateLabel',
-          key: const ValueKey('collectible-detail-packlox-subtitle'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: HomeTokens.textSecondary,
-            fontWeight: FontWeight.w600,
-            height: 1.35,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _DetailAuthorityHeader extends StatelessWidget {
   const _DetailAuthorityHeader({
     required this.item,
@@ -978,7 +933,6 @@ class _DetailAuthorityHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Semantics(
       container: true,
       label: 'Collectible Details. ${item.title}.',
@@ -990,66 +944,37 @@ class _DetailAuthorityHeader extends StatelessWidget {
           borderRadius: BorderRadius.circular(HomeTokens.cardRadius),
           border: Border.all(color: HomeTokens.border),
         ),
-        child: Column(
+        // Action bar only. The item name lives once, large, in the overview
+        // block directly below — no need to repeat it (and an eyebrow) here.
+        child: Row(
           children: [
-            Row(
-              children: [
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-back'),
-                  tooltip: 'Back',
-                  icon: Icons.arrow_back,
-                  onPressed: onBack,
-                ),
-                const Spacer(),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-favorite-action'),
-                  tooltip: isFavorited ? 'Favorited' : 'Favorite',
-                  icon: isFavorited ? Icons.favorite : Icons.favorite_border,
-                  selected: isFavorited,
-                  onPressed: onFavorite,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-share-action'),
-                  tooltip: 'Share',
-                  icon: Icons.ios_share_outlined,
-                  onPressed: onShare,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-edit-button'),
-                  tooltip: 'Edit collectible',
-                  icon: Icons.edit_outlined,
-                  onPressed: onEdit,
-                ),
-              ],
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-back'),
+              tooltip: 'Back',
+              icon: Icons.arrow_back,
+              onPressed: onBack,
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Saved collectible',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: HomeTokens.textSecondary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: HomeTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
+            const Spacer(),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-favorite-action'),
+              tooltip: isFavorited ? 'Favorited' : 'Favorite',
+              icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+              selected: isFavorited,
+              onPressed: onFavorite,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-share-action'),
+              tooltip: 'Share',
+              icon: Icons.ios_share_outlined,
+              onPressed: onShare,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-edit-button'),
+              tooltip: 'Edit collectible',
+              icon: Icons.edit_outlined,
+              onPressed: onEdit,
             ),
           ],
         ),
@@ -1336,8 +1261,9 @@ class _DetailInlineContent extends StatelessWidget {
     return Column(
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
-        _DetailOverviewSection(item: item),
-        const SizedBox(height: AppSpacing.sm),
+        // "At a glance" was removed: Category shows as a chip in the overview,
+        // Rarity lives in Details & Info, Confidence in the overview mini-stat +
+        // Item insights, so it only duplicated content shown elsewhere.
         _DetailIntelligenceActionPanel(
           item: item,
           isRefreshingValue: isRefreshingValue,
@@ -1669,37 +1595,6 @@ class _DetailMiniStat extends StatelessWidget {
   }
 }
 
-class _DetailOverviewSection extends StatelessWidget {
-  const _DetailOverviewSection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailAuthorityPanel(
-      key: const ValueKey('collectible-detail-overview-section'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _DetailSectionTitle(title: 'At a glance', icon: Icons.info_outline),
-          const SizedBox(height: AppSpacing.sm),
-          _DetailAuthorityRows(
-            rows: [
-              _DetailInfoRowData('Category', _fallback(item.category)),
-              _DetailInfoRowData('Rarity', _rarityLabel(item)),
-              _DetailInfoRowData(
-                'Confidence',
-                '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
-              ),
-              _DetailInfoRowData('Recommendation', item.recommendation),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DetailGallerySection extends StatelessWidget {
   const _DetailGallerySection({
     required this.item,
@@ -1734,24 +1629,11 @@ class _DetailGallerySection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           if (galleryImages.isEmpty)
             const _DetailEmptyCopy('No saved image is available for this item.')
-          else ...[
-            AspectRatio(
-              aspectRatio: 1.35,
-              child: InkWell(
-                onTap: onImageTap,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  child: _DetailImageSurface(item: item, image: selectedImage),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _DetailGalleryFilmstrip(
-              item: item,
-              selectedPath: selectedImage?.path,
-              onSelected: onImageSelected,
-            ),
-            const SizedBox(height: AppSpacing.sm),
+          else
+            // Image viewing and browsing already live in the overview hero +
+            // filmstrip above (they share the selected image), so this section
+            // no longer re-renders a large preview or a second filmstrip — it
+            // only adds new photos.
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -1769,7 +1651,6 @@ class _DetailGallerySection extends StatelessWidget {
                 ),
               ),
             ),
-          ],
         ],
       ),
     );
@@ -2011,14 +1892,9 @@ class _DetailInfoSection extends StatelessWidget {
             )
           else
             _DetailAuthorityRows(rows: rows),
-          const SizedBox(height: AppSpacing.md),
-          _DetailSectionTitle(
-            title: 'Identification confidence',
-            icon: Icons.fact_check_outlined,
-            compact: true,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _DetailConfidenceMeter(confidence: item.confidence),
+          // The "Identification confidence" meter was removed here — confidence
+          // is already shown in the overview mini-stat and, with an explanation,
+          // in the "Item insights" section below.
         ],
       ),
     );
@@ -2041,8 +1917,9 @@ class _DetailMarketSection extends StatelessWidget {
         children: [
           _DetailSectionTitle(title: 'Market & Value', icon: Icons.paid),
           const SizedBox(height: AppSpacing.sm),
-          _DetailAuthorityValueBlock(item: item),
-          const SizedBox(height: AppSpacing.md),
+          // The big "Estimated value" block was removed here — it duplicated the
+          // top value card. This section keeps the value history, pricing
+          // evidence, and the detailed market rows (current, at-scan, range…).
           _DetailValueHistoryPanel(item: item),
           const SizedBox(height: AppSpacing.md),
           _PricingTrustPanel(item: item),
@@ -2791,20 +2668,10 @@ class _DetailActionsMenuSection extends StatelessWidget {
             description: 'Get the latest available pricing snapshot',
             onTap: onRefreshValue,
           ),
-          _DetailActionMenuRow(
-            key: const ValueKey('collectible-detail-action-favorite-row'),
-            icon: isFavorited ? Icons.favorite : Icons.favorite_border,
-            label: isFavorited ? 'Favorited' : 'Add to Wishlist',
-            description: 'Save for quick access',
-            onTap: onFavorite,
-          ),
-          _DetailActionMenuRow(
-            key: const ValueKey('collectible-detail-action-share-row'),
-            icon: Icons.ios_share_outlined,
-            label: 'Share item',
-            description: 'Uses real saved item data',
-            onTap: onShare,
-          ),
+          // "Add to Wishlist" and "Share item" were removed here — both are one
+          // tap away in the header action bar (♡ / share), and wishlist state
+          // also has its own "Wishlist Status" section. This menu keeps the
+          // actions that aren't in the header: reprice, refresh, delete.
           if (onDelete != null)
             _DetailActionMenuRow(
               key: const ValueKey('collectible-detail-delete-action'),
@@ -4003,120 +3870,6 @@ class _DetailGalleryImage extends StatelessWidget {
       imagePath: path,
       fit: BoxFit.cover,
       placeholderBuilder: () => placeholder,
-    );
-  }
-}
-
-class _AnimatedDetailMetadata extends StatelessWidget {
-  const _AnimatedDetailMetadata({
-    required this.id,
-    required this.value,
-    required this.child,
-  });
-
-  final String id;
-  final Object? value;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 150),
-      reverseDuration: const Duration(milliseconds: 100),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      child: KeyedSubtree(
-        key: ValueKey('collectible-detail-metadata-$id-$value'),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _DetailConfidenceMeter extends StatelessWidget {
-  const _DetailConfidenceMeter({required this.confidence});
-
-  final double confidence;
-
-  @override
-  Widget build(BuildContext context) {
-    final bounded = confidence.clamp(0.0, 1.0);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return _AnimatedDetailMetadata(
-      id: 'confidence-meter',
-      value: bounded,
-      child: DecoratedBox(
-        key: const ValueKey('collectible-detail-confidence-meter'),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Confidence',
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _confidencePercent(bounded),
-                    key: const ValueKey('collectible-detail-confidence-value'),
-                    style: textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: _confidenceMeterColor(context, bounded),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: SizedBox(
-                  height: 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                    ),
-                    child: TweenAnimationBuilder<double>(
-                      key: const ValueKey('collectible-detail-confidence-fill'),
-                      tween: Tween(begin: 0, end: bounded),
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      builder: (context, value, _) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: value,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: _confidenceMeterColor(context, bounded),
-                              ),
-                              child: const SizedBox.expand(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -6264,16 +6017,6 @@ String _fallback(String? value, {String fallback = 'Unknown'}) {
   return trimmed.isEmpty ? fallback : trimmed;
 }
 
-String _confidenceBand(double confidence) {
-  if (confidence >= 0.85) {
-    return 'High confidence';
-  }
-  if (confidence >= 0.70) {
-    return 'Medium confidence';
-  }
-  return 'Needs review';
-}
-
 String _confidencePercent(double confidence) {
   final bounded = confidence.clamp(0.0, 1.0);
   return '${(bounded * 100).toStringAsFixed(0)}%';
@@ -6397,14 +6140,6 @@ String _formatAud(double value) {
   }
   final withCommas = _formatMoneyAmountWithCommas(value);
   return '\$$withCommas';
-}
-
-String _rarityLabel(CollectibleItem item) {
-  final explicit = _clean(item.rarity);
-  if (explicit != null) {
-    return explicit;
-  }
-  return 'Rarity unavailable';
 }
 
 Color _confidenceMeterColor(BuildContext context, double confidence) {

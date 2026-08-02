@@ -51,10 +51,16 @@ void main() {
         find.byKey(const ValueKey('collectible-detail-authority-header')),
         findsOneWidget,
       );
-      expect(find.text('Portfolio Detail'), findsOneWidget);
-      expect(find.text('Saved collectible'), findsOneWidget);
+      // The item leads directly now — no generic "Portfolio Detail" title block
+      // and no repeated "Saved collectible" eyebrow. The name shows once, in the
+      // overview below.
+      expect(find.text('Portfolio Detail'), findsNothing);
       expect(
         find.byKey(const ValueKey('collectible-detail-authority-overview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-title')),
         findsOneWidget,
       );
       expect(
@@ -99,13 +105,12 @@ void main() {
   );
 
   testWidgets(
-    'inline gallery preserves saved image order and active preview switching',
+    'overview gallery preserves saved image order and active preview switching',
     (tester) async {
       await _pumpDetail(tester, _authorityItem());
 
-      await _revealText(tester, 'Image Gallery');
-
-      expect(find.text('Image Gallery'), findsOneWidget);
+      // Image browsing lives in the overview hero + filmstrip at the top of the
+      // screen; there is a single filmstrip (no duplicate in a gallery section).
       expect(
         find.byKey(const ValueKey('collectible-detail-gallery-filmstrip')),
         findsOneWidget,
@@ -119,9 +124,7 @@ void main() {
       await tester.tap(detailTile);
       await tester.pumpAndSettle();
 
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, 900));
-      await tester.pumpAndSettle();
-
+      // Selecting a thumbnail swaps the overview hero to that image.
       expect(
         find.byKey(const ValueKey('collectible-detail-hero-sample://detail')),
         findsOneWidget,
@@ -130,8 +133,9 @@ void main() {
   );
 
   testWidgets(
-    'inline market section separates unavailable valuation from saved zero value',
+    'value card separates unavailable valuation from saved zero market value',
     (tester) async {
+      // Unavailable: no trusted value → "No valuation saved" on the top card.
       await _pumpDetail(
         tester,
         _authorityItem(
@@ -139,11 +143,10 @@ void main() {
           valuationStatus: ValuationStatus.unavailable,
         ),
       );
-
-      await _revealText(tester, 'Market & Value');
-      expect(find.text('Value unavailable'), findsWidgets);
       expect(find.text('No valuation saved'), findsWidgets);
+      expect(find.text('Estimated from saved market data'), findsNothing);
 
+      // Saved zero market value: a trusted status with distinct copy.
       await _pumpDetail(
         tester,
         _authorityItem(
@@ -151,10 +154,8 @@ void main() {
           valuationStatus: ValuationStatus.marketEstimated,
         ),
       );
-
-      await _revealText(tester, 'Market & Value');
-      expect(find.textContaining('USD \$0'), findsWidgets);
       expect(find.text('Estimated from saved market data'), findsWidgets);
+      expect(find.text('No valuation saved'), findsNothing);
     },
   );
 
@@ -621,7 +622,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Portfolio Detail'), findsOneWidget);
+      expect(find.text('Portfolio Detail'), findsNothing);
       expect(
         find.byKey(const ValueKey('collectible-detail-authority-overview')),
         findsOneWidget,
