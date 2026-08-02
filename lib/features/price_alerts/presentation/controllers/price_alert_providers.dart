@@ -74,6 +74,15 @@ Future<PriceAlertSummary> evaluateAndDispatchPriceAlerts(
           .append(NotificationEvent.fromPriceAlert(evaluation.alert));
     }
   }
+  // Surface alerts that were triggered elsewhere (e.g. the server-side
+  // scheduler, synced in via SupabasePriceAlertRepository) in the in-app inbox.
+  // Dedup by alertId@triggeredAt means already-logged events never repeat.
+  final eventStore = ref.read(notificationEventStoreProvider);
+  for (final alert in alerts) {
+    if (alert.isTriggered) {
+      await eventStore.append(NotificationEvent.fromPriceAlert(alert));
+    }
+  }
   unawaited(
     ref
         .read(priceAlertNotificationDispatcherProvider)
