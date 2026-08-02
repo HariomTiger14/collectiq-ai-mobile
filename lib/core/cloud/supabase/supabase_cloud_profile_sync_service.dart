@@ -13,7 +13,7 @@ class SupabaseCloudProfileSyncService implements CloudProfileSyncService {
     required this.bootstrap,
     required this.authService,
     required this.cloudStorageService,
-    this.tableName = 'profiles',
+    this.tableName = 'collector_profiles',
     this.bucketName = 'collectiq-portfolio-images',
   });
 
