@@ -189,12 +189,13 @@ void main() {
     expect(find.text('No trusted match yet'), findsWidgets);
     expect(
       find.text(
-        'PackLox could not match this identity to trusted catalog or sold-comps evidence. Correct details and reprice.',
+        'PackLox could not match this item to a trusted pricing source. Add the exact name, set, number, SKU, or condition and recheck value.',
       ),
       findsWidgets,
     );
-    expect(find.text('Match basis'), findsOneWidget);
-    expect(find.text('Catalog match'), findsOneWidget);
+    expect(find.text('Pricing confidence'), findsWidgets);
+    expect(find.text('Not available'), findsWidgets);
+    expect(find.text('Match basis'), findsNothing);
     expect(find.text('Reason'), findsWidgets);
   });
 
@@ -457,9 +458,7 @@ void main() {
   testWidgets('refresh value skips duplicate history when value is unchanged', (
     tester,
   ) async {
-    final item = _authorityItem(
-      estimatedValue: 310,
-    ).copyWith(
+    final item = _authorityItem(estimatedValue: 310).copyWith(
       pricing: const PricingInfo(
         estimatedMarketValue: 310,
         lowEstimate: 290,
@@ -648,8 +647,8 @@ void main() {
       expect(find.text('Brand'), findsOneWidget);
       expect(find.text('PackLox Motors'), findsOneWidget);
 
-      await _revealText(tester, 'AI Insights');
-      expect(find.text('AI Insights'), findsOneWidget);
+      await _revealText(tester, 'Item insights');
+      expect(find.text('Item insights'), findsOneWidget);
       expect(
         find.textContaining('Stored scan reasoning only.'),
         findsOneWidget,
@@ -657,7 +656,7 @@ void main() {
 
       await _revealText(tester, 'Stored owner note.');
       expect(
-        find.byKey(const ValueKey('collectible-detail-notes-field')),
+        find.byKey(const ValueKey('collectible-detail-notes-edit-button')),
         findsOneWidget,
       );
       expect(find.text('Stored owner note.'), findsOneWidget);

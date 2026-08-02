@@ -2000,7 +2000,7 @@ class _DetailInfoSection extends StatelessWidget {
             _DetailAuthorityRows(rows: rows),
           const SizedBox(height: AppSpacing.md),
           _DetailSectionTitle(
-            title: 'Condition',
+            title: 'Identification confidence',
             icon: Icons.fact_check_outlined,
             compact: true,
           ),
@@ -2615,7 +2615,7 @@ class _DetailInsightsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _DetailSectionTitle(
-            title: 'AI Insights',
+            title: 'Item insights',
             icon: Icons.psychology_alt_outlined,
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -3009,15 +3009,23 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
 List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
   final pricing = item.pricing;
   final market = item.marketSummary;
+  final trustedPricing = _hasTrustedPricingEvidence(item);
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
         'Current value',
-        _displayValue(pricing, fallbackValue: item.estimatedValue),
+        trustedPricing
+            ? _displayValue(pricing, fallbackValue: item.estimatedValue)
+            : 'Value unavailable',
       ),
       _DetailInfoRowData(
         'Value at scan',
-        _formatMoney(item.valueAtScan ?? item.estimatedValue, pricing.currency),
+        trustedPricing
+            ? _formatMoney(
+                item.valueAtScan ?? item.estimatedValue,
+                pricing.currency,
+              )
+            : 'Value unavailable',
       ),
       _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
@@ -3032,16 +3040,21 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
         ),
       _DetailInfoRowData(
         'Value range',
-        _formatMoneyRange(
-          pricing.lowEstimate,
-          pricing.highEstimate,
-          pricing.currency,
-        ),
+        trustedPricing
+            ? _formatMoneyRange(
+                pricing.lowEstimate,
+                pricing.highEstimate,
+                pricing.currency,
+              )
+            : 'Value unavailable',
       ),
-      _DetailInfoRowData('Source', pricing.pricingSource),
+      _DetailInfoRowData('Source', _pricingProviderLabel(item)),
       _DetailInfoRowData(
-        'Confidence',
-        '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+        'Pricing confidence',
+        _pricingConfidenceLabel(
+          status: _effectiveValuationStatus(item),
+          confidence: pricing.pricingConfidence,
+        ),
       ),
       _DetailInfoRowData('Updated', _formatPricingDate(pricing.lastUpdated)),
     ],
@@ -3060,16 +3073,15 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
   final confidence = pricing?.pricingConfidence ?? market?.confidence;
   final rows = <_DetailInfoRowData>[
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
-    if (pricing?.pricingSource.trim().isNotEmpty == true)
-      _DetailInfoRowData('Provider', pricing!.pricingSource),
+    _DetailInfoRowData('Provider', _pricingProviderLabel(item)),
     if (pricing?.currency.trim().isNotEmpty == true)
       _DetailInfoRowData('Currency', pricing!.currency.toUpperCase()),
-    if (confidence != null)
-      _DetailInfoRowData(
-        'Confidence',
-        '${_pricingConfidenceBand(confidence)} (${_confidencePercent(confidence)})',
-      ),
-    if (pricing?.valuationStrategy?.trim().isNotEmpty == true)
+    _DetailInfoRowData(
+      'Pricing confidence',
+      _pricingConfidenceLabel(status: status, confidence: confidence),
+    ),
+    if (_hasTrustedPricingEvidence(item) &&
+        pricing?.valuationStrategy?.trim().isNotEmpty == true)
       _DetailInfoRowData(
         'Match basis',
         _pricingStrategyLabel(pricing!.valuationStrategy!),
@@ -3124,7 +3136,7 @@ String _pricingTrustTitle(ValuationStatus status) {
     ValuationStatus.providerNotConfigured => 'Provider not connected',
     ValuationStatus.noMarketMatch => 'No trusted match yet',
     ValuationStatus.lookupFailed => 'Lookup did not complete',
-    ValuationStatus.unavailable => 'Trusted value unavailable',
+    ValuationStatus.unavailable => 'No trusted valuation yet',
   };
 }
 
@@ -3142,10 +3154,10 @@ String _pricingTrustTrailing(ValuationStatus status) {
 String _pricingTrustMessage(CollectibleItem item) {
   final pricing = item.pricing;
   final explanation = _clean(pricing?.pricingExplanation);
-  if (explanation != null) {
+  final status = _effectiveValuationStatus(item);
+  if (_hasTrustedPricingEvidence(item) && explanation != null) {
     return explanation;
   }
-  final status = _effectiveValuationStatus(item);
   final unavailableCopy = pricingUnavailableCopy(
     reasonCode: pricing?.reasonCode,
     status: status,
@@ -3157,9 +3169,10 @@ String _pricingTrustMessage(CollectibleItem item) {
       'This item has an AI estimate only. Reprice it before relying on portfolio value.',
     ValuationStatus.providerNotConfigured => unavailableCopy.message,
     ValuationStatus.noMarketMatch =>
-      '${unavailableCopy.message} ${unavailableCopy.actionLabel}.',
+      'PackLox could not match this item to a trusted pricing source. Add the exact name, set, number, SKU, or condition and recheck value.',
     ValuationStatus.lookupFailed => unavailableCopy.message,
-    ValuationStatus.unavailable => unavailableCopy.message,
+    ValuationStatus.unavailable =>
+      'PackLox could not match this item to a trusted pricing source yet. Review the item details and recheck value when ready.',
   };
 }
 
@@ -3186,6 +3199,44 @@ String _pricingConfidenceBand(double confidence) {
     return 'Low';
   }
   return 'Not scored';
+}
+
+String _pricingConfidenceLabel({
+  required ValuationStatus status,
+  required double? confidence,
+}) {
+  if (status != ValuationStatus.marketEstimated &&
+      status != ValuationStatus.aiEstimated) {
+    return 'Not available';
+  }
+  final value = confidence;
+  if (value == null || value <= 0) {
+    return 'Not available';
+  }
+  return '${_pricingConfidenceBand(value)} (${_confidencePercent(value)})';
+}
+
+String _pricingProviderLabel(CollectibleItem item) {
+  final status = _effectiveValuationStatus(item);
+  final pricingSource = _clean(item.pricing?.pricingSource);
+  return switch (status) {
+    ValuationStatus.marketEstimated ||
+    ValuationStatus.aiEstimated => pricingSource ?? 'Trusted provider',
+    ValuationStatus.providerNotConfigured => 'Provider not connected',
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => 'Not matched',
+  };
+}
+
+bool _hasTrustedPricingEvidence(CollectibleItem item) {
+  return switch (_effectiveValuationStatus(item)) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => false,
+  };
 }
 
 String _pricingStrategyLabel(String strategy) {
@@ -4401,6 +4452,7 @@ class _NotesCard extends ConsumerStatefulWidget {
 
 class _NotesCardState extends ConsumerState<_NotesCard> {
   late final TextEditingController _controller;
+  var _isEditing = false;
 
   @override
   void initState() {
@@ -4425,28 +4477,65 @@ class _NotesCardState extends ConsumerState<_NotesCard> {
 
   @override
   Widget build(BuildContext context) {
+    final note = _clean(widget.item.notes);
     return AppProfileSection(
-      title: 'Notes',
+      title: 'Collector notes',
       children: [
-        TextField(
-          key: const ValueKey('collectible-detail-notes-field'),
-          controller: _controller,
-          minLines: 2,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Add private collection notes',
+        if (!_isEditing) ...[
+          Text(
+            note ??
+                'Add private notes such as purchase price, storage location, condition comments, or where you found this item.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: note == null
+                  ? PackLoxTokens.textSecondary
+                  : PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            key: const ValueKey('collectible-detail-notes-save-button'),
-            onPressed: _save,
-            icon: const Icon(Icons.save_outlined),
-            label: const Text('Save notes'),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('collectible-detail-notes-edit-button'),
+              onPressed: () => setState(() => _isEditing = true),
+              icon: Icon(note == null ? Icons.add_outlined : Icons.edit_note),
+              label: Text(note == null ? 'Add note' : 'Edit note'),
+            ),
           ),
-        ),
+        ] else ...[
+          TextField(
+            key: const ValueKey('collectible-detail-notes-field'),
+            controller: _controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Add private collection notes',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              TextButton(
+                key: const ValueKey('collectible-detail-notes-cancel-button'),
+                onPressed: () {
+                  _controller.text = widget.item.notes ?? '';
+                  setState(() => _isEditing = false);
+                },
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                key: const ValueKey('collectible-detail-notes-save-button'),
+                onPressed: _save,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save note'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -4456,6 +4545,7 @@ class _NotesCardState extends ConsumerState<_NotesCard> {
         .read(portfolioControllerProvider.notifier)
         .updateItem(widget.item.copyWith(notes: _controller.text.trim()));
     if (mounted) {
+      setState(() => _isEditing = false);
       _showDetailSnackBar(context, 'Notes saved');
     }
   }
@@ -6118,15 +6208,57 @@ String _confidencePercent(double confidence) {
 }
 
 String? _storedAiSummaryFor(CollectibleItem item) {
+  final friendlySummary = _collectorInsightSummaryFor(item);
+  if (friendlySummary != null) {
+    return friendlySummary;
+  }
   final parts = [
-    _clean(item.aiReasoning),
-    _clean(item.confidenceExplanation),
-    _clean(item.detectionQuality),
+    _collectorSafeInsight(item.aiReasoning),
+    _collectorSafeInsight(item.confidenceExplanation),
+    _collectorSafeInsight(item.detectionQuality),
   ].whereType<String>().toList(growable: false);
   if (parts.isEmpty) {
     return null;
   }
   return parts.join('\n\n');
+}
+
+String? _collectorInsightSummaryFor(CollectibleItem item) {
+  final hasInternalCopy = [
+    item.aiReasoning,
+    item.confidenceExplanation,
+    item.detectionQuality,
+  ].whereType<String>().any(_looksInternalInsight);
+  final hasTrustedValue = _hasTrustedPricingEvidence(item);
+  if (!hasInternalCopy && hasTrustedValue) {
+    return null;
+  }
+  final category = _fallback(item.category, fallback: 'collectible');
+  final title = _fallback(item.title, fallback: 'this item');
+  if (!hasTrustedValue) {
+    return 'PackLox identified $title as a $category, but more details are needed before a trusted valuation can be shown.\n\nTry adding the exact name, set, number, SKU, or condition, then recheck value.';
+  }
+  return 'PackLox matched this item with saved identity and pricing evidence. Review the details if the title, set, number, SKU, or condition looks incomplete.';
+}
+
+String? _collectorSafeInsight(String? value) {
+  final clean = _clean(value);
+  if (clean == null || _looksInternalInsight(clean)) {
+    return null;
+  }
+  return clean;
+}
+
+bool _looksInternalInsight(String? value) {
+  final text = (value ?? '').toLowerCase();
+  return text.contains('sit') ||
+      text.contains('analyzer') ||
+      text.contains('backend') ||
+      text.contains('noop') ||
+      text.contains('mock') ||
+      text.contains('debug') ||
+      text.contains('api-only') ||
+      text.contains('ai-only value is stored');
 }
 
 String? _clean(String? value) {
