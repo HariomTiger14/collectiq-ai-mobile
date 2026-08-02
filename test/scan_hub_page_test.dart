@@ -22,12 +22,9 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.byType(HomeBrandLockup), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-brand-emblem')), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-brand-wordmark')), findsOneWidget);
     expect(find.text('Scan'), findsOneWidget);
     expect(find.byType(HomeActionRow), findsNWidgets(2));
-    expect(find.text('Start with one clear item.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,
@@ -94,7 +91,7 @@ void main() {
       expect(cameraService.isAlive, isFalse);
       expect(find.byType(CameraCapturePage), findsNothing);
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.text('Start with one clear item.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     },
   );
 
@@ -109,7 +106,7 @@ void main() {
       await _pumpHub(tester);
 
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
       expect(find.text('Choose from gallery'), findsOneWidget);
       expect(tester.takeException(), isNull, reason: 'logical width $width');
     });
@@ -120,9 +117,8 @@ void main() {
   ) async {
     await _pumpHub(tester);
 
-    expect(find.byType(HomeBrandLockup), findsOneWidget);
     expect(find.byKey(const ValueKey('scan-hub-title')), findsOneWidget);
-    expect(find.byKey(const ValueKey('scan-hub-hero-card')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     expect(find.byType(HomeActionRow), findsNWidgets(2));
     expect(
       find.byKey(const ValueKey('home-action-scan-take-photo')),
@@ -145,7 +141,7 @@ void main() {
     );
   });
 
-  testWidgets('scan hub brand header reflows without clipping', (
+  testWidgets('scan hub header reflows without clipping', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(360, 760);
@@ -155,8 +151,8 @@ void main() {
 
     await _pumpHub(tester);
 
-    expect(find.byType(HomeBrandLockup), findsOneWidget);
     expect(find.text('Scan'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -177,7 +173,10 @@ void main() {
       find.byKey(const ValueKey('scan-hub-scroll-view')),
       const Offset(0, -700),
     );
-    await tester.pumpAndSettle();
+    // Note: pump (not pumpAndSettle) — the scan reticle animates continuously,
+    // so the tree never fully settles.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,

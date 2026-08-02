@@ -58,6 +58,8 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
           icon: Icons.photo_camera_outlined,
           title: 'Take a photo',
           subtitle: 'Use your camera to scan an item.',
+          emphasis: true,
+          showChevron: false,
           onTap: () => unawaited(_startCameraScan(context)),
         ),
       ),
@@ -69,6 +71,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
           title: 'Choose from gallery',
           subtitle: 'Select an existing photo.',
           iconColor: HomeTokens.categoryMore,
+          showChevron: false,
           onTap: () => unawaited(_pickFromGallery(context)),
         ),
       ),
@@ -81,6 +84,7 @@ class _ScanHubPageState extends ConsumerState<ScanHubPage> {
                 title: 'Try a sample scan',
                 subtitle: 'See how PackLox works.',
                 iconColor: HomeTokens.categoryCoins,
+                showChevron: false,
                 onTap: ref
                     .read(scannerControllerProvider.notifier)
                     .useSampleScan,

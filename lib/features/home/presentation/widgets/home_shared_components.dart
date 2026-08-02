@@ -345,6 +345,8 @@ class HomeActionRow extends StatelessWidget {
     required this.subtitle,
     this.iconColor = const Color(0xFF8BC7FF),
     this.informational = false,
+    this.emphasis = false,
+    this.showChevron = true,
     this.onTap,
     super.key,
   });
@@ -355,6 +357,14 @@ class HomeActionRow extends StatelessWidget {
   final String subtitle;
   final Color iconColor;
   final bool informational;
+
+  /// Accent-filled primary treatment for the main call to action on a screen
+  /// (e.g. the scanner's "Take a photo"). Only applies while [onTap] is set.
+  final bool emphasis;
+
+  /// Trailing disclosure chevron. Hidden for button-style actions that open a
+  /// flow (camera/gallery) rather than navigate into a list/detail.
+  final bool showChevron;
   final VoidCallback? onTap;
 
   @override
@@ -377,6 +387,34 @@ class HomeActionRow extends StatelessWidget {
         ? HomeTokens.border.withValues(alpha: .82)
         : HomeTokens.border.withValues(alpha: .58);
 
+    // Accent-filled primary variant. Falls back to the standard surface styling
+    // when the row is disabled so the emphasis never sits on a dead control.
+    final useEmphasis = emphasis && enabled;
+    final surfaceColor = useEmphasis
+        ? HomeTokens.accent
+        : enabled
+        ? HomeTokens.surfaceRaised
+        : informational
+        ? HomeTokens.surfaceRaised.withValues(alpha: .88)
+        : HomeTokens.surfaceRaised.withValues(alpha: .64);
+    final resolvedBorderColor = useEmphasis
+        ? HomeTokens.accentStrong
+        : borderColor;
+    final iconBackgroundColor = useEmphasis
+        ? Colors.white.withValues(alpha: .22)
+        : effectiveIconColor.withValues(
+            alpha: enabled
+                ? .18
+                : informational
+                ? .14
+                : .10,
+          );
+    final resolvedIconColor = useEmphasis ? Colors.white : effectiveIconColor;
+    final resolvedTitleColor = useEmphasis ? Colors.white : titleColor;
+    final resolvedSubtitleColor = useEmphasis
+        ? Colors.white.withValues(alpha: .84)
+        : subtitleColor;
+
     return MotionTapScale(
       onTap: onTap,
       child: Semantics(
@@ -390,13 +428,9 @@ class HomeActionRow extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 84),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: enabled
-                ? HomeTokens.surfaceRaised
-                : informational
-                ? HomeTokens.surfaceRaised.withValues(alpha: .88)
-                : HomeTokens.surfaceRaised.withValues(alpha: .64),
+            color: surfaceColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
+            border: Border.all(color: resolvedBorderColor),
           ),
           child: Row(
             children: [
@@ -404,16 +438,10 @@ class HomeActionRow extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: effectiveIconColor.withValues(
-                    alpha: enabled
-                        ? .18
-                        : informational
-                        ? .14
-                        : .10,
-                  ),
+                  color: iconBackgroundColor,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: effectiveIconColor, size: 24),
+                child: Icon(icon, color: resolvedIconColor, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -426,7 +454,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: titleColor,
+                        color: resolvedTitleColor,
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
@@ -437,7 +465,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: subtitleColor,
+                        color: resolvedSubtitleColor,
                         fontWeight: FontWeight.w600,
                         height: 1.22,
                       ),
@@ -445,14 +473,15 @@ class HomeActionRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              if (enabled)
+              if (enabled && showChevron) ...[
+                const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_right_rounded,
                   key: ValueKey('home-action-$keySeed-chevron'),
                   color: const Color(0xFF8BC7FF),
                   size: 26,
                 ),
+              ],
             ],
           ),
         ),

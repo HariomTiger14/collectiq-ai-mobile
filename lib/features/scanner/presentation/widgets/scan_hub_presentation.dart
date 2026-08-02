@@ -45,27 +45,18 @@ class ScannerPageScaffold extends StatelessWidget {
                 ),
                 sections: [
                   const HomeSection(
-                    topPadding: AppSpacing.sm,
-                    child: HomeBrandLockup(),
-                  ),
-                  const HomeSection(
-                    topPadding: AppSpacing.lg,
+                    topPadding: AppSpacing.md,
                     child: _ScannerTitleBlock(),
                   ),
                   const HomeSection(
-                    topPadding: AppSpacing.xl,
-                    child: _ScannerHeroCard(),
+                    topPadding: AppSpacing.xxl,
+                    child: _ScannerReticle(),
                   ),
                   HomeSection(
-                    topPadding: AppSpacing.xl,
+                    topPadding: AppSpacing.xxl,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const _ScannerSectionHeader(),
-                        const SizedBox(
-                          key: ValueKey('scan-hub-section-tile-gap'),
-                          height: 12,
-                        ),
                         cameraTile,
                         const SizedBox(
                           key: ValueKey('scan-hub-tile-gap-1'),
@@ -79,6 +70,8 @@ class ScannerPageScaffold extends StatelessWidget {
                           ),
                           sampleTile!,
                         ],
+                        const SizedBox(height: 18),
+                        const _ScannerTrustNote(),
                       ],
                     ),
                   ),
@@ -112,10 +105,10 @@ class _ScannerTitleBlock extends StatelessWidget {
             height: 1.05,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         Text(
-          'Capture one collectible, then PackLox will identify, price, and save the evidence.',
-          maxLines: 3,
+          'Capture one item — PackLox identifies it, prices it, and files the evidence.',
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: textTheme.titleMedium?.copyWith(
             color: HomeTokens.textSecondary,
@@ -128,131 +121,197 @@ class _ScannerTitleBlock extends StatelessWidget {
   }
 }
 
-class _ScannerHeroCard extends StatelessWidget {
-  const _ScannerHeroCard();
+/// Animated scanner viewfinder that anchors the hub visually. Replaces the old
+/// text-heavy hero card. Honors reduce-motion by resting mid-sweep.
+class _ScannerReticle extends StatefulWidget {
+  const _ScannerReticle();
+
+  @override
+  State<_ScannerReticle> createState() => _ScannerReticleState();
+}
+
+class _ScannerReticleState extends State<_ScannerReticle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      _controller.stop();
+      _controller.value = 0.5;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return HomeSurface(
-      keyPrefix: 'scan-hub',
-      keySeed: 'hero-card',
-      semanticLabel:
-          'PackLox scanner. Start with one clear item. Use camera or gallery. PackLox will guide identity, condition notes, and trusted valuation.',
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
-      radius: 24,
-      backgroundColor: HomeTokens.surfaceRaised.withValues(alpha: .94),
-      borderColor: HomeTokens.border,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -38,
-            top: -42,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: HomeTokens.accent.withValues(alpha: .18),
-                ),
-              ),
-            ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return RepaintBoundary(
+      child: Container(
+        key: const ValueKey('scan-hub-reticle'),
+        height: 210,
+        decoration: BoxDecoration(
+          color: HomeTokens.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'PackLox Scanner'.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFF67B6FF),
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.8,
-                      ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.15),
+                      radius: 1.1,
+                      colors: [
+                        HomeTokens.accent.withValues(alpha: .16),
+                        Colors.transparent,
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Start with one clear item.',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.headlineMedium?.copyWith(
-                        color: HomeTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                        height: 1.08,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Use camera or gallery. PackLox will guide identity, condition notes, and trusted valuation.',
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: HomeTokens.textSecondary,
-                        fontWeight: FontWeight.w700,
-                        height: 1.32,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 18),
-              Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: HomeTokens.accent.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: HomeTokens.accent.withValues(alpha: .38),
                   ),
                 ),
-                child: const Icon(
+              ),
+              Center(
+                child: Icon(
                   Icons.center_focus_strong_rounded,
-                  color: Color(0xFF67B6FF),
-                  size: 30,
+                  size: 40,
+                  color: HomeTokens.accent.withValues(alpha: .55),
+                ),
+              ),
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) => CustomPaint(
+                    painter: _ReticlePainter(progress: _controller.value),
+                  ),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ScannerSectionHeader extends StatelessWidget {
-  const _ScannerSectionHeader();
+class _ReticlePainter extends CustomPainter {
+  const _ReticlePainter({required this.progress});
+
+  final double progress;
+
+  static const _line = Color(0xFF67B6FF);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = 34.0;
+    final rect = Rect.fromLTRB(
+      inset,
+      26,
+      size.width - inset,
+      size.height - 26,
+    );
+    const cornerLen = 22.0;
+    final bracket = Paint()
+      ..color = _line
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    canvas
+      ..drawPath(
+        Path()
+          ..moveTo(rect.left, rect.top + cornerLen)
+          ..lineTo(rect.left, rect.top)
+          ..lineTo(rect.left + cornerLen, rect.top),
+        bracket,
+      )
+      ..drawPath(
+        Path()
+          ..moveTo(rect.right - cornerLen, rect.top)
+          ..lineTo(rect.right, rect.top)
+          ..lineTo(rect.right, rect.top + cornerLen),
+        bracket,
+      )
+      ..drawPath(
+        Path()
+          ..moveTo(rect.left, rect.bottom - cornerLen)
+          ..lineTo(rect.left, rect.bottom)
+          ..lineTo(rect.left + cornerLen, rect.bottom),
+        bracket,
+      )
+      ..drawPath(
+        Path()
+          ..moveTo(rect.right - cornerLen, rect.bottom)
+          ..lineTo(rect.right, rect.bottom)
+          ..lineTo(rect.right, rect.bottom - cornerLen),
+        bracket,
+      );
+
+    // Sweeping scan line with a soft trailing band.
+    final y = rect.top + 6 + (rect.height - 12) * progress;
+    final band = Paint()
+      ..shader = const LinearGradient(
+        colors: [Colors.transparent, _line, Colors.transparent],
+      ).createShader(Rect.fromLTWH(rect.left, y - 7, rect.width, 14));
+    canvas
+      ..drawRect(
+        Rect.fromLTWH(rect.left, y - 7, rect.width, 14),
+        Paint()..color = _line.withValues(alpha: .06),
+      )
+      ..drawRect(Rect.fromLTWH(rect.left, y - 1.5, rect.width, 3), band);
+  }
+
+  @override
+  bool shouldRepaint(_ReticlePainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+class _ScannerTrustNote extends StatelessWidget {
+  const _ScannerTrustNote();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      key: const ValueKey('scan-hub-trust-note'),
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          'Choose an option',
-          style: textTheme.titleLarge?.copyWith(
-            color: HomeTokens.textPrimary,
-            fontWeight: FontWeight.w900,
-            height: 1.08,
-          ),
+        const Icon(
+          Icons.verified_outlined,
+          size: 16,
+          color: HomeTokens.categoryMore,
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Camera is best for fresh evidence. Gallery works for existing photos.',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: textTheme.bodyMedium?.copyWith(
-            color: HomeTokens.textSecondary,
-            fontWeight: FontWeight.w600,
-            height: 1.25,
+        const SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            'Priced from real market data — not AI guesses.',
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
           ),
         ),
       ],
