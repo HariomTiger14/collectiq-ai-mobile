@@ -1,5 +1,8 @@
+import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
 import 'package:collectiq_ai/features/wishlist/data/repositories/shared_preferences_wishlist_repository.dart';
+import 'package:collectiq_ai/features/wishlist/data/repositories/supabase_wishlist_repository.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/domain/repositories/wishlist_repository.dart';
 import 'package:collectiq_ai/features/wishlist/domain/services/wishlist_service.dart';
@@ -7,6 +10,14 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final wishlistRepositoryProvider = Provider<WishlistRepository>((ref) {
+  final supabaseDataGateway = ref.watch(supabaseServiceProvider);
+  final registry = ref.watch(cloudServiceRegistryProvider);
+  if (supabaseDataGateway.isConfigured) {
+    return SupabaseWishlistRepository(
+      authService: registry.authService,
+      supabaseDataGateway: supabaseDataGateway,
+    );
+  }
   return const SharedPreferencesWishlistRepository();
 });
 
