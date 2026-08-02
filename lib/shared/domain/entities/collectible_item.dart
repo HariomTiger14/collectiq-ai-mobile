@@ -167,6 +167,7 @@ class CollectibleItem {
     this.aiEstimatedValue,
     this.valueAtScan,
     this.lastValueRefreshedAt,
+    this.purchasePrice,
   });
 
   /// Unique item identifier.
@@ -240,6 +241,14 @@ class CollectibleItem {
   final double? valueAtScan;
   final DateTime? lastValueRefreshedAt;
 
+  /// What the owner paid for this item (their own figure, separate from the
+  /// market-derived [estimatedValue]). Null when not recorded.
+  final double? purchasePrice;
+
+  /// Gain/loss versus the owner's purchase price, or null if no price is set.
+  double? get gainOverPurchase =>
+      purchasePrice == null ? null : estimatedValue - purchasePrice!;
+
   /// Creates a collectible item from a JSON map.
   factory CollectibleItem.fromJson(Map<String, dynamic> json) {
     return CollectibleItem(
@@ -294,6 +303,7 @@ class CollectibleItem {
       aiEstimatedValue: _optionalDouble(json['aiEstimatedValue']),
       valueAtScan: _optionalDouble(json['valueAtScan']),
       lastValueRefreshedAt: _optionalDateTime(json['lastValueRefreshedAt']),
+      purchasePrice: _optionalDouble(json['purchasePrice']),
     );
   }
 
@@ -347,6 +357,7 @@ class CollectibleItem {
       'aiEstimatedValue': aiEstimatedValue,
       'valueAtScan': valueAtScan,
       'lastValueRefreshedAt': lastValueRefreshedAt?.toIso8601String(),
+      'purchasePrice': purchasePrice,
     };
   }
 
@@ -419,6 +430,7 @@ class CollectibleItem {
       aiEstimatedValue: aiEstimatedValue,
       valueAtScan: valueAtScan,
       lastValueRefreshedAt: lastValueRefreshedAt,
+      purchasePrice: purchasePrice,
     );
   }
 
@@ -466,6 +478,7 @@ class CollectibleItem {
       aiEstimatedValue: aiEstimatedValue,
       valueAtScan: valueAtScan ?? estimatedValue,
       lastValueRefreshedAt: lastValueRefreshedAt,
+      purchasePrice: purchasePrice,
     );
   }
 
@@ -520,6 +533,7 @@ class CollectibleItem {
       aiEstimatedValue: aiEstimatedValue,
       valueAtScan: valueAtScan,
       lastValueRefreshedAt: lastValueRefreshedAt,
+      purchasePrice: purchasePrice,
     );
   }
 
@@ -553,6 +567,8 @@ class CollectibleItem {
     double? aiEstimatedValue,
     double? valueAtScan,
     DateTime? lastValueRefreshedAt,
+    double? purchasePrice,
+    bool clearPurchasePrice = false,
     List<CollectibleImage>? galleryImages,
   }) {
     return CollectibleItem(
@@ -597,6 +613,9 @@ class CollectibleItem {
       aiEstimatedValue: aiEstimatedValue ?? this.aiEstimatedValue,
       valueAtScan: valueAtScan ?? this.valueAtScan,
       lastValueRefreshedAt: lastValueRefreshedAt ?? this.lastValueRefreshedAt,
+      purchasePrice: clearPurchasePrice
+          ? null
+          : (purchasePrice ?? this.purchasePrice),
     );
   }
 }

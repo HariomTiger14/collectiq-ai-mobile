@@ -1496,6 +1496,19 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (item.purchasePrice != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _purchaseSummaryLabel(item),
+              key: const ValueKey('collectible-detail-purchase-summary'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: _purchaseGainColor(item),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3463,6 +3476,28 @@ _DetailInfoRowData? _detailRow(String label, String? value) {
   return _DetailInfoRowData(label, clean);
 }
 
+String _purchaseSummaryLabel(CollectibleItem item) {
+  final currency = item.pricing?.currency ?? 'AUD';
+  final paid = _formatMoney(item.purchasePrice!, currency);
+  if (!_shouldShowDetailValue(item) || item.estimatedValue <= 0) {
+    return 'Paid $paid';
+  }
+  final gain = item.estimatedValue - item.purchasePrice!;
+  final sign = gain >= 0 ? '+' : '-';
+  return 'Paid $paid · $sign${_formatMoney(gain.abs(), currency)}';
+}
+
+Color _purchaseGainColor(CollectibleItem item) {
+  if (item.purchasePrice == null ||
+      !_shouldShowDetailValue(item) ||
+      item.estimatedValue <= 0) {
+    return HomeTokens.textSecondary;
+  }
+  return item.estimatedValue - item.purchasePrice! >= 0
+      ? HomeTokens.positive
+      : HomeTokens.negative;
+}
+
 String _detailValueLabel(BuildContext context, CollectibleItem item) {
   if (!_shouldShowDetailValue(item)) {
     return 'Value unavailable';
@@ -4683,6 +4718,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
   late final TextEditingController _yearController;
   late final TextEditingController _countryController;
   late final TextEditingController _notesController;
+  late final TextEditingController _purchasePriceController;
 
   @override
   void initState() {
@@ -4706,6 +4742,11 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _yearController = TextEditingController(text: widget.item.year ?? '');
     _countryController = TextEditingController(text: widget.item.country ?? '');
     _notesController = TextEditingController(text: widget.item.notes ?? '');
+    _purchasePriceController = TextEditingController(
+      text: widget.item.purchasePrice == null
+          ? ''
+          : widget.item.purchasePrice!.toStringAsFixed(2),
+    );
   }
 
   @override
@@ -4723,6 +4764,7 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _yearController.dispose();
     _countryController.dispose();
     _notesController.dispose();
+    _purchasePriceController.dispose();
     super.dispose();
   }
 
@@ -4923,6 +4965,17 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
+                              'edit-collectible-purchase-price-field',
+                            ),
+                            controller: _purchasePriceController,
+                            label: 'Purchase price (optional)',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            validator: _optionalPrice,
+                          ),
+                          _EditTextField(
+                            fieldKey: const ValueKey(
                               'edit-collectible-notes-field',
                             ),
                             controller: _notesController,
@@ -5005,6 +5058,11 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       return;
     }
 
+    final purchaseText = _purchasePriceController.text.trim();
+    final purchasePrice = purchaseText.isEmpty
+        ? null
+        : double.tryParse(purchaseText);
+
     Navigator.of(context).pop(
       _EditCollectibleResult(
         retryPricing: retryPricing,
@@ -5022,6 +5080,8 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
           edition: _editionController.text.trim(),
           country: _countryController.text.trim(),
           notes: _notesController.text.trim(),
+          purchasePrice: purchasePrice,
+          clearPurchasePrice: purchaseText.isEmpty,
         ),
       ),
     );
@@ -5029,6 +5089,18 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
 
   String? _requiredText(String? value) {
     return (value ?? '').trim().isEmpty ? 'Required' : null;
+  }
+
+  String? _optionalPrice(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    final parsed = double.tryParse(text);
+    if (parsed == null || parsed < 0) {
+      return 'Enter a valid amount';
+    }
+    return null;
   }
 }
 
