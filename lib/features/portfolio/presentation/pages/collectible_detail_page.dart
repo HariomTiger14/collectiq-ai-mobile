@@ -1091,7 +1091,10 @@ class _DetailAuthorityOverview extends StatelessWidget {
               );
             },
           ),
-          if (images.isNotEmpty) ...[
+          // Only show the filmstrip when there is more than one image — with a
+          // single image the hero already shows it and there is nothing to
+          // switch between.
+          if (images.length > 1) ...[
             const SizedBox(height: AppSpacing.sm),
             _DetailGalleryFilmstrip(
               item: item,
@@ -1142,7 +1145,9 @@ class _DetailOverviewImagePreview extends StatelessWidget {
                   item: item,
                   image: selectedImage,
                 ),
-                if (images.isNotEmpty)
+                // The "n/N" position pill is only meaningful with multiple
+                // images; a lone "1/1" is noise on a single-image hero.
+                if (images.length > 1)
                   Positioned(
                     left: AppSpacing.xs,
                     top: AppSpacing.xs,
@@ -5675,7 +5680,7 @@ class _PriceAlertSection extends ConsumerWidget {
       title: 'Price Alerts',
       children: [
         Text(
-          notificationState.settingsSubtitle,
+          _priceAlertSubtitle(notificationState),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -5703,6 +5708,23 @@ class _PriceAlertSection extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  // Detail-screen copy: alerts are always saved and listed below, so the
+  // subtitle must not read as "this feature is off". When the platform can't
+  // show a system notification we say so without contradicting the buttons.
+  String _priceAlertSubtitle(PriceAlertNotificationState state) {
+    switch (state.permissionStatus) {
+      case PriceAlertNotificationPermissionStatus.notSupported:
+        return 'Saved alerts appear below. This device can\'t show a system '
+            'notification when one triggers.';
+      case PriceAlertNotificationPermissionStatus.denied:
+        return 'Saved alerts appear below. Enable notifications in device '
+            'settings to also get a system alert when one triggers.';
+      case PriceAlertNotificationPermissionStatus.granted:
+      case PriceAlertNotificationPermissionStatus.unknown:
+        return state.settingsSubtitle;
+    }
   }
 }
 
