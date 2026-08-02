@@ -30,6 +30,19 @@ class PriceAlertEvaluator {
       );
     }
 
+    // Already fired (triggered on a prior pass, or notified after the server
+    // pushed). Leave it untouched: re-flipping it to `triggered` here would
+    // re-save the row and make the server re-push. The server owns the
+    // triggered -> notified -> (re-arm) active lifecycle.
+    if (alert.status == PriceAlertStatus.triggered ||
+        alert.status == PriceAlertStatus.notified) {
+      return PriceAlertEvaluation(
+        alert: alert.copyWith(itemTitle: item.title),
+        triggered: false,
+        message: alert.message ?? _waitingMessage(alert, item),
+      );
+    }
+
     final currentValue = item.estimatedValue;
     final message = _message(alert, item, currentValue, now ?? DateTime.now());
     final triggered = message != null;
@@ -60,7 +73,7 @@ class PriceAlertEvaluator {
   ) {
     final alerts = evaluations.map((evaluation) => evaluation.alert).toList();
     final triggered = alerts
-        .where((alert) => alert.status == PriceAlertStatus.triggered)
+        .where((alert) => alert.isTriggered)
         .toList(growable: false);
     final active = alerts
         .where((alert) => alert.status == PriceAlertStatus.active)
