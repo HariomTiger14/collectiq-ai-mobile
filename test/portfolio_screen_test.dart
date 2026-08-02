@@ -62,7 +62,9 @@ void main() {
 
     await _pumpPortfolio(tester);
 
-    expect(find.text('Your collection at a glance'), findsOneWidget);
+    // The overview hero is suppressed in the normal populated view; the metrics
+    // now lead directly under the title.
+    expect(find.text('Your collection at a glance'), findsNothing);
     expect(find.text('Collection value'), findsOneWidget);
     expect(find.text('\$18'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);

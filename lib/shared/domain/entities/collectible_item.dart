@@ -249,6 +249,15 @@ class CollectibleItem {
   double? get gainOverPurchase =>
       purchasePrice == null ? null : estimatedValue - purchasePrice!;
 
+  /// Whether this item carries a valuation we can present as real (market- or
+  /// AI-derived) rather than a placeholder. This is the single source of truth
+  /// for "is this item valued" — Home and Portfolio both gate their value totals
+  /// and trusted/valued counts on it so the two screens can never disagree.
+  /// A raw [estimatedValue] > 0 is NOT sufficient; the status must be trusted.
+  bool get hasTrustedValuation =>
+      valuationStatus == ValuationStatus.marketEstimated ||
+      valuationStatus == ValuationStatus.aiEstimated;
+
   /// Creates a collectible item from a JSON map.
   factory CollectibleItem.fromJson(Map<String, dynamic> json) {
     return CollectibleItem(

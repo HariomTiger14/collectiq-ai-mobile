@@ -89,6 +89,10 @@ class DemoCollectibleSeedService {
       estimatedValue: value,
       confidence: confidence.clamp(0.0, 0.96),
       condition: condition,
+      // Demo records carry a real (market) valuation status so they count as
+      // "valued" under CollectibleItem.hasTrustedValuation — otherwise a priced
+      // item would still read as "needs value" on both Home and Portfolio.
+      valuationStatus: ValuationStatus.marketEstimated,
       recommendation:
           'Demo/mock record for local portfolio testing. Verify real items with independent sources.',
       imagePath: 'sample://demo-${_slug(category)}',
@@ -101,6 +105,7 @@ class DemoCollectibleSeedService {
         pricingSource: 'PackLox demo seed (mock)',
         pricingConfidence: 0.62 + ((index * 5) % 22) / 100,
         lastUpdated: createdAt,
+        valuationStatus: ValuationStatus.marketEstimated,
       ),
       marketSummary: MarketSummary(
         averagePrice: value,

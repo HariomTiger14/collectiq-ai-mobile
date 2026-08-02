@@ -364,9 +364,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   context,
                 ),
                 sections: [
-                  const HomeSection(child: HomeBrandLockup()),
                   const HomeSection(child: _PortfolioTitleBlock()),
-                  if (!showError)
+                  // The overview hero doubles as the empty/filtered/loading
+                  // state. In the normal populated view it just restates the
+                  // subtitle and adds a redundant Scan CTA (Scan is a nav tab),
+                  // so suppress it there and let the metrics + list lead.
+                  if (!showError && (showLoading || isFilteredEmpty || !hasItems))
                     HomeSection(
                       child: HomeAuthorityHero(
                         eyebrow: 'Portfolio overview',
@@ -1344,7 +1347,7 @@ class _PortfolioMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = [
+    final metrics = <Widget>[
       HomeMetricTile(
         label: 'Collection value',
         value: _formatAud(totalValue),
@@ -1360,16 +1363,15 @@ class _PortfolioMetrics extends StatelessWidget {
         value: '$itemCount',
         supportingText: '$valuedItemCount valued',
       ),
-      HomeMetricTile(
-        label: filteredCount == null ? 'Needs value' : 'Filtered',
-        value: filteredCount == null ? '$pendingItemCount' : '$filteredCount',
-        supportingText: filteredCount == null
-            ? (pendingItemCount == 0 ? 'Healthy' : 'Review')
-            : 'No matches',
-        supportingColor: filteredCount == null && pendingItemCount > 0
-            ? HomeTokens.warning
-            : HomeTokens.positive,
-      ),
+      // The old third "Needs value" tile just restated the sublines above, so it
+      // is dropped. The slot is reused only to report a filtered-empty result.
+      if (filteredCount != null)
+        HomeMetricTile(
+          label: 'Filtered',
+          value: '$filteredCount',
+          supportingText: 'No matches',
+          supportingColor: HomeTokens.positive,
+        ),
     ];
 
     return KeyedSubtree(
@@ -1519,28 +1521,10 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                             : HomeTokens.warning,
                       ),
                     ),
-                    SizedBox(
-                      width: tileWidth,
-                      child: _IntelligenceMetricTile(
-                        label: 'Stale values',
-                        value: '${health.stalePricingCount}',
-                        supportingText: 'Refresh queue',
-                        color: health.stalePricingCount == 0
-                            ? HomeTokens.positive
-                            : HomeTokens.warning,
-                      ),
-                    ),
-                    SizedBox(
-                      width: tileWidth,
-                      child: _IntelligenceMetricTile(
-                        label: 'Missing details',
-                        value: '${health.missingDataCount}',
-                        supportingText: 'Metadata gaps',
-                        color: health.missingDataCount == 0
-                            ? HomeTokens.positive
-                            : HomeTokens.warning,
-                      ),
-                    ),
+                    // "Stale values" and "Missing details" were dropped here to
+                    // cut stat density — both are low-signal (usually 0), already
+                    // rolled into the health score above and surfaced as review
+                    // signals in the Pro attention queue below.
                   ],
                 );
               },
@@ -2197,7 +2181,12 @@ class _PortfolioItemRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${item.category} - ${item.condition}',
+                    // For unvalued items the "Needs value" pill already conveys
+                    // status, so drop the placeholder condition (e.g. "Review
+                    // needed") that only repeated it and clipped the line.
+                    hasValue
+                        ? '${item.category} · ${item.condition}'
+                        : item.category,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -2208,25 +2197,25 @@ class _PortfolioItemRow extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Flexible(
-                        child: _StatusPill(
-                          label: statusLabel,
-                          color: statusColor,
+                      // Pill sizes to its label so "Needs value" never clips.
+                      _StatusPill(label: statusLabel, color: statusColor),
+                      // The trend restates "Needs value" for unvalued items, so
+                      // only show it when there is an actual value to trend.
+                      if (hasValue) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _trendLabel(item),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: HomeTokens.textMuted,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _trendLabel(item),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: HomeTokens.textMuted,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ],
@@ -2251,35 +2240,28 @@ class _PortfolioItemRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox.square(
-                        dimension: 34,
-                        child: IconButton(
-                          key: ValueKey('portfolio-grid-item-edit-${item.id}'),
-                          onPressed: onEdit,
-                          tooltip: needsValue
-                              ? 'Correct details and reprice'
-                              : 'Edit item',
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            needsValue
-                                ? Icons.manage_search_outlined
-                                : Icons.edit_outlined,
-                            color: needsValue
-                                ? HomeTokens.warning
-                                : const Color(0xFF8BC7FF),
-                            size: 18,
-                          ),
-                        ),
+                  // The whole row is tappable (opens the item), so no trailing
+                  // chevron. One contextual action remains: edit, or correct &
+                  // reprice for items that still need a value.
+                  SizedBox.square(
+                    dimension: 34,
+                    child: IconButton(
+                      key: ValueKey('portfolio-grid-item-edit-${item.id}'),
+                      onPressed: onEdit,
+                      tooltip: needsValue
+                          ? 'Correct details and reprice'
+                          : 'Edit item',
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        needsValue
+                            ? Icons.manage_search_outlined
+                            : Icons.edit_outlined,
+                        color: needsValue
+                            ? HomeTokens.warning
+                            : const Color(0xFF8BC7FF),
+                        size: 18,
                       ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF8BC7FF),
-                        size: 22,
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -2889,13 +2871,9 @@ double _displayTotalValue(List<CollectibleItem> items) {
 }
 
 bool _hasDisplayableValuation(CollectibleItem item) {
-  return switch (item.valuationStatus) {
-    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
-    ValuationStatus.providerNotConfigured ||
-    ValuationStatus.noMarketMatch ||
-    ValuationStatus.lookupFailed ||
-    ValuationStatus.unavailable => false,
-  };
+  // Shared with Home via CollectibleItem.hasTrustedValuation so both screens
+  // report the same value total and valued/trusted counts.
+  return item.hasTrustedValuation;
 }
 
 bool _isPendingItem(CollectibleItem item) {

@@ -2002,9 +2002,10 @@ void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
 }
 
 bool _hasDisplayValue(CollectibleItem item) {
-  return item.estimatedValue > 0 ||
-      item.valuationStatus == ValuationStatus.marketEstimated ||
-      item.valuationStatus == ValuationStatus.aiEstimated;
+  // Shared definition with Portfolio: a raw estimatedValue > 0 is not enough —
+  // the valuation status must be market/AI-derived. Keeps the "Portfolio value"
+  // and "trusted" counts identical across Home and Portfolio.
+  return item.hasTrustedValuation;
 }
 
 String _valueLabelFor(CollectibleItem item) {
