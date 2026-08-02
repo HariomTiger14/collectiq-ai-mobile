@@ -1938,7 +1938,7 @@ class _DetailMarketSection extends StatelessWidget {
               'No market pricing evidence has been saved for this collectible.',
             )
           else
-            _DetailAuthorityRows(rows: rows, alignValuesRight: true),
+            _DetailAuthorityRows(rows: rows),
           const SizedBox(height: AppSpacing.md),
           _DetailEmptyCopy(
             item.marketSummary == null
@@ -2173,7 +2173,7 @@ class _SnapshotEvidenceRows extends StatelessWidget {
       if (pricing.reasonCode?.trim().isNotEmpty ?? false)
         _DetailInfoRowData('Reason', _humanizeToken(pricing.reasonCode!)),
     ];
-    return _DetailAuthorityRows(rows: rows, alignValuesRight: true);
+    return _DetailAuthorityRows(rows: rows);
   }
 }
 
@@ -2824,13 +2824,9 @@ class _DetailInfoRowData {
 }
 
 class _DetailAuthorityRows extends StatelessWidget {
-  const _DetailAuthorityRows({
-    required this.rows,
-    this.alignValuesRight = false,
-  });
+  const _DetailAuthorityRows({required this.rows});
 
   final List<_DetailInfoRowData> rows;
-  final bool alignValuesRight;
 
   @override
   Widget build(BuildContext context) {
@@ -2855,7 +2851,6 @@ class _DetailAuthorityRows extends StatelessWidget {
                 flex: 7,
                 child: Text(
                   row.value,
-                  textAlign: alignValuesRight ? TextAlign.right : null,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: PackLoxTokens.textPrimary,
                     fontWeight: FontWeight.w700,
