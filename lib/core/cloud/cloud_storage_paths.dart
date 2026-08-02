@@ -10,6 +10,14 @@ class CloudStoragePaths {
         '${safePathSegment(itemId)}${normalizedImageExtension(extension)}';
   }
 
+  static String profileAvatar({
+    required String userId,
+    String extension = '.jpg',
+  }) {
+    return 'users/${safePathSegment(userId)}/profile/avatar'
+        '${normalizedImageExtension(extension)}';
+  }
+
   static String portfolioImageVariant({
     required String userId,
     required String itemId,

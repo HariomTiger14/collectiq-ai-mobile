@@ -288,6 +288,7 @@ CloudServiceRegistry _registry({
     authService: authService,
     cloudStorageService: storageService,
     cloudPortfolioSyncService: syncService,
+    cloudProfileSyncService: const NoOpCloudProfileSyncService(),
     analyticsService: analyticsService,
     crashReportingService: const NoOpCrashReportingService(),
     remoteConfigService: remoteConfigService,
