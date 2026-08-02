@@ -13,6 +13,7 @@ import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
+import 'package:collectiq_ai/features/settings/presentation/account_screen.dart';
 import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -39,6 +40,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
@@ -165,9 +167,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         subtitle: authState.isSignedIn
             ? authState.user?.email ?? 'Signed in'
             : 'Sign in to enable cloud backup.',
-        trailing: authState.isSignedIn ? 'Signed in' : 'Sign in',
+        trailing: authState.isSignedIn ? 'Manage' : 'Sign in',
         onTap: authState.isSignedIn
-            ? null
+            ? () => Navigator.of(context).push(AccountScreen.route())
             : () => Navigator.of(context).push(AuthWelcomeScreen.route()),
       ),
       _SettingsRow(
@@ -798,11 +800,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 navigator.pop();
                 _showSettingsSnackBar('Support details copied.');
               },
+              onEmail: (subject, body) =>
+                  _launchSupportEmail(sheetContext, subject, body),
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _launchSupportEmail(
+    BuildContext sheetContext,
+    String subject,
+    String body,
+  ) async {
+    final navigator = Navigator.of(sheetContext);
+    final query = <String>[
+      'subject=${Uri.encodeComponent(subject)}',
+      if (body.isNotEmpty) 'body=${Uri.encodeComponent(body)}',
+    ].join('&');
+    final uri = Uri.parse('mailto:${_HelpAndFeedbackSheet._supportEmail}?$query');
+    var launched = false;
+    try {
+      launched = await launchUrl(uri);
+    } catch (_) {
+      launched = false;
+    }
+    if (!mounted) {
+      return;
+    }
+    navigator.pop();
+    if (!launched) {
+      // Fallback so the user can still reach support without a mail client.
+      await Clipboard.setData(
+        const ClipboardData(text: _HelpAndFeedbackSheet._supportEmail),
+      );
+      _showSettingsSnackBar('No email app found — support address copied.');
+    }
   }
 
   String _maskedEmail(String? email) {
@@ -1449,9 +1483,10 @@ class _SettingsSurface extends StatelessWidget {
 }
 
 class _HelpAndFeedbackSheet extends StatelessWidget {
-  const _HelpAndFeedbackSheet({required this.onCopy});
+  const _HelpAndFeedbackSheet({required this.onCopy, required this.onEmail});
 
   final Future<void> Function(String message) onCopy;
+  final Future<void> Function(String subject, String body) onEmail;
 
   static const _supportEmail = 'support@packlox.com';
 
@@ -1487,15 +1522,15 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
                 icon: Icons.mail_outline_rounded,
                 title: 'Contact support',
                 subtitle: _supportEmail,
-                trailing: 'Copy',
-                onTap: () => onCopy(_supportEmail),
+                trailing: 'Email',
+                onTap: () => onEmail('PackLox support request', ''),
               ),
               _HelpActionRow(
                 icon: Icons.document_scanner_outlined,
                 title: 'Report scan issue',
-                subtitle: 'Copies a ready-to-send scan support template.',
-                trailing: 'Copy',
-                onTap: () => onCopy(_scanIssueTemplate),
+                subtitle: 'Opens a ready-to-send scan report email.',
+                trailing: 'Email',
+                onTap: () => onEmail('PackLox scan issue', _scanIssueTemplate),
               ),
               _HelpActionRow(
                 icon: Icons.privacy_tip_outlined,
