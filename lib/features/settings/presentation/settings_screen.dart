@@ -46,6 +46,8 @@ const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
 );
 
+enum _AvatarSourceChoice { camera, gallery, remove }
+
 /// Settings screen for account, app preferences, and supported local/cloud state.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.qaInitialScrollOffset = 0});
@@ -493,6 +495,64 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<_AvatarSourceChoice?> _chooseAvatarSource(
+    BuildContext context, {
+    required bool hasAvatar,
+  }) {
+    Widget tile({
+      required IconData icon,
+      required String label,
+      required _AvatarSourceChoice value,
+      bool destructive = false,
+    }) {
+      final color = destructive ? HomeTokens.warning : HomeTokens.accent;
+      return ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: destructive ? HomeTokens.warning : HomeTokens.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        onTap: () => Navigator.of(context).pop(value),
+      );
+    }
+
+    return showModalBottomSheet<_AvatarSourceChoice>(
+      context: context,
+      backgroundColor: HomeTokens.surfaceRaised,
+      showDragHandle: true,
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              tile(
+                icon: Icons.photo_camera_outlined,
+                label: 'Take photo',
+                value: _AvatarSourceChoice.camera,
+              ),
+              tile(
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                value: _AvatarSourceChoice.gallery,
+              ),
+              if (hasAvatar)
+                tile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Remove photo',
+                  value: _AvatarSourceChoice.remove,
+                  destructive: true,
+                ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showProfileEditor(BuildContext context) async {
     final currentProfile =
         (ref.read(profileControllerProvider).hasValue
@@ -535,8 +595,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (isSaving) {
                 return;
               }
+              final hasAvatar =
+                  currentProfile.avatarPath?.isNotEmpty ?? false;
+              final choice = await _chooseAvatarSource(
+                sheetContext,
+                hasAvatar: hasAvatar,
+              );
+              if (choice == null) {
+                return;
+              }
+              if (choice == _AvatarSourceChoice.remove) {
+                setSheetState(() => isSaving = true);
+                try {
+                  await ref
+                      .read(profileControllerProvider.notifier)
+                      .removeAvatar();
+                  if (mounted) {
+                    _showSettingsSnackBar('Profile photo removed.');
+                  }
+                } finally {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => isSaving = false);
+                  }
+                }
+                return;
+              }
               final image = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
+                source: choice == _AvatarSourceChoice.camera
+                    ? ImageSource.camera
+                    : ImageSource.gallery,
                 maxWidth: 900,
                 maxHeight: 900,
                 imageQuality: 86,
@@ -600,6 +687,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
     await showModalBottomSheet<void>(
       context: context,
+      // Size to content (with scroll fallback) so the option list never clips.
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return SafeArea(
@@ -1905,8 +1994,8 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           OutlinedButton.icon(
             key: const ValueKey('settings-profile-photo-button'),
             onPressed: widget.isSaving ? null : widget.onPickAvatar,
-            icon: const Icon(Icons.photo_library_outlined),
-            label: const Text('Choose profile photo'),
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: const Text('Change photo'),
             style: OutlinedButton.styleFrom(
               foregroundColor: HomeTokens.textPrimary,
               side: const BorderSide(color: HomeTokens.border),

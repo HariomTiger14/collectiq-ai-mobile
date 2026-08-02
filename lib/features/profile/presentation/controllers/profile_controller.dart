@@ -35,6 +35,15 @@ class ProfileController extends AsyncNotifier<CollectorProfile> {
     state = AsyncValue.data(saved);
   }
 
+  Future<void> removeAvatar() async {
+    final current = state.hasValue
+        ? state.requireValue
+        : await _repository.loadProfile();
+    // Empty avatarPath is treated as "no avatar" and cleared by the repository.
+    final saved = await _repository.saveProfile(current.copyWith(avatarPath: ''));
+    state = AsyncValue.data(saved);
+  }
+
   Future<void> updateCountry(String countryCode) async {
     final current = state.hasValue
         ? state.requireValue
