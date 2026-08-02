@@ -412,17 +412,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                           : _handleScanPressed,
                     ),
                   ),
-                  HomeSection(
+                  const HomeSection(
                     topPadding: AppSpacing.xl,
-                    child: _CategoryExplorer(
-                      onCategoryTap: (category) => _openCategoryOverview(
-                        context,
-                        category,
-                        onScanPressed: widget.onScanPressed == null
-                            ? null
-                            : _handleScanPressed,
-                      ),
-                    ),
+                    child: _CategoryExplorer(),
                   ),
                   HomeSection(
                     topPadding: AppSpacing.xl,
@@ -497,17 +489,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   // Supported categories is a discovery/reference surface, so it
                   // sits in the bottom zone rather than competing with the
                   // personal data (and its own category mix) higher up.
-                  HomeSection(
+                  const HomeSection(
                     topPadding: AppSpacing.xl,
-                    child: _CategoryExplorer(
-                      onCategoryTap: (category) => _openCategoryOverview(
-                        context,
-                        category,
-                        onScanPressed: widget.onScanPressed == null
-                            ? null
-                            : _handleScanPressed,
-                      ),
-                    ),
+                    child: _CategoryExplorer(),
                   ),
                   const HomeSection(
                     topPadding: AppSpacing.xl,
@@ -999,12 +983,14 @@ String _relativeAddedLabel(CollectibleItem item) {
 }
 
 class _CategoryExplorer extends StatelessWidget {
-  const _CategoryExplorer({required this.onCategoryTap});
-
-  final ValueChanged<_SupportedCategory> onCategoryTap;
+  const _CategoryExplorer();
 
   @override
   Widget build(BuildContext context) {
+    // Reference-only band: signals the breadth of what PackLox supports. The
+    // tiles are intentionally non-interactive — there is no per-category screen
+    // worth navigating to (it would be the same static template every time and
+    // shows none of the user's own data).
     return HomeSectionSurface(
       keySeed: 'category-explorer',
       title: 'Supported categories',
@@ -1017,7 +1003,6 @@ class _CategoryExplorer extends StatelessWidget {
               semanticMeaning: category.description,
               iconColor: category.color,
               assetPath: category.assetPath,
-              onTap: () => onCategoryTap(category),
             ),
         ],
       ),
@@ -1212,103 +1197,6 @@ class _ProviderPill extends StatelessWidget {
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: HomeTokens.textPrimary,
           fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryOverviewScreen extends StatelessWidget {
-  const _CategoryOverviewScreen({required this.category, this.onScanPressed});
-
-  final _SupportedCategory category;
-  final VoidCallback? onScanPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: HomeTokens.background,
-        systemNavigationBarDividerColor: HomeTokens.background,
-        systemNavigationBarIconBrightness: Brightness.light,
-        systemNavigationBarContrastEnforced: false,
-      ),
-      child: Theme(
-        data: AppTheme.dark,
-        child: Scaffold(
-          backgroundColor: HomeTokens.background,
-          body: SafeArea(
-            bottom: false,
-            child: HomeStateContainer(
-              storageKey: 'category-overview-${category.key}',
-              sections: [
-                HomeSection(
-                  child: Row(
-                    children: [
-                      IconButton(
-                        key: const ValueKey('category-overview-back'),
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        color: HomeTokens.textPrimary,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      const HomeBrandLockup(),
-                    ],
-                  ),
-                ),
-                HomeSection(
-                  topPadding: AppSpacing.lg,
-                  child: HomeAuthorityHero(
-                    eyebrow: 'Category overview',
-                    title: category.label,
-                    body: category.description,
-                    ctaLabel: 'Scan ${category.shortLabel}',
-                    icon: category.icon,
-                    onPressed: onScanPressed == null
-                        ? null
-                        : () {
-                            Navigator.of(context).maybePop();
-                            onScanPressed?.call();
-                          },
-                  ),
-                ),
-                HomeSection(
-                  topPadding: AppSpacing.xl,
-                  child: HomeSectionSurface(
-                    keySeed: 'category-provider-${category.key}',
-                    title: 'Supported providers',
-                    child: Text(
-                      category.providers,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: HomeTokens.textSecondary,
-                        fontWeight: FontWeight.w700,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ),
-                HomeSection(
-                  topPadding: AppSpacing.xl,
-                  bottomPadding: AppSpacing.xxl,
-                  child: HomeSectionSurface(
-                    keySeed: 'category-examples-${category.key}',
-                    title: 'Example items',
-                    child: Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        for (final example in category.examples)
-                          _ProviderPill(label: example, tone: category.color),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -2111,21 +1999,6 @@ void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
   Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
-}
-
-void _openCategoryOverview(
-  BuildContext context,
-  _SupportedCategory category, {
-  VoidCallback? onScanPressed,
-}) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => _CategoryOverviewScreen(
-        category: category,
-        onScanPressed: onScanPressed,
-      ),
-    ),
-  );
 }
 
 bool _hasDisplayValue(CollectibleItem item) {
