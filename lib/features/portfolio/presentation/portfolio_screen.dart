@@ -332,6 +332,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     );
     final hasItems = portfolioState.items.isNotEmpty;
     final isFilteredEmpty = hasItems && visibleItems.isEmpty;
+    // Active search = "dedicated search mode": the whole-portfolio overview
+    // chrome (value/metrics, intelligence, export) collapses so results — or a
+    // quiet "no matches" — sit directly under the search field instead of being
+    // pushed below the dashboard.
+    final hasSearchQuery = effectiveSearchQuery.trim().isNotEmpty;
     final showLoading =
         portfolioState.isLoading && portfolioState.items.isEmpty;
     final showError =
@@ -461,7 +466,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               PortfolioSearchPreview.active,
                         ),
                       ),
-                    if (hasItems && !isFilteredEmpty)
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioMetrics(
                           totalValue: _displayTotalValue(portfolioState.items),
@@ -480,7 +485,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               : null,
                         ),
                       ),
-                    if (hasItems && !isFilteredEmpty)
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioIntelligencePanel(
                           analytics: portfolioAnalytics,
@@ -495,7 +500,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           onAddMoreCollectibles: widget.onScanPressed,
                         ),
                       ),
-                    if (hasItems && !isFilteredEmpty)
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioExportPanel(
                           itemCount: portfolioState.items.length,
