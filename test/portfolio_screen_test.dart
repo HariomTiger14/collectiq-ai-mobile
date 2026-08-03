@@ -394,17 +394,30 @@ void main() {
       await _pumpPortfolio(tester);
 
       final fieldFinder = find.byKey(const ValueKey('portfolio-search-field'));
-      // The field's State must survive each keystroke. The old query-embedded
-      // key rebuilt the field as a new widget on every character, which dropped
-      // focus and forced the user to re-tap between characters.
-      final stateBefore = tester.state(fieldFinder);
 
+      // Capture the field's State after the first character is in, then assert
+      // it survives subsequent keystrokes. The old query-embedded key rebuilt
+      // the field on every character (dropping focus); the filtered-empty hero
+      // (inserted on a no-match query) also reshuffled the sibling sections.
       await tester.enterText(fieldFinder, 'c');
       await tester.pump();
+      final searchState = tester.state(fieldFinder);
+
+      // Another matching keystroke — field must not be rebuilt.
       await tester.enterText(fieldFinder, 'ch');
       await tester.pump();
+      expect(tester.state(fieldFinder), same(searchState));
 
-      expect(tester.state(fieldFinder), same(stateBefore));
+      // Type into no-match territory: this inserts the filtered-empty hero as a
+      // sibling ABOVE the toolbar. It must still be the same field with focus.
+      await tester.enterText(fieldFinder, 'chzzz');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-hero-section')),
+        findsWidgets,
+      );
+      expect(tester.state(fieldFinder), same(searchState));
 
       final editable = tester.widget<EditableText>(
         find.descendant(of: fieldFinder, matching: find.byType(EditableText)),

@@ -372,6 +372,11 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   // so suppress it there and let the metrics + list lead.
                   if (!showError && (showLoading || isFilteredEmpty || !hasItems))
                     HomeSection(
+                      // Keyed so that when this hero appears/disappears (e.g. a
+                      // search that yields no matches), the sibling toolbar below
+                      // is matched by key and keeps its state + focus instead of
+                      // being rebuilt.
+                      key: const ValueKey('portfolio-hero-section'),
                       child: HomeAuthorityHero(
                         eyebrow: 'Portfolio overview',
                         title: _heroTitle(
@@ -434,6 +439,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   else ...[
                     if (hasItems)
                       HomeSection(
+                        // Stable key so the search field keeps focus even when a
+                        // sibling (the hero above) is inserted/removed as results
+                        // change while typing.
+                        key: const ValueKey('portfolio-toolbar-section'),
                         child: _PortfolioToolbar(
                           searchQuery: effectiveSearchQuery,
                           onSearchChanged: (value) {

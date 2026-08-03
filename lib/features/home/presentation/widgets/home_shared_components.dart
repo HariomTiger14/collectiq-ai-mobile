@@ -783,9 +783,20 @@ class HomeStateContainer extends StatelessWidget {
             SliverPadding(
               padding: EdgeInsets.only(top: topPadding),
               sliver: SliverList(
-                delegate: SliverChildListDelegate.fixed([
+                // Regular (not .fixed) delegate so children are reconciled by
+                // key, not just index. Combined with forwarding each section's
+                // key onto the wrapper Flutter diffs, a keyed section keeps its
+                // element (and any focus) when sibling sections are inserted or
+                // removed — e.g. the Portfolio search hero appearing on a
+                // no-match query, which otherwise rebuilt the search field and
+                // dropped focus after a single character.
+                delegate: SliverChildListDelegate([
                   for (final section in sections)
-                    _HomeConstrainedSection(gutter: gutter, child: section),
+                    _HomeConstrainedSection(
+                      key: section.key,
+                      gutter: gutter,
+                      child: section,
+                    ),
                   SizedBox(height: bottomClearance),
                 ]),
               ),
@@ -828,7 +839,11 @@ class HomeSection extends StatelessWidget {
 }
 
 class _HomeConstrainedSection extends StatelessWidget {
-  const _HomeConstrainedSection({required this.gutter, required this.child});
+  const _HomeConstrainedSection({
+    required this.gutter,
+    required this.child,
+    super.key,
+  });
 
   final double gutter;
   final Widget child;
