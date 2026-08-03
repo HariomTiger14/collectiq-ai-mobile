@@ -1198,7 +1198,7 @@ class _ExportDisclosureRow extends StatelessWidget {
   }
 }
 
-class _PortfolioToolbar extends StatelessWidget {
+class _PortfolioToolbar extends StatefulWidget {
   const _PortfolioToolbar({
     required this.searchQuery,
     required this.onSearchChanged,
@@ -1220,6 +1220,40 @@ class _PortfolioToolbar extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<_PortfolioToolbar> createState() => _PortfolioToolbarState();
+}
+
+class _PortfolioToolbarState extends State<_PortfolioToolbar> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PortfolioToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync the field only when the query changes from OUTSIDE the field (the
+    // clear button, or a QA preset). During normal typing the controller text
+    // already matches, so we skip resetting value/selection — resetting on each
+    // keystroke is exactly what used to drop focus after a single character.
+    if (widget.searchQuery != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.searchQuery,
+        selection: TextSelection.collapsed(offset: widget.searchQuery.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return HomeSurface(
       keySeed: 'toolbar',
@@ -1229,11 +1263,13 @@ class _PortfolioToolbar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
-            key: ValueKey('portfolio-search-field-$searchQuery'),
-            initialValue: searchQuery,
-            autofocus: autofocus,
-            onChanged: onSearchChanged,
+          TextField(
+            // Stable key: the key previously embedded the query, so every
+            // keystroke rebuilt the field as a new widget and dropped focus.
+            key: const ValueKey('portfolio-search-field'),
+            controller: _controller,
+            autofocus: widget.autofocus,
+            onChanged: widget.onSearchChanged,
             cursorColor: const Color(0xFF8BE7FF),
             style: const TextStyle(
               color: HomeTokens.textPrimary,
@@ -1242,12 +1278,12 @@ class _PortfolioToolbar extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Search saved items',
               prefixIcon: const Icon(Icons.search, color: Color(0xFF8BC7FF)),
-              suffixIcon: searchQuery.trim().isEmpty
+              suffixIcon: widget.searchQuery.trim().isEmpty
                   ? null
                   : IconButton(
                       key: const ValueKey('portfolio-search-clear'),
                       tooltip: 'Clear search',
-                      onPressed: onSearchCleared,
+                      onPressed: widget.onSearchCleared,
                       icon: const Icon(Icons.close, color: Color(0xFFBEEBFF)),
                     ),
               filled: true,
@@ -1277,8 +1313,8 @@ class _PortfolioToolbar extends StatelessWidget {
                 child: _ToolbarButton(
                   key: const ValueKey('portfolio-action-sort'),
                   icon: Icons.swap_vert_outlined,
-                  label: sortLabel,
-                  onPressed: onSort,
+                  label: widget.sortLabel,
+                  onPressed: widget.onSort,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1286,10 +1322,10 @@ class _PortfolioToolbar extends StatelessWidget {
                 child: _ToolbarButton(
                   key: const ValueKey('portfolio-action-filter'),
                   icon: Icons.tune_outlined,
-                  label: activeFilterCount == 0
+                  label: widget.activeFilterCount == 0
                       ? 'Filter'
-                      : 'Filter ($activeFilterCount)',
-                  onPressed: onFilter,
+                      : 'Filter (${widget.activeFilterCount})',
+                  onPressed: widget.onFilter,
                 ),
               ),
             ],

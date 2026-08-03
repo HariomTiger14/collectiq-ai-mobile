@@ -383,6 +383,36 @@ void main() {
     expect(find.text('Base Set Charizard'), findsOneWidget);
   });
 
+  testWidgets(
+    'search field keeps focus across keystrokes (no per-char rebuild)',
+    (tester) async {
+      _seedPortfolio([
+        _item('search-card', 'Pokemon Charizard', 1850),
+        _item('search-coin', 'Silver Eagle', 52, category: 'Coin'),
+      ]);
+
+      await _pumpPortfolio(tester);
+
+      final fieldFinder = find.byKey(const ValueKey('portfolio-search-field'));
+      // The field's State must survive each keystroke. The old query-embedded
+      // key rebuilt the field as a new widget on every character, which dropped
+      // focus and forced the user to re-tap between characters.
+      final stateBefore = tester.state(fieldFinder);
+
+      await tester.enterText(fieldFinder, 'c');
+      await tester.pump();
+      await tester.enterText(fieldFinder, 'ch');
+      await tester.pump();
+
+      expect(tester.state(fieldFinder), same(stateBefore));
+
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: fieldFinder, matching: find.byType(EditableText)),
+      );
+      expect(editable.focusNode.hasFocus, isTrue);
+    },
+  );
+
   testWidgets('entering a search query shows matching results', (tester) async {
     _seedPortfolio([
       _item('search-card', 'Pokemon Charizard', 1850),
@@ -392,7 +422,7 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
@@ -430,7 +460,7 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
@@ -466,7 +496,7 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'zzzzz',
     );
     await tester.pumpAndSettle();
@@ -697,7 +727,7 @@ void main() {
     await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
@@ -747,14 +777,14 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
     await _revealPortfolio(tester, find.text('No matches found'));
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-charizard')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       '',
     );
     await tester.pumpAndSettle();
@@ -834,7 +864,7 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey('portfolio-search-field-')),
+        find.byKey(const ValueKey('portfolio-search-field')),
         findsOneWidget,
       );
       expect(
