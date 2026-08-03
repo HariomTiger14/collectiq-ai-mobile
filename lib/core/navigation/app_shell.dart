@@ -11,6 +11,7 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
@@ -74,8 +75,35 @@ class _AppShellState extends ConsumerState<AppShell>
     super.dispose();
   }
 
+  // Re-sync the cloud portfolio when the app returns to the foreground so that
+  // server-side changes made while backgrounded (fresh valuations, newly
+  // triggered price alerts) surface promptly on reopen — not only on a full
+  // relaunch. Throttled via the shared marker so a quick background/foreground
+  // toggle doesn't hammer the network.
+  static const _resumeSyncThrottle = Duration(minutes: 2);
+
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {}
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _maybeSyncOnResume();
+    }
+  }
+
+  void _maybeSyncOnResume() {
+    if (!ref.read(authControllerProvider).isSignedIn) {
+      return;
+    }
+    final last = ref.read(homeLastAutoSyncProvider);
+    final now = DateTime.now();
+    if (last != null && now.difference(last) < _resumeSyncThrottle) {
+      return;
+    }
+    ref.read(homeLastAutoSyncProvider.notifier).mark(now);
+    unawaited(
+      ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow(),
+    );
+  }
 
   void _startNewScan() {
     ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
