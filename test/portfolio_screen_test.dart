@@ -366,14 +366,14 @@ void main() {
     await _revealPortfolio(tester, find.text('No matches found'));
     expect(find.text('No matches found'), findsWidgets);
     expect(find.text('Your portfolio is waiting'), findsNothing);
-    expect(find.text('Clear search'), findsWidgets);
+    // Quiet empty state: no "clear search" action — the user clears the field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-search')), findsNothing);
 
-    final previewClearSearch = find.byKey(
-      const ValueKey('portfolio-clear-search'),
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      '',
     );
-    await tester.ensureVisible(previewClearSearch);
-    await tester.pumpAndSettle();
-    await tester.tap(previewClearSearch);
     await tester.pumpAndSettle();
 
     await _revealPortfolio(
@@ -397,8 +397,8 @@ void main() {
 
       // Capture the field's State after the first character is in, then assert
       // it survives subsequent keystrokes. The old query-embedded key rebuilt
-      // the field on every character (dropping focus); the filtered-empty hero
-      // (inserted on a no-match query) also reshuffled the sibling sections.
+      // the field on every character (dropping focus); sibling sections changing
+      // as results filter (metrics/hero) also used to reshuffle + rebuild it.
       await tester.enterText(fieldFinder, 'c');
       await tester.pump();
       final searchState = tester.state(fieldFinder);
@@ -408,14 +408,14 @@ void main() {
       await tester.pump();
       expect(tester.state(fieldFinder), same(searchState));
 
-      // Type into no-match territory: this inserts the filtered-empty hero as a
-      // sibling ABOVE the toolbar. It must still be the same field with focus.
+      // Type into no-match territory: the metrics/export sections collapse and
+      // the quiet empty state appears below. The anchored field must survive.
       await tester.enterText(fieldFinder, 'chzzz');
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('portfolio-hero-section')),
-        findsWidgets,
+        find.byKey(const ValueKey('portfolio-filtered-empty-state-surface')),
+        findsOneWidget,
       );
       expect(tester.state(fieldFinder), same(searchState));
 
@@ -516,16 +516,17 @@ void main() {
 
     await _revealPortfolio(tester, find.text('No matches found'));
     expect(find.text('No matches found'), findsWidgets);
-    expect(find.text('Clear search'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('portfolio-clear-search')),
-      findsOneWidget,
-    );
+    // Quiet empty state: search-only has no button; the user just edits/clears
+    // the field. Metrics + export collapse so the message sits under the field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-search')), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-filters')), findsNothing);
+    expect(find.text('Collection value'), findsNothing);
 
-    final clearSearch = find.byKey(const ValueKey('portfolio-clear-search'));
-    await tester.ensureVisible(clearSearch);
-    await tester.pumpAndSettle();
-    await tester.tap(clearSearch);
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      '',
+    );
     await tester.pumpAndSettle();
     await _revealPortfolio(
       tester,
@@ -760,8 +761,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('No matches found'), findsWidgets);
-    expect(find.text('Clear search'), findsWidgets);
-    expect(find.text('Reset filters'), findsOneWidget);
+    // Search + filters: no clear-search action, but filters keep a lightweight
+    // text button since they can't be dismissed by editing the search field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.text('Clear filters'), findsOneWidget);
   });
 
   testWidgets('search clear preserves applied filter and sort state', (

@@ -370,12 +370,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   // state. In the normal populated view it just restates the
                   // subtitle and adds a redundant Scan CTA (Scan is a nav tab),
                   // so suppress it there and let the metrics + list lead.
-                  if (!showError && (showLoading || isFilteredEmpty || !hasItems))
+                  // Only the genuine onboarding / loading states get the big
+                  // hero. A search or filter that yields no matches shows a quiet
+                  // inline empty state below the (anchored) toolbar instead — the
+                  // hero here used to insert above the toolbar and shove it down.
+                  if (!showError && (showLoading || !hasItems))
                     HomeSection(
-                      // Keyed so that when this hero appears/disappears (e.g. a
-                      // search that yields no matches), the sibling toolbar below
-                      // is matched by key and keeps its state + focus instead of
-                      // being rebuilt.
                       key: const ValueKey('portfolio-hero-section'),
                       child: HomeAuthorityHero(
                         eyebrow: 'Portfolio overview',
@@ -461,7 +461,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               PortfolioSearchPreview.active,
                         ),
                       ),
-                    if (hasItems)
+                    if (hasItems && !isFilteredEmpty)
                       HomeSection(
                         child: _PortfolioMetrics(
                           totalValue: _displayTotalValue(portfolioState.items),
@@ -495,7 +495,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           onAddMoreCollectibles: widget.onScanPressed,
                         ),
                       ),
-                    if (hasItems)
+                    if (hasItems && !isFilteredEmpty)
                       HomeSection(
                         child: _PortfolioExportPanel(
                           itemCount: portfolioState.items.length,
@@ -513,7 +513,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         hasActiveFilters: _activeFilterCount > 0,
                         onScanPressed: widget.onScanPressed,
                         onClearFilters: _clearFilters,
-                        onClearSearch: _clearSearch,
                         onItemTap: _openItem,
                         onItemEdit: _editItem,
                       ),
@@ -2129,7 +2128,6 @@ class _PortfolioContent extends StatelessWidget {
     required this.hasActiveFilters,
     required this.onScanPressed,
     required this.onClearFilters,
-    required this.onClearSearch,
     required this.onItemTap,
     required this.onItemEdit,
   });
@@ -2141,7 +2139,6 @@ class _PortfolioContent extends StatelessWidget {
   final bool hasActiveFilters;
   final VoidCallback? onScanPressed;
   final VoidCallback onClearFilters;
-  final VoidCallback onClearSearch;
   final ValueChanged<CollectibleItem> onItemTap;
   final ValueChanged<CollectibleItem> onItemEdit;
 
@@ -2155,7 +2152,6 @@ class _PortfolioContent extends StatelessWidget {
       return _PortfolioFilteredEmptyPanel(
         hasSearchQuery: hasSearchQuery,
         hasActiveFilters: hasActiveFilters,
-        onClearSearch: onClearSearch,
         onClearFilters: onClearFilters,
       );
     }
@@ -2396,76 +2392,72 @@ class _PortfolioFilteredEmptyPanel extends StatelessWidget {
   const _PortfolioFilteredEmptyPanel({
     required this.hasSearchQuery,
     required this.hasActiveFilters,
-    required this.onClearSearch,
     required this.onClearFilters,
   });
 
   final bool hasSearchQuery;
   final bool hasActiveFilters;
-  final VoidCallback onClearSearch;
   final VoidCallback onClearFilters;
 
   @override
   Widget build(BuildContext context) {
     final title = hasSearchQuery ? 'No matches found' : 'No matching filters';
-    final body = hasSearchQuery && hasActiveFilters
-        ? 'No saved items match this search inside the current filters. Clear search to keep your filters, or reset filters to widen the list.'
+    final hint = hasSearchQuery && hasActiveFilters
+        ? 'Nothing matches this search inside your active filters.'
         : hasSearchQuery
-        ? 'No saved items match this search. Clear the search to return to your current portfolio list.'
-        : 'Your saved items are still here, but the current filters found none.';
+        ? 'Try a different name, set, or category.'
+        : 'None of your saved items match the current filters.';
+    final textTheme = Theme.of(context).textTheme;
 
     return KeyedSubtree(
       key: const ValueKey('portfolio-filtered-empty-state-surface'),
-      child: HomeSectionSurface(
-        keySeed: 'portfolio-filtered-empty',
-        title: title,
+      // Quiet, cardless empty state that sits directly under the anchored search
+      // field. No "clear search" action — the user just edits or clears the
+      // field. Filters keep a lightweight text button since they can't be
+      // dismissed by editing the search text.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xl,
+          horizontal: AppSpacing.lg,
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Icon(
+              hasSearchQuery
+                  ? Icons.search_off_rounded
+                  : Icons.filter_alt_off_rounded,
+              size: 34,
+              color: HomeTokens.textMuted,
+            ),
+            const SizedBox(height: AppSpacing.md),
             Text(
-              body,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              title,
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
                 color: HomeTokens.textSecondary,
                 fontWeight: FontWeight.w600,
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: FilledButton.icon(
-                key: hasSearchQuery
-                    ? const ValueKey('portfolio-clear-search')
-                    : const ValueKey('portfolio-clear-filters'),
-                onPressed: hasSearchQuery ? onClearSearch : onClearFilters,
-                icon: Icon(
-                  hasSearchQuery ? Icons.close : Icons.filter_alt_off_outlined,
+            if (hasActiveFilters) ...[
+              const SizedBox(height: AppSpacing.xs),
+              TextButton(
+                key: const ValueKey('portfolio-clear-filters'),
+                onPressed: onClearFilters,
+                style: TextButton.styleFrom(
+                  foregroundColor: HomeTokens.accent,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                label: Text(hasSearchQuery ? 'Clear search' : 'Clear filters'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: HomeTokens.accentStrong,
-                  foregroundColor: HomeTokens.textPrimary,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ),
-            if (hasSearchQuery && hasActiveFilters) ...[
-              const SizedBox(height: AppSpacing.sm),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('portfolio-clear-filters'),
-                  onPressed: onClearFilters,
-                  icon: const Icon(Icons.filter_alt_off_outlined),
-                  label: const Text('Reset filters'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: HomeTokens.textPrimary,
-                    side: const BorderSide(color: HomeTokens.border),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
+                child: const Text('Clear filters'),
               ),
             ],
           ],
