@@ -1,5 +1,9 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -48,6 +52,30 @@ class _UpgradeSheet extends ConsumerWidget {
     (Icons.ios_share_rounded, 'Export & advanced filters'),
     (Icons.notifications_active_outlined, 'Unlimited alerts & refreshes'),
   ];
+
+  /// Resolves the headline. For the collection-full wall — the primary
+  /// conversion moment — it leads with the value the user has already built
+  /// ("you've secured $X"), which converts harder than a generic limit notice.
+  /// Falls back to the static copy when there's no value yet.
+  ({String title, String subtitle}) _resolveCopy(WidgetRef ref) {
+    if (reason == PaywallReason.collectionFull) {
+      final total = ref.watch(portfolioControllerProvider).totalValue;
+      if (total > 0) {
+        final profileAsync = ref.watch(profileControllerProvider);
+        final currency = profileAsync.hasValue
+            ? profileAsync.requireValue.preferredCurrency
+            : CollectorProfile.defaultPreferredCurrency;
+        final formatted = formatCollectionValue(total, currencyCode: currency);
+        return (
+          title: "You've secured $formatted in collectibles",
+          subtitle:
+              'Upgrade to Pro to save your whole collection and keep tracking '
+              'its value — no limits.',
+        );
+      }
+    }
+    return _copy;
+  }
 
   ({String title, String subtitle}) get _copy {
     return switch (reason) {
@@ -128,7 +156,7 @@ class _UpgradeSheet extends ConsumerWidget {
     final state = ref.watch(subscriptionControllerProvider);
     final price = _proProduct(state)?.price ?? _fallbackPrice;
     final isBusy = state.isLoading;
-    final copy = _copy;
+    final copy = _resolveCopy(ref);
 
     return SafeArea(
       top: false,
