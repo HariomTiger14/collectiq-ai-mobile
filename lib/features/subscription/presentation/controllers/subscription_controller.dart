@@ -26,7 +26,9 @@ class UsageLimitConfig {
   /// Creates usage limit config.
   const UsageLimitConfig({
     this.developmentUnlimited = true,
-    this.dailyFreeScanLimit = 25,
+    // Quiet per-day anti-abuse ceiling, not a marketed limit. The real free
+    // wall is the saved-collectibles cap (kFreeMaxCollectibles).
+    this.dailyFreeScanLimit = 20,
   });
 
   /// Whether local/dev builds should avoid blocking scanner testing.
@@ -44,7 +46,7 @@ class UsageLimitConfig {
       ),
       dailyFreeScanLimit: int.fromEnvironment(
         'COLLECTIQ_DAILY_FREE_SCAN_LIMIT',
-        defaultValue: 25,
+        defaultValue: 20,
       ),
     );
   }
@@ -180,7 +182,11 @@ class SubscriptionState {
 
   /// User-facing monthly refresh usage label.
   String get priceRefreshUsageLabel {
-    return '$priceRefreshesUsedThisMonth / ${entitlements.planLimits.monthlyPriceRefreshes}';
+    final limit = entitlements.planLimits.monthlyPriceRefreshes;
+    if (limit >= kUnlimitedLabelThreshold) {
+      return 'Unlimited';
+    }
+    return '$priceRefreshesUsedThisMonth / $limit';
   }
 
   /// Whether another manual price refresh is available.

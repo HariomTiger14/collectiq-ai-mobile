@@ -12,17 +12,19 @@ class UserEntitlements {
     this.paymentsConfigured = false,
   });
 
-  /// Default local-first development entitlements.
+  /// Default local-first development entitlements. Caps mirror the real Free
+  /// tier so the paywall/limits can be exercised in dev/SIT; scans stay
+  /// unlimited locally so scanner testing isn't blocked by the daily ceiling.
   static const developmentFree = UserEntitlements(
     plan: SubscriptionPlan.free,
     usageLimit: UsageLimit.unlimited,
     planLimits: PlanLimits(
       plan: SubscriptionPlan.free,
       scanLimit: UsageLimit.unlimited,
-      maxPortfolioItems: 250,
-      maxPhotosPerItem: 2,
-      maxActivePriceAlerts: 3,
-      monthlyPriceRefreshes: 10,
+      maxPortfolioItems: kFreeMaxCollectibles,
+      maxPhotosPerItem: kFreeMaxPhotosPerItem,
+      maxActivePriceAlerts: kFreeMaxActiveAlerts,
+      monthlyPriceRefreshes: kFreeMonthlyRefreshes,
       canUseFullValueHistory: false,
       canExportPortfolio: false,
       canUseAdvancedFilters: false,
