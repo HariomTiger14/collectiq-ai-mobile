@@ -56,7 +56,7 @@ enum AuthProviderType {
   String get displayName {
     return switch (this) {
       AuthProviderType.localAnonymous => 'Local Anonymous',
-      AuthProviderType.supabaseAnonymous => 'Supabase Anonymous',
+      AuthProviderType.supabaseAnonymous => 'Guest',
       AuthProviderType.emailPassword => 'Email / Password',
       AuthProviderType.google => 'Google',
       AuthProviderType.apple => 'Apple',

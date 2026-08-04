@@ -55,12 +55,12 @@ class AuthMessages {
   static const invalidCredentials = 'Invalid email or password.';
   static const emailNotRegistered = 'Please sign up first.';
   static const networkFailure =
-      'Unable to reach Supabase. Check your internet connection.';
+      'Unable to reach the server. Check your internet connection.';
   static const authTimedOut =
       'Auth request timed out. Please check your internet and try again.';
   static const signedIn = 'Signed in successfully.';
   static const configurationInvalid =
-      'Supabase configuration is missing or invalid.';
+      "Sign-in isn't available right now. Please try again later.";
   static const sessionExpired = 'Session expired. Please sign in again.';
   static const passwordResetSent = 'Password reset email sent.';
   static const passwordResetSentWithCooldown =
@@ -903,7 +903,7 @@ class AuthController extends Notifier<AuthState> {
       return AuthMessages.authTimedOut;
     }
 
-    return 'Supabase Auth returned an unexpected response.';
+    return 'Sign-in returned an unexpected response. Please try again.';
   }
 
   AuthFlowStatus _statusForError(Object error) {

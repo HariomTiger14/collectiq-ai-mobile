@@ -185,7 +185,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                     padding: const EdgeInsets.only(bottom: 16),
                                     child: CloudSyncDiagnosticTile(
                                       icon: Icons.dns_outlined,
-                                      title: 'Supabase Project',
+                                      title: 'Cloud project',
                                       subtitle: _supabaseProjectLabel(
                                         supabaseConfig,
                                         registry.config.environment,
@@ -362,7 +362,9 @@ String _supabaseProjectLabel(
   AppEnvironment environment,
 ) {
   if (!config.isConfigured) {
-    return '${environment.name.toUpperCase()} environment, Supabase not configured';
+    return '${environment.name.toUpperCase()} environment, cloud not configured';
   }
-  return config.baseUri?.host ?? 'Configured Supabase project';
+  // Show a de-vendored status rather than the raw backend host (which would
+  // otherwise leak the provider domain into the UI).
+  return 'Connected · ${environment.name.toUpperCase()} environment';
 }

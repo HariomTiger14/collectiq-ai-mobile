@@ -238,7 +238,7 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
     } on FormatException catch (error) {
       debugPrint('[Supabase] anonymous sign-in invalid response: $error');
       throw const SupabaseAuthException(
-        'Supabase returned an invalid anonymous auth response.',
+        'Received an invalid sign-in response.',
       );
     }
   }
@@ -780,7 +780,7 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       case SupabaseAuthNormalizedStatus.otpVerified:
       case SupabaseAuthNormalizedStatus.passwordUpdated:
         throw const SupabaseAuthException(
-          'Supabase Auth request completed unexpectedly.',
+          'Sign-in completed unexpectedly. Please try again.',
         );
       case SupabaseAuthNormalizedStatus.invalidCredentials:
       case SupabaseAuthNormalizedStatus.emailNotRegistered:
@@ -797,7 +797,7 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       case SupabaseAuthNormalizedStatus.signedIn:
       case SupabaseAuthNormalizedStatus.signedOut:
         throw const SupabaseAuthException(
-          'Supabase Auth request failed. Try again or check Supabase Auth settings.',
+          'Sign-in failed. Please try again.',
         );
     }
   }
@@ -1071,7 +1071,7 @@ class SupabaseAuthSession {
         metadata['display_name'] as String? ??
         metadata['name'] as String? ??
         email ??
-        'Supabase Collector';
+        'Collector';
 
     return SupabaseAuthSession(
       userId: user['id'] as String? ?? '',
@@ -1092,7 +1092,7 @@ class SupabaseAuthSession {
       userId: decoded['userId'] ?? '',
       email: decoded['email']?.isEmpty == true ? null : decoded['email'],
       accessToken: decoded['accessToken'] ?? '',
-      displayName: decoded['displayName'] ?? 'Supabase Collector',
+      displayName: decoded['displayName'] ?? 'Collector',
       isAnonymous: decoded['isAnonymous'] == 'true',
       projectUrl: decoded['projectUrl'] ?? '',
     );

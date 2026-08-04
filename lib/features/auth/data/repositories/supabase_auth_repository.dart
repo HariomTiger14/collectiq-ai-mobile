@@ -126,7 +126,7 @@ class SupabaseAuthRepository
       return gateway as SupabaseOtpSignupGateway;
     }
     throw const SupabaseAuthException(
-      'Supabase OTP signup is not available in this runtime.',
+      'Email code sign-up is not available in this build.',
     );
   }
 

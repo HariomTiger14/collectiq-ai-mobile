@@ -190,19 +190,19 @@ class SupabaseAuthResponseNormalizer {
       SupabaseAuthNormalizedStatus.configMissing =>
         'Supabase anon key is missing from SIT config.',
       SupabaseAuthNormalizedStatus.networkFailure =>
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       SupabaseAuthNormalizedStatus.expiredSession =>
         'Session expired. Please sign in again.',
       SupabaseAuthNormalizedStatus.temporaryFailure =>
-        'Supabase is temporarily unavailable. Please try again soon.',
+        'The service is temporarily unavailable. Please try again soon.',
       SupabaseAuthNormalizedStatus.otpSent ||
       SupabaseAuthNormalizedStatus.otpVerified ||
       SupabaseAuthNormalizedStatus.passwordUpdated ||
       SupabaseAuthNormalizedStatus.signedIn ||
       SupabaseAuthNormalizedStatus.signedOut =>
-        'Supabase Auth request completed.',
+        'Sign-in request completed.',
       SupabaseAuthNormalizedStatus.unknownFailure =>
-        'Supabase Auth request failed. Try again or check Supabase Auth settings.',
+        'Sign-in failed. Please try again.',
     };
   }
 

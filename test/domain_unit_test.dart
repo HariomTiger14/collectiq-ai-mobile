@@ -2804,7 +2804,7 @@ void main() {
       expect(missingKey, 'Supabase anon key is missing from SIT config.');
       expect(
         network,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
       expect(
         confirmationRequired,
@@ -2819,7 +2819,7 @@ void main() {
       );
       expect(
         unmappedHttpError,
-        'Supabase is temporarily unavailable. Please try again soon.',
+        'The service is temporarily unavailable. Please try again soon.',
       );
       expect(unmappedHttpError, isNot(contains('Unable to connect')));
     });
@@ -2899,7 +2899,7 @@ void main() {
         expect(invalidEmail, 'Please enter a valid email address.');
         expect(
           network,
-          'Unable to reach Supabase. Check your internet connection.',
+          'Unable to reach the server. Check your internet connection.',
         );
       },
     );
@@ -4002,7 +4002,7 @@ void main() {
     test('password reset failure shows user-safe error', () async {
       final repository = _ScriptedAuthRepository(
         passwordResetError: const SupabaseAuthException(
-          'Unable to reach Supabase. Check your internet connection.',
+          'Unable to reach the server. Check your internet connection.',
         ),
       );
       final container = ProviderContainer(
@@ -4018,7 +4018,7 @@ void main() {
       expect(state.infoMessage, isNull);
       expect(
         state.errorMessage,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
       expect(repository.passwordResetCalls, 1);
     });
@@ -4151,7 +4151,7 @@ void main() {
           authRepositoryProvider.overrideWithValue(
             _ScriptedAuthRepository(
               signUpError: const SupabaseAuthException(
-                'Unable to reach Supabase. Check your internet connection.',
+                'Unable to reach the server. Check your internet connection.',
               ),
             ),
           ),
@@ -4172,7 +4172,7 @@ void main() {
       expect(state.infoMessage, isNull);
       expect(
         state.errorMessage,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
     });
 
@@ -4659,7 +4659,7 @@ void main() {
       expect(state.status, AuthFlowStatus.configurationError);
       expect(
         state.errorMessage,
-        'Supabase configuration is missing or invalid.',
+        "Sign-in isn't available right now. Please try again later.",
       );
     });
 

@@ -37,7 +37,7 @@ class MockAuthRepository implements AuthRepository {
     required String password,
   }) async {
     throw const AuthException(
-      'Email/password sign-in requires Supabase configuration.',
+      "Email sign-in isn't available in this build.",
     );
   }
 
@@ -47,21 +47,21 @@ class MockAuthRepository implements AuthRepository {
     required String password,
   }) async {
     throw const AuthException(
-      'Email/password sign-up requires Supabase configuration.',
+      "Email sign-up isn't available in this build.",
     );
   }
 
   @override
   Future<void> resendEmailConfirmation({required String email}) async {
     throw const AuthException(
-      'Email confirmation requires Supabase configuration.',
+      "Email confirmation isn't available in this build.",
     );
   }
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     throw const AuthException(
-      'Password reset requires Supabase configuration.',
+      "Password reset isn't available in this build.",
     );
   }
 
