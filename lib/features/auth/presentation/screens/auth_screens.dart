@@ -1108,10 +1108,13 @@ class _InlineLegalLink extends StatelessWidget {
         onPressed: onPressed,
         style: TextButton.styleFrom(
           foregroundColor: style.color,
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.only(left: 4),
-          tapTargetSize: MaterialTapTargetSize.padded,
-          visualDensity: VisualDensity.standard,
+          // Keep the link inline-height so a wrapped legal line sits tight to
+          // the line above (the old 48px min made each wrap run 48px tall,
+          // opening a big gap). Horizontal padding preserves a usable tap area.
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
           textStyle: style,
         ),
         child: Text(label),
