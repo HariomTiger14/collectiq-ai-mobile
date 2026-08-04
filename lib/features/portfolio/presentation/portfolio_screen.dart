@@ -370,7 +370,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   context,
                 ),
                 sections: [
-                  const HomeSection(child: _PortfolioTitleBlock()),
+                  const HomeSection(
+                    topPadding: AppSpacing.sm,
+                    child: HomeBrandLockup(),
+                  ),
+                  const HomeSection(
+                    topPadding: AppSpacing.lg,
+                    child: _PortfolioTitleBlock(),
+                  ),
                   // The overview hero doubles as the empty/filtered/loading
                   // state. In the normal populated view it just restates the
                   // subtitle and adds a redundant Scan CTA (Scan is a nav tab),

@@ -45,7 +45,11 @@ class ScannerPageScaffold extends StatelessWidget {
                 ),
                 sections: [
                   const HomeSection(
-                    topPadding: AppSpacing.md,
+                    topPadding: AppSpacing.sm,
+                    child: HomeBrandLockup(),
+                  ),
+                  const HomeSection(
+                    topPadding: AppSpacing.lg,
                     child: _ScannerTitleBlock(),
                   ),
                   const HomeSection(

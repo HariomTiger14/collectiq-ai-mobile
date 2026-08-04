@@ -49,10 +49,12 @@ void main() {
         // old repeated marketing copy.
         expect(source, contains("ValueKey('scan-hub-reticle')"));
         expect(source, contains("ValueKey('scan-hub-trust-note')"));
+        // The PackLox brand lockup now leads the hub for cross-tab header
+        // consistency (Home/Portfolio/Search/Settings all show it).
+        expect(source, contains('HomeBrandLockup'));
         // Retired surfaces stay retired.
         expect(source, isNot(contains('_ScannerHeroCard')));
         expect(source, isNot(contains('Choose an option')));
-        expect(source, isNot(contains('HomeBrandLockup')));
         expect(source, isNot(contains('class ScanHubHero')));
         expect(source, isNot(contains('class ScanHubEntryTile')));
         expect(source, isNot(contains('scan-hub-real-collectible-montage')));

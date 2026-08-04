@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
@@ -118,7 +119,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             key: const ValueKey('search-scroll-view'),
             slivers: [
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 28, 16, bottomPadding),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding),
                 sliver: SliverToBoxAdapter(
                   child: Center(
                     child: ConstrainedBox(
@@ -126,6 +127,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const HomeBrandLockup(),
+                          const SizedBox(height: 20),
                           const _SearchHeader(),
                           const SizedBox(height: 22),
                           _SearchField(
