@@ -312,6 +312,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: HomeTokens.background,
       body: SafeArea(
+        // Let content run to the bottom edge behind the floating nav bar,
+        // matching the other tabs (Portfolio uses the same). Otherwise the
+        // bottom safe-area inset leaves a black gap under the nav bar.
+        bottom: false,
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
