@@ -98,6 +98,7 @@ flutter:
     - assets/packlox/portfolio/portfolio_detail_pending_valuation.png
     - assets/packlox/portfolio/portfolio_detail_missing_image.png
     - assets/packlox/s01_hero_premium_collectibles_v0_7.png
+    - assets/packlox/s01_hero_premium_collectibles_clean_original_slab_v1.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
