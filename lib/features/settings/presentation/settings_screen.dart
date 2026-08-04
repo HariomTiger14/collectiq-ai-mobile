@@ -208,12 +208,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         subtitle: notificationState.settingsSubtitle,
         trailing: notificationState.settingsStatusLabel,
       ),
-      _SettingsRow(
-        icon: Icons.dark_mode_outlined,
-        title: 'Appearance',
-        subtitle: 'PackLox uses a dark collector theme.',
-        trailing: 'Dark',
-      ),
+      // No Appearance row: PackLox is intentionally dark-only, so a row that
+      // can't be changed would just be filler.
     ];
 
     final subscriptionTiles = [
@@ -1356,11 +1352,17 @@ class _SubscriptionStatusChip extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: HomeTokens.textPrimary,
-              fontWeight: FontWeight.w800,
+          // Flexible + ellipsis so the chip shrinks instead of overflowing at
+          // narrow widths / large text (e.g. 320px with 1.3x accessibility text).
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

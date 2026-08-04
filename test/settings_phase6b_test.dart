@@ -22,7 +22,6 @@ void main() {
       'Account',
       'Collection & Backup',
       'Price Alerts',
-      'Appearance',
       'Privacy',
       'About PackLox',
       'Help & Feedback',
