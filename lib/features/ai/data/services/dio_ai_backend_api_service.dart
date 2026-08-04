@@ -21,6 +21,7 @@ class DioAiBackendApiService implements AiBackendApiService {
     this.validator = const AiBackendContractValidator(),
     this.readinessChecker = const AiBackendEndpointReadinessChecker(),
     this.isReleaseMode = false,
+    this.authToken,
   }) : _dio =
            dio ??
            Dio(
@@ -51,6 +52,11 @@ class DioAiBackendApiService implements AiBackendApiService {
   /// Whether the app is running in release mode.
   final bool isReleaseMode;
 
+  /// Supplies the signed-in user's access token so the backend can attribute
+  /// the scan and enforce the per-user quota. Null/empty when signed out (the
+  /// backend then treats the scan as unauthenticated and fails open).
+  final Future<String?> Function()? authToken;
+
   final Dio _dio;
 
   @override
@@ -61,6 +67,8 @@ class DioAiBackendApiService implements AiBackendApiService {
   }) async {
     _validateEndpoint();
     _validateRequest(request);
+
+    final token = await authToken?.call();
 
     try {
       final stopwatch = Stopwatch()..start();
@@ -89,9 +97,11 @@ class DioAiBackendApiService implements AiBackendApiService {
           sendTimeout: timeout,
           receiveTimeout: timeout,
           validateStatus: (_) => true,
-          headers: const {
+          headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            if (token != null && token.isNotEmpty)
+              'Authorization': 'Bearer $token',
           },
         ),
       );
