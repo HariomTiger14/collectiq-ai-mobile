@@ -321,6 +321,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   authState: authState,
                   profile: profile,
                   isLoadingProfile: profileState.isLoading,
+                  planLabel: subscriptionState.entitlements.plan.displayName,
                   onEditProfile: () => _showProfileEditor(context),
                 ),
                 padding: const EdgeInsets.fromLTRB(
@@ -1677,11 +1678,28 @@ class _HelpActionRow extends StatelessWidget {
   }
 }
 
+/// Derives a friendly display name from the local part of an email
+/// (e.g. "ada.lovelace@x.com" -> "Ada Lovelace") for signed-in users who
+/// haven't set a custom name yet. Returns null when there's nothing usable.
+String? _nameFromEmail(String? email) {
+  final local = email?.split('@').first.trim();
+  if (local == null || local.isEmpty) {
+    return null;
+  }
+  final words = local
+      .split(RegExp(r'[._\-+]'))
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .toList();
+  return words.isEmpty ? null : words.join(' ');
+}
+
 class IdentityBlock extends StatelessWidget {
   const IdentityBlock({
     super.key,
     required this.authState,
     required this.onEditProfile,
+    required this.planLabel,
     this.profile,
     this.isLoadingProfile = false,
   });
@@ -1689,26 +1707,41 @@ class IdentityBlock extends StatelessWidget {
   final AuthState authState;
   final CollectorProfile? profile;
   final bool isLoadingProfile;
+  final String planLabel;
   final VoidCallback onEditProfile;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isSignedIn = authState.isSignedIn;
-    final savedName = profile?.displayName.trim();
-    final authName = authState.user?.displayName.trim();
+    final rawSaved = profile?.displayName.trim();
+    // The profile ships with a generic default name, so treat that as "unset"
+    // and fall through to the person's real identity when they're signed in.
+    final savedName =
+        (rawSaved != null &&
+            rawSaved.isNotEmpty &&
+            rawSaved != CollectorProfile.defaultDisplayName)
+        ? rawSaved
+        : null;
+    final rawAuthName = authState.user?.displayName.trim();
     final email = authState.user?.email;
-    final headline = savedName?.isNotEmpty == true
-        ? savedName!
-        : isSignedIn
-        ? authName?.isNotEmpty == true
-              ? authName!
-              : email ?? 'Collector'
-        : CollectorProfile.defaultDisplayName;
+    // Providers often set the display name to the email; a raw address makes a
+    // poor headline, so only keep a real name and otherwise derive one.
+    final authName =
+        (rawAuthName != null &&
+            rawAuthName.isNotEmpty &&
+            !rawAuthName.contains('@'))
+        ? rawAuthName
+        : null;
+    final headline =
+        savedName ??
+        (isSignedIn
+            ? (authName ?? _nameFromEmail(email) ?? 'Collector')
+            : CollectorProfile.defaultDisplayName);
     final initial = headline.trim().isNotEmpty
         ? headline.trim().substring(0, 1).toUpperCase()
         : 'P';
-    final statusColor = isSignedIn ? HomeTokens.positive : HomeTokens.accent;
+    final statusColor = HomeTokens.accent;
     final avatarPath = profile?.avatarPath;
     final avatarFile = avatarPath == null || avatarPath.isEmpty
         ? null
@@ -1831,17 +1864,24 @@ class IdentityBlock extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
+              if (isSignedIn)
+                Icon(
+                  Icons.workspace_premium_outlined,
+                  size: 14,
                   color: statusColor,
-                  shape: BoxShape.circle,
+                )
+              else
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
               const SizedBox(width: 7),
               Text(
-                isSignedIn ? 'Signed in' : 'Local access',
+                isSignedIn ? '$planLabel plan' : 'Local access',
                 style: textTheme.labelMedium?.copyWith(
                   color: statusColor,
                   fontWeight: FontWeight.w800,
@@ -2044,140 +2084,6 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class AboutCard extends StatelessWidget {
-  const AboutCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.24)),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.20),
-            colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 66,
-                height: 66,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.tertiary.withValues(alpha: 0.82),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.22),
-                      blurRadius: 28,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.auto_awesome_outlined,
-                  color: colorScheme.onPrimary,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CollectIQ',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Version 0.1.0',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const ModernSettingsRow(
-            icon: Icons.flutter_dash_outlined,
-            title: 'Made with Flutter',
-            subtitle: 'Native-feeling mobile experience.',
-            trailingText: 'Flutter',
-          ),
-          const SizedBox(height: 16),
-          const ModernSettingsRow(
-            icon: Icons.cloud_done_outlined,
-            title: 'Powered by Supabase',
-            subtitle: 'Cloud auth and sync when configured.',
-            trailingText: 'Ready',
-          ),
-          const SizedBox(height: 16),
-          const ModernSettingsRow(
-            icon: Icons.auto_awesome_outlined,
-            title: 'AI features enabled',
-            subtitle: 'Scanning pipeline is prepared for providers.',
-            trailingText: 'Enabled',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class HelpCard extends StatelessWidget {
-  const HelpCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        ModernSettingsRow(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy',
-          subtitle: 'Images stay local unless cloud services are configured.',
-          trailingText: 'View',
-        ),
-        SizedBox(height: 16),
-        ModernSettingsRow(
-          icon: Icons.description_outlined,
-          title: 'Terms',
-          subtitle: 'Terms will be added before public release.',
-          trailingText: 'Soon',
-        ),
-        SizedBox(height: 16),
-        ModernSettingsRow(
-          icon: Icons.mail_outline,
-          title: 'Contact',
-          subtitle: 'Support contact details will be added before release.',
-          trailingText: 'Soon',
-        ),
-      ],
     );
   }
 }

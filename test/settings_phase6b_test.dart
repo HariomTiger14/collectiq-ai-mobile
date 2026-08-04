@@ -116,7 +116,9 @@ void main() {
     await tester.pumpSettings(repository: repository);
 
     expect(find.text('collector@example.com'), findsWidgets);
-    expect(find.text('Signed in'), findsWidgets);
+    // The identity pill now surfaces the plan instead of a redundant
+    // "Signed in" status (the account row already shows the email).
+    expect(find.text('Free plan'), findsWidgets);
 
     await tester.revealText('Sign Out');
     await tester.tap(find.text('Sign Out'));

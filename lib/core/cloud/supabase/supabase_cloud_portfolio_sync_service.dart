@@ -144,12 +144,12 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
         return const CloudPortfolioSyncStatus(
           enabled: false,
           message:
-              'Sign in to enable Supabase cloud sync. Local portfolio is active.',
+              'Sign in to back up your collection. It stays on this device for now.',
         );
       }
       return CloudPortfolioSyncStatus(
         enabled: true,
-        message: 'Supabase portfolio sync ready.',
+        message: 'Your collection is backed up to the cloud.',
         userId: session.userId,
       );
     }
@@ -162,12 +162,12 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     if (userId == null || userId.trim().isEmpty) {
       return const CloudPortfolioSyncStatus(
         enabled: false,
-        message: 'Cloud sync skipped: no signed-in Supabase user.',
+        message: 'Sign in to back up your collection to the cloud.',
       );
     }
     return CloudPortfolioSyncStatus(
       enabled: true,
-      message: 'Supabase portfolio sync ready.',
+      message: 'Your collection is backed up to the cloud.',
       userId: userId,
     );
   }

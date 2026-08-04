@@ -105,6 +105,12 @@ class PriceAlertNotificationState {
     if (!enabled) {
       return 'Off';
     }
+    // Cloud push is the real alert channel, so a registered device is "On"
+    // even where on-device local notifications aren't available (e.g. sim).
+    if (pushRegistrationStatus ==
+        PushNotificationRegistrationStatus.registered) {
+      return 'On';
+    }
     if (permissionStatus == PriceAlertNotificationPermissionStatus.denied) {
       return 'Denied';
     }
@@ -112,29 +118,25 @@ class PriceAlertNotificationState {
         PriceAlertNotificationPermissionStatus.notSupported) {
       return 'Unavailable';
     }
-    if (pushRegistrationStatus ==
-        PushNotificationRegistrationStatus.registered) {
-      return 'Cloud ready';
-    }
     return permissionStatus.canNotify ? 'On' : 'Needs permission';
   }
 
   String get settingsSubtitle {
     if (!enabled) {
-      return 'Price alert notifications are disabled on this device.';
-    }
-    if (permissionStatus == PriceAlertNotificationPermissionStatus.denied) {
-      return 'Enable notifications in device settings to receive local alerts.';
-    }
-    if (permissionStatus ==
-        PriceAlertNotificationPermissionStatus.notSupported) {
-      return 'Local notifications are not supported on this platform.';
+      return 'Turn on notifications to get alerts when your prices move.';
     }
     if (pushRegistrationStatus ==
         PushNotificationRegistrationStatus.registered) {
-      return 'Cloud push is ready for price alerts on this device.';
+      return "You'll be notified when a price alert triggers.";
     }
-    return 'Local notifications are shown only when saved price alerts trigger.';
+    if (permissionStatus == PriceAlertNotificationPermissionStatus.denied) {
+      return 'Enable notifications in Settings to get price alerts.';
+    }
+    if (permissionStatus ==
+        PriceAlertNotificationPermissionStatus.notSupported) {
+      return "Alerts aren't available on this device yet.";
+    }
+    return "You'll be notified when a saved price alert triggers.";
   }
 
   PriceAlertNotificationState copyWith({
