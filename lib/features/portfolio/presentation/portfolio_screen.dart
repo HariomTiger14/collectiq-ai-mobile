@@ -16,6 +16,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -505,6 +506,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           isUnlocked: planLimits.canUsePortfolioIntelligence,
                           onAttentionFocus: _applyIntelligenceFocus,
                           onAddMoreCollectibles: widget.onScanPressed,
+                          onUpgrade: () => showUpgradeSheet(
+                            context,
+                            reason: PaywallReason.portfolioIntelligence,
+                          ),
                         ),
                       ),
                     if (hasItems && !isFilteredEmpty && !hasSearchQuery)
@@ -778,15 +783,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   void _openAdvancedFilters() {
     final planLimits = ref.read(activePlanLimitsProvider);
     if (!planLimits.canUseAdvancedFilters) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Advanced filters are included with Pro and Premium.',
-            ),
-          ),
-        );
+      showUpgradeSheet(context, reason: PaywallReason.advancedFilters);
       return;
     }
     _showSortFilterSheet(context);
@@ -795,9 +792,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   Future<void> _startPortfolioExport(List<CollectibleItem> items) async {
     final planLimits = ref.read(activePlanLimitsProvider);
     if (!planLimits.canExportPortfolio) {
-      _showPortfolioSnackBar(
-        'Portfolio export is included with Pro and Premium.',
-      );
+      await showUpgradeSheet(context, reason: PaywallReason.export);
       return;
     }
     if (items.isEmpty) {
@@ -1464,6 +1459,7 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
     required this.isUnlocked,
     required this.onAttentionFocus,
     required this.onAddMoreCollectibles,
+    this.onUpgrade,
   });
 
   final CollectorDashboardAnalytics analytics;
@@ -1472,6 +1468,7 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
   final bool isUnlocked;
   final ValueChanged<_PortfolioIntelligenceFocus> onAttentionFocus;
   final VoidCallback? onAddMoreCollectibles;
+  final VoidCallback? onUpgrade;
 
   @override
   Widget build(BuildContext context) {
@@ -1593,7 +1590,11 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
             ),
             if (!isUnlocked) ...[
               const SizedBox(height: AppSpacing.md),
-              const _PortfolioIntelligenceLockedPreview(),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onUpgrade,
+                child: const _PortfolioIntelligenceLockedPreview(),
+              ),
             ] else ...[
               const SizedBox(height: AppSpacing.md),
               _PortfolioAttentionQueue(

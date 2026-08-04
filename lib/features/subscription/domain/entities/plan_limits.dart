@@ -14,7 +14,7 @@ const kFreeMaxPhotosPerItem = int.fromEnvironment(
 );
 const kFreeMaxActiveAlerts = int.fromEnvironment(
   'PACKLOX_FREE_ACTIVE_ALERTS',
-  defaultValue: 3,
+  defaultValue: 1,
 );
 const kFreeMonthlyRefreshes = int.fromEnvironment(
   'PACKLOX_FREE_MONTHLY_REFRESHES',

@@ -1529,15 +1529,22 @@ class _CatalogResultDetailPageState
     setState(() => _isSaving = true);
     final item = _catalogResultToPortfolioItem(_result);
     try {
-      await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+      final saved = await ref
+          .read(portfolioControllerProvider.notifier)
+          .saveItem(item);
+      if (!mounted) {
+        return;
+      }
+      if (!saved) {
+        // Blocked by the free cap; the app shell shows the upgrade sheet.
+        setState(() => _isSaving = false);
+        return;
+      }
       final savedItem = ref
           .read(portfolioControllerProvider)
           .items
           .where((candidate) => candidate.id == item.id)
           .firstOrNull;
-      if (!mounted) {
-        return;
-      }
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => CollectibleDetailPage(

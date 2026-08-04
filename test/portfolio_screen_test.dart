@@ -202,11 +202,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The real sort/filter sheet stays closed; the upgrade sheet is shown.
     expect(_portfolioSheet, findsNothing);
     expect(
-      find.text('Advanced filters are included with Pro and Premium.'),
+      find.byKey(const ValueKey('upgrade-sheet-activate')),
       findsOneWidget,
     );
+    expect(find.text('Filter your whole collection'), findsOneWidget);
   });
 
   testWidgets('unavailable valuation is distinct from genuine zero', (

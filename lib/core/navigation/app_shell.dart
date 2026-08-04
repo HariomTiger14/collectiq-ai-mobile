@@ -16,6 +16,7 @@ import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
@@ -477,6 +478,23 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authControllerProvider, _handleAuthChanged);
+
+    // A blocked save (free collectible cap reached) — from a scan or a
+    // catalog-add — presents the upgrade sheet from the always-mounted shell.
+    ref.listen<bool>(
+      portfolioControllerProvider.select(
+        (state) => state.collectionLimitReached,
+      ),
+      (previous, reachedLimit) {
+        if (!reachedLimit) {
+          return;
+        }
+        ref
+            .read(portfolioControllerProvider.notifier)
+            .consumeCollectionLimitPrompt();
+        showUpgradeSheet(context, reason: PaywallReason.collectionFull);
+      },
+    );
 
     final authState = ref.watch(authControllerProvider);
     final onboardingCompleted = ref.watch(onboardingControllerProvider);

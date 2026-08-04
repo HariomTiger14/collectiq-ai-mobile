@@ -1150,7 +1150,8 @@ class _PlanLimitsSummary extends StatelessWidget {
       if (limits.canUseAdvancedFilters) 'Advanced filters',
       if (limits.canExportPortfolio) 'Export',
       if (limits.canUsePortfolioIntelligence) 'Intelligence',
-      if (limits.canBulkRefreshValues) 'Bulk refresh',
+      // 'Bulk refresh' is intentionally omitted: the capability flag exists but
+      // the feature isn't built yet, so we don't advertise it as a Pro perk.
     ];
     final toolLabel = unlockedTools.isEmpty
         ? 'Basic tools'

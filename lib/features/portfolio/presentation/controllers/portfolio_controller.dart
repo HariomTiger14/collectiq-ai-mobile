@@ -29,6 +29,7 @@ class PortfolioState {
     this.items = const [],
     this.isLoading = false,
     this.errorMessage,
+    this.collectionLimitReached = false,
   });
 
   /// Saved portfolio items.
@@ -42,6 +43,11 @@ class PortfolioState {
 
   /// User-safe portfolio error message.
   final String? errorMessage;
+
+  /// One-shot signal that a save was blocked by the free collectible cap, so
+  /// the UI can present the upgrade sheet. Consumed via
+  /// [PortfolioController.consumeCollectionLimitPrompt].
+  final bool collectionLimitReached;
 
   /// Total estimated portfolio value.
   double get totalValue {
@@ -60,6 +66,7 @@ class PortfolioState {
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
+    bool collectionLimitReached = false,
   }) {
     return PortfolioState(
       items: items ?? this.items,
@@ -67,6 +74,7 @@ class PortfolioState {
       errorMessage: clearErrorMessage
           ? null
           : errorMessage ?? this.errorMessage,
+      collectionLimitReached: collectionLimitReached,
     );
   }
 }
@@ -123,8 +131,19 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
-  /// Saves [item] and refreshes portfolio state.
-  Future<void> saveItem(CollectibleItem item) async {
+  /// Clears the one-shot collectible-cap upgrade signal after the UI has shown
+  /// the upgrade sheet, so it doesn't re-trigger on the next rebuild.
+  void consumeCollectionLimitPrompt() {
+    if (!state.collectionLimitReached) {
+      return;
+    }
+    state = state.copyWith();
+  }
+
+  /// Saves [item] and refreshes portfolio state. Returns `true` when the item
+  /// was persisted, or `false` when it was blocked by the free cap or errored —
+  /// so callers (scan/search) don't show a false "saved" confirmation.
+  Future<bool> saveItem(CollectibleItem item) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final persistedItemsBeforeSave = await _repository.getItems();
@@ -140,8 +159,9 @@ class PortfolioController extends Notifier<PortfolioState> {
           items: collectiblesNewestFirst(persistedItemsBeforeSave),
           isLoading: false,
           errorMessage: planLimits.portfolioLimitMessage,
+          collectionLimitReached: true,
         );
-        return;
+        return false;
       }
 
       final itemForSave = item.valueAtScan == null
@@ -160,11 +180,13 @@ class PortfolioController extends Notifier<PortfolioState> {
         isLoading: false,
       );
       await _syncPendingCloudItems();
+      return true;
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Unable to save portfolio item.',
       );
+      return false;
     }
   }
 

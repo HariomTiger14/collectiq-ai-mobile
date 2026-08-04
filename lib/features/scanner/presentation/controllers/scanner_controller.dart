@@ -1722,7 +1722,15 @@ class ScannerController extends Notifier<ScannerState> {
       '${await _localFileExists(item.imagePath)}',
     );
     try {
-      await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+      final saved = await ref
+          .read(portfolioControllerProvider.notifier)
+          .saveItem(item);
+      if (!saved) {
+        // Blocked by the free cap (or errored). The app shell presents the
+        // upgrade sheet; don't mark this scan as saved.
+        state = state.copyWith(isSavingToPortfolio: false);
+        return false;
+      }
       _logFlow('portfolio updated', details: {'itemId': item.id});
       _trackCloudAnalytics(
         'portfolio_item_saved',

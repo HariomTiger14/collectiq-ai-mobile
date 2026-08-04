@@ -22,6 +22,7 @@ import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_servic
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
@@ -437,10 +438,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       final planLimits = ref.read(activePlanLimitsProvider);
       final currentPhotoCount = item.effectiveGalleryImages.length;
       if (!planLimits.canAddPhoto(currentPhotoCount)) {
-        _showDetailSnackBar(
-          context,
-          'Your ${planLimits.plan.displayName} plan supports ${planLimits.photosPerItemLabel}. Upgrade to add more photos.',
-        );
+        await showUpgradeSheet(context, reason: PaywallReason.morePhotos);
         return;
       }
 
@@ -492,9 +490,9 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       await ref
           .read(subscriptionControllerProvider.notifier)
           .ensureCanRefreshValue();
-    } on SubscriptionException catch (error) {
+    } on SubscriptionException {
       if (mounted) {
-        _showDetailSnackBar(context, error.message);
+        await showUpgradeSheet(context, reason: PaywallReason.moreRefreshes);
       }
       return;
     }
@@ -2294,11 +2292,16 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
           ],
           const SizedBox(height: AppSpacing.sm),
           if (!planLimits.canUseFullValueHistory)
-            _DetailPlanLockedPanel(
-              icon: Icons.lock_outline_rounded,
-              title: 'Full history is a Pro tool',
-              message:
-                  'Free plan shows value at scan and current value. Upgrade for trend charts and deeper valuation history.',
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () =>
+                  showUpgradeSheet(context, reason: PaywallReason.priceHistory),
+              child: _DetailPlanLockedPanel(
+                icon: Icons.lock_outline_rounded,
+                title: 'Full history is a Pro tool',
+                message:
+                    'Free plan shows value at scan and current value. Tap to unlock trend charts and deeper valuation history with Pro.',
+              ),
             )
           else
             Container(
@@ -4359,32 +4362,48 @@ Future<void> _showEditCollectibleDialog({
   ValuationStatus? refreshedStatus;
   var hasRefreshedValue = false;
   if (editResult.retryPricing) {
+    // Repricing hits the pricing API and updates value, so it counts against
+    // the same monthly refresh quota as the manual refresh button. The edits
+    // themselves are always kept — only the reprice is metered.
+    var canReprice = true;
     try {
-      final quote = await ref
-          .read(scanPricingQuoteServiceProvider)
-          .repriceItem(nextItem);
-      refreshedStatus = quote.valuationStatus;
-      hasRefreshedValue =
-          quote.valuationStatus == ValuationStatus.marketEstimated &&
-          quote.estimatedValue > 0;
-      nextItem = nextItem.copyWith(
-        estimatedValue: hasRefreshedValue
-            ? quote.estimatedValue
-            : nextItem.estimatedValue,
-        pricing: quote.pricing,
-        marketSummary: hasRefreshedValue
-            ? quote.marketSummary ?? nextItem.marketSummary
-            : nextItem.marketSummary,
-        valuationStatus: quote.valuationStatus,
-        valuationSource: quote.valuationSource,
-        aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
-        valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
-        lastValueRefreshedAt: hasRefreshedValue
-            ? DateTime.now()
-            : nextItem.lastValueRefreshedAt,
-      );
-    } catch (_) {
-      refreshedStatus = null;
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanRefreshValue();
+    } on SubscriptionException {
+      canReprice = false;
+      if (context.mounted) {
+        await showUpgradeSheet(context, reason: PaywallReason.moreRefreshes);
+      }
+    }
+    if (canReprice) {
+      try {
+        final quote = await ref
+            .read(scanPricingQuoteServiceProvider)
+            .repriceItem(nextItem);
+        refreshedStatus = quote.valuationStatus;
+        hasRefreshedValue =
+            quote.valuationStatus == ValuationStatus.marketEstimated &&
+            quote.estimatedValue > 0;
+        nextItem = nextItem.copyWith(
+          estimatedValue: hasRefreshedValue
+              ? quote.estimatedValue
+              : nextItem.estimatedValue,
+          pricing: quote.pricing,
+          marketSummary: hasRefreshedValue
+              ? quote.marketSummary ?? nextItem.marketSummary
+              : nextItem.marketSummary,
+          valuationStatus: quote.valuationStatus,
+          valuationSource: quote.valuationSource,
+          aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
+          valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
+          lastValueRefreshedAt: hasRefreshedValue
+              ? DateTime.now()
+              : nextItem.lastValueRefreshedAt,
+        );
+      } catch (_) {
+        refreshedStatus = null;
+      }
     }
   }
 
@@ -5782,10 +5801,7 @@ class _CreateAlertButtons extends ConsumerWidget {
         .length;
     if (!planLimits.canCreatePriceAlert(activeAlertCount)) {
       if (context.mounted) {
-        _showDetailSnackBar(
-          context,
-          'Your ${planLimits.plan.displayName} plan supports ${planLimits.priceAlertsLabel}. Upgrade to create more alerts.',
-        );
+        await showUpgradeSheet(context, reason: PaywallReason.moreAlerts);
       }
       return;
     }
