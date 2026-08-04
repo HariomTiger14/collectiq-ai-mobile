@@ -1,6 +1,11 @@
 import 'dart:async';
 
+import 'package:collectiq_ai/core/config/environment_config.dart';
+import 'package:collectiq_ai/core/network/api_constants.dart' as net;
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/cloud_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_usage_repository.dart';
@@ -98,9 +103,20 @@ final billingRepositoryProvider = Provider<BillingRepository>((ref) {
   return GooglePlayBillingRepository(config: config);
 });
 
-/// Provides entitlement persistence.
+/// Provides entitlement persistence. When cloud services are allowed, the plan
+/// is read from and written to the server (per-user, cross-device, tamper-proof)
+/// with the local store as an offline cache. Otherwise it stays purely local.
 final entitlementRepositoryProvider = Provider<EntitlementRepository>((ref) {
-  return const SharedPreferencesEntitlementRepository();
+  const local = SharedPreferencesEntitlementRepository();
+  final cloudAllowed = ref.watch(environmentConfigProvider).allowsCloudServices;
+  if (!cloudAllowed) {
+    return local;
+  }
+  return CloudEntitlementRepository(
+    baseUrl: net.EnvironmentConfig.fromEnvironment().baseUrl,
+    supabaseService: ref.watch(supabaseServiceProvider),
+    cache: local,
+  );
 });
 
 /// Provides user entitlements.
@@ -244,6 +260,23 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     _paymentsConfigured = ref.watch(paymentsConfiguredProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     final entitlements = ref.watch(userEntitlementsProvider);
+    // Reload the entitlement whenever the signed-in user changes (sign-in,
+    // sign-out, or switching accounts) so the plan always reflects the current
+    // user's server-owned entitlement rather than a stale device value.
+    ref.listen(authControllerProvider.select((state) => state.user?.id), (
+      previous,
+      next,
+    ) {
+      if (previous == next) {
+        return;
+      }
+      Future.microtask(() async {
+        if (!ref.mounted) {
+          return;
+        }
+        await loadUsage();
+      });
+    });
     Future.microtask(() async {
       if (!ref.mounted) {
         return;
