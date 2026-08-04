@@ -15,6 +15,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
@@ -379,6 +380,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     topPadding: AppSpacing.lg,
                     child: _PortfolioTitleBlock(),
                   ),
+                  // Free-tier collectible counter: gentle awareness of the cap
+                  // so the limit is visible before the paywall. Hidden for Pro
+                  // (unlimited) and on the empty state (the hero leads there).
+                  if (hasItems &&
+                      planLimits.maxPortfolioItems < kUnlimitedLabelThreshold)
+                    HomeSection(
+                      topPadding: AppSpacing.sm,
+                      child: _FreePlanCollectibleCounter(
+                        savedCount: portfolioState.items.length,
+                        cap: planLimits.maxPortfolioItems,
+                        onUpgrade: () => showUpgradeSheet(
+                          context,
+                          reason: PaywallReason.collectionFull,
+                        ),
+                      ),
+                    ),
                   // The overview hero doubles as the empty/filtered/loading
                   // state. In the normal populated view it just restates the
                   // subtitle and adds a redundant Scan CTA (Scan is a nav tab),
@@ -1097,6 +1114,85 @@ String _exportDateStamp(DateTime dateTime) {
   final hour = dateTime.hour.toString().padLeft(2, '0');
   final minute = dateTime.minute.toString().padLeft(2, '0');
   return '${dateTime.year}$month$day-$hour$minute';
+}
+
+/// Free-tier cue showing progress toward the saved-collectible cap. Reads
+/// "N of CAP free collectibles" under the cap and "Collection full — Upgrade"
+/// once at/over it (covers users grandfathered above a lowered cap). Always
+/// tappable to the upgrade sheet.
+class _FreePlanCollectibleCounter extends StatelessWidget {
+  const _FreePlanCollectibleCounter({
+    required this.savedCount,
+    required this.cap,
+    required this.onUpgrade,
+  });
+
+  final int savedCount;
+  final int cap;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final atCap = savedCount >= cap;
+    final accent = atCap ? HomeTokens.accent : HomeTokens.textSecondary;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onUpgrade,
+      child: Container(
+        key: const ValueKey('portfolio-free-collectible-counter'),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: atCap
+              ? HomeTokens.accent.withValues(alpha: 0.10)
+              : HomeTokens.surfaceInteractive.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+          border: Border.all(
+            color: atCap
+                ? HomeTokens.accent.withValues(alpha: 0.34)
+                : HomeTokens.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              atCap ? Icons.lock_outline_rounded : Icons.inventory_2_outlined,
+              size: 17,
+              color: accent,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                atCap
+                    ? 'Collection full — upgrade to save more'
+                    : '$savedCount of $cap free collectibles',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  color: atCap
+                      ? HomeTokens.textPrimary
+                      : HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (atCap)
+              Text(
+                'Pro',
+                style: textTheme.labelLarge?.copyWith(
+                  color: HomeTokens.accent,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PortfolioTitleBlock extends StatelessWidget {
@@ -3030,7 +3126,7 @@ String _valuationDisplayLabel(CollectibleItem item) {
     ValuationStatus.providerNotConfigured => 'No source',
     ValuationStatus.lookupFailed => 'Retry',
     ValuationStatus.unavailable => 'No value',
-    ValuationStatus.marketEstimated ||
-    ValuationStatus.aiEstimated => _formatAud(item.estimatedValue, currencyForItem(item)),
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated =>
+      _formatAud(item.estimatedValue, currencyForItem(item)),
   };
 }
