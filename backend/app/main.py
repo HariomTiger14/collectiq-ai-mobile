@@ -7,6 +7,7 @@ from app.core.config import UPLOAD_DIR, settings
 from app.routers import (
     admin_pricecharting,
     api_analyze,
+    api_subscription,
     auth,
     health,
     pricing,
@@ -44,6 +45,7 @@ app.include_router(portfolio.router)
 app.include_router(pricing.router)
 app.include_router(search.router)
 app.include_router(push.router)
+app.include_router(api_subscription.router)
 app.include_router(admin_pricecharting.router)
 
 
