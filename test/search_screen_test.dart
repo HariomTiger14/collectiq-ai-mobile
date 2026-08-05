@@ -65,13 +65,17 @@ void main() {
       ]),
     );
 
-    await tester.tap(find.text('Toy Cars'));
+    // Quick filters are canonicalized (matching Home's category grouping)
+    // so variants collapse into one consistent bucket instead of showing
+    // raw, possibly-duplicated category strings — "Toy Cars" buckets under
+    // the shared "Figures" canonical label.
+    await tester.tap(find.text('Figures'));
     await tester.pump();
 
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Toy Cars');
+    expect(input.controller?.text, 'Figures');
     expect(find.text('Hot Wheels Mazda MX-5'), findsOneWidget);
   });
 
@@ -144,6 +148,9 @@ void main() {
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(catalogRepository.queries, ['charizard']);
@@ -187,6 +194,9 @@ void main() {
       find.byKey(const ValueKey('discover-search-input')),
       'mario kart',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('discover-catalog-result-pc-mario-kart')),
@@ -274,6 +284,9 @@ void main() {
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
@@ -300,6 +313,9 @@ void main() {
       find.byKey(const ValueKey('discover-search-input')),
       'nintendo',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(

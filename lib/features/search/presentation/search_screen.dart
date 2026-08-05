@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
@@ -8,6 +9,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
+import 'package:collectiq_ai/shared/domain/collectible_category.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
@@ -39,6 +41,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String? _catalogError;
   String _lastCatalogQuery = '';
   int _catalogRequestId = 0;
+  Timer? _catalogDebounceTimer;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _catalogDebounceTimer?.cancel();
     _queryController.dispose();
     super.dispose();
   }
@@ -137,10 +141,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 ? 'Search catalog prices'
                                 : 'Search saved items',
                             onChanged: _onQueryChanged,
-                            onClear: () {
-                              _queryController.clear();
-                              _onQueryChanged('');
-                            },
+                            // Clearing is a deliberate one-off action, not a
+                            // keystroke to debounce — route it the same way
+                            // as a quick-filter tap so results disappear
+                            // immediately instead of after the typing delay.
+                            onClear: () => _setQuery(''),
                           ),
                           const SizedBox(height: 12),
                           _SearchScopeControl(
@@ -249,7 +254,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
     return items
         .where((item) {
-          return [
+          final matchesField = [
             item.title,
             item.category,
             item.condition,
@@ -263,6 +268,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ].whereType<String>().any((value) {
             return value.toLowerCase().contains(normalized);
           });
+          if (matchesField) {
+            return true;
+          }
+          // Also match on the canonicalized category so a quick-filter tap
+          // like "Cards" (which represents merged variants — "Trading
+          // Card", "TCG", "Pokemon Card", ...) catches every item in that
+          // bucket, not just ones whose raw category text happens to
+          // literally contain "cards".
+          return canonicalCategory(item.category).toLowerCase().contains(
+            normalized,
+          );
         })
         .toList(growable: false);
   }
@@ -278,7 +294,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (category.isEmpty) {
         continue;
       }
-      counts[category] = (counts[category] ?? 0) + 1;
+      // Canonicalize so card-game variants ("Pokemon Card", "Trading Card",
+      // "TCG", ...) collapse into one "Cards" bucket instead of showing as
+      // separate, overlapping quick filters — matches how Home groups them.
+      final label = canonicalCategory(category);
+      counts[label] = (counts[label] ?? 0) + 1;
     }
 
     final ranked = counts.entries.toList()
@@ -298,13 +318,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _queryController.selection = TextSelection.collapsed(
       offset: _queryController.text.length,
     );
-    _onQueryChanged(query);
+    // A quick-filter tap is a deliberate, one-off action rather than a
+    // stream of keystrokes, so it should search immediately rather than
+    // wait out the typing debounce below.
+    _catalogDebounceTimer?.cancel();
+    setState(() {});
+    if (_scope == _SearchScope.catalog) {
+      _runCatalogSearch(query);
+    }
   }
 
   void _setScope(_SearchScope scope) {
     if (_scope == scope) {
       return;
     }
+    _catalogDebounceTimer?.cancel();
     setState(() => _scope = scope);
     if (scope == _SearchScope.catalog) {
       _runCatalogSearch(_queryController.text);
@@ -313,9 +341,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onQueryChanged(String query) {
     setState(() {});
-    if (_scope == _SearchScope.catalog) {
-      _runCatalogSearch(query);
+    // Collection search filters an already-loaded local list, so it stays
+    // instant on every keystroke. Catalog search hits the backend (which
+    // itself queries Supabase), so debounce it — otherwise a query like
+    // "Charizard" fires a request per keystroke.
+    _catalogDebounceTimer?.cancel();
+    if (_scope != _SearchScope.catalog) {
+      return;
     }
+    _catalogDebounceTimer = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) {
+        _runCatalogSearch(query);
+      }
+    });
   }
 
   Future<void> _runCatalogSearch(String query) async {

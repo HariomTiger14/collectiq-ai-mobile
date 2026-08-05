@@ -17,6 +17,7 @@ import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_comp
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/shared/domain/collectible_category.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -1751,7 +1752,7 @@ class _HomeViewData {
   List<_CategoryShare> get categoryShares {
     final counts = <String, int>{};
     for (final item in items) {
-      final label = _canonicalCategory(item.category);
+      final label = canonicalCategory(item.category);
       counts[label] = (counts[label] ?? 0) + 1;
     }
     final total = counts.values.fold<int>(0, (sum, value) => sum + value);
@@ -1872,72 +1873,6 @@ Color _categoryBarColor(int index, String label) {
 
 /// Canonicalizes a raw collectible category label so obvious variants merge
 /// (all card types → "Cards") while distinct real categories stay separate.
-String _canonicalCategory(String raw) {
-  final value = raw.trim().toLowerCase();
-  if (value.isEmpty) {
-    return 'Other';
-  }
-  bool has(String token) => value.contains(token);
-  if (has('card') ||
-      has('tcg') ||
-      has('pokemon') ||
-      has('pokémon') ||
-      has('magic') ||
-      has('mtg') ||
-      has('yu-gi') ||
-      has('yugioh') ||
-      has('one piece') ||
-      has('trainer')) {
-    return 'Cards';
-  }
-  if (has('coin') || has('numismat')) {
-    return 'Coins';
-  }
-  if (has('comic')) {
-    return 'Comics';
-  }
-  if (has('video game') ||
-      has('game') ||
-      has('cartridge') ||
-      has('console')) {
-    return 'Video Games';
-  }
-  if (has('lego')) {
-    return 'LEGO';
-  }
-  if (has('funko')) {
-    return 'Funko';
-  }
-  if (has('sneaker') ||
-      has('shoe') ||
-      has('streetwear') ||
-      has('nike') ||
-      has('jordan')) {
-    return 'Sneakers';
-  }
-  if (has('watch')) {
-    return 'Watches';
-  }
-  if (has('sport') ||
-      has('jersey') ||
-      has('autograph') ||
-      has('memorabilia')) {
-    return 'Sports';
-  }
-  if (has('figure') || has('toy')) {
-    return 'Figures';
-  }
-  return _titleCase(raw.trim());
-}
-
-String _titleCase(String value) {
-  return value
-      .split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty)
-      .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
-      .join(' ');
-}
-
 String _signedCurrency(double value, [String currencyCode = 'AUD']) {
   if (value == 0) {
     return formatCollectionValue(0, currencyCode: currencyCode);
