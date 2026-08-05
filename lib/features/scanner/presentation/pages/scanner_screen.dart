@@ -40,6 +40,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
   String? _captureLoopRoleId;
   bool _hasOpenedInitialCamera = false;
   bool _isOpeningInitialCamera = false;
+  bool _errorDialogShowing = false;
 
   @override
   void initState() {
@@ -61,6 +62,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
             _captureLoopRoleId = null;
           });
         }
+        final nextError = next.errorMessage;
+        if (nextError != null && nextError != previous?.errorMessage) {
+          _showScanErrorDialog(nextError);
+        }
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -79,6 +84,37 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
     WidgetsBinding.instance.removeObserver(this);
     _scannerSubscription.close();
     super.dispose();
+  }
+
+  /// Interrupts the user with the scan failure instead of leaving it as an
+  /// easy-to-miss card at the bottom of a tall scroll view (a genuine failure
+  /// — network loss, quota, a slow backend timing out — deserves attention
+  /// the moment it happens, not whenever the user happens to scroll down).
+  /// The inline `_ScannerWorkspaceError` card stays as a fallback for anyone
+  /// who dismisses the dialog via the barrier without picking an action.
+  void _showScanErrorDialog(String message) {
+    if (_errorDialogShowing || !mounted) {
+      return;
+    }
+    _errorDialogShowing = true;
+    final scannerController = ref.read(scannerControllerProvider.notifier);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => _ScannerErrorDialog(
+        message: message,
+        onPrimary: () {
+          Navigator.of(dialogContext).pop();
+          scannerController.analyzeWithAi();
+        },
+        onSecondary: () {
+          Navigator.of(dialogContext).pop();
+          scannerController.resetScan();
+        },
+      ),
+    ).then((_) {
+      _errorDialogShowing = false;
+    });
   }
 
   @override
@@ -557,6 +593,63 @@ class _ScannerWorkspaceError extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Modal presentation of a scan failure — see `_showScanErrorDialog` for why
+/// this interrupts the user instead of relying on the inline card alone.
+class _ScannerErrorDialog extends StatelessWidget {
+  const _ScannerErrorDialog({
+    required this.message,
+    required this.onPrimary,
+    required this.onSecondary,
+  });
+
+  final String message;
+  final VoidCallback onPrimary;
+  final VoidCallback onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = _scannerErrorCopyFor(message);
+    return Semantics(
+      liveRegion: true,
+      child: AlertDialog(
+        key: const ValueKey('scanner-error-dialog'),
+        backgroundColor: ScannerVisualTheme.background,
+        icon: Icon(copy.icon, color: Colors.white, size: 32),
+        title: Text(
+          copy.title,
+          key: const ValueKey('scanner-error-dialog-title'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          copy.body,
+          key: const ValueKey('scanner-error-dialog-body'),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        actionsOverflowButtonSpacing: AppSpacing.xs,
+        actions: [
+          TextButton(
+            key: const ValueKey('scanner-error-dialog-secondary'),
+            onPressed: onSecondary,
+            child: Text(copy.secondaryLabel),
+          ),
+          FilledButton(
+            key: const ValueKey('scanner-error-dialog-primary'),
+            onPressed: onPrimary,
+            child: Text(copy.primaryLabel),
+          ),
+        ],
       ),
     );
   }

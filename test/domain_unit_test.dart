@@ -1536,11 +1536,17 @@ void main() {
       expect(result.alternativeMatches.single.title, 'Unknown alternative');
       expect(result.alternativeMatches.single.confidence, 0.73);
 
+      // A fully-defaulted parsed response ("Unknown collectible", 0
+      // confidence) is the same shape the real backend legitimately returns
+      // for a photo that isn't a recognizable collectible. validateResponse
+      // must accept it as a valid low-confidence result (the result screen's
+      // "Needs Review" banner handles telling the user), not reject it as a
+      // contract violation — raw field presence is enforced separately by
+      // validateResponsePayload before parsing ever happens.
       final validation = const AiBackendContractValidator().validateResponse(
         response,
       );
-      expect(validation.isValid, isFalse);
-      expect(validation.issues, contains('itemName is missing or defaulted.'));
+      expect(validation.isValid, isTrue);
     });
 
     test('backend error parses safe defaults', () {

@@ -18,6 +18,7 @@ class DioAiBackendApiService implements AiBackendApiService {
     required this.endpointUrl,
     Dio? dio,
     this.timeout = const Duration(seconds: 30),
+    this.receiveTimeout = const Duration(seconds: 90),
     this.validator = const AiBackendContractValidator(),
     this.readinessChecker = const AiBackendEndpointReadinessChecker(),
     this.isReleaseMode = false,
@@ -27,7 +28,7 @@ class DioAiBackendApiService implements AiBackendApiService {
            Dio(
              BaseOptions(
                connectTimeout: timeout,
-               receiveTimeout: timeout,
+               receiveTimeout: receiveTimeout,
                sendTimeout: timeout,
                responseType: ResponseType.json,
                headers: const {
@@ -40,8 +41,13 @@ class DioAiBackendApiService implements AiBackendApiService {
   /// Future backend endpoint supplied by build config.
   final String endpointUrl;
 
-  /// Request timeout.
+  /// Connect/send timeout. Kept short so genuine offline fails fast.
   final Duration timeout;
+
+  /// Receive timeout. Held well above the backend's Gemini budget (60s) so a
+  /// real analysis — plus a possible cold-start on the first hit — is not cut
+  /// off mid-response and surfaced as a spurious "Scan interrupted".
+  final Duration receiveTimeout;
 
   /// Contract validator used before and after transport.
   final AiBackendContractValidator validator;
@@ -95,7 +101,7 @@ class DioAiBackendApiService implements AiBackendApiService {
         options: Options(
           responseType: ResponseType.json,
           sendTimeout: timeout,
-          receiveTimeout: timeout,
+          receiveTimeout: receiveTimeout,
           validateStatus: (_) => true,
           headers: {
             'Accept': 'application/json',
