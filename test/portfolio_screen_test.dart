@@ -949,7 +949,7 @@ Future<void> _pumpPortfolio(
           activePlanLimitsProvider.overrideWithValue(
             PlanLimits.forPlan(
               plan: SubscriptionPlan.pro,
-              freeScanLimit: const UsageLimit(dailyFreeScanLimit: 25),
+              freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 25),
             ),
           ),
       ],

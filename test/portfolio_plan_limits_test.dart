@@ -20,7 +20,7 @@ void main() {
           activePlanLimitsProvider.overrideWithValue(
             PlanLimits(
               plan: SubscriptionPlan.free,
-              scanLimit: const UsageLimit(dailyFreeScanLimit: 10),
+              scanLimit: const UsageLimit(monthlyFreeScanLimit: 10),
               maxPortfolioItems: 1,
               maxPhotosPerItem: 2,
               maxActivePriceAlerts: 3,
@@ -59,7 +59,7 @@ void main() {
             activePlanLimitsProvider.overrideWithValue(
               PlanLimits(
                 plan: SubscriptionPlan.free,
-                scanLimit: const UsageLimit(dailyFreeScanLimit: 10),
+                scanLimit: const UsageLimit(monthlyFreeScanLimit: 10),
                 maxPortfolioItems: 1,
                 maxPhotosPerItem: 2,
                 maxActivePriceAlerts: 3,

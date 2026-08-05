@@ -31,16 +31,19 @@ class UsageLimitConfig {
   /// Creates usage limit config.
   const UsageLimitConfig({
     this.developmentUnlimited = true,
-    // Quiet per-day anti-abuse ceiling, not a marketed limit. The real free
-    // wall is the saved-collectibles cap (kFreeMaxCollectibles).
-    this.dailyFreeScanLimit = 20,
+    // Quiet monthly anti-abuse ceiling, not a marketed limit. The real free
+    // wall is the saved-collectibles cap (kFreeMaxCollectibles). Matches the
+    // server-side monthly cap enforced on /analyze
+    // (SUBSCRIPTION_FREE_MONTHLY_SCAN_LIMIT, default 30) — this is a
+    // client-side pre-check only, the server is authoritative.
+    this.monthlyFreeScanLimit = 30,
   });
 
   /// Whether local/dev builds should avoid blocking scanner testing.
   final bool developmentUnlimited;
 
-  /// Daily scan limit used when unlimited mode is disabled.
-  final int dailyFreeScanLimit;
+  /// Monthly scan limit used when unlimited mode is disabled.
+  final int monthlyFreeScanLimit;
 
   /// Build config from dart-define values.
   factory UsageLimitConfig.fromEnvironment() {
@@ -49,9 +52,9 @@ class UsageLimitConfig {
         'COLLECTIQ_USAGE_UNLIMITED',
         defaultValue: true,
       ),
-      dailyFreeScanLimit: int.fromEnvironment(
-        'COLLECTIQ_DAILY_FREE_SCAN_LIMIT',
-        defaultValue: 20,
+      monthlyFreeScanLimit: int.fromEnvironment(
+        'COLLECTIQ_MONTHLY_FREE_SCAN_LIMIT',
+        defaultValue: 30,
       ),
     );
   }
@@ -59,7 +62,7 @@ class UsageLimitConfig {
   /// Limit model for the active config.
   UsageLimit get usageLimit {
     return UsageLimit(
-      dailyFreeScanLimit: dailyFreeScanLimit,
+      monthlyFreeScanLimit: monthlyFreeScanLimit,
       isUnlimited: developmentUnlimited,
     );
   }
@@ -150,7 +153,7 @@ class SubscriptionState {
            usage ??
            UsageTracker.fromLimit(
              limit: UserEntitlements.developmentFree.usageLimit,
-             scansUsedToday: 0,
+             scansUsedThisMonth: 0,
            );
 
   /// Current entitlements.
@@ -287,7 +290,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       entitlements: entitlements,
       usage: UsageTracker.fromLimit(
         limit: entitlements.usageLimit,
-        scansUsedToday: 0,
+        scansUsedThisMonth: 0,
       ),
     );
   }
@@ -299,7 +302,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     }
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      final used = await _usageRepository.scansUsedToday();
+      final used = await _usageRepository.scansUsedThisMonth();
       final refreshesUsed = await _usageRepository
           .priceRefreshesUsedThisMonth();
       final plan = await _entitlementRepository.loadPlan();
@@ -329,7 +332,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
         entitlements: entitlements,
         usage: UsageTracker.fromLimit(
           limit: entitlements.usageLimit,
-          scansUsedToday: used,
+          scansUsedThisMonth: used,
         ),
         priceRefreshesUsedThisMonth: refreshesUsed,
         products: products,
@@ -357,18 +360,18 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     }
 
     throw SubscriptionException(
-      'Daily free scan limit reached. Your scans reset ${_formatResetDate(state.usage.resetAt)}.',
+      'Monthly free scan limit reached. Your scans reset ${_formatResetDate(state.usage.resetAt)}.',
     );
   }
 
   /// Records a successful analysis.
   Future<void> recordSuccessfulAnalysis() async {
     try {
-      final used = await _usageRepository.incrementScansUsedToday();
+      final used = await _usageRepository.incrementScansUsedThisMonth();
       state = state.copyWith(
         usage: UsageTracker.fromLimit(
           limit: state.entitlements.usageLimit,
-          scansUsedToday: used,
+          scansUsedThisMonth: used,
         ),
         clearErrorMessage: true,
       );
@@ -485,7 +488,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
         entitlements: entitlements,
         usage: UsageTracker.fromLimit(
           limit: entitlements.usageLimit,
-          scansUsedToday: state.usage.scansUsedToday,
+          scansUsedThisMonth: state.usage.scansUsedThisMonth,
         ),
         isLoading: false,
         purchaseMessage: result.message,
@@ -506,10 +509,23 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     );
   }
 
+  static const _monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
   String _formatResetDate(DateTime resetAt) {
-    final hour = resetAt.hour.toString().padLeft(2, '0');
-    final minute = resetAt.minute.toString().padLeft(2, '0');
-    return 'at $hour:$minute tomorrow';
+    return 'on ${_monthNames[resetAt.month - 1]} 1';
   }
 
   void _trackTelemetry(

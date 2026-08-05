@@ -4779,14 +4779,14 @@ void main() {
       const config = UsageLimitConfig();
       final usage = UsageTracker.fromLimit(
         limit: config.usageLimit,
-        scansUsedToday: 999,
+        scansUsedThisMonth: 999,
       );
 
       expect(UserEntitlements.developmentFree.plan, SubscriptionPlan.free);
       expect(config.developmentUnlimited, isTrue);
       expect(usage.canAnalyze, isTrue);
       expect(usage.isUnlimited, isTrue);
-      expect(usage.remainingScans, config.dailyFreeScanLimit);
+      expect(usage.remainingScans, config.monthlyFreeScanLimit);
     });
 
     test('usage controller increments successful analyses', () async {
@@ -4797,7 +4797,7 @@ void main() {
           usageLimitConfigProvider.overrideWithValue(
             const UsageLimitConfig(
               developmentUnlimited: false,
-              dailyFreeScanLimit: 2,
+              monthlyFreeScanLimit: 2,
             ),
           ),
         ],
@@ -4814,7 +4814,7 @@ void main() {
 
       final state = container.read(subscriptionControllerProvider);
       expect(repository.count, 1);
-      expect(state.usage.scansUsedToday, 1);
+      expect(state.usage.scansUsedThisMonth, 1);
       expect(state.usage.remainingScans, 1);
     });
 
@@ -4826,7 +4826,7 @@ void main() {
           usageLimitConfigProvider.overrideWithValue(
             const UsageLimitConfig(
               developmentUnlimited: false,
-              dailyFreeScanLimit: 1,
+              monthlyFreeScanLimit: 1,
             ),
           ),
         ],
@@ -7140,12 +7140,12 @@ class _MemoryUsageRepository implements UsageRepository {
   int refreshCount;
 
   @override
-  Future<int> scansUsedToday() async {
+  Future<int> scansUsedThisMonth() async {
     return count;
   }
 
   @override
-  Future<int> incrementScansUsedToday() async {
+  Future<int> incrementScansUsedThisMonth() async {
     count += 1;
     return count;
   }

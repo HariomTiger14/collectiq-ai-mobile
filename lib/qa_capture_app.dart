@@ -51,7 +51,7 @@ const packloxQaCaptureActive =
 
 const _qaProPlanLimits = PlanLimits(
   plan: SubscriptionPlan.pro,
-  scanLimit: UsageLimit(dailyFreeScanLimit: 250),
+  scanLimit: UsageLimit(monthlyFreeScanLimit: 250),
   maxPortfolioItems: 1000,
   maxPhotosPerItem: 6,
   maxActivePriceAlerts: 25,

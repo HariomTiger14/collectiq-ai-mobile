@@ -8,10 +8,10 @@ void main() {
     test('free plan keeps core collecting useful but bounded', () {
       final limits = PlanLimits.forPlan(
         plan: SubscriptionPlan.free,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
-      expect(limits.scanLimit.dailyFreeScanLimit, 20);
+      expect(limits.scanLimit.monthlyFreeScanLimit, 20);
       expect(limits.maxPortfolioItems, kFreeMaxCollectibles);
       expect(limits.maxPhotosPerItem, kFreeMaxPhotosPerItem);
       expect(limits.maxActivePriceAlerts, kFreeMaxActiveAlerts);
@@ -24,7 +24,7 @@ void main() {
     test('pro is the single paid tier: everything unlocked', () {
       final limits = PlanLimits.forPlan(
         plan: SubscriptionPlan.pro,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
       expect(limits.scanLimit.isUnlimited, isTrue);
@@ -42,11 +42,11 @@ void main() {
     test('premium maps to the same limits as pro (data safety)', () {
       final premium = PlanLimits.forPlan(
         plan: SubscriptionPlan.premium,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
       final pro = PlanLimits.forPlan(
         plan: SubscriptionPlan.pro,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
       expect(premium.scanLimit.isUnlimited, isTrue);
@@ -59,7 +59,7 @@ void main() {
     test('high pro caps read as "Unlimited" in labels', () {
       final pro = PlanLimits.forPlan(
         plan: SubscriptionPlan.pro,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
       expect(pro.portfolioItemsLabel, 'Unlimited');
@@ -69,7 +69,7 @@ void main() {
     test('portfolio and alert helper checks enforce the free caps', () {
       final limits = PlanLimits.forPlan(
         plan: SubscriptionPlan.free,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 20),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
       expect(limits.canAddPortfolioItem(kFreeMaxCollectibles - 1), isTrue);

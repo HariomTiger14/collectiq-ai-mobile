@@ -87,7 +87,7 @@ class PlanLimits {
     return switch (plan) {
       SubscriptionPlan.free => PlanLimits(
         plan: plan,
-        // The daily scan limit is only a quiet anti-abuse ceiling; the real
+        // The monthly scan limit is only a quiet anti-abuse ceiling; the real
         // free wall is the saved-collectibles cap below.
         scanLimit: freeScanLimit,
         maxPortfolioItems: kFreeMaxCollectibles,
@@ -141,7 +141,7 @@ class PlanLimits {
   String get scanLimitLabel {
     return scanLimit.isUnlimited
         ? 'Unlimited scans'
-        : '${scanLimit.dailyFreeScanLimit} scans/day';
+        : '${scanLimit.monthlyFreeScanLimit} scans/month';
   }
 
   /// Human-readable portfolio item limit.

@@ -216,7 +216,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.workspace_premium_outlined,
         title: 'Plan & Usage',
-        subtitle: '${subscriptionState.remainingLabel} scans remaining today.',
+        subtitle:
+            '${subscriptionState.remainingLabel} scans remaining this month.',
         trailing: subscriptionState.entitlements.plan.displayName,
       ),
       _SubscriptionPlanPanel(
@@ -1077,7 +1078,7 @@ class _SubscriptionPlanPanel extends StatelessWidget {
             _SubscriptionStatusChip(
               label: state.entitlements.usageLimit.isUnlimited
                   ? 'Unlimited scans'
-                  : '${state.entitlements.usageLimit.dailyFreeScanLimit} scans/day',
+                  : '${state.entitlements.usageLimit.monthlyFreeScanLimit} scans/month',
               icon: Icons.qr_code_scanner_rounded,
               color: HomeTokens.accent,
             ),
@@ -2143,7 +2144,7 @@ class _SettingsCompatibilityLabels extends StatelessWidget {
       'Plan & Usage',
       'Current plan',
       subscriptionState.entitlements.plan.displayName,
-      'Scans used today',
+      'Scans used this month',
       'Remaining scans',
       subscriptionState.remainingLabel,
       'Payment status',

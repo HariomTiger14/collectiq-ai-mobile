@@ -14,7 +14,7 @@ class UserEntitlements {
 
   /// Default local-first development entitlements. Caps mirror the real Free
   /// tier so the paywall/limits can be exercised in dev/SIT; scans stay
-  /// unlimited locally so scanner testing isn't blocked by the daily ceiling.
+  /// unlimited locally so scanner testing isn't blocked by the monthly ceiling.
   static const developmentFree = UserEntitlements(
     plan: SubscriptionPlan.free,
     usageLimit: UsageLimit.unlimited,
