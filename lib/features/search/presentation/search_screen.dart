@@ -9,7 +9,6 @@ import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfol
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
-import 'package:collectiq_ai/shared/domain/collectible_category.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
@@ -66,14 +65,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final bottomPadding = GlassBottomNavBar.scrollContentClearance(context);
     final query = _queryController.text.trim();
+    // Category is explicit per entry rather than inferred from the label
+    // text — "Charizard 4/102" is a product name, not a string containing
+    // "card"/"pokemon", so canonicalCategory() couldn't place it correctly.
     final catalogQuickFilters = const [
-      'Charizard 4/102',
-      'Pokemon Cards',
-      'Magic Cards',
-      'Comics',
-      'Coins',
-      'Nike Air Force 1',
-      'Video Games',
+      (label: 'Charizard 4/102', category: 'Cards'),
+      (label: 'Pokemon Cards', category: 'Cards'),
+      (label: 'Magic Cards', category: 'Cards'),
+      (label: 'Comics', category: 'Comics'),
+      (label: 'Coins', category: 'Coins'),
+      (label: 'Nike Air Force 1', category: 'Sneakers'),
+      (label: 'Video Games', category: 'Video Games'),
     ];
     final hasQuery = query.isNotEmpty;
     final isCatalogReady = query.length >= 2;
@@ -134,7 +136,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             const _SectionTitle('Search the catalog'),
                             const SizedBox(height: 10),
                             _QuickFilterChips(
-                              labels: catalogQuickFilters,
+                              filters: catalogQuickFilters,
                               onSelected: _setQuery,
                             ),
                           ] else if (_isCatalogLoading)
@@ -541,9 +543,9 @@ class _CatalogEmptyState extends StatelessWidget {
 // pill chips sizes each one to its own content instead, so nothing clips
 // and short/long examples can sit naturally side by side.
 class _QuickFilterChips extends StatelessWidget {
-  const _QuickFilterChips({required this.labels, required this.onSelected});
+  const _QuickFilterChips({required this.filters, required this.onSelected});
 
-  final List<String> labels;
+  final List<({String label, String category})> filters;
   final ValueChanged<String> onSelected;
 
   @override
@@ -553,11 +555,12 @@ class _QuickFilterChips extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        for (var index = 0; index < labels.length; index++)
+        for (var index = 0; index < filters.length; index++)
           _QuickFilterChip(
             key: ValueKey('discover-quick-filter-$index'),
-            label: labels[index],
-            onTap: () => onSelected(labels[index]),
+            label: filters[index].label,
+            category: filters[index].category,
+            onTap: () => onSelected(filters[index].label),
           ),
       ],
     );
@@ -567,19 +570,23 @@ class _QuickFilterChips extends StatelessWidget {
 class _QuickFilterChip extends StatelessWidget {
   const _QuickFilterChip({
     required this.label,
+    required this.category,
     required this.onTap,
     super.key,
   });
 
   final String label;
+  final String category;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     // Same category → same icon/art/color everywhere in the app: resolve
     // through the shared mapping (also used by Home's category tiles)
-    // instead of this screen's own icon logic.
-    final visual = categoryVisualFor(canonicalCategory(label));
+    // instead of this screen's own icon logic. The category is passed in
+    // explicitly (not inferred from the label) since example product names
+    // like "Charizard 4/102" don't contain a recognizable category keyword.
+    final visual = categoryVisualFor(category);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
