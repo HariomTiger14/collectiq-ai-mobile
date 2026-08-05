@@ -12,113 +12,47 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('searches saved portfolio items by title and metadata', (
+  // Discover is Catalog-only (market-price lookup) — searching your own
+  // saved items lives in Portfolio, which already has a richer search/sort/
+  // filter system, so Discover no longer duplicates it. See
+  // search_screen.dart for the rationale.
+
+  testWidgets('quick filters fill the query and trigger a catalog search', (
     tester,
   ) async {
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-charizard',
+        title: 'Charizard #4 Base Set',
+        category: 'Pokemon Cards',
+        source: 'PriceCharting',
+        setName: 'Base Set',
+        identifier: '4/102',
+        currency: 'USD',
+        marketValue: 161,
+        confidence: 0.91,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
     await _pumpSearch(
       tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-          brand: 'Mattel',
-        ),
-        _item(
-          id: 'charizard',
-          title: 'Charizard Base Set',
-          category: 'Pokemon Cards',
-          setName: 'Base Set',
-          cardNumber: '4/102',
-        ),
-      ]),
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
     );
 
-    expect(find.text('2 saved items searchable'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('discover-search-input')),
-      '4/102',
-    );
-    await tester.pump();
-
-    expect(find.text('1 saved match'), findsOneWidget);
-    expect(find.text('Charizard Base Set'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('discover-portfolio-image-charizard')),
-      findsOneWidget,
-    );
-    expect(find.text('Hot Wheels Mazda MX-5'), findsNothing);
-  });
-
-  testWidgets('quick filters fill the query from saved categories', (
-    tester,
-  ) async {
-    await _pumpSearch(
-      tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-        ),
-      ]),
-    );
-
-    // Quick filters are canonicalized (matching Home's category grouping)
-    // so variants collapse into one consistent bucket instead of showing
-    // raw, possibly-duplicated category strings — "Toy Cars" buckets under
-    // the shared "Figures" canonical label.
-    await tester.tap(find.text('Figures'));
+    await tester.tap(find.text('Pokemon Cards'));
     await tester.pump();
 
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Figures');
-    expect(find.text('Hot Wheels Mazda MX-5'), findsOneWidget);
-  });
+    expect(input.controller?.text, 'Pokemon Cards');
 
-  testWidgets('result cards open the saved item detail screen', (tester) async {
-    await _pumpSearch(
-      tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-        ),
-      ]),
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('discover-search-input')),
-      'mazda',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('discover-result-hot-wheels')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.byType(CollectibleDetailPage), findsOneWidget);
-  });
-
-  testWidgets('portfolio load failure shows retryable search error state', (
-    tester,
-  ) async {
-    final repository = _FailingOncePortfolioRepository([
-      _item(id: 'coin', title: 'Silver Eagle', category: 'Coins'),
-    ]);
-    await _pumpSearch(tester, repository: repository);
-
-    expect(find.byKey(const ValueKey('discover-error-state')), findsOneWidget);
-    expect(find.text('Search is unavailable'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('discover-retry')));
+    // A quick-filter tap is a deliberate action, not a keystroke, so it
+    // searches immediately rather than waiting out the typing debounce.
     await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('discover-error-state')), findsNothing);
-    expect(find.text('1 saved item searchable'), findsOneWidget);
+    expect(catalogRepository.queries, ['Pokemon Cards']);
+    expect(find.text('Charizard #4 Base Set'), findsOneWidget);
   });
 
   testWidgets('catalog search shows backend catalog results', (tester) async {
@@ -142,8 +76,6 @@ void main() {
       catalogRepository: catalogRepository,
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
@@ -188,8 +120,6 @@ void main() {
       ]),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'mario kart',
@@ -278,8 +208,6 @@ void main() {
       ]),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
@@ -307,8 +235,6 @@ void main() {
       catalogRepository: _FailingCatalogSearchRepository(),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'nintendo',
@@ -342,30 +268,6 @@ Future<void> _pumpSearch(
     ),
   );
   await tester.pumpAndSettle();
-}
-
-CollectibleItem _item({
-  required String id,
-  required String title,
-  required String category,
-  String? brand,
-  String? setName,
-  String? cardNumber,
-}) {
-  return CollectibleItem(
-    id: id,
-    title: title,
-    category: category,
-    estimatedValue: id == 'hot-wheels' ? 18 : 0,
-    confidence: 0.88,
-    condition: 'Good',
-    recommendation: 'Saved test item.',
-    imagePath: '',
-    createdAt: DateTime(2026, 7, 26, 12),
-    brand: brand,
-    setName: setName,
-    cardNumber: cardNumber,
-  );
 }
 
 class _MemoryPortfolioRepository implements PortfolioRepository {
@@ -412,21 +314,6 @@ class _MemoryPortfolioRepository implements PortfolioRepository {
   @override
   Future<void> upsertSyncedItem(CollectibleItem item) async {
     await updateItem(item);
-  }
-}
-
-class _FailingOncePortfolioRepository extends _MemoryPortfolioRepository {
-  _FailingOncePortfolioRepository(super.items);
-
-  var _hasFailed = false;
-
-  @override
-  Future<List<CollectibleItem>> getItems() async {
-    if (!_hasFailed) {
-      _hasFailed = true;
-      throw StateError('Search test failure');
-    }
-    return super.getItems();
   }
 }
 

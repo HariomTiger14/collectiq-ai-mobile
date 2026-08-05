@@ -1,11 +1,11 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeTokens {
   const HomeTokens._();
@@ -1539,34 +1539,37 @@ class HomeCategoryTile extends StatelessWidget {
   });
 
   factory HomeCategoryTile.cards({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Cards');
     return HomeCategoryTile(
       label: 'Cards',
-      icon: Icons.style_outlined,
-      assetPath: PackLoxAssets.categoryColorCards,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'trading cards',
-      iconColor: HomeTokens.categoryCards,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
 
   factory HomeCategoryTile.coins({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Coins');
     return HomeCategoryTile(
       label: 'Coins',
-      icon: Icons.album_outlined,
-      assetPath: PackLoxAssets.categoryColorCoins,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'collectible coins and medallions',
-      iconColor: HomeTokens.categoryCoins,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
 
   factory HomeCategoryTile.figures({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Figures');
     return HomeCategoryTile(
       label: 'Figures',
-      icon: Icons.smart_toy_outlined,
-      assetPath: PackLoxAssets.categoryColorFunko,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'figurines and action figures',
-      iconColor: HomeTokens.categoryFigures,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
@@ -1614,12 +1617,15 @@ class HomeCategoryTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _CategoryTileArtwork(
+              CategoryArtwork(
                 key: ValueKey(
                   'home-popular-category-${label.toLowerCase()}-icon',
                 ),
-                assetPath: assetPath,
-                iconColor: iconColor,
+                visual: CategoryVisual(
+                  icon: icon,
+                  color: iconColor,
+                  assetPath: assetPath,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -1637,55 +1643,6 @@ class HomeCategoryTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CategoryTileArtwork extends StatelessWidget {
-  const _CategoryTileArtwork({
-    required this.assetPath,
-    required this.iconColor,
-    super.key,
-  });
-
-  final String assetPath;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    if (assetPath.endsWith('.svg')) {
-      return SizedBox(
-        width: 44,
-        height: 44,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: iconColor.withValues(alpha: 0.16),
-                blurRadius: 18,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: SvgPicture.asset(assetPath, fit: BoxFit.contain),
-        ),
-      );
-    }
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: iconColor.withValues(alpha: 0.18),
-            blurRadius: 18,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Image.asset(assetPath, fit: BoxFit.contain),
     );
   }
 }

@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/collectible_category.dart';
@@ -18,8 +18,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
-
-enum _SearchScope { collection, catalog }
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
@@ -35,7 +33,6 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _queryController;
-  _SearchScope _scope = _SearchScope.collection;
   var _catalogResults = const <CatalogSearchResult>[];
   var _isCatalogLoading = false;
   String? _catalogError;
@@ -47,11 +44,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void initState() {
     super.initState();
     _queryController = TextEditingController(text: _initialQuery);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(portfolioControllerProvider.notifier).ensureLoaded();
-      }
-    });
   }
 
   @override
@@ -73,10 +65,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = GlassBottomNavBar.scrollContentClearance(context);
-    final portfolioState = ref.watch(portfolioControllerProvider);
     final query = _queryController.text.trim();
-    final results = _searchItems(portfolioState.items, query);
-    final quickFilters = _quickFilters(portfolioState.items);
     final catalogQuickFilters = const [
       'Charizard 4/102',
       'Pokemon Cards',
@@ -87,26 +76,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       'Video Games',
     ];
     final hasQuery = query.isNotEmpty;
-    final hasResults = results.isNotEmpty;
-    final isCollection = _scope == _SearchScope.collection;
-    final isCatalog = _scope == _SearchScope.catalog;
-    final isEmpty = isCollection && hasQuery && !hasResults;
     final isCatalogReady = query.length >= 2;
     final isCatalogEmpty =
-        isCatalog &&
         isCatalogReady &&
         !_isCatalogLoading &&
         _catalogError == null &&
         _catalogResults.isEmpty &&
         _lastCatalogQuery == query;
-    final showInitialLoading =
-        isCollection &&
-        portfolioState.isLoading &&
-        portfolioState.items.isEmpty;
-    final showInitialError =
-        isCollection &&
-        portfolioState.errorMessage != null &&
-        portfolioState.items.isEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -137,9 +113,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           const SizedBox(height: 22),
                           _SearchField(
                             controller: _queryController,
-                            hintText: isCatalog
-                                ? 'Search catalog prices'
-                                : 'Search saved items',
+                            hintText: 'Search catalog prices',
                             onChanged: _onQueryChanged,
                             // Clearing is a deliberate one-off action, not a
                             // keystroke to debounce — route it the same way
@@ -147,88 +121,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             // immediately instead of after the typing delay.
                             onClear: () => _setQuery(''),
                           ),
-                          const SizedBox(height: 12),
-                          _SearchScopeControl(
-                            scope: _scope,
-                            onChanged: _setScope,
+                          const SizedBox(height: 18),
+                          _CatalogStatusCard(
+                            resultCount: _catalogResults.length,
+                            hasQuery: hasQuery,
+                            isConnected:
+                                _catalogError == null ||
+                                _catalogResults.isNotEmpty,
                           ),
                           const SizedBox(height: 18),
-                          if (showInitialLoading)
-                            const _SearchLoadingState()
-                          else if (showInitialError)
-                            _SearchErrorState(
-                              message:
-                                  portfolioState.errorMessage ??
-                                  'Unable to load saved items.',
-                              onRetry: () => ref
-                                  .read(portfolioControllerProvider.notifier)
-                                  .loadItems(),
+                          if (!isCatalogReady) ...[
+                            const _SectionTitle('Search the catalog'),
+                            const SizedBox(height: 10),
+                            _QuickFilterChips(
+                              labels: catalogQuickFilters,
+                              onSelected: _setQuery,
+                            ),
+                          ] else if (_isCatalogLoading)
+                            const _CatalogLoadingState()
+                          else if (_catalogError != null)
+                            _CatalogErrorState(
+                              message: _catalogError!,
+                              onRetry: () => _runCatalogSearch(query),
                             )
-                          else if (isEmpty)
-                            const _SearchEmptyState()
-                          else if (isCatalog) ...[
-                            _CatalogStatusCard(
-                              resultCount: _catalogResults.length,
-                              hasQuery: hasQuery,
-                              isConnected:
-                                  _catalogError == null ||
-                                  _catalogResults.isNotEmpty,
-                            ),
-                            const SizedBox(height: 18),
-                            if (!isCatalogReady) ...[
-                              const _SectionTitle('Search the catalog'),
-                              const SizedBox(height: 10),
-                              _QuickFilterGrid(
-                                labels: catalogQuickFilters,
-                                onSelected: _setQuery,
+                          else if (isCatalogEmpty)
+                            const _CatalogEmptyState()
+                          else ...[
+                            const _SectionTitle('Catalog matches'),
+                            const SizedBox(height: 10),
+                            for (final result in _catalogResults.take(
+                              20,
+                            )) ...[
+                              _CatalogResultCard(
+                                result: result,
+                                onTap: () =>
+                                    _openCatalogResult(context, result),
                               ),
-                            ] else if (_isCatalogLoading)
-                              const _CatalogLoadingState()
-                            else if (_catalogError != null)
-                              _CatalogErrorState(
-                                message: _catalogError!,
-                                onRetry: () => _runCatalogSearch(query),
-                              )
-                            else if (isCatalogEmpty)
-                              const _CatalogEmptyState()
-                            else ...[
-                              const _SectionTitle('Catalog matches'),
                               const SizedBox(height: 10),
-                              for (final result in _catalogResults.take(
-                                20,
-                              )) ...[
-                                _CatalogResultCard(
-                                  result: result,
-                                  onTap: () =>
-                                      _openCatalogResult(context, result),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ],
-                          ] else ...[
-                            _SearchStatusCard(
-                              itemCount: portfolioState.items.length,
-                              resultCount: results.length,
-                              hasQuery: hasQuery,
-                            ),
-                            const SizedBox(height: 18),
-                            if (hasQuery && hasResults) ...[
-                              const _SectionTitle('Saved matches'),
-                              const SizedBox(height: 10),
-                              for (final item in results.take(12)) ...[
-                                _PortfolioResultCard(
-                                  item: item,
-                                  onTap: () => _openItem(context, item),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ] else ...[
-                              const _SectionTitle('Search your collection'),
-                              const SizedBox(height: 10),
-                              _QuickFilterGrid(
-                                labels: quickFilters,
-                                onSelected: _setQuery,
-                              ),
                             ],
                           ],
                         ],
@@ -244,75 +173,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  List<CollectibleItem> _searchItems(
-    List<CollectibleItem> items,
-    String query,
-  ) {
-    final normalized = query.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return const [];
-    }
-    return items
-        .where((item) {
-          final matchesField = [
-            item.title,
-            item.category,
-            item.condition,
-            item.brand,
-            item.setName,
-            item.series,
-            item.cardNumber,
-            item.playerOrCharacter,
-            item.rarity,
-            item.edition,
-          ].whereType<String>().any((value) {
-            return value.toLowerCase().contains(normalized);
-          });
-          if (matchesField) {
-            return true;
-          }
-          // Also match on the canonicalized category so a quick-filter tap
-          // like "Cards" (which represents merged variants — "Trading
-          // Card", "TCG", "Pokemon Card", ...) catches every item in that
-          // bucket, not just ones whose raw category text happens to
-          // literally contain "cards".
-          return canonicalCategory(item.category).toLowerCase().contains(
-            normalized,
-          );
-        })
-        .toList(growable: false);
-  }
-
-  List<String> _quickFilters(List<CollectibleItem> items) {
-    if (items.isEmpty) {
-      return const ['Cards', 'Video Games', 'Sneakers', 'Comics', 'Coins'];
-    }
-
-    final counts = <String, int>{};
-    for (final item in items) {
-      final category = item.category.trim();
-      if (category.isEmpty) {
-        continue;
-      }
-      // Canonicalize so card-game variants ("Pokemon Card", "Trading Card",
-      // "TCG", ...) collapse into one "Cards" bucket instead of showing as
-      // separate, overlapping quick filters — matches how Home groups them.
-      final label = canonicalCategory(category);
-      counts[label] = (counts[label] ?? 0) + 1;
-    }
-
-    final ranked = counts.entries.toList()
-      ..sort((a, b) {
-        final countCompare = b.value.compareTo(a.value);
-        if (countCompare != 0) {
-          return countCompare;
-        }
-        return a.key.compareTo(b.key);
-      });
-
-    return ranked.take(4).map((entry) => entry.key).toList(growable: false);
-  }
-
   void _setQuery(String query) {
     _queryController.text = query;
     _queryController.selection = TextSelection.collapsed(
@@ -323,32 +183,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // wait out the typing debounce below.
     _catalogDebounceTimer?.cancel();
     setState(() {});
-    if (_scope == _SearchScope.catalog) {
-      _runCatalogSearch(query);
-    }
-  }
-
-  void _setScope(_SearchScope scope) {
-    if (_scope == scope) {
-      return;
-    }
-    _catalogDebounceTimer?.cancel();
-    setState(() => _scope = scope);
-    if (scope == _SearchScope.catalog) {
-      _runCatalogSearch(_queryController.text);
-    }
+    _runCatalogSearch(query);
   }
 
   void _onQueryChanged(String query) {
     setState(() {});
-    // Collection search filters an already-loaded local list, so it stays
-    // instant on every keystroke. Catalog search hits the backend (which
-    // itself queries Supabase), so debounce it — otherwise a query like
-    // "Charizard" fires a request per keystroke.
+    // Catalog search hits the backend (which itself queries Supabase), so
+    // debounce it — otherwise a query like "Charizard" fires a request per
+    // keystroke.
     _catalogDebounceTimer?.cancel();
-    if (_scope != _SearchScope.catalog) {
-      return;
-    }
     _catalogDebounceTimer = Timer(const Duration(milliseconds: 350), () {
       if (mounted) {
         _runCatalogSearch(query);
@@ -391,27 +234,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() {
         _catalogResults = const [];
         _isCatalogLoading = false;
-        _catalogError =
-            'Catalog search is not connected yet. Collection search still works.';
+        _catalogError = 'Catalog search is not connected yet.';
       });
     }
-  }
-
-  Future<void> _openItem(BuildContext context, CollectibleItem item) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => CollectibleDetailPage(
-          item: item,
-          onDelete: (itemId) async {
-            await ref
-                .read(portfolioControllerProvider.notifier)
-                .removeItem(itemId);
-            return true;
-          },
-        ),
-        settings: RouteSettings(name: '/search/portfolio/${item.id}'),
-      ),
-    );
   }
 
   Future<void> _openCatalogResult(
@@ -447,7 +272,7 @@ class _SearchHeader extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Search saved collectibles by name, category, brand, set, or identifier.',
+          'Search real market prices by name, category, brand, set, or identifier.',
           style: textTheme.titleMedium?.copyWith(
             color: PackLoxTokens.textSecondary,
             fontWeight: FontWeight.w700,
@@ -539,170 +364,6 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _SearchScopeControl extends StatelessWidget {
-  const _SearchScopeControl({required this.scope, required this.onChanged});
-
-  final _SearchScope scope;
-  final ValueChanged<_SearchScope> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('discover-search-scope-control'),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: PackLoxTokens.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ScopeButton(
-              label: 'Collection',
-              icon: Icons.inventory_2_outlined,
-              selected: scope == _SearchScope.collection,
-              onTap: () => onChanged(_SearchScope.collection),
-            ),
-          ),
-          Expanded(
-            child: _ScopeButton(
-              label: 'Catalog',
-              icon: Icons.manage_search_outlined,
-              selected: scope == _SearchScope.catalog,
-              onTap: () => onChanged(_SearchScope.catalog),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScopeButton extends StatelessWidget {
-  const _ScopeButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        key: ValueKey('discover-scope-${label.toLowerCase()}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? PackLoxTokens.blue : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected
-                    ? PackLoxTokens.textPrimary
-                    : PackLoxTokens.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: selected
-                        ? PackLoxTokens.textPrimary
-                        : PackLoxTokens.textSecondary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchStatusCard extends StatelessWidget {
-  const _SearchStatusCard({
-    required this.itemCount,
-    required this.resultCount,
-    required this.hasQuery,
-  });
-
-  final int itemCount;
-  final int resultCount;
-  final bool hasQuery;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: PackLoxTokens.blue.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              hasQuery
-                  ? Icons.manage_search_rounded
-                  : Icons.inventory_2_outlined,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasQuery
-                      ? '$resultCount saved ${resultCount == 1 ? 'match' : 'matches'}'
-                      : '$itemCount saved ${itemCount == 1 ? 'item' : 'items'} searchable',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasQuery
-                      ? 'Results come from your PackLox portfolio.'
-                      : 'Scan or save items, then search them here.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: PackLoxTokens.textSecondary,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _CatalogStatusCard extends StatelessWidget {
   const _CatalogStatusCard({
@@ -764,84 +425,6 @@ class _CatalogStatusCard extends StatelessWidget {
   }
 }
 
-class _SearchEmptyState extends StatelessWidget {
-  const _SearchEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-empty-state'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: PackLoxTokens.surfaceRaised,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: PackLoxTokens.border),
-            ),
-            child: const Icon(
-              Icons.search_off_rounded,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No matches found',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try an item name, category, brand, set, card number, or character.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchLoadingState extends StatelessWidget {
-  const _SearchLoadingState();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-loading-state'),
-      child: Row(
-        children: [
-          const SizedBox.square(
-            dimension: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Loading saved items...',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: PackLoxTokens.textPrimary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CatalogLoadingState extends StatelessWidget {
   const _CatalogLoadingState();
 
@@ -867,50 +450,6 @@ class _CatalogLoadingState extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchErrorState extends StatelessWidget {
-  const _SearchErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-error-state'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.error_outline, color: PackLoxTokens.amber),
-          const SizedBox(height: 12),
-          Text(
-            'Search is unavailable',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            key: const ValueKey('discover-retry'),
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retry'),
           ),
         ],
       ),
@@ -996,138 +535,74 @@ class _CatalogEmptyState extends StatelessWidget {
   }
 }
 
-class _QuickFilterGrid extends StatelessWidget {
-  const _QuickFilterGrid({required this.labels, required this.onSelected});
+// A fixed-column grid forces every label into the same width regardless of
+// how long it is — "Coins" and "Nike Air Force 1" don't belong in equally
+// sized boxes, and the longer ones were truncating illegibly. A Wrap of
+// pill chips sizes each one to its own content instead, so nothing clips
+// and short/long examples can sit naturally side by side.
+class _QuickFilterChips extends StatelessWidget {
+  const _QuickFilterChips({required this.labels, required this.onSelected});
 
   final List<String> labels;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 420 ? 4 : 2;
-        return GridView.builder(
-          key: const ValueKey('discover-quick-filter-grid'),
-          itemCount: labels.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: columns == 4 ? 1.1 : 2.2,
+    return Wrap(
+      key: const ValueKey('discover-quick-filter-grid'),
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (var index = 0; index < labels.length; index++)
+          _QuickFilterChip(
+            key: ValueKey('discover-quick-filter-$index'),
+            label: labels[index],
+            onTap: () => onSelected(labels[index]),
           ),
-          itemBuilder: (context, index) {
-            final label = labels[index];
-            return GestureDetector(
-              key: ValueKey('discover-quick-filter-$index'),
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onSelected(label),
-              child: _SurfaceCard(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      _quickFilterIcon(label),
-                      color: _quickFilterColor(index),
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: PackLoxTokens.textPrimary,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      ],
     );
   }
 }
 
-class _PortfolioResultCard extends StatelessWidget {
-  const _PortfolioResultCard({required this.item, required this.onTap});
+class _QuickFilterChip extends StatelessWidget {
+  const _QuickFilterChip({
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
 
-  final CollectibleItem item;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final value = _formatSearchValue(item);
-    return Semantics(
-      button: true,
-      label: 'Open ${item.title}',
-      child: GestureDetector(
-        key: ValueKey('discover-result-${item.id}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: _SurfaceCard(
-          child: Row(
-            children: [
-              _SearchThumbnail(
-                key: ValueKey('discover-portfolio-image-${item.id}'),
-                item: item,
+    // Same category → same icon/art/color everywhere in the app: resolve
+    // through the shared mapping (also used by Home's category tiles)
+    // instead of this screen's own icon logic.
+    final visual = categoryVisualFor(canonicalCategory(label));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: PackLoxTokens.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CategoryArtwork(visual: visual, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: PackLoxTokens.textPrimary,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: PackLoxTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                        height: 1.12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${item.category} - ${item.condition}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: PackLoxTokens.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: PackLoxTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: PackLoxTokens.textSecondary,
-                    size: 20,
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -2014,85 +1489,6 @@ class _CatalogDetailRow extends StatelessWidget {
   }
 }
 
-class _SearchThumbnail extends StatelessWidget {
-  const _SearchThumbnail({required this.item, super.key});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final imagePath = _searchImagePath(item);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: PackLoxTokens.surfaceRaised,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: PackLoxTokens.border),
-        ),
-        child: imagePath == null
-            ? _CatalogPlaceholderArt(
-                category: item.category,
-                title: item.title,
-                setName: item.setName,
-                compact: true,
-              )
-            : _SearchImage(path: imagePath),
-      ),
-    );
-  }
-}
-
-class _SearchImage extends StatelessWidget {
-  const _SearchImage({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    final normalizedPath = path.trim();
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return Image.network(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _MissingSearchImage(),
-      );
-    }
-    if (normalizedPath.startsWith('assets/')) {
-      return Image.asset(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _MissingSearchImage(),
-      );
-    }
-    return buildLocalPortfolioImage(
-      imagePath: normalizedPath,
-      fit: BoxFit.cover,
-      placeholderBuilder: () => const _MissingSearchImage(),
-    );
-  }
-}
-
-class _MissingSearchImage extends StatelessWidget {
-  const _MissingSearchImage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(
-        Icons.inventory_2_outlined,
-        color: PackLoxTokens.cyan,
-        size: 24,
-      ),
-    );
-  }
-}
-
 class _CatalogPlaceholderThumbnail extends StatelessWidget {
   const _CatalogPlaceholderThumbnail({
     required this.category,
@@ -2132,13 +1528,11 @@ class _CatalogPlaceholderArt extends StatelessWidget {
     required this.category,
     required this.title,
     required this.setName,
-    this.compact = false,
   });
 
   final String category;
   final String title;
   final String? setName;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2148,22 +1542,19 @@ class _CatalogPlaceholderArt extends StatelessWidget {
         style.assetPath!,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        errorBuilder: (_, _, _) =>
-            _FallbackCatalogPlaceholderArt(style: style, compact: compact),
+        errorBuilder: (_, _, _) => _FallbackCatalogPlaceholderArt(
+          style: style,
+        ),
       );
     }
-    return _FallbackCatalogPlaceholderArt(style: style, compact: compact);
+    return _FallbackCatalogPlaceholderArt(style: style);
   }
 }
 
 class _FallbackCatalogPlaceholderArt extends StatelessWidget {
-  const _FallbackCatalogPlaceholderArt({
-    required this.style,
-    required this.compact,
-  });
+  const _FallbackCatalogPlaceholderArt({required this.style});
 
   final _PlaceholderStyle style;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2189,8 +1580,8 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         Align(
           alignment: Alignment.topRight,
           child: Container(
-            width: compact ? 28 : 34,
-            height: compact ? 28 : 34,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: style.accent.withValues(alpha: 0.18),
               shape: BoxShape.circle,
@@ -2200,8 +1591,8 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         Align(
           alignment: Alignment.bottomLeft,
           child: Container(
-            width: compact ? 20 : 26,
-            height: compact ? 20 : 26,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               color: PackLoxTokens.textPrimary.withValues(alpha: 0.04),
               shape: BoxShape.circle,
@@ -2210,42 +1601,40 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         ),
         Center(
           child: SizedBox(
-            width: compact ? 34 : 38,
-            height: compact ? 34 : 38,
+            width: 38,
+            height: 38,
             child: CustomPaint(
               painter: _PlaceholderMarkPainter(
                 mark: style.mark,
                 accent: style.accent,
-                compact: compact,
               ),
             ),
           ),
         ),
-        if (!compact)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: PackLoxTokens.surface.withValues(alpha: 0.62),
-                border: Border(
-                  top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
-                ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surface.withValues(alpha: 0.62),
+              border: Border(
+                top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
               ),
-              child: Text(
-                style.label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: PackLoxTokens.textSecondary,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
+            ),
+            child: Text(
+              style.label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w900,
+                height: 1,
               ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -2279,22 +1668,17 @@ class _SearchPill extends StatelessWidget {
 enum _PlaceholderMark { card, game, toy, coin, comic, watch, shoe, collectible }
 
 class _PlaceholderMarkPainter extends CustomPainter {
-  const _PlaceholderMarkPainter({
-    required this.mark,
-    required this.accent,
-    required this.compact,
-  });
+  const _PlaceholderMarkPainter({required this.mark, required this.accent});
 
   final _PlaceholderMark mark;
   final Color accent;
-  final bool compact;
 
   @override
   void paint(Canvas canvas, Size size) {
     final stroke = Paint()
       ..color = accent
       ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 1.8 : 2.1
+      ..strokeWidth = 2.1
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final fill = Paint()
@@ -2303,7 +1687,7 @@ class _PlaceholderMarkPainter extends CustomPainter {
     final glow = Paint()
       ..color = accent.withValues(alpha: 0.18)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 5 : 6
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
@@ -2618,34 +2002,8 @@ class _PlaceholderMarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PlaceholderMarkPainter oldDelegate) {
-    return oldDelegate.mark != mark ||
-        oldDelegate.accent != accent ||
-        oldDelegate.compact != compact;
+    return oldDelegate.mark != mark || oldDelegate.accent != accent;
   }
-}
-
-String? _searchImagePath(CollectibleItem item) {
-  final cloudImageUrl = item.cloudImageUrl?.trim();
-  if (cloudImageUrl != null && cloudImageUrl.isNotEmpty) {
-    return cloudImageUrl;
-  }
-  for (final image in item.galleryImages) {
-    final cloudUrl = image.cloudImageUrl?.trim();
-    if (cloudUrl != null && cloudUrl.isNotEmpty) {
-      return cloudUrl;
-    }
-  }
-  final primaryPath = item.imagePath.trim();
-  if (primaryPath.isNotEmpty && !primaryPath.startsWith('sample://')) {
-    return primaryPath;
-  }
-  for (final image in item.galleryImages) {
-    final path = image.path.trim();
-    if (path.isNotEmpty && !path.startsWith('sample://')) {
-      return path;
-    }
-  }
-  return null;
 }
 
 CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
@@ -2859,53 +2217,6 @@ class _PlaceholderStyle {
   final Color accent;
   final Color background;
   final String? assetPath;
-}
-
-IconData _quickFilterIcon(String label) {
-  final normalized = label.toLowerCase();
-  if (normalized.contains('card')) {
-    return Icons.style_outlined;
-  }
-  if (normalized.contains('coin')) {
-    return Icons.album_outlined;
-  }
-  if (normalized.contains('game')) {
-    return Icons.sports_esports_outlined;
-  }
-  if (normalized.contains('figure') || normalized.contains('toy')) {
-    return Icons.smart_toy_outlined;
-  }
-  return Icons.grid_view_outlined;
-}
-
-Color _quickFilterColor(int index) {
-  return switch (index % 4) {
-    0 => PackLoxTokens.cyan,
-    1 => PackLoxTokens.amber,
-    2 => const Color(0xFF9B7CFF),
-    _ => PackLoxTokens.success,
-  };
-}
-
-String _formatSearchValue(CollectibleItem item) {
-  if (item.estimatedValue <= 0) {
-    return 'Pending';
-  }
-  final currency = item.pricing?.currency.trim().toUpperCase() ?? 'AUD';
-  final amount = _formatCatalogAmount(item.estimatedValue);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-  if (currency == 'AUD' || currency.isEmpty) {
-    return '\$$withCommas AUD';
-  }
-  if (currency == 'USD') {
-    return 'USD \$$withCommas';
-  }
-  return '$currency $withCommas';
 }
 
 String _formatCatalogValue(CatalogSearchResult result) {
