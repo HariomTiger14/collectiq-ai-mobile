@@ -105,15 +105,34 @@ class ImageEnhancementService {
     );
     return switch (preset) {
       ImageEnhancementPreset.original => working,
-      ImageEnhancementPreset.autoEnhance => image_lib.convolution(
+      // Two earlier attempts just blended a raw 3x3 high-pass convolution
+      // kernel back toward the original pixel at decreasing strength
+      // (amount 1 -> 0.4 -> 0.2) and still showed visible noise on
+      // glossy/holographic card surfaces (confirmed live both times). That
+      // approach can't succeed at any blend strength: a plain convolution
+      // kernel amplifies every local pixel difference uniformly, with no
+      // way to tell "this is a real edge" from "this is fine holographic
+      // texture/sensor noise" — turning the blend down scales both down
+      // together, so noise can never be suppressed without also killing
+      // the real enhancement. This is a real Unsharp Mask instead (the
+      // technique Photoshop/Lightroom/most scanning apps actually use):
+      // blur to get a "detail layer" (original minus blurred = edges +
+      // noise mixed together), then only amplify differences that exceed
+      // a threshold. Real edges (card borders, text) have large luminance
+      // jumps and clear the threshold; fine texture/noise has small
+      // differences and is left untouched entirely — a lever plain
+      // convolution sharpening structurally cannot offer.
+      ImageEnhancementPreset.autoEnhance => _thresholdedSharpen(
         image_lib.adjustColor(
           working,
           brightness: 1.08,
-          contrast: 1.14,
+          contrast: 1.06,
           saturation: 1.02,
           gamma: 1.04,
         ),
-        filter: _softClarityKernel,
+        blurRadius: 2,
+        amount: 1.2,
+        threshold: 14,
       ),
       ImageEnhancementPreset.brighten => image_lib.adjustColor(
         working,
@@ -142,8 +161,50 @@ class ImageEnhancementService {
       ),
     };
   }
+
+  /// Real unsharp mask: blurs [source] to isolate a "detail layer" (the
+  /// difference between the original and the blurred version — a mix of
+  /// real edges and fine texture/noise), then only amplifies differences
+  /// that exceed [threshold]. Small differences (holographic texture,
+  /// sensor noise) are left completely untouched; large ones (text
+  /// strokes, card borders) are boosted by [amount]. This is what gives
+  /// independent control over sharpening strength vs. noise sensitivity —
+  /// a plain high-pass convolution kernel can't offer that; every local
+  /// difference gets amplified by the same proportion regardless of
+  /// whether it's a real edge or noise.
+  image_lib.Image _thresholdedSharpen(
+    image_lib.Image source, {
+    required int blurRadius,
+    required num amount,
+    required num threshold,
+  }) {
+    final blurred = image_lib.gaussianBlur(
+      image_lib.Image.from(source),
+      radius: blurRadius,
+    );
+    final result = image_lib.Image.from(source);
+    for (final frame in result.frames) {
+      final blurredFrame = blurred.frames[frame.frameIndex];
+      for (final p in frame) {
+        final b = blurredFrame.getPixel(p.x, p.y);
+        final dr = p.r - b.r;
+        final dg = p.g - b.g;
+        final db = p.b - b.b;
+        p
+          ..r = dr.abs() > threshold
+              ? (p.r + dr * amount).clamp(0, p.maxChannelValue)
+              : p.r
+          ..g = dg.abs() > threshold
+              ? (p.g + dg * amount).clamp(0, p.maxChannelValue)
+              : p.g
+          ..b = db.abs() > threshold
+              ? (p.b + db * amount).clamp(0, p.maxChannelValue)
+              : p.b;
+      }
+    }
+    return result;
+  }
 }
 
 const _sharpenKernel = <num>[0, -1, 0, -1, 5, -1, 0, -1, 0];
 const _clarityKernel = <num>[-1, -1, -1, -1, 9, -1, -1, -1, -1];
-const _softClarityKernel = <num>[0, -0.5, 0, -0.5, 3, -0.5, 0, -0.5, 0];
