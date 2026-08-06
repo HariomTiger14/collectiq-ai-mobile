@@ -267,44 +267,68 @@ class _ImageEnhancementPreviewSurfaceState
   Widget build(BuildContext context) {
     final previewFile = File(_activePath);
     final canShowImage = previewFile.existsSync();
-    return Stack(
+    // User-reported: the preset tiles/readiness pill/action buttons used to
+    // float as a Positioned overlay, assuming the BoxFit.contain image would
+    // always leave letterboxed empty space beneath it. For a photo whose
+    // aspect ratio is close to the screen's (e.g. a tall PSA-slab capture),
+    // the image fills nearly the full height and the "floating" controls
+    // end up rendered directly on top of card content instead of below it.
+    // Column + Expanded reserves the control panel's actual height, so the
+    // image area is constrained to never extend behind it.
+    return Column(
       key: const ValueKey('enhancement-preview-surface'),
-      fit: StackFit.expand,
       children: [
-        ColoredBox(
-          key: const ValueKey('review-photo-authority-surface'),
-          color: ScannerVisualTheme.backgroundDeep,
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeOutCubic,
-              child: canShowImage
-                  ? Image.file(
-                      previewFile,
-                      key: ValueKey('enhancement-preview-$_activePath'),
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                    )
-                  : const Icon(
-                      Icons.image_not_supported_outlined,
-                      key: ValueKey('enhancement-preview-missing'),
-                      color: Colors.white54,
-                      size: 56,
-                    ),
-            ),
-          ),
-        ),
+        // Same fix as the bottom control panel, applied to the top bar:
+        // it also used to float as a Positioned overlay inside the image
+        // Stack, on the same assumption of guaranteed letterboxing. Once
+        // the bottom panel stopped eating into the image's available
+        // space, the image rendered even larger and the top bar started
+        // overlapping it too (title text over the PSA label, "AI" badge
+        // clipped at the edge) — confirmed live. Same reserved-space fix.
         _TopBar(
           title: widget.title,
           subtitle: widget.subtitle,
           selectedPreset: _selectedPreset,
           onCancel: widget.onCancel,
         ),
-        Positioned(
-          left: AppSpacing.md,
-          right: AppSpacing.md,
-          bottom: AppSpacing.md,
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                key: const ValueKey('review-photo-authority-surface'),
+                color: ScannerVisualTheme.backgroundDeep,
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeOutCubic,
+                    child: canShowImage
+                        ? Image.file(
+                            previewFile,
+                            key: ValueKey('enhancement-preview-$_activePath'),
+                            fit: BoxFit.contain,
+                            gaplessPlayback: true,
+                          )
+                        : const Icon(
+                            Icons.image_not_supported_outlined,
+                            key: ValueKey('enhancement-preview-missing'),
+                            color: Colors.white54,
+                            size: 56,
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -385,10 +409,11 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: AppSpacing.sm,
-      left: AppSpacing.sm,
-      right: AppSpacing.sm,
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
       child: Row(
         children: [
           IconButton.filledTonal(
