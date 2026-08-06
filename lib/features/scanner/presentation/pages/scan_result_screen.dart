@@ -67,7 +67,17 @@ class ScanResultScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final imagePath = activeSlot?.path ?? result.thumbnail;
     final isEnhanced = activeSlot?.isEnhanced == true;
-    final bottomPadding = isSaved ? AppSpacing.xxl * 2 : AppSpacing.xl;
+    // Scaffold already reserves space above bottomNavigationBar for body
+    // content automatically (extendBody defaults to false) — this is just
+    // breathing room below the last card, not a second reservation on top
+    // of that. It previously varied by isSaved (up to 64px) to compensate
+    // for the action bar's height, which was redundant: Scaffold measures
+    // the actual bottomNavigationBar height itself, in both states.
+    const bottomPadding = AppSpacing.lg;
+    final scrollController = ScrollController(
+      initialScrollOffset: qaInitialScrollOffset,
+      keepScrollOffset: false,
+    );
     return ScannerFocusTheme(
       child: Scaffold(
         key: ValueKey('scan-result-${result.id}'),
@@ -84,135 +94,136 @@ class ScanResultScreen extends StatelessWidget {
           ],
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            controller: ScrollController(
-              initialScrollOffset: qaInitialScrollOffset,
-              keepScrollOffset: false,
-            ),
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              bottomPadding,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _ResultHeroImage(path: imagePath, isEnhanced: isEnhanced),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: Duration.zero,
-                  child: Text(
-                    result.title,
-                    key: const ValueKey('result-item-name'),
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                      color: ScannerVisualTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 30),
-                  child: Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      _ResultChip(
-                        key: const ValueKey('result-category-chip'),
-                        icon: Icons.category_outlined,
-                        label: result.category,
-                      ),
-                      _ResultChip(
-                        key: const ValueKey('result-rarity-indicator'),
-                        icon: Icons.diamond_outlined,
-                        label: _rarityLabel(result),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 60),
-                  child: _ConfidenceMeter(confidence: result.confidence),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 90),
-                  child: _ValueCard(
-                    value: _primaryValueLabel(result),
-                    source: _valueSourceLabel(result),
-                    secondaryValue: _sourceMarketValueLabel(result.pricing),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 120),
-                  child: _ResultInsightGrid(result: result),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 135),
-                  child: _PricingReliabilityPanel(result: result),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 150),
-                  child: _ResultSection(
-                    title: 'Market check',
-                    icon: Icons.query_stats_outlined,
-                    child: _MarketEvidence(result: result),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 180),
-                  child: _ResultSection(
-                    title: 'Identification',
-                    icon: Icons.fingerprint_outlined,
-                    child: _IdentificationDetails(result: result),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 210),
-                  child: _ResultSection(
-                    title: 'Condition notes',
-                    icon: Icons.fact_check_outlined,
-                    child: _ConditionNotes(result: result),
-                  ),
-                ),
-                if (result.alternativeMatches.isNotEmpty) ...[
+          child: Scrollbar(
+            controller: scrollController,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: scrollController,
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                bottomPadding,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _ResultHeroImage(path: imagePath, isEnhanced: isEnhanced),
                   const SizedBox(height: AppSpacing.md),
                   _FadeInMetadata(
-                    delay: const Duration(milliseconds: 240),
+                    delay: Duration.zero,
+                    child: Text(
+                      result.title,
+                      key: const ValueKey('result-item-name'),
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                        color: ScannerVisualTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 30),
+                    child: Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        _ResultChip(
+                          key: const ValueKey('result-category-chip'),
+                          icon: Icons.category_outlined,
+                          label: result.category,
+                        ),
+                        _ResultChip(
+                          key: const ValueKey('result-rarity-indicator'),
+                          icon: Icons.diamond_outlined,
+                          label: _rarityLabel(result),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 60),
+                    child: _ConfidenceMeter(confidence: result.confidence),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 90),
+                    child: _ValueCard(
+                      value: _primaryValueLabel(result),
+                      source: _valueSourceLabel(result),
+                      secondaryValue: _sourceMarketValueLabel(result.pricing),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 120),
+                    child: _ResultInsightGrid(result: result),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 135),
+                    child: _PricingReliabilityPanel(result: result),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 150),
                     child: _ResultSection(
-                      title: 'Possible alternatives',
-                      icon: Icons.compare_arrows_outlined,
-                      child: _AlternativeMatches(
-                        matches: result.alternativeMatches,
+                      title: 'Market check',
+                      icon: Icons.query_stats_outlined,
+                      child: _MarketEvidence(result: result),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 180),
+                    child: _ResultSection(
+                      title: 'Identification',
+                      icon: Icons.fingerprint_outlined,
+                      child: _IdentificationDetails(result: result),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 210),
+                    child: _ResultSection(
+                      title: 'Condition notes',
+                      icon: Icons.fact_check_outlined,
+                      child: _ConditionNotes(result: result),
+                    ),
+                  ),
+                  if (result.alternativeMatches.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _FadeInMetadata(
+                      delay: const Duration(milliseconds: 240),
+                      child: _ResultSection(
+                        title: 'Possible alternatives',
+                        icon: Icons.compare_arrows_outlined,
+                        child: _AlternativeMatches(
+                          matches: result.alternativeMatches,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  _FadeInMetadata(
+                    delay: const Duration(milliseconds: 270),
+                    child: _ResultSection(
+                      title: 'Next best action',
+                      icon: Icons.lightbulb_outline,
+                      child: Text(
+                        _recommendationFor(result),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: ScannerVisualTheme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.md),
-                _FadeInMetadata(
-                  delay: const Duration(milliseconds: 270),
-                  child: _ResultSection(
-                    title: 'Next best action',
-                    icon: Icons.lightbulb_outline,
-                    child: Text(
-                      _recommendationFor(result),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: ScannerVisualTheme.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
