@@ -302,6 +302,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                         categoryLabel: scannerState.captureCategory.title,
                         hasManualCategory:
                             scannerState.hasManualCaptureCategory,
+                        onSelectCategory:
+                            scannerController.selectCaptureCategory,
                         onPrimaryCapture: () => setState(() {
                           _showCaptureLoopScan = true;
                           _captureLoopRoleId = workspaceRole.id;

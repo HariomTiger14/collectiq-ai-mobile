@@ -63,6 +63,31 @@ enum ScanCaptureRole {
     };
   }
 
+  /// Compact single-word/short-phrase label for cramped inline UI (status
+  /// rows, chips, badges) where the full [title] (e.g. "Close-up / detail")
+  /// would overflow or truncate.
+  String get shortLabel {
+    return switch (this) {
+      ScanCaptureRole.front => 'Front',
+      ScanCaptureRole.back => 'Back',
+      ScanCaptureRole.leftSide => 'Left',
+      ScanCaptureRole.rightSide => 'Right',
+      ScanCaptureRole.closeUp => 'Close-up',
+      ScanCaptureRole.edge => 'Edge',
+      ScanCaptureRole.side => 'Side',
+      ScanCaptureRole.top => 'Top',
+      ScanCaptureRole.bottom => 'Bottom',
+      ScanCaptureRole.baseUnderside => 'Base',
+      ScanCaptureRole.barcode => 'Barcode',
+      ScanCaptureRole.cornerCondition => 'Corner',
+      ScanCaptureRole.surfaceGlare => 'Glare',
+      ScanCaptureRole.dateMint => 'Date',
+      ScanCaptureRole.serialOrMark => 'Serial',
+      ScanCaptureRole.damageDetail => 'Damage',
+      ScanCaptureRole.angledReflective => 'Angle',
+    };
+  }
+
   String get slotType {
     return switch (this) {
       ScanCaptureRole.front => 'front',

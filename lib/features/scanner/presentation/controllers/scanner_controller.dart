@@ -38,6 +38,7 @@ import 'package:collectiq_ai/features/scanner/services/gallery_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_enhancement_service.dart';
 import 'package:collectiq_ai/features/scanner/services/image_quality_assessment_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_draft_repository.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
@@ -113,7 +114,7 @@ class ScannerState {
     this.selectedItemStatus,
     this.photoSlots = const {},
     this.captureImages = const [],
-    this.captureCategory = CollectibleCategory.toyCar,
+    this.captureCategory = CollectibleCategory.generic,
     this.hasManualCaptureCategory = false,
     this.activeCaptureRole,
     this.primaryImagePath,
@@ -381,7 +382,7 @@ class ScannerController extends Notifier<ScannerState> {
           isPreparingImage: false,
           selectedImage: XFile(activeSlot.path),
           selectedImagePath: activeSlot.path,
-          selectedItemTitle: activeSlot.label,
+          selectedItemTitle: _shortSlotLabel(activeSlot.role),
           selectedItemStatus: 'Ready for AI analysis',
           photoSlots: _latestSlotsFromImages(draftImages),
           captureImages: draftImages,
@@ -500,9 +501,7 @@ class ScannerController extends Notifier<ScannerState> {
         activeCaptureRole: normalizedRole,
         selectedImage: slot?.image,
         selectedImagePath: slot?.path,
-        selectedItemTitle: slot == null
-            ? _slotLabel(normalizedRole)
-            : slot.label,
+        selectedItemTitle: _shortSlotLabel(normalizedRole),
         selectedItemStatus: slot == null
             ? 'Ready to capture'
             : 'Ready for AI analysis',
@@ -522,7 +521,7 @@ class ScannerController extends Notifier<ScannerState> {
       state.copyWith(
         selectedImage: slot.image,
         selectedImagePath: slot.path,
-        selectedItemTitle: '${slot.label} photo',
+        selectedItemTitle: '${_shortSlotLabel(slot.role)} photo',
         selectedItemStatus: 'Ready for AI analysis',
       ),
       event: 'active capture selected',
@@ -535,7 +534,7 @@ class ScannerController extends Notifier<ScannerState> {
         activeCaptureRole: slot.role,
         selectedImage: slot.image,
         selectedImagePath: slot.path,
-        selectedItemTitle: slot.label,
+        selectedItemTitle: _shortSlotLabel(slot.role),
         selectedItemStatus: 'Ready for AI analysis',
       ),
       event: 'active captured photo selected',
@@ -549,7 +548,7 @@ class ScannerController extends Notifier<ScannerState> {
         activeCaptureRole: slot.role,
         selectedImage: slot.image,
         selectedImagePath: slot.path,
-        selectedItemTitle: slot.label,
+        selectedItemTitle: _shortSlotLabel(slot.role),
         selectedItemStatus: 'Primary portfolio image',
       ),
       event: 'capture primary photo selected',
@@ -605,7 +604,7 @@ class ScannerController extends Notifier<ScannerState> {
       state.copyWith(
         selectedImage: enhancedSlot.image,
         selectedImagePath: enhancedSlot.path,
-        selectedItemTitle: enhancedSlot.label,
+        selectedItemTitle: _shortSlotLabel(enhancedSlot.role),
         selectedItemStatus: enhancedSlot.isEnhanced
             ? '${enhancedSlot.enhancementPreset.label} applied'
             : 'Ready for AI analysis',
@@ -678,6 +677,12 @@ class ScannerController extends Notifier<ScannerState> {
     String imageRole = 'front',
   }) async {
     _logFlow('camera button tapped');
+    if (await _blockedByPhotoLimit(context)) {
+      return;
+    }
+    if (!context.mounted) {
+      return;
+    }
     _setState(
       state.copyWith(
         scanSession: _sessionWithEventForRole(
@@ -883,6 +888,9 @@ class ScannerController extends Notifier<ScannerState> {
     String imageRole = 'front',
   }) async {
     _logFlow('gallery button tapped');
+    if (await _blockedByPhotoLimit(context)) {
+      return;
+    }
     _setState(
       state.copyWith(
         scanSession: _sessionWithEventForRole(
@@ -1062,6 +1070,30 @@ class ScannerController extends Notifier<ScannerState> {
         event: 'gallery loading shell cleared',
       );
     }
+  }
+
+  /// Blocks another photo capture once the active plan's per-item photo cap
+  /// is reached, surfacing the upgrade sheet (or a fallback error when no
+  /// [context] is available, e.g. the in-app-camera gallery fallback path).
+  Future<bool> _blockedByPhotoLimit(BuildContext? context) async {
+    final planLimits = ref.read(activePlanLimitsProvider);
+    final currentPhotoCount = state.captureImages.length;
+    if (planLimits.canAddPhoto(currentPhotoCount)) {
+      return false;
+    }
+    if (context != null && context.mounted) {
+      await showUpgradeSheet(context, reason: PaywallReason.morePhotos);
+    } else {
+      _setState(
+        state.copyWith(
+          errorMessage:
+              'Your ${planLimits.plan.displayName} plan supports '
+              '${planLimits.photosPerItemLabel}. Upgrade to add more.',
+        ),
+        event: 'photo limit reached',
+      );
+    }
+    return true;
   }
 
   Future<void> _acceptPreparedImage({
@@ -1746,9 +1778,13 @@ class ScannerController extends Notifier<ScannerState> {
           'source': _imageSourceFor(item.imagePath),
         },
       );
-      await ref
-          .read(imageSyncControllerProvider.notifier)
-          .enqueueImage(collectibleId: item.id, localPath: item.imagePath);
+      final imageSync = ref.read(imageSyncControllerProvider.notifier);
+      for (final galleryImage in item.galleryImages) {
+        await imageSync.enqueueImage(
+          collectibleId: item.id,
+          localPath: galleryImage.path,
+        );
+      }
       unawaited(_syncSavedItemIfEnabled(itemId: item.id));
       state = state.copyWith(
         isSavedToPortfolio: true,
@@ -2350,6 +2386,13 @@ class ScannerController extends Notifier<ScannerState> {
     return ScanCaptureRole.fromId(role).title;
   }
 
+  /// Compact role label for the "selected item" summary row, which has no
+  /// room for the full descriptive [ScanCaptureRole.title] (e.g. "Close-up
+  /// / detail" truncates there).
+  String _shortSlotLabel(String role) {
+    return ScanCaptureRole.fromId(role).shortLabel;
+  }
+
   String _analyzeDisabledReason(ScanCapturePlan plan) {
     final missingRequired = plan.requiredRoles
         .where((role) => !state.photoSlots.containsKey(role.id))
@@ -2368,7 +2411,7 @@ class ScannerController extends Notifier<ScannerState> {
     if (normalizedRole == 'front') {
       return source == 'camera' ? 'Captured image' : 'Gallery image';
     }
-    return '${_slotLabel(normalizedRole)} photo';
+    return '${_shortSlotLabel(normalizedRole)} photo';
   }
 
   Future<String?> _validateSelectedImagePath(String imagePath) async {
