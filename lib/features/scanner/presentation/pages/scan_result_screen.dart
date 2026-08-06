@@ -1167,20 +1167,72 @@ class _ResultHeroImage extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        child: AspectRatio(
-          aspectRatio: 1.18,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _ResultImage(path: path),
-              if (isEnhanced)
-                const Positioned(
-                  left: AppSpacing.md,
-                  top: AppSpacing.md,
-                  child: _AiEnhancedBadge(),
-                ),
-            ],
+        child: Semantics(
+          button: true,
+          label: 'Open image preview',
+          child: InkWell(
+            key: const ValueKey('result-hero-image-preview'),
+            onTap: () => _showResultImageViewer(context, path),
+            child: AspectRatio(
+              aspectRatio: 1.18,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _ResultImage(path: path),
+                  if (isEnhanced)
+                    const Positioned(
+                      left: AppSpacing.md,
+                      top: AppSpacing.md,
+                      child: _AiEnhancedBadge(),
+                    ),
+                ],
+              ),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showResultImageViewer(BuildContext context, String path) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.92),
+    builder: (_) => _ResultImageViewer(path: path),
+  );
+}
+
+class _ResultImageViewer extends StatelessWidget {
+  const _ResultImageViewer({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: _ResultImage(path: path),
+              ),
+            ),
+            Positioned(
+              top: AppSpacing.md,
+              right: AppSpacing.md,
+              child: IconButton.filledTonal(
+                key: const ValueKey('result-image-viewer-close'),
+                tooltip: 'Close image preview',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ],
         ),
       ),
     );
