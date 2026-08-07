@@ -24,6 +24,7 @@ import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum HomePreviewScenario {
   empty('Empty/new collector'),
@@ -1157,8 +1158,16 @@ class _ProviderFooter extends StatelessWidget {
         spacing: AppSpacing.sm,
         runSpacing: AppSpacing.sm,
         children: [
-          _ProviderPill(label: 'PriceCharting', tone: HomeTokens.accent),
-          _ProviderPill(label: 'KicksDB', tone: HomeTokens.categoryMore),
+          _ProviderPill(
+            label: 'PriceCharting',
+            tone: HomeTokens.accent,
+            url: 'https://www.pricecharting.com/',
+          ),
+          _ProviderPill(
+            label: 'KicksDB',
+            tone: HomeTokens.categoryMore,
+            url: 'https://kicks.dev/',
+          ),
           _ProviderPill(
             label: 'WatchCharts future',
             tone: HomeTokens.categoryCoins,
@@ -1177,14 +1186,33 @@ class _ProviderFooter extends StatelessWidget {
 }
 
 class _ProviderPill extends StatelessWidget {
-  const _ProviderPill({required this.label, required this.tone});
+  const _ProviderPill({required this.label, required this.tone, this.url});
 
   final String label;
   final Color tone;
+  final String? url;
+
+  Future<void> _openUrl(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        Uri.parse(url!),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text("Couldn't open $label — no browser found.")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final pill = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.xs,
@@ -1194,12 +1222,38 @@ class _ProviderPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(color: tone.withValues(alpha: .34)),
       ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: HomeTokens.textPrimary,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (url != null) ...[
+            const SizedBox(width: 4),
+            Icon(
+              Icons.open_in_new,
+              size: 12,
+              color: HomeTokens.textPrimary.withValues(alpha: .72),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (url == null) {
+      return pill;
+    }
+    return Semantics(
+      button: true,
+      label: 'Open $label website',
+      child: InkWell(
+        key: ValueKey('provider-pill-$label'),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        onTap: () => _openUrl(context),
+        child: pill,
       ),
     );
   }
