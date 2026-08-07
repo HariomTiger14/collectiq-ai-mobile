@@ -8,11 +8,9 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/smart_scan_guidance_service.dart';
-import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 enum CaptureRoleCardStatus { missing, captured, warning }
 
@@ -47,6 +45,8 @@ class CaptureWorkspace extends StatelessWidget {
     this.hasManualCategory = false,
     this.detectedCategory,
     this.onSelectCategory,
+    this.onRetakeSlot,
+    this.primaryImagePath,
   });
 
   final ScanGoal goal;
@@ -65,7 +65,7 @@ class CaptureWorkspace extends StatelessWidget {
   final void Function(String role) onSelectRole;
   final void Function(ScannerPhotoSlot slot) onPreview;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
-  final Future<void> Function(
+  final Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
@@ -79,6 +79,17 @@ class CaptureWorkspace extends StatelessWidget {
   final bool hasManualCategory;
   final String? detectedCategory;
   final void Function(CollectibleCategory category)? onSelectCategory;
+  /// Replaces this exact captured photo with a freshly captured one
+  /// (instead of adding another photo to the same role), returning the
+  /// replacement so the open review carousel can show it immediately.
+  /// Falls back to [onCamera] (append, no immediate refresh) when not
+  /// provided.
+  final Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot)?
+  onRetakeSlot;
+  /// Path of the photo currently marked as the saved item's cover image —
+  /// lets the review carousel show which photo "Use as Primary" already
+  /// applies to.
+  final String? primaryImagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -185,10 +196,16 @@ class CaptureWorkspace extends StatelessWidget {
                 initialSlot: activeSlot,
                 photos: captureImages,
                 onSelect: onPreview,
-                onRetake: (slot) => onCamera(slot.role),
+                onRetake:
+                    onRetakeSlot ??
+                    (slot) async {
+                      await onCamera(slot.role);
+                      return null;
+                    },
                 onDelete: (slot) => onDelete(slot.path),
                 onUseAsPrimary: onUseAsPrimary,
                 onEnhance: onEnhance,
+                initialPrimaryPath: primaryImagePath,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -211,10 +228,16 @@ class CaptureWorkspace extends StatelessWidget {
                   initialSlot: slot,
                   photos: captureImages,
                   onSelect: onPreview,
-                  onRetake: (slot) => onCamera(slot.role),
+                  onRetake:
+                    onRetakeSlot ??
+                    (slot) async {
+                      await onCamera(slot.role);
+                      return null;
+                    },
                   onDelete: (slot) => onDelete(slot.path),
                   onUseAsPrimary: onUseAsPrimary,
                   onEnhance: onEnhance,
+                  initialPrimaryPath: primaryImagePath,
                 );
               } else {
                 onSelectRole(role);
@@ -636,14 +659,15 @@ Future<void> _openPhotoReview(
   required ScannerPhotoSlot initialSlot,
   required List<ScannerPhotoSlot> photos,
   required void Function(ScannerPhotoSlot slot) onSelect,
-  required void Function(ScannerPhotoSlot slot) onRetake,
+  required Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot) onRetake,
   required void Function(ScannerPhotoSlot slot) onDelete,
   required void Function(ScannerPhotoSlot slot) onUseAsPrimary,
-  required Future<void> Function(
+  required Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
   onEnhance,
+  String? initialPrimaryPath,
 }) {
   if (photos.isEmpty) {
     return Future<void>.value();
@@ -663,6 +687,7 @@ Future<void> _openPhotoReview(
       onDelete: onDelete,
       onUseAsPrimary: onUseAsPrimary,
       onEnhance: onEnhance,
+      initialPrimaryPath: initialPrimaryPath,
     ),
   );
 }
@@ -676,19 +701,21 @@ class _PhotoReviewCarousel extends StatefulWidget {
     required this.onDelete,
     required this.onUseAsPrimary,
     required this.onEnhance,
+    this.initialPrimaryPath,
   });
 
   final int initialIndex;
   final List<ScannerPhotoSlot> photos;
   final void Function(ScannerPhotoSlot slot) onSelect;
-  final void Function(ScannerPhotoSlot slot) onRetake;
+  final Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot) onRetake;
   final void Function(ScannerPhotoSlot slot) onDelete;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
-  final Future<void> Function(
+  final Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
   onEnhance;
+  final String? initialPrimaryPath;
 
   @override
   State<_PhotoReviewCarousel> createState() => _PhotoReviewCarouselState();
@@ -698,6 +725,9 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
   late final PageController _pageController;
   late List<ScannerPhotoSlot> _photos;
   late int _index;
+  late String? _primaryPath;
+  bool _isEnhancing = false;
+  bool _isRetaking = false;
 
   @override
   void initState() {
@@ -705,6 +735,7 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
     _photos = widget.photos.toList(growable: true);
     _index = widget.initialIndex.clamp(0, _photos.length - 1).toInt();
     _pageController = PageController(initialPage: _index);
+    _primaryPath = widget.initialPrimaryPath;
   }
 
   @override
@@ -728,6 +759,64 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
     });
     widget.onSelect(_photos[_index]);
     _pageController.jumpToPage(_index);
+  }
+
+  Future<void> _toggleEnhance(ScannerPhotoSlot slot) async {
+    final nextPreset = slot.isEnhanced
+        ? ImageEnhancementPreset.original
+        : ImageEnhancementPreset.autoEnhance;
+    setState(() => _isEnhancing = true);
+    final enhancedSlot = await widget.onEnhance(slot, nextPreset);
+    if (!mounted) {
+      return;
+    }
+    await _precacheSlotImage(enhancedSlot);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _photos[_index] = enhancedSlot;
+      _isEnhancing = false;
+    });
+  }
+
+  /// Decodes [slot]'s image into the cache before it's swapped into view, so
+  /// the new (differently-pathed, uncached) file doesn't cause a visible
+  /// flash/flicker while it decodes on the following frame.
+  Future<void> _precacheSlotImage(ScannerPhotoSlot slot) async {
+    final path = slot.path;
+    if (path.startsWith('sample://') ||
+        path.startsWith('assets/') ||
+        path.startsWith('http://') ||
+        path.startsWith('https://')) {
+      return;
+    }
+    try {
+      await precacheImage(FileImage(File(path)), context);
+    } catch (_) {
+      // Best-effort; the image still renders (and shows its own error
+      // state) even if precaching fails.
+    }
+  }
+
+  Future<void> _retake(ScannerPhotoSlot slot) async {
+    setState(() => _isRetaking = true);
+    final replacement = await widget.onRetake(slot);
+    if (!mounted) {
+      return;
+    }
+    if (replacement == null) {
+      setState(() => _isRetaking = false);
+      return;
+    }
+    await _precacheSlotImage(replacement);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _photos[_index] = replacement;
+      _isRetaking = false;
+    });
   }
 
   @override
@@ -823,33 +912,54 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                 children: [
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-enhance'),
-                    onPressed: () async {
-                      final originalPath = active.originalPath ?? active.path;
-                      final result = await ImageEnhancementPreviewPage.show(
-                        context,
-                        image: XFile(originalPath),
-                        initialPreset: active.enhancementPreset,
-                        title: 'Edit enhancement',
-                        subtitle: 'Choose the clearest version for analysis.',
-                      );
-                      if (result != null) {
-                        await widget.onEnhance(active, result.preset);
-                      }
-                    },
-                    icon: const Icon(Icons.auto_fix_high_outlined),
-                    label: const Text('Enhance/Edit'),
+                    onPressed: _isEnhancing
+                        ? null
+                        : () => _toggleEnhance(active),
+                    icon: _isEnhancing
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            active.isEnhanced
+                                ? Icons.replay_outlined
+                                : Icons.auto_fix_high_outlined,
+                          ),
+                    label: Text(
+                      _isEnhancing
+                          ? 'Enhancing…'
+                          : active.isEnhanced
+                          ? 'Revert to original'
+                          : 'AI Enhance',
+                    ),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-retake'),
-                    onPressed: () => widget.onRetake(active),
-                    icon: const Icon(Icons.add_a_photo_outlined),
-                    label: const Text('Retake'),
+                    onPressed: _isRetaking ? null : () => _retake(active),
+                    icon: _isRetaking
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_a_photo_outlined),
+                    label: Text(_isRetaking ? 'Retaking…' : 'Retake'),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-primary'),
-                    onPressed: () => widget.onUseAsPrimary(active),
-                    icon: const Icon(Icons.star_outline),
-                    label: const Text('Use as Primary'),
+                    onPressed: active.path == _primaryPath
+                        ? null
+                        : () {
+                            widget.onUseAsPrimary(active);
+                            setState(() => _primaryPath = active.path);
+                          },
+                    icon: Icon(
+                      active.path == _primaryPath
+                          ? Icons.star
+                          : Icons.star_outline,
+                    ),
+                    label: Text(
+                      active.path == _primaryPath ? 'Primary' : 'Use as Primary',
+                    ),
                   ),
                   FilledButton.tonalIcon(
                     key: const ValueKey('photo-review-delete'),

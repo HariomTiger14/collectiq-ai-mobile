@@ -65,16 +65,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final bottomPadding = GlassBottomNavBar.scrollContentClearance(context);
     final query = _queryController.text.trim();
-    // Category is explicit per entry rather than inferred from the label
-    // text — "Charizard 4/102" is a product name, not a string containing
-    // "card"/"pokemon", so canonicalCategory() couldn't place it correctly.
+    // Only categories with real catalog coverage belong here — a chip that
+    // searches to zero results reads as a broken/missing item, not an empty
+    // category. Sneakers has no catalog data yet, and this specific card
+    // isn't in the catalog, so both were removed (confirmed live against
+    // SIT: both returned zero results while every chip below returns real
+    // matches).
     final catalogQuickFilters = const [
-      (label: 'Charizard 4/102', category: 'Cards'),
       (label: 'Pokemon Cards', category: 'Cards'),
       (label: 'Magic Cards', category: 'Cards'),
       (label: 'Comics', category: 'Comics'),
       (label: 'Coins', category: 'Coins'),
-      (label: 'Nike Air Force 1', category: 'Sneakers'),
       (label: 'Video Games', category: 'Video Games'),
     ];
     final hasQuery = query.isNotEmpty;

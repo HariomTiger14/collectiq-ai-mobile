@@ -555,13 +555,13 @@ class ScannerController extends Notifier<ScannerState> {
     );
   }
 
-  Future<void> applyEnhancementToPhoto(
+  Future<ScannerPhotoSlot> applyEnhancementToPhoto(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   ) async {
     final originalPath = (slot.originalPath ?? slot.path).trim();
     if (originalPath.isEmpty) {
-      return;
+      return slot;
     }
 
     final result = await _imageEnhancementService.enhance(
@@ -620,6 +620,7 @@ class ScannerController extends Notifier<ScannerState> {
       event: 'image enhancement applied',
     );
     unawaited(_persistPendingDraft());
+    return enhancedSlot;
   }
 
   /// Opens the selected camera.
@@ -672,16 +673,17 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   /// Opens the camera capture page and stores the captured image path.
-  Future<void> startCameraScan(
+  Future<ScannerPhotoSlot?> startCameraScan(
     BuildContext context, {
     String imageRole = 'front',
+    ScannerPhotoSlot? replacingSlot,
   }) async {
     _logFlow('camera button tapped');
-    if (await _blockedByPhotoLimit(context)) {
-      return;
+    if (replacingSlot == null && await _blockedByPhotoLimit(context)) {
+      return null;
     }
     if (!context.mounted) {
-      return;
+      return null;
     }
     _setState(
       state.copyWith(
@@ -699,7 +701,7 @@ class ScannerController extends Notifier<ScannerState> {
     if (_isPickerActive) {
       debugPrint('[Scanner] camera picker request ignored; picker active');
       _logFlow('camera picker ignored active');
-      return;
+      return null;
     }
 
     debugPrint(
@@ -719,7 +721,7 @@ class ScannerController extends Notifier<ScannerState> {
         imageRole: imageRole,
       );
       if (_isDisposed) {
-        return;
+        return null;
       }
       if (captureResult?.openGallery ?? false) {
         _isPickerActive = false;
@@ -727,8 +729,10 @@ class ScannerController extends Notifier<ScannerState> {
           state.copyWith(isPreparingImage: false, isLoading: false),
           event: 'camera gallery fallback requested',
         );
-        await pickImageFromGallery(imageRole: imageRole);
-        return;
+        return pickImageFromGallery(
+          imageRole: imageRole,
+          replacingSlot: replacingSlot,
+        );
       }
       final capturedImage = captureResult?.image;
       final originalCaptureImage =
@@ -750,7 +754,7 @@ class ScannerController extends Notifier<ScannerState> {
           state.copyWith(isPreparingImage: false, clearErrorMessage: true),
           event: 'camera capture cancelled',
         );
-        return;
+        return null;
       }
 
       debugPrint('[Scanner] camera image copy started');
@@ -781,7 +785,7 @@ class ScannerController extends Notifier<ScannerState> {
           'elapsedMs': copyStopwatch.elapsedMilliseconds,
         },
       );
-      await _acceptPreparedImage(
+      final acceptedSlot = await _acceptPreparedImage(
         imageRole: imageRole,
         source: 'camera',
         activeImage: image,
@@ -789,11 +793,13 @@ class ScannerController extends Notifier<ScannerState> {
         enhancementPreset:
             captureResult?.enhancementPreset ?? ImageEnhancementPreset.original,
         enhancementMetadata: captureResult?.enhancementMetadata ?? const {},
+        replacingSlot: replacingSlot,
       );
       _trackTelemetry(
         TelemetryEventNames.imageSelected,
         properties: const {'source': 'camera'},
       );
+      return acceptedSlot;
     } on ScannerException catch (error) {
       debugPrint('[Scanner] camera picker scanner error: ${error.code}');
       _logFlow('camera picker scanner error', error: error);
@@ -841,6 +847,7 @@ class ScannerController extends Notifier<ScannerState> {
         event: 'camera loading shell cleared',
       );
     }
+    return null;
   }
 
   /// Creates a sample selected scan for development and UI testing.
@@ -883,13 +890,14 @@ class ScannerController extends Notifier<ScannerState> {
   }
 
   /// Opens the gallery and stores a validated selected image.
-  Future<void> pickImageFromGallery({
+  Future<ScannerPhotoSlot?> pickImageFromGallery({
     BuildContext? context,
     String imageRole = 'front',
+    ScannerPhotoSlot? replacingSlot,
   }) async {
     _logFlow('gallery button tapped');
-    if (await _blockedByPhotoLimit(context)) {
-      return;
+    if (replacingSlot == null && await _blockedByPhotoLimit(context)) {
+      return null;
     }
     _setState(
       state.copyWith(
@@ -907,7 +915,7 @@ class ScannerController extends Notifier<ScannerState> {
     if (_isPickerActive) {
       debugPrint('[Scanner] gallery picker request ignored; picker active');
       _logFlow('gallery picker ignored active');
-      return;
+      return null;
     }
 
     debugPrint(
@@ -924,7 +932,7 @@ class ScannerController extends Notifier<ScannerState> {
     try {
       final image = await _galleryService.pickImage();
       if (_isDisposed) {
-        return;
+        return null;
       }
       debugPrint(
         '[Scanner] gallery picker returned on tab '
@@ -940,12 +948,12 @@ class ScannerController extends Notifier<ScannerState> {
           state.copyWith(isPreparingImage: false, clearErrorMessage: true),
           event: 'gallery selection cancelled',
         );
-        return;
+        return null;
       }
 
       await _galleryService.validateImage(image);
       if (context != null && !context.mounted) {
-        return;
+        return null;
       }
       final previewResult = context == null
           ? null
@@ -958,14 +966,14 @@ class ScannerController extends Notifier<ScannerState> {
               assessmentService: _qualityAssessmentService,
             );
       if (_isDisposed) {
-        return;
+        return null;
       }
       if (context != null && previewResult == null) {
         _setState(
           state.copyWith(isPreparingImage: false, clearErrorMessage: true),
           event: 'gallery enhancement cancelled',
         );
-        return;
+        return null;
       }
       final originalGalleryImage = previewResult?.originalImage ?? image;
       final activeGalleryImage = previewResult?.activeImage ?? image;
@@ -1009,13 +1017,14 @@ class ScannerController extends Notifier<ScannerState> {
       debugPrint(
         '[Scanner] Supabase sync triggered after gallery selection: false',
       );
-      await _acceptPreparedImage(
+      final acceptedSlot = await _acceptPreparedImage(
         imageRole: imageRole,
         source: 'gallery',
         activeImage: persistedImage,
         originalImage: persistedOriginalImage,
         enhancementPreset: selectedPreset,
         enhancementMetadata: previewResult?.metadata ?? const {},
+        replacingSlot: replacingSlot,
       );
       _trackTelemetry(
         TelemetryEventNames.imageSelected,
@@ -1024,6 +1033,7 @@ class ScannerController extends Notifier<ScannerState> {
       unawaited(
         _logPersistentGalleryDiagnostics(_displayPathFor(persistedImage)),
       );
+      return acceptedSlot;
     } on ScannerException catch (error) {
       debugPrint('[Scanner] gallery picker scanner error: ${error.code}');
       _logFlow('gallery picker scanner error', error: error);
@@ -1070,6 +1080,7 @@ class ScannerController extends Notifier<ScannerState> {
         event: 'gallery loading shell cleared',
       );
     }
+    return null;
   }
 
   /// Blocks another photo capture once the active plan's per-item photo cap
@@ -1096,13 +1107,14 @@ class ScannerController extends Notifier<ScannerState> {
     return true;
   }
 
-  Future<void> _acceptPreparedImage({
+  Future<ScannerPhotoSlot> _acceptPreparedImage({
     required String imageRole,
     required String source,
     required XFile activeImage,
     required XFile originalImage,
     required ImageEnhancementPreset enhancementPreset,
     required Map<String, Object?> enhancementMetadata,
+    ScannerPhotoSlot? replacingSlot,
   }) async {
     final selectedImagePath = _displayPathFor(activeImage);
     final originalImagePath = _displayPathFor(originalImage);
@@ -1141,7 +1153,9 @@ class ScannerController extends Notifier<ScannerState> {
           : null,
       qualityMetadata: qualityMetadata,
     );
-    final captureImages = _appendCaptureImage(capturedSlot);
+    final captureImages = replacingSlot != null
+        ? _replaceCaptureImage(replacingSlot, capturedSlot)
+        : _appendCaptureImage(capturedSlot);
     _setState(
       state.copyWith(
         selectedImage: activeImage,
@@ -1173,6 +1187,7 @@ class ScannerController extends Notifier<ScannerState> {
       event: 'selected image state emitted',
     );
     unawaited(_persistPendingDraft());
+    return capturedSlot;
   }
 
   Map<String, Object?> _persistedEnhancementMetadata(
@@ -2060,6 +2075,19 @@ class ScannerController extends Notifier<ScannerState> {
 
   List<ScannerPhotoSlot> _appendCaptureImage(ScannerPhotoSlot slot) {
     return [...state.captureImages, slot];
+  }
+
+  /// Swaps a specific existing photo out for a freshly captured one — used
+  /// by "Retake" on an already-captured photo, which should replace that
+  /// exact shot rather than add another photo alongside it.
+  List<ScannerPhotoSlot> _replaceCaptureImage(
+    ScannerPhotoSlot oldSlot,
+    ScannerPhotoSlot newSlot,
+  ) {
+    return [
+      for (final existing in state.captureImages)
+        existing.path == oldSlot.path ? newSlot : existing,
+    ];
   }
 
   CapturedScanImage _capturedImageFromSlot(ScannerPhotoSlot slot) {

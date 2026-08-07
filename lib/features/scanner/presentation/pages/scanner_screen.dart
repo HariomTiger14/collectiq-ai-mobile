@@ -318,10 +318,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
                               context: context,
                               imageRole: role,
                             ),
+                        onRetakeSlot: (slot) =>
+                            scannerController.startCameraScan(
+                              context,
+                              imageRole: slot.role,
+                              replacingSlot: slot,
+                            ),
                         onSelectRole: scannerController.selectCaptureRole,
                         onPreview: scannerController.selectCapturedPhoto,
                         onUseAsPrimary:
                             scannerController.useCapturedPhotoAsPrimary,
+                        primaryImagePath: scannerState.primaryImagePath,
                         onEnhance: scannerController.applyEnhancementToPhoto,
                         onDelete: scannerController.deleteCapturedImage,
                         onSample: _showSampleScan
