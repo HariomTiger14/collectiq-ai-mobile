@@ -98,6 +98,11 @@ abstract interface class CloudPortfolioSyncService {
     String itemId,
   );
 
+  /// All valuation snapshots across every item the user owns — used to draw
+  /// the portfolio-total value history chart (Home screen), as opposed to
+  /// [fetchValuationSnapshots] which is scoped to one item's own chart.
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots();
+
   Future<List<CollectibleItem>> fetchItems();
 
   Future<CollectibleItem> markSynced(CollectibleItem item);

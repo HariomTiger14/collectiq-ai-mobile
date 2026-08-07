@@ -99,6 +99,29 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
   }
 
   @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
+    final restSnapshots = await _fetchAllValuationSnapshotsWithRestSession();
+    if (restSnapshots != null) {
+      return restSnapshots;
+    }
+
+    final userId = await _signedInUserId();
+    if (userId == null) {
+      return const [];
+    }
+    final rows = await bootstrap.client!
+        .from(valuationSnapshotTableName)
+        .select()
+        .eq('user_id', userId)
+        .order('priced_at');
+
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(PortfolioValuationSnapshot.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async {
     final restItems = await _fetchItemsWithRestSession();
     if (restItems != null) {
@@ -270,6 +293,30 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
         'select': '*',
         'user_id': 'eq.${session.userId}',
         'portfolio_item_id': 'eq.$itemId',
+        'order': 'priced_at.asc',
+      },
+    );
+
+    final rows = response.data ?? const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(PortfolioValuationSnapshot.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<PortfolioValuationSnapshot>?>
+  _fetchAllValuationSnapshotsWithRestSession() async {
+    final gateway = supabaseDataGateway;
+    final session = await _signedInRestSession();
+    if (gateway == null || session == null) {
+      return null;
+    }
+    final response = await gateway.authenticatedGetWithSession<List<dynamic>>(
+      '/rest/v1/$valuationSnapshotTableName',
+      session: session,
+      queryParameters: {
+        'select': '*',
+        'user_id': 'eq.${session.userId}',
         'order': 'priced_at.asc',
       },
     );

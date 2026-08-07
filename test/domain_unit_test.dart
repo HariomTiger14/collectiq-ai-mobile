@@ -6109,6 +6109,80 @@ void main() {
       expect(snapshots.first.itemValues['card'], 1800);
     });
 
+    test(
+      'historyFromCloudSnapshots forward-fills each item to its last known '
+      'value and excludes items that did not exist yet',
+      () {
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Card A',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'card-b',
+            title: 'Card B',
+            category: 'Coin',
+            value: 50,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-02T00:00:00Z'),
+          ),
+        ];
+        // Card A: priced day 1 ($100) and day 3 ($150), no day-2 event.
+        // Card B: only priced on day 2 ($50) — didn't exist on day 1.
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-1',
+            portfolioItemId: 'card-a',
+            valueAud: 100,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'b-1',
+            portfolioItemId: 'card-b',
+            valueAud: 50,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-02T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-2',
+            portfolioItemId: 'card-a',
+            valueAud: 150,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        expect(daily, hasLength(3));
+        expect(daily[0].periodStart, DateTime(2026, 7, 1));
+        expect(daily[0].totalPortfolioValue, 100); // only card-a exists
+        expect(daily[0].itemValues.containsKey('card-b'), isFalse);
+
+        expect(daily[1].periodStart, DateTime(2026, 7, 2));
+        expect(daily[1].totalPortfolioValue, 150); // card-a forward-filled + b
+
+        expect(daily[2].periodStart, DateTime(2026, 7, 3));
+        expect(daily[2].totalPortfolioValue, 200); // card-a's new price + b
+      },
+    );
+
+    test('historyFromCloudSnapshots returns empty when there is no data', () {
+      expect(service.historyFromCloudSnapshots(const [], const []), isEmpty);
+    });
+
     test('persists and upserts history snapshots', () async {
       const repository = SharedPreferencesPortfolioHistoryRepository();
       final first = service.createSnapshot(

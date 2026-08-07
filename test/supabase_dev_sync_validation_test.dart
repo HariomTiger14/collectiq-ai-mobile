@@ -479,6 +479,11 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
   }
 
   @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
+    return const [];
+  }
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async => syncedItems;
 
   @override

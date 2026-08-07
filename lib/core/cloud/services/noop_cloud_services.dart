@@ -84,6 +84,11 @@ class NoOpCloudPortfolioSyncService implements CloudPortfolioSyncService {
   }
 
   @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
+    return const [];
+  }
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async {
     return const [];
   }

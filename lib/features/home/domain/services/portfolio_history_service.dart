@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -62,6 +63,165 @@ class PortfolioHistoryService {
       itemValues: {for (final item in items) item.id: item.estimatedValue},
       itemTitles: {for (final item in items) item.id: item.title},
       itemCategories: {for (final item in items) item.id: item.category},
+    );
+  }
+
+  /// Builds real day-by-day (plus derived weekly/monthly) history from the
+  /// backend-tracked value snapshots, instead of the device-local-only
+  /// mechanism this used to rely on. For each calendar day from the earliest
+  /// snapshot through today, every item's most-recently-known value *as of*
+  /// that day is carried forward and summed — so a day with no repricing
+  /// activity correctly repeats the prior day's total (a real flat line)
+  /// rather than being skipped or estimated.
+  List<PortfolioSnapshot> historyFromCloudSnapshots(
+    List<PortfolioValuationSnapshot> cloudSnapshots,
+    List<CollectibleItem> currentItems, {
+    DateTime? now,
+  }) {
+    if (cloudSnapshots.isEmpty || currentItems.isEmpty) {
+      return const [];
+    }
+
+    final today = bucketDate(now ?? DateTime.now(), TrendSnapshotPeriod.daily);
+    final byItem = <String, List<PortfolioValuationSnapshot>>{};
+    for (final snapshot in cloudSnapshots) {
+      if (snapshot.valueAud == null) {
+        continue;
+      }
+      (byItem[snapshot.portfolioItemId] ??= []).add(snapshot);
+    }
+    if (byItem.isEmpty) {
+      return const [];
+    }
+    for (final history in byItem.values) {
+      history.sort((a, b) => a.pricedAt.compareTo(b.pricedAt));
+    }
+
+    final earliest = byItem.values
+        .map((history) => bucketDate(history.first.pricedAt, TrendSnapshotPeriod.daily))
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final dayCount = today.difference(earliest).inDays;
+    if (dayCount < 0) {
+      return const [];
+    }
+    final itemById = {for (final item in currentItems) item.id: item};
+
+    final dailySnapshots = <PortfolioSnapshot>[];
+    for (var offset = 0; offset <= dayCount; offset++) {
+      final day = earliest.add(Duration(days: offset));
+      final snapshot = _snapshotAsOf(day, byItem, itemById);
+      if (snapshot != null) {
+        dailySnapshots.add(snapshot);
+      }
+    }
+    if (dailySnapshots.isEmpty) {
+      return const [];
+    }
+
+    final weeklyByBucket = <String, PortfolioSnapshot>{};
+    final monthlyByBucket = <String, PortfolioSnapshot>{};
+    for (final daily in dailySnapshots) {
+      final weekStart = bucketDate(daily.periodStart, TrendSnapshotPeriod.weekly);
+      weeklyByBucket[PortfolioSnapshot.idFor(TrendSnapshotPeriod.weekly, weekStart)] =
+          _asPeriod(daily, TrendSnapshotPeriod.weekly, weekStart);
+
+      final monthStart = bucketDate(
+        daily.periodStart,
+        TrendSnapshotPeriod.monthly,
+      );
+      monthlyByBucket[PortfolioSnapshot.idFor(
+            TrendSnapshotPeriod.monthly,
+            monthStart,
+          )] =
+          _asPeriod(daily, TrendSnapshotPeriod.monthly, monthStart);
+    }
+
+    return [
+      ...dailySnapshots,
+      ...weeklyByBucket.values,
+      ...monthlyByBucket.values,
+    ];
+  }
+
+  PortfolioSnapshot? _snapshotAsOf(
+    DateTime day,
+    Map<String, List<PortfolioValuationSnapshot>> byItem,
+    Map<String, CollectibleItem> itemById,
+  ) {
+    final itemValues = <String, double>{};
+    final itemTitles = <String, String>{};
+    final itemCategories = <String, String>{};
+    final categoryTotals = {
+      for (final category in CollectorCategory.values) category: 0.0,
+    };
+    var total = 0.0;
+
+    for (final entry in byItem.entries) {
+      PortfolioValuationSnapshot? asOf;
+      for (final candidate in entry.value) {
+        if (!bucketDate(
+          candidate.pricedAt,
+          TrendSnapshotPeriod.daily,
+        ).isAfter(day)) {
+          asOf = candidate;
+        } else {
+          break;
+        }
+      }
+      final value = asOf?.valueAud;
+      if (asOf == null || value == null) {
+        continue;
+      }
+      final item = itemById[entry.key];
+      final title = item?.title ?? entry.key;
+      final category = item?.category ?? 'Collectible';
+      itemValues[entry.key] = value;
+      itemTitles[entry.key] = title;
+      itemCategories[entry.key] = category;
+      total += value;
+      final bucket = CollectorDashboardAnalyticsService.categoryForCollectible(
+        category,
+      );
+      categoryTotals[bucket] = (categoryTotals[bucket] ?? 0) + value;
+    }
+
+    if (itemValues.isEmpty) {
+      return null;
+    }
+    return PortfolioSnapshot(
+      id: PortfolioSnapshot.idFor(TrendSnapshotPeriod.daily, day),
+      period: TrendSnapshotPeriod.daily,
+      periodStart: day,
+      capturedAt: day,
+      totalPortfolioValue: total,
+      totalItems: itemValues.length,
+      averageValue: total / itemValues.length,
+      categoryTotals: categoryTotals,
+      collectionScore: 0,
+      itemValues: itemValues,
+      itemTitles: itemTitles,
+      itemCategories: itemCategories,
+    );
+  }
+
+  PortfolioSnapshot _asPeriod(
+    PortfolioSnapshot source,
+    TrendSnapshotPeriod period,
+    DateTime periodStart,
+  ) {
+    return PortfolioSnapshot(
+      id: PortfolioSnapshot.idFor(period, periodStart),
+      period: period,
+      periodStart: periodStart,
+      capturedAt: source.capturedAt,
+      totalPortfolioValue: source.totalPortfolioValue,
+      totalItems: source.totalItems,
+      averageValue: source.averageValue,
+      categoryTotals: source.categoryTotals,
+      collectionScore: source.collectionScore,
+      itemValues: source.itemValues,
+      itemTitles: source.itemTitles,
+      itemCategories: source.itemCategories,
     );
   }
 
