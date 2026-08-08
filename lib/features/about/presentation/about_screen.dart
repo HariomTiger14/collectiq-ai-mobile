@@ -1,8 +1,10 @@
+import 'package:collectiq_ai/core/app_info/app_info_providers.dart';
 import 'package:collectiq_ai/core/ui/about/about_ui.dart';
 import 'package:collectiq_ai/core/ui/home/home_ui.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class AboutScreen extends ConsumerStatefulWidget {
   const AboutScreen({super.key});
@@ -23,7 +25,8 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final appInfo = _AppInfo.current();
+    final packageInfo = ref.watch(packageInfoProvider).value;
+    final appInfo = _AppInfo.from(packageInfo);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -123,10 +126,10 @@ class _AppInfo {
   final String backupMode;
   final String storageLocation;
 
-  factory _AppInfo.current() {
-    return const _AppInfo(
-      version: '1.0.0',
-      buildNumber: '1',
+  factory _AppInfo.from(PackageInfo? packageInfo) {
+    return _AppInfo(
+      version: packageInfo?.version ?? '1.0.0',
+      buildNumber: packageInfo?.buildNumber ?? '1',
       backupMode: 'Optional account backup',
       storageLocation: 'Local device storage',
     );
