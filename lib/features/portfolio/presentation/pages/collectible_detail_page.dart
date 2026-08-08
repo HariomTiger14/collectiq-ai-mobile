@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
@@ -29,6 +30,7 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -177,94 +179,103 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
             child: ColoredBox(
               key: const ValueKey('collectible-detail-packlox-surface'),
               color: HomeTokens.background,
-              child: HomeStateContainer(
-                key: const ValueKey('collectible-detail-scroll-view'),
-                storageKey: 'collectible-detail-scroll-position',
+              child: Scrollbar(
                 controller: _scrollController,
-                sections: [
-                  // Lead straight with the item: the action bar + hero + name +
-                  // value. The old repeated brand lockup and generic "Portfolio
-                  // Detail" title block duplicated what the item block already
-                  // shows, so they were removed.
-                  HomeSection(
-                    child: _DetailAuthorityHeader(
-                      item: currentItem,
-                      isFavorited: isFavorited,
-                      onBack: () => Navigator.of(context).maybePop(),
-                      onEdit: () => _showEditCollectibleDialog(
-                        context: context,
-                        ref: ref,
+                thumbVisibility: true,
+                child: HomeStateContainer(
+                  key: const ValueKey('collectible-detail-scroll-view'),
+                  storageKey: 'collectible-detail-scroll-position',
+                  controller: _scrollController,
+                  sections: [
+                    // Lead straight with the item: the action bar + hero + name +
+                    // value. The old repeated brand lockup and generic "Portfolio
+                    // Detail" title block duplicated what the item block already
+                    // shows, so they were removed.
+                    HomeSection(
+                      child: _DetailAuthorityHeader(
                         item: currentItem,
+                        isFavorited: isFavorited,
+                        onBack: () => Navigator.of(context).maybePop(),
+                        onEdit: () => _showEditCollectibleDialog(
+                          context: context,
+                          ref: ref,
+                          item: currentItem,
+                        ),
+                        onShare: () => _shareItem(context, currentItem),
+                        onFavorite: () => _toggleWishlistFavorite(
+                          currentItem,
+                          wishlistStatus,
+                        ),
                       ),
-                      onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () =>
-                          _toggleWishlistFavorite(currentItem, wishlistStatus),
                     ),
-                  ),
-                  HomeSection(
-                    child: _DetailAuthorityOverview(
-                      item: currentItem,
-                      selectedImage: selectedImage,
-                      isFavorited: isFavorited,
-                      onImageSelected: (image) {
-                        setState(() => _selectedGalleryPath = image.path);
-                      },
-                      onImageTap: selectedImage == null
-                          ? null
-                          : () => _showImageViewer(
-                              context,
-                              item: currentItem,
-                              initialImage: selectedImage,
-                              onUseAsPrimary: _setPrimaryImage,
-                              onDelete: _deleteGalleryImage,
-                              onEdit: _editGalleryImage,
-                            ),
-                    ),
-                  ),
-                  if (currentItem.confidence < 0.70)
-                    const HomeSection(child: _LowConfidenceBanner()),
-                  HomeSection(
-                    bottomPadding: AppSpacing.xl,
-                    child: _DetailInlineContent(
-                      item: currentItem,
-                      galleryImages: galleryImages,
-                      isFavorited: isFavorited,
-                      onImageSelected: (image) {
-                        setState(() => _selectedGalleryPath = image.path);
-                      },
-                      selectedImage: selectedImage,
-                      onImageTap: selectedImage == null
-                          ? null
-                          : () => _showImageViewer(
-                              context,
-                              item: currentItem,
-                              initialImage: selectedImage,
-                              onUseAsPrimary: _setPrimaryImage,
-                              onDelete: _deleteGalleryImage,
-                              onEdit: _editGalleryImage,
-                            ),
-                      onAddPhoto: () =>
-                          _addPortfolioPhotoFromGallery(currentItem),
-                      isRefreshingValue: _isRefreshingValue,
-                      onRefreshValue: () => _refreshPortfolioValue(currentItem),
-                      onEdit: () => _showEditCollectibleDialog(
-                        context: context,
-                        ref: ref,
+                    HomeSection(
+                      child: _DetailAuthorityOverview(
                         item: currentItem,
+                        selectedImage: selectedImage,
+                        isFavorited: isFavorited,
+                        onImageSelected: (image) {
+                          setState(() => _selectedGalleryPath = image.path);
+                        },
+                        onImageTap: selectedImage == null
+                            ? null
+                            : () => _showImageViewer(
+                                context,
+                                item: currentItem,
+                                initialImage: selectedImage,
+                                onUseAsPrimary: _setPrimaryImage,
+                                onDelete: _deleteGalleryImage,
+                                onEdit: _editGalleryImage,
+                              ),
                       ),
-                      onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () =>
-                          _toggleWishlistFavorite(currentItem, wishlistStatus),
-                      onDelete: widget.onDelete == null
-                          ? null
-                          : () => _confirmDetailDelete(
-                              context,
-                              currentItem,
-                              widget.onDelete!,
-                            ),
                     ),
-                  ),
-                ],
+                    if (currentItem.confidence < 0.70)
+                      const HomeSection(child: _LowConfidenceBanner()),
+                    HomeSection(
+                      bottomPadding: AppSpacing.xl,
+                      child: _DetailInlineContent(
+                        item: currentItem,
+                        galleryImages: galleryImages,
+                        isFavorited: isFavorited,
+                        onImageSelected: (image) {
+                          setState(() => _selectedGalleryPath = image.path);
+                        },
+                        selectedImage: selectedImage,
+                        onImageTap: selectedImage == null
+                            ? null
+                            : () => _showImageViewer(
+                                context,
+                                item: currentItem,
+                                initialImage: selectedImage,
+                                onUseAsPrimary: _setPrimaryImage,
+                                onDelete: _deleteGalleryImage,
+                                onEdit: _editGalleryImage,
+                              ),
+                        onAddPhoto: () =>
+                            _addPortfolioPhotoFromGallery(currentItem),
+                        isRefreshingValue: _isRefreshingValue,
+                        onRefreshValue: () =>
+                            _refreshPortfolioValue(currentItem),
+                        onEdit: () => _showEditCollectibleDialog(
+                          context: context,
+                          ref: ref,
+                          item: currentItem,
+                        ),
+                        onShare: () => _shareItem(context, currentItem),
+                        onFavorite: () => _toggleWishlistFavorite(
+                          currentItem,
+                          wishlistStatus,
+                        ),
+                        onDelete: widget.onDelete == null
+                            ? null
+                            : () => _confirmDetailDelete(
+                                context,
+                                currentItem,
+                                widget.onDelete!,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2190,7 +2201,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       data: (value) => value,
       orElse: () => const <PortfolioValuationSnapshot>[],
     );
-    final chartValues = _valueHistoryChartValues(item, snapshots);
+    final chartPoints = _valueHistoryPoints(item, snapshots);
     final currency = item.pricing?.currency ?? 'AUD';
     final scanValue = _valueAtScanFor(item);
     final currentValue = _currentValueFor(item);
@@ -2253,19 +2264,20 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                   value: _formatMoney(currentValue, currency),
                 ),
               ),
-              if (hasMovement) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _DetailValueHistoryMetric(
-                    label: 'Gain/Loss',
-                    value: movementLabel!,
-                    valueColor: movementColor,
-                    subtitle: movementPercent,
-                  ),
-                ),
-              ],
             ],
           ),
+          // Gain/Loss gets its own full-width row instead of squeezing into
+          // a third column -- its value (sign + amount + currency code) is
+          // longer than the other two metrics and was clipping there.
+          if (hasMovement) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _DetailValueHistoryMetric(
+              label: 'Gain/Loss',
+              value: movementLabel!,
+              valueColor: movementColor,
+              subtitle: movementPercent,
+            ),
+          ],
           if (historyHint.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Row(
@@ -2303,39 +2315,48 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                     'Free plan shows value at scan and current value. Tap to unlock trend charts and deeper valuation history with Pro.',
               ),
             )
-          else
-            Container(
-              height: 54,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: HomeTokens.background.withValues(alpha: 0.48),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(
-                  color: HomeTokens.border.withValues(alpha: 0.62),
-                ),
-              ),
-              child: CustomPaint(
-                painter: _ValueHistorySparklinePainter(
-                  color: movementColor,
-                  values: chartValues,
-                ),
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Text(
-                      footerLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: HomeTokens.textSecondary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
+          else ...[
+            Text(
+              footerLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: HomeTokens.textSecondary,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            if (chartPoints.length < 2)
+              Container(
+                height: 120,
+                width: double.infinity,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: HomeTokens.background.withValues(alpha: 0.48),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: HomeTokens.border.withValues(alpha: 0.62),
+                  ),
+                ),
+                child: Text(
+                  'Not enough saved history yet for a trend chart.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: _ValueHistoryChart(
+                  points: chartPoints,
+                  color: movementColor,
+                  currency: currency,
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -2448,55 +2469,222 @@ class _DetailValueHistoryMetric extends StatelessWidget {
   }
 }
 
-class _ValueHistorySparklinePainter extends CustomPainter {
-  const _ValueHistorySparklinePainter({
+/// A dated value-history point for the [_ValueHistoryChart].
+class _ValueHistoryPoint {
+  const _ValueHistoryPoint({required this.date, required this.value});
+
+  final DateTime date;
+  final double value;
+}
+
+/// Real axis-labeled trend chart for a single item's value history --
+/// dates along the bottom, price along the left, matching the kind of
+/// chart other portfolio/finance apps show rather than an unlabeled
+/// sparkline.
+class _ValueHistoryChart extends StatelessWidget {
+  const _ValueHistoryChart({
+    required this.points,
     required this.color,
-    required this.values,
+    required this.currency,
   });
 
+  final List<_ValueHistoryPoint> points;
   final Color color;
-  final List<double> values;
+  final String currency;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final cleanedValues = values.where((value) => value >= 0).toList();
-    if (cleanedValues.isEmpty) {
-      return;
-    }
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.9)
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final path = Path();
-    final left = AppSpacing.sm;
-    final right = size.width - AppSpacing.sm;
-    final top = size.height * 0.22;
-    final bottom = size.height * 0.76;
-    final minValue = cleanedValues.reduce((a, b) => a < b ? a : b);
-    final maxValue = cleanedValues.reduce((a, b) => a > b ? a : b);
-    final range = maxValue - minValue;
-    Offset pointFor(int index, double value) {
-      final x = cleanedValues.length == 1
-          ? size.width / 2
-          : left + ((right - left) * index / (cleanedValues.length - 1));
-      final normalized = range <= 0 ? 0.5 : (value - minValue) / range;
-      return Offset(x, bottom - ((bottom - top) * normalized));
-    }
+  Widget build(BuildContext context) {
+    final values = points.map((point) => point.value).toList();
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final rawRange = maxValue - minValue;
+    // A little vertical headroom so the line never touches the chart edges;
+    // when every point is flat, fall back to a fixed band around the value.
+    final padding = rawRange > 0 ? rawRange * 0.15 : (maxValue.abs() * 0.1) + 1;
+    final (minY, maxY, yInterval) = _niceAxisBounds(
+      (minValue - padding).clamp(0, double.infinity).toDouble(),
+      maxValue + padding,
+    );
+    final lastIndex = points.length - 1;
+    final labelIndices = _pickChartLabelIndices(points);
+    final textTheme = Theme.of(context).textTheme;
+    final axisLabelStyle = textTheme.labelSmall?.copyWith(
+      color: HomeTokens.textSecondary,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+    );
 
-    final firstPoint = pointFor(0, cleanedValues.first);
-    path.moveTo(firstPoint.dx, firstPoint.dy);
-    for (var index = 1; index < cleanedValues.length; index += 1) {
-      final point = pointFor(index, cleanedValues[index]);
-      path.lineTo(point.dx, point.dy);
-    }
-    canvas.drawPath(path, paint);
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: lastIndex.toDouble(),
+        minY: minY,
+        maxY: maxY,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: yInterval,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: HomeTokens.border.withValues(alpha: 0.4),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              interval: yInterval,
+              getTitlesWidget: (value, meta) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(_compactChartMoney(value), style: axisLabelStyle),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.round();
+                if (!labelIndices.contains(index)) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _shortChartDate(points[index].date),
+                    style: axisLabelStyle,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+              final point = points[spot.x.round().clamp(0, lastIndex)];
+              return LineTooltipItem(
+                '${_formatMoney(point.value, currency)}\n'
+                '${_formatPricingDate(point.date)}',
+                textTheme.labelSmall!.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var index = 0; index <= lastIndex; index += 1)
+                FlSpot(index.toDouble(), points[index].value),
+            ],
+            isCurved: true,
+            curveSmoothness: 0.22,
+            color: color,
+            barWidth: 2.5,
+            dotData: FlDotData(show: points.length <= 6),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  color.withValues(alpha: 0.28),
+                  color.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  @override
-  bool shouldRepaint(covariant _ValueHistorySparklinePainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.values != values;
+/// Picks which point indices get an x-axis date label. Evenly-spaced
+/// candidates can still land on the same calendar day (e.g. an at-scan
+/// point and a same-day backfilled snapshot) -- when two chosen candidates
+/// would render identical text, the earlier one is dropped in favor of the
+/// later one, so the axis never shows the same date twice in a row and the
+/// most-recent point (today) is always kept.
+/// Rounds a raw (min, max) range out to "nice" gridline values (multiples of
+/// 1/2/5 * 10^n) with an evenly-spaced interval, instead of showing whatever
+/// arbitrary numbers the raw data produces. Without this, fl_chart's own
+/// tick generation (which steps from zero, not from [rawMin]) can add an
+/// extra tick very close to rawMin, crowding two labels together near the
+/// bottom of the axis.
+(double, double, double) _niceAxisBounds(double rawMin, double rawMax) {
+  final range = (rawMax - rawMin) <= 0 ? rawMax.abs() + 1 : rawMax - rawMin;
+  final roughStep = range / 4;
+  final magnitude = math
+      .pow(10, (math.log(roughStep) / math.ln10).floor())
+      .toDouble();
+  final residual = roughStep / magnitude;
+  final niceResidual = residual <= 1
+      ? 1.0
+      : residual <= 2
+      ? 2.0
+      : residual <= 5
+      ? 5.0
+      : 10.0;
+  final step = niceResidual * magnitude;
+  final minY = (rawMin / step).floor() * step;
+  final maxY = (rawMax / step).ceil() * step;
+  return (math.max(0, minY), maxY == minY ? minY + step : maxY, step);
+}
+
+Set<int> _pickChartLabelIndices(List<_ValueHistoryPoint> points) {
+  final lastIndex = points.length - 1;
+  if (lastIndex <= 0) {
+    return {0};
   }
+  const targetLabelCount = 4;
+  final rawCandidates = <int>{
+    for (var i = 0; i < targetLabelCount; i += 1)
+      (lastIndex * i / (targetLabelCount - 1)).round(),
+  }.toList()..sort();
+
+  final chosen = <int>[];
+  for (final index in rawCandidates) {
+    final label = _shortChartDate(points[index].date);
+    if (chosen.isNotEmpty &&
+        _shortChartDate(points[chosen.last].date) == label) {
+      chosen[chosen.length - 1] = index;
+    } else {
+      chosen.add(index);
+    }
+  }
+  return chosen.toSet();
+}
+
+const _chartMonthAbbreviations = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _shortChartDate(DateTime date) {
+  return '${date.day} ${_chartMonthAbbreviations[date.month - 1]}';
+}
+
+String _compactChartMoney(double value) {
+  if (value >= 1000) {
+    final thousands = value / 1000;
+    final formatted = thousands.toStringAsFixed(thousands < 10 ? 1 : 0);
+    return '\$${formatted}k';
+  }
+  return '\$${value.toStringAsFixed(0)}';
 }
 
 class _DetailInsightsSection extends StatelessWidget {
@@ -3253,35 +3441,52 @@ double _currentValueFor(CollectibleItem item) {
   return item.estimatedValue;
 }
 
-List<double> _valueHistoryChartValues(
+/// Dated points for [_ValueHistoryChart]: the at-scan value, every saved
+/// snapshot (real or catalog-history-backfilled -- pre-ownership market
+/// context is legitimate to show here, unlike on the portfolio-wide
+/// aggregate), and the current value, sorted chronologically.
+List<_ValueHistoryPoint> _valueHistoryPoints(
   CollectibleItem item,
   List<PortfolioValuationSnapshot> snapshots,
 ) {
-  final values = <double>[];
+  final points = <_ValueHistoryPoint>[];
   final scanValue = _valueAtScanFor(item);
   if (scanValue > 0) {
-    values.add(scanValue);
+    points.add(_ValueHistoryPoint(date: item.createdAt, value: scanValue));
   }
-  final sortedSnapshots = [...snapshots]
-    ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
-  for (final snapshot in sortedSnapshots) {
+  for (final snapshot in snapshots) {
     final value = snapshot.valueAud;
     if (value != null && value > 0) {
-      values.add(value);
+      points.add(_ValueHistoryPoint(date: snapshot.pricedAt, value: value));
     }
   }
   final currentValue = _currentValueFor(item);
-  if (currentValue > 0 &&
-      (values.isEmpty || (values.last - currentValue).abs() > 0.01)) {
-    values.add(currentValue);
+  if (currentValue > 0) {
+    final currentDate = item.lastValueRefreshedAt ?? DateTime.now();
+    points.add(_ValueHistoryPoint(date: currentDate, value: currentValue));
   }
-  if (values.isEmpty) {
-    return const [0, 0];
+  points.sort((left, right) => left.date.compareTo(right.date));
+
+  // Collapse same-day, same-value runs into one point -- e.g. the "current"
+  // value is often just a re-read of the same day's latest real snapshot,
+  // which otherwise plots two visually identical dots stacked at the same
+  // spot. Keeps the later point in each run.
+  final deduped = <_ValueHistoryPoint>[];
+  for (final point in points) {
+    if (deduped.isNotEmpty) {
+      final last = deduped.last;
+      final sameDay =
+          last.date.year == point.date.year &&
+          last.date.month == point.date.month &&
+          last.date.day == point.date.day;
+      if (sameDay && (last.value - point.value).abs() < 0.01) {
+        deduped[deduped.length - 1] = point;
+        continue;
+      }
+    }
+    deduped.add(point);
   }
-  if (values.length == 1) {
-    return [values.first, values.first];
-  }
-  return values;
+  return deduped;
 }
 
 String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
