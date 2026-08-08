@@ -157,6 +157,17 @@ class PortfolioHistoryService {
     var total = 0.0;
 
     for (final entry in byItem.entries) {
+      final item = itemById[entry.key];
+      // Anchor each item's contribution to when it actually entered the
+      // portfolio, not to its earliest available valuation snapshot --
+      // catalog-matched items can have snapshots backfilled from real
+      // pre-ownership market history, which must never count toward "my
+      // portfolio's" total/gain before I actually owned the item.
+      if (item != null &&
+          day.isBefore(bucketDate(item.createdAt, TrendSnapshotPeriod.daily))) {
+        continue;
+      }
+
       PortfolioValuationSnapshot? asOf;
       for (final candidate in entry.value) {
         if (!bucketDate(
@@ -172,7 +183,6 @@ class PortfolioHistoryService {
       if (asOf == null || value == null) {
         continue;
       }
-      final item = itemById[entry.key];
       final title = item?.title ?? entry.key;
       final category = item?.category ?? 'Collectible';
       itemValues[entry.key] = value;

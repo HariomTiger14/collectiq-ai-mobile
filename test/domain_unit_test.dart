@@ -6316,6 +6316,60 @@ void main() {
       expect(service.historyFromCloudSnapshots(const [], const []), isEmpty);
     });
 
+    test(
+      'historyFromCloudSnapshots ignores a backfilled snapshot dated before '
+      'the item actually entered the portfolio',
+      () {
+        // Card A was added on day 3, but has a catalog-history-backfilled
+        // snapshot from day 1 (real market price, before the user owned
+        // it) plus its real at-scan snapshot on day 3. The portfolio total
+        // must not count card-a's value on day 1/2 -- the user never
+        // experienced that gain.
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Card A',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-03T00:00:00Z'),
+          ),
+        ];
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-backfilled',
+            portfolioItemId: 'card-a',
+            valueAud: 40,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-at-scan',
+            portfolioItemId: 'card-a',
+            valueAud: 150,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        // Only day 3 (the real add date) should carry any value at all --
+        // days 1-2 have a backfilled snapshot but no owned items, so no
+        // daily snapshot is produced for them.
+        expect(daily, hasLength(1));
+        expect(daily.single.periodStart, DateTime(2026, 7, 3));
+        expect(daily.single.totalPortfolioValue, 150);
+      },
+    );
+
     test('persists and upserts history snapshots', () async {
       const repository = SharedPreferencesPortfolioHistoryRepository();
       final first = service.createSnapshot(
