@@ -61,10 +61,12 @@ class GlassBottomNavBar extends StatelessWidget {
             child: Container(
               height: navHeight,
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
+                // Same violet as the PackLox app icon's own gradient
+                // (sampled from assets/brand/packlox_app_icon_master.png).
+                color: const Color(0xFF6211FA),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: const Color(0xFF334155).withValues(alpha: 0.86),
+                  color: const Color(0xFF3B0A96).withValues(alpha: 0.5),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -141,9 +143,14 @@ class NavBarItem extends StatelessWidget {
         mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
     final duration = reduceMotion ? Duration.zero : PackLoxMotionTheme.fast;
     final isScanAction = label == 'Scan';
+    // Active items always sit on their own solid blue pill (fillColor
+    // below), so white stays readable regardless of the bar's own
+    // background -- only the inactive color needs to track that
+    // background. This violet is dark/saturated, so inactive icons use a
+    // light lavender for contrast.
     final foreground = isActive
         ? PackLoxTokens.textPrimary
-        : const Color(0xFF94A3B8);
+        : const Color(0xFFDDD6FE);
     final borderColor = isScanAction
         ? const Color(0xFF63B3FF).withValues(alpha: isActive ? 0.42 : 0.0)
         : isActive

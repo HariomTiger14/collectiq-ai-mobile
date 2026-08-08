@@ -349,23 +349,22 @@ class _AlertListRow extends ConsumerWidget {
               runSpacing: AppSpacing.sm,
               children: [
                 if (triggered)
-                  OutlinedButton(
+                  FilledButton(
                     onPressed: () => _resetAlert(context, ref),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: color,
-                      side: BorderSide(color: color.withValues(alpha: 0.6)),
+                    style: FilledButton.styleFrom(
+                      // Same emerald as the Pro plan pill on Settings
+                      // (see _proGradientColors in settings_screen.dart),
+                      // for a consistent "positive" green across the app.
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: HomeTokens.textPrimary,
                     ),
                     child: const Text('Reset'),
                   ),
-                OutlinedButton(
+                FilledButton(
                   onPressed: () => _deleteAlert(context, ref),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                    side: BorderSide(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.error.withValues(alpha: 0.6),
-                    ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: HomeTokens.textPrimary,
                   ),
                   child: const Text('Delete'),
                 ),
