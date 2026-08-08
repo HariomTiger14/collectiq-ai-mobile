@@ -2343,7 +2343,10 @@ class _PortfolioItemRow extends StatelessWidget {
                     hasValue
                         ? '${item.category} · ${item.condition}'
                         : item.category,
-                    maxLines: 1,
+                    // A longer category name (e.g. "Trading Card Game") combined
+                    // with "Unknown" could clip mid-word at 1 line ("Unkno...");
+                    // the row's height is a floor, not a cap, so 2 lines is safe.
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: HomeTokens.textSecondary,
