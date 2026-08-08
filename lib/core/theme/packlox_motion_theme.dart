@@ -50,6 +50,17 @@ class PackLoxMotionTheme {
     );
   }
 
+  static Gradient ambientTealEmerald(double t) {
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color.lerp(Colors.teal.shade400, Colors.green.shade300, t)!,
+        Color.lerp(Colors.green.shade600, Colors.teal.shade700, 1 - t)!,
+      ],
+    );
+  }
+
   static bool get isTestMode {
     var isWidgetTest = false;
     assert(() {
