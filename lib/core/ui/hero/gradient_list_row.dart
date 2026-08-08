@@ -1,7 +1,14 @@
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:flutter/material.dart';
+
+/// Semantic color for [GradientListRow.trailingText]. Defaults to
+/// [neutral], which keeps the original actionable-vs-status color rule;
+/// [positive]/[warning] override that for a status that's genuinely good
+/// or genuinely needs attention (e.g. notification permission state).
+enum GradientRowTone { neutral, positive, warning }
 
 /// A frosted, gradient-icon-badge list row matching the visual language of
 /// [CloudSyncDiagnosticTile]/[AboutInfoTile]'s tile shell, but keeping
@@ -16,6 +23,7 @@ class GradientListRow extends StatefulWidget {
     required this.title,
     required this.subtitle,
     this.trailingText,
+    this.trailingTone = GradientRowTone.neutral,
     this.onTap,
     super.key,
   });
@@ -24,6 +32,7 @@ class GradientListRow extends StatefulWidget {
   final String title;
   final String subtitle;
   final String? trailingText;
+  final GradientRowTone trailingTone;
   final VoidCallback? onTap;
 
   @override
@@ -116,18 +125,18 @@ class _GradientListRowState extends State<GradientListRow> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          (isActionable
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant)
-                              .withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      color: _trailingColor(
+                        colorScheme,
+                        isActionable,
+                      ).withValues(alpha: 0.16),
+                      // A fixed pill radius stretches into an odd oval if
+                      // this wraps to 2 lines, so use a rounded-rect chip.
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
-                        color:
-                            (isActionable
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant)
-                                .withValues(alpha: 0.4),
+                        color: _trailingColor(
+                          colorScheme,
+                          isActionable,
+                        ).withValues(alpha: 0.4),
                       ),
                     ),
                     child: Text(
@@ -136,9 +145,7 @@ class _GradientListRowState extends State<GradientListRow> {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: textTheme.labelMedium?.copyWith(
-                        color: isActionable
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
+                        color: _trailingColor(colorScheme, isActionable),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -161,5 +168,14 @@ class _GradientListRowState extends State<GradientListRow> {
         ),
       ),
     );
+  }
+
+  Color _trailingColor(ColorScheme colorScheme, bool isActionable) {
+    return switch (widget.trailingTone) {
+      GradientRowTone.positive => HomeTokens.positive,
+      GradientRowTone.warning => HomeTokens.warning,
+      GradientRowTone.neutral =>
+        isActionable ? colorScheme.primary : colorScheme.onSurfaceVariant,
+    };
   }
 }

@@ -229,6 +229,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Price Alerts',
         subtitle: notificationState.settingsSubtitle,
         trailing: notificationState.settingsStatusLabel,
+        trailingWarning: notificationState.settingsStatusNeedsAttention,
         onTap: () => Navigator.of(context).push(PriceAlertsScreen.route()),
       ),
       // No Appearance row: PackLox is intentionally dark-only, so a row that
@@ -2602,6 +2603,7 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.trailingWarning = false,
     this.onTap,
   });
 
@@ -2609,6 +2611,7 @@ class _SettingsRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final String trailing;
+  final bool trailingWarning;
   final VoidCallback? onTap;
 
   @override
@@ -2618,6 +2621,7 @@ class _SettingsRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       trailingText: trailing,
+      trailingWarning: trailingWarning,
       onTap: onTap,
     );
   }

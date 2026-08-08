@@ -121,6 +121,21 @@ class PriceAlertNotificationState {
     return permissionStatus.canNotify ? 'On' : 'Needs permission';
   }
 
+  /// True when alerts are enabled but won't actually fire (permission
+  /// missing or denied) -- worth flagging distinctly from a routine "Off"/
+  /// "On" status.
+  bool get settingsStatusNeedsAttention {
+    if (!enabled) {
+      return false;
+    }
+    if (pushRegistrationStatus ==
+        PushNotificationRegistrationStatus.registered) {
+      return false;
+    }
+    return permissionStatus == PriceAlertNotificationPermissionStatus.denied ||
+        permissionStatus == PriceAlertNotificationPermissionStatus.unknown;
+  }
+
   String get settingsSubtitle {
     if (!enabled) {
       return 'Turn on notifications to get alerts when your prices move.';

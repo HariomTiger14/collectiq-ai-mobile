@@ -12,6 +12,7 @@ class ModernSettingsRow extends StatefulWidget {
     required this.subtitle,
     this.trailing,
     this.trailingText,
+    this.trailingWarning = false,
     this.onTap,
   });
 
@@ -29,6 +30,11 @@ class ModernSettingsRow extends StatefulWidget {
 
   /// Optional trailing text.
   final String? trailingText;
+
+  /// When true, [trailingText] renders as a warning pill instead of plain
+  /// text -- for a status that genuinely needs the user's attention (e.g.
+  /// a missing permission), so it doesn't blend in with routine nav values.
+  final bool trailingWarning;
 
   /// Tap callback.
   final VoidCallback? onTap;
@@ -227,6 +233,33 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
       return null;
     }
     final textTheme = Theme.of(context).textTheme;
+
+    if (widget.trailingWarning) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: HomeTokens.warning.withValues(alpha: 0.16),
+          // A fixed pill radius (999) stretches into an odd oval once this
+          // wraps to 2 lines, so use a small rounded-rect radius instead.
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: HomeTokens.warning.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: textTheme.labelMedium?.copyWith(
+            color: HomeTokens.warning,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+          ),
+        ),
+      );
+    }
 
     // Accent only when the row is actionable; muted when it's a status value so
     // blue never implies tappable on an inert row.

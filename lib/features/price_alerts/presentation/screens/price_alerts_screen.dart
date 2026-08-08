@@ -136,6 +136,11 @@ class _NotificationStatusRow extends StatelessWidget {
       title: 'Notifications',
       subtitle: state.settingsSubtitle,
       trailingText: state.settingsStatusLabel,
+      trailingTone: state.settingsStatusNeedsAttention
+          ? GradientRowTone.warning
+          : state.settingsStatusLabel == 'On'
+          ? GradientRowTone.positive
+          : GradientRowTone.neutral,
     );
   }
 }
