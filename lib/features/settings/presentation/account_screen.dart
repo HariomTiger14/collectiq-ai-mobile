@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
+import 'package:collectiq_ai/core/ui/hero/gradient_hero_header.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -15,7 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Account overview: identity, a collection snapshot, account details, and
 /// session controls. Reached from the Settings "Account" row.
-class AccountScreen extends ConsumerWidget {
+class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
 
   static Route<void> route() {
@@ -23,7 +24,20 @@ class AccountScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends ConsumerState<AccountScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final profileState = ref.watch(profileControllerProvider);
     final portfolio = ref.watch(portfolioControllerProvider);
@@ -57,159 +71,134 @@ class AccountScreen extends ConsumerWidget {
         child: Scaffold(
           key: const ValueKey('account-screen'),
           backgroundColor: HomeTokens.background,
-          body: SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                HomeTokens.pageGutter,
-                AppSpacing.sm,
-                HomeTokens.pageGutter,
-                AppSpacing.xxl,
-              ),
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      key: const ValueKey('account-screen-back'),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      color: HomeTokens.textPrimary,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      'Account',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: HomeTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _AccountIdentityHeader(
-                  name: name,
-                  email: email,
-                  avatarPath: profile?.avatarPath,
-                  isSignedIn: authState.isSignedIn,
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                HomeSectionSurface(
-                  keySeed: 'account-collection',
-                  title: 'Your collection',
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final tileWidth =
-                          (constraints.maxWidth - AppSpacing.sm) / 2;
-                      return Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          SizedBox(
-                            width: tileWidth,
-                            child: HomeMetricTile(
-                              label: 'Items tracked',
-                              value: '${portfolio.itemCount}',
-                              supportingText: '${valuedItems.length} valued',
-                            ),
-                          ),
-                          SizedBox(
-                            width: tileWidth,
-                            child: HomeMetricTile(
-                              label: 'Value tracked',
-                              value: _formatMoney(trackedValue),
-                              supportingText: 'Estimated',
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                HomeSectionSurface(
-                  keySeed: 'account-details',
+          body: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverToBoxAdapter(
+                child: GradientHeroHeader(
+                  scrollController: _scrollController,
+                  icon: Icons.person_rounded,
                   title: 'Account',
+                  subtitle: 'Your PackLox profile and collection',
+                  onBack: () => Navigator.of(context).maybePop(),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  HomeTokens.pageGutter,
+                  AppSpacing.xl,
+                  HomeTokens.pageGutter,
+                  AppSpacing.xxl,
+                ),
+                sliver: SliverToBoxAdapter(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _AccountDetailRow(
-                        label: 'Email',
-                        value: email ?? 'Not connected',
+                      _AccountIdentityHeader(
+                        name: name,
+                        email: email,
+                        avatarPath: profile?.avatarPath,
+                        isSignedIn: authState.isSignedIn,
                       ),
-                      _AccountDetailRow(
-                        label: 'Plan',
-                        value: subscription.entitlements.plan.displayName,
-                      ),
-                      _AccountDetailRow(
-                        label: 'Currency',
-                        value:
-                            profile?.preferredCurrency ??
-                            CollectorProfile.defaultPreferredCurrency,
-                      ),
-                      if (collectingSince != null)
-                        _AccountDetailRow(
-                          label: 'Collecting since',
-                          value: collectingSince,
-                          isLast: true,
+                      const SizedBox(height: AppSpacing.xl),
+                      HomeSectionSurface(
+                        keySeed: 'account-collection',
+                        title: 'Your collection',
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final tileWidth =
+                                (constraints.maxWidth - AppSpacing.sm) / 2;
+                            return Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.sm,
+                              children: [
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeMetricTile(
+                                    label: 'Items tracked',
+                                    value: '${portfolio.itemCount}',
+                                    supportingText:
+                                        '${valuedItems.length} valued',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: HomeMetricTile(
+                                    label: 'Value tracked',
+                                    value: _formatMoney(trackedValue),
+                                    supportingText: 'Estimated',
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      HomeSectionSurface(
+                        keySeed: 'account-details',
+                        title: 'Account',
+                        child: Column(
+                          children: [
+                            _AccountDetailRow(
+                              label: 'Email',
+                              value: email ?? 'Not connected',
+                            ),
+                            _AccountDetailRow(
+                              label: 'Plan',
+                              value: subscription.entitlements.plan.displayName,
+                            ),
+                            _AccountDetailRow(
+                              label: 'Currency',
+                              value:
+                                  profile?.preferredCurrency ??
+                                  CollectorProfile.defaultPreferredCurrency,
+                            ),
+                            if (collectingSince != null)
+                              _AccountDetailRow(
+                                label: 'Collecting since',
+                                value: collectingSince,
+                                isLast: true,
+                              ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                if (authState.isSignedIn) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      key: const ValueKey('account-screen-sign-out'),
-                      onPressed: () {
-                        ref.read(authControllerProvider.notifier).signOut();
-                        Navigator.of(context).maybePop();
-                      },
-                      icon: const Icon(Icons.logout_rounded, size: 18),
-                      label: const Text('Sign out'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: HomeTokens.textPrimary,
-                        side: const BorderSide(color: HomeTokens.border),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.md,
-                        ),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  static String? _collectingSince(List<CollectibleItem> items) {
-    if (items.isEmpty) {
-      return null;
-    }
-    var earliest = items.first.createdAt;
-    for (final item in items) {
-      if (item.createdAt.isBefore(earliest)) {
-        earliest = item.createdAt;
-      }
-    }
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[earliest.month - 1]} ${earliest.year}';
+String? _collectingSince(List<CollectibleItem> items) {
+  if (items.isEmpty) {
+    return null;
   }
+  var earliest = items.first.createdAt;
+  for (final item in items) {
+    if (item.createdAt.isBefore(earliest)) {
+      earliest = item.createdAt;
+    }
+  }
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[earliest.month - 1]} ${earliest.year}';
+}
 
-  static String _formatMoney(double value) {
-    final whole = value.toStringAsFixed(0);
-    final withCommas = whole.replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (match) => ',',
-    );
-    return '\$$withCommas';
-  }
+String _formatMoney(double value) {
+  final whole = value.toStringAsFixed(0);
+  final withCommas = whole.replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (match) => ',',
+  );
+  return '\$$withCommas';
 }
 
 class _AccountIdentityHeader extends StatelessWidget {
