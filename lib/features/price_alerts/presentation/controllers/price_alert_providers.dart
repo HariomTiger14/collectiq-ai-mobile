@@ -36,6 +36,14 @@ final itemPriceAlertsProvider = FutureProvider.family<List<PriceAlert>, String>(
   },
 );
 
+/// Every alert across the whole portfolio, for the standalone Price Alerts
+/// screen (Settings row) -- as opposed to [itemPriceAlertsProvider], which is
+/// scoped to one collectible's detail page.
+final allPriceAlertsProvider = FutureProvider<List<PriceAlert>>((ref) async {
+  final repository = ref.watch(priceAlertRepositoryProvider);
+  return repository.getAlerts();
+});
+
 final priceAlertSummaryProvider =
     FutureProvider.family<PriceAlertSummary, List<CollectibleItem>>((
       ref,

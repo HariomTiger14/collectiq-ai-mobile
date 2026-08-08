@@ -135,7 +135,7 @@ void main() {
       find.byKey(const ValueKey('shell-destination-settings')),
       findsOneWidget,
     );
-    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Account'), findsWidgets);
     expect(find.text('Price Alerts'), findsOneWidget);
   });
 

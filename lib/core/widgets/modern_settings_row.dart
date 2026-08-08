@@ -233,7 +233,7 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
     final isActionable = widget.onTap != null;
     return Text(
       text,
-      maxLines: 1,
+      maxLines: 2,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
       style: textTheme.labelMedium?.copyWith(

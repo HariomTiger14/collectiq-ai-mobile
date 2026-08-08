@@ -5898,7 +5898,11 @@ class _PriceAlertRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final triggered = alert.status == PriceAlertStatus.triggered;
+    // isTriggered covers both the freshly-triggered state and the post-push
+    // "notified" terminal state, so a reset stays offered until the alert
+    // is actually cleared -- not just for the brief triggered window before
+    // a push goes out.
+    final triggered = alert.isTriggered;
     final color = triggered ? AppColors.success : colorScheme.primary;
 
     return Container(

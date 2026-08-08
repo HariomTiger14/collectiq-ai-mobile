@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:collectiq_ai/core/app_info/app_info_providers.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
@@ -24,6 +25,7 @@ import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboar
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/demo_price_alert_seed_service.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/screens/price_alerts_screen.dart';
 import 'package:collectiq_ai/features/notifications/data/notification_event_store.dart';
 import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
 import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
@@ -148,13 +150,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     List<Widget> sectionSlivers(
       List<Widget> children, {
       double topSpacing = 18,
+      String? title,
     }) {
       return [
+        if (title != null)
+          sliverBox(
+            SettingsSectionHeader(title),
+            padding: EdgeInsets.fromLTRB(
+              HomeTokens.pageGutter,
+              topSpacing,
+              HomeTokens.pageGutter,
+              10,
+            ),
+          ),
         sliverBox(
           SettingsCardGroup(children: children),
           padding: EdgeInsets.fromLTRB(
             HomeTokens.pageGutter,
-            topSpacing,
+            title != null ? 0 : topSpacing,
             HomeTokens.pageGutter,
             0,
           ),
@@ -164,6 +177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final primaryTiles = [
       _SettingsRow(
+        key: const ValueKey('settings-account-row'),
         icon: Icons.account_circle_outlined,
         title: 'Account',
         subtitle: authState.isSignedIn
@@ -207,6 +221,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Price Alerts',
         subtitle: notificationState.settingsSubtitle,
         trailing: notificationState.settingsStatusLabel,
+        onTap: () => Navigator.of(context).push(PriceAlertsScreen.route()),
       ),
       // No Appearance row: PackLox is intentionally dark-only, so a row that
       // can't be changed would just be filler.
@@ -242,6 +257,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final packageInfo = ref.watch(packageInfoProvider).value;
+    final appVersionLabel = packageInfo != null
+        ? 'Version ${packageInfo.version} (${packageInfo.buildNumber})'
+        : 'Version 1.0.0 (1)';
+
     final infoTiles = [
       const _SettingsRow(
         icon: Icons.lock_outline,
@@ -252,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.info_outline_rounded,
         title: 'About PackLox',
-        subtitle: 'Version 1.0.0 (1)',
+        subtitle: appVersionLabel,
         trailing: 'Open',
         onTap: () => Navigator.of(
           context,
@@ -282,27 +302,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           action: () => _resetOnboarding(context),
         ),
       ),
-      _SettingsRow(
-        icon: Icons.cleaning_services_outlined,
-        title: 'Clear Local Collection',
-        subtitle: 'Remove portfolio items stored locally on this device.',
-        trailing: 'Confirm',
-        onTap: () => _confirmDangerAction(
-          context,
-          title: 'Clear Local Collection?',
-          message:
-              'This removes local portfolio items from this device. Cloud account deletion is not supported here.',
-          confirmLabel: 'Clear',
-          action: _clearLocalCollection,
-        ),
-      ),
       if (authState.isSignedIn)
         _SettingsRow(
           icon: Icons.logout_outlined,
           title: 'Sign Out',
           subtitle: 'Sign out of cloud auth. Local data stays on device.',
-          trailing: 'Account',
-          onTap: () => ref.read(authControllerProvider.notifier).signOut(),
+          trailing: 'Confirm',
+          onTap: () => _confirmDangerAction(
+            context,
+            title: 'Sign Out?',
+            message:
+                "You'll need to sign in again to sync or back up your "
+                'collection. Local data on this device is unaffected.',
+            confirmLabel: 'Sign Out',
+            action: () => ref.read(authControllerProvider.notifier).signOut(),
+          ),
         ),
     ];
 
@@ -359,9 +373,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   apiConfig: apiConfig,
                 ),
               ),
-            ...sectionSlivers(primaryTiles),
-            ...sectionSlivers(subscriptionTiles, topSpacing: 14),
-            if (demoSeedEnabled) ...sectionSlivers(demoDataTiles),
+            ...sectionSlivers(primaryTiles, title: 'Account'),
+            ...sectionSlivers(
+              subscriptionTiles,
+              topSpacing: 24,
+              title: 'Subscription',
+            ),
+            if (demoSeedEnabled)
+              ...sectionSlivers(
+                demoDataTiles,
+                topSpacing: 24,
+                title: 'Demo Data',
+              ),
             if (showDeveloperTools) ...[
               sliverBox(
                 SettingsSectionHeader('Developer Tools'),
@@ -390,8 +413,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
-            ...sectionSlivers(infoTiles, topSpacing: 14),
-            ...sectionSlivers(dangerTiles, topSpacing: 14),
+            ...sectionSlivers(infoTiles, topSpacing: 24, title: 'Support'),
+            ...sectionSlivers(
+              dangerTiles,
+              topSpacing: 24,
+              title: 'Danger Zone',
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
@@ -465,13 +492,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         setState(() => _isUpdatingDemoData = false);
       }
-    }
-  }
-
-  Future<void> _clearLocalCollection() async {
-    await ref.read(portfolioControllerProvider.notifier).clearPortfolio();
-    if (mounted) {
-      _showSettingsSnackBar('Local collection cleared on this device.');
     }
   }
 
@@ -1553,7 +1573,15 @@ class _AccountPromptCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.close, color: HomeTokens.textMuted, size: 22),
+            // A chevron, not a close icon: the whole card (including this
+            // icon) navigates to sign-in on tap -- there's no dismiss
+            // behavior, so a close "X" here previously misled users into
+            // thinking they could dismiss the prompt.
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: HomeTokens.textMuted,
+              size: 24,
+            ),
           ],
         ),
       ),
@@ -1760,6 +1788,36 @@ class IdentityBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const Align(alignment: Alignment.centerLeft, child: HomeBrandLockup()),
+        const SizedBox(height: AppSpacing.lg),
+        // Matches Home/Discover's own title-block convention (brand lockup,
+        // then a left-aligned page title + subtitle) so Settings' tab root
+        // looks consistent with its sibling tabs instead of standing out.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settings',
+                key: const ValueKey('settings-title'),
+                style: textTheme.displaySmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Account, subscription, and app preferences',
+                style: textTheme.titleMedium?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 26),
         GestureDetector(
           onTap: onEditProfile,
