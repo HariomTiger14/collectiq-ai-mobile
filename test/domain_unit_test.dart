@@ -3670,6 +3670,139 @@ void main() {
     );
   });
 
+  group('SupabaseAuthSession refresh token', () {
+    test('fromJson captures refresh_token and expires_at from the top level', () {
+      final session = SupabaseAuthSession.fromJson({
+        'access_token': 'access-1',
+        'refresh_token': 'refresh-1',
+        'expires_at': 1700000000,
+        'user': {'id': 'user-1', 'email': 'harry@example.com'},
+      }, projectUrl: 'https://example.supabase.co');
+
+      expect(session.accessToken, 'access-1');
+      expect(session.refreshToken, 'refresh-1');
+      expect(
+        session.expiresAt,
+        DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000, isUtc: true),
+      );
+    });
+
+    test('fromJson falls back to expires_in when expires_at is absent', () {
+      final before = DateTime.now().toUtc();
+      final session = SupabaseAuthSession.fromJson({
+        'access_token': 'access-1',
+        'refresh_token': 'refresh-1',
+        'expires_in': 3600,
+        'user': {'id': 'user-1', 'email': 'harry@example.com'},
+      }, projectUrl: 'https://example.supabase.co');
+
+      final expiry = session.expiresAt;
+      expect(expiry, isNotNull);
+      expect(
+        expiry!.difference(before).inSeconds,
+        closeTo(3600, 2),
+      );
+    });
+
+    test('fromJson reads refresh_token and expiry from a nested session map', () {
+      final session = SupabaseAuthSession.fromJson({
+        'session': {
+          'access_token': 'access-1',
+          'refresh_token': 'refresh-1',
+          'expires_in': 3600,
+          'user': {'id': 'user-1', 'email': 'harry@example.com'},
+        },
+      }, projectUrl: 'https://example.supabase.co');
+
+      expect(session.accessToken, 'access-1');
+      expect(session.refreshToken, 'refresh-1');
+      expect(session.expiresAt, isNotNull);
+    });
+
+    test('a session with no expiry info is treated as not expired', () {
+      const session = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      expect(session.expiresAt, isNull);
+      expect(session.isExpired(), isFalse);
+    });
+
+    test('isExpired is true once past expiry, honoring the safety buffer', () {
+      final justExpired = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: DateTime.now().toUtc().add(const Duration(seconds: 30)),
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+      final wellInFuture = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 30)),
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      // Within the 60s safety buffer -> treated as expired so a refresh
+      // happens before the token actually dies mid-request.
+      expect(justExpired.isExpired(), isTrue);
+      expect(wellInFuture.isExpired(), isFalse);
+    });
+
+    test('toJsonString/fromJsonString round-trips refreshToken and expiresAt', () {
+      final expiresAt = DateTime.now().toUtc().add(const Duration(hours: 1));
+      final session = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: expiresAt,
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      final restored = SupabaseAuthSession.fromJsonString(
+        session.toJsonString(),
+      );
+
+      expect(restored.refreshToken, 'refresh-1');
+      expect(restored.expiresAt, expiresAt);
+    });
+
+    test(
+      'a persisted session from before this field existed restores with an '
+      'empty refresh token and unknown (not-expired) expiry',
+      () {
+        // Simulates a session saved by an older build: no refreshToken/
+        // expiresAt keys in the query string at all.
+        const legacyEncoded =
+            'userId=user-1&email=harry%40example.com&accessToken=access-1&'
+            'displayName=Harry&isAnonymous=false&'
+            'projectUrl=https%3A%2F%2Fexample.supabase.co';
+
+        final restored = SupabaseAuthSession.fromJsonString(legacyEncoded);
+
+        expect(restored.refreshToken, isEmpty);
+        expect(restored.expiresAt, isNull);
+        expect(restored.isExpired(), isFalse);
+      },
+    );
+  });
+
   group('AuthController', () {
     test('starts signed out and keeps local placeholder internal', () async {
       final container = ProviderContainer();

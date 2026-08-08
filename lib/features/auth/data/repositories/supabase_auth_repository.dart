@@ -164,7 +164,19 @@ class SupabaseAuthRepository
       return fallbackRepository.signOut();
     }
 
-    final session = await supabaseService.currentSession();
+    SupabaseAuthSession? session;
+    try {
+      session = await supabaseService.currentSession();
+    } on Object catch (error) {
+      // currentSession() already clears the local session before throwing
+      // (e.g. SupabaseSessionExpiredException when there's no refresh
+      // token left to try) -- a dead/unrecoverable session is already
+      // effectively signed out, so there's nothing left to do here. The
+      // user's intent ("sign me out of this device") must never get stuck
+      // behind a session that can't be loaded.
+      debugPrint('[Auth] sign out: session already unusable ($error)');
+      return;
+    }
     if (session == null || session.accessToken.isEmpty) {
       return;
     }

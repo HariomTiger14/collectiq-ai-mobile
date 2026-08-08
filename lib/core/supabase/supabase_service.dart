@@ -153,8 +153,12 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
 
     final cachedSession = _cachedSession;
     if (_isSessionUsableForCurrentProject(cachedSession)) {
+      if (cachedSession!.isExpired()) {
+        debugPrint('[Supabase] cached session expired; refreshing');
+        return _refreshSession(cachedSession);
+      }
       debugPrint(
-        '[Supabase] current user id from memory: ${cachedSession!.userId}',
+        '[Supabase] current user id from memory: ${cachedSession.userId}',
       );
       return cachedSession;
     }
@@ -177,16 +181,59 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       return null;
     }
 
+    if (session.isExpired()) {
+      debugPrint('[Supabase] stored session expired; refreshing');
+      return _refreshSession(session);
+    }
+
     final isValid = await _validateSessionForRestore(session);
     if (!isValid) {
-      debugPrint('[Supabase] cached session expired or invalid; clearing');
-      await clearSession();
-      throw const SupabaseSessionExpiredException();
+      debugPrint(
+        '[Supabase] cached session rejected on restore; attempting refresh',
+      );
+      return _refreshSession(session);
     }
 
     _cachedSession = session;
     debugPrint('[Supabase] current user id from storage: ${session.userId}');
     return session;
+  }
+
+  /// Exchanges [session]'s refresh token for a new access token. Throws
+  /// [SupabaseSessionExpiredException] (and clears the stored session) when
+  /// there's no refresh token to use, or the refresh token itself has been
+  /// revoked/expired -- the only case that should force a real sign-in.
+  Future<SupabaseAuthSession> _refreshSession(
+    SupabaseAuthSession session,
+  ) async {
+    if (session.refreshToken.isEmpty) {
+      debugPrint('[Supabase] refresh skipped: no refresh token on session');
+      await clearSession();
+      throw const SupabaseSessionExpiredException();
+    }
+
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/v1/token',
+        queryParameters: const {'grant_type': 'refresh_token'},
+        data: {'refresh_token': session.refreshToken},
+      );
+      final refreshed = SupabaseAuthSession.fromJson(
+        response.data ?? {},
+        projectUrl: config.url,
+      );
+      _ensureValidSession(refreshed);
+      await _saveSession(refreshed);
+      debugPrint('[Supabase] session refreshed for user ${refreshed.userId}');
+      return refreshed;
+    } on Object catch (error) {
+      if (error is DioException) {
+        logDioException(error);
+      }
+      debugPrint('[Supabase] refresh failed; clearing session: $error');
+      await clearSession();
+      throw const SupabaseSessionExpiredException();
+    }
   }
 
   @override
@@ -434,6 +481,7 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
         : body;
     final updatedSession = SupabaseAuthSession.fromJson({
       'access_token': session.accessToken,
+      'refresh_token': session.refreshToken,
       'user': userBody,
     }, projectUrl: config.url);
     _ensureValidSession(updatedSession);
@@ -520,6 +568,7 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       );
       final session = SupabaseAuthSession.fromJson({
         'access_token': accessToken,
+        'refresh_token': refreshToken,
         'user': response.data ?? const <String, dynamic>{},
       }, projectUrl: config.url);
       _ensureValidSession(session);
@@ -545,7 +594,14 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       );
     } on DioException catch (error) {
       logDioException(error);
-      rethrow;
+      // Server-side revoke is best-effort: an already-expired/invalid
+      // access token or a network hiccup must never block the user from
+      // being signed out of this device. The local session is always
+      // cleared below regardless of what happened here.
+      debugPrint(
+        '[Supabase] server-side sign-out failed; clearing local session '
+        'anyway: ${_authFailureMessage(error)}',
+      );
     }
     await clearSession();
   }
@@ -587,6 +643,15 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       );
     } on DioException catch (error) {
       logDioException(error);
+      if (_isUnauthorized(error)) {
+        debugPrint('[Supabase] GET $path got 401; refreshing and retrying');
+        final refreshed = await _refreshSession(session);
+        return _dio.get<T>(
+          path,
+          queryParameters: queryParameters,
+          options: _authOptions(refreshed),
+        );
+      }
       rethrow;
     }
   }
@@ -628,6 +693,16 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       );
     } on DioException catch (error) {
       logDioException(error, payload: data);
+      if (_isUnauthorized(error)) {
+        debugPrint('[Supabase] POST $path got 401; refreshing and retrying');
+        final refreshed = await _refreshSession(session);
+        return _dio.post<T>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: _mergeAuthOptions(refreshed, options),
+        );
+      }
       rethrow;
     }
   }
@@ -653,6 +728,11 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
     }
 
     debugPrint('[Supabase] initialization success');
+  }
+
+  bool _isUnauthorized(DioException error) {
+    final status = error.response?.statusCode;
+    return status == 401 || status == 403;
   }
 
   bool _isSessionUsableForCurrentProject(SupabaseAuthSession? session) {
@@ -1029,6 +1109,8 @@ class SupabaseAuthSession {
     required this.displayName,
     required this.isAnonymous,
     required this.projectUrl,
+    this.refreshToken = '',
+    this.expiresAt,
   });
 
   final String userId;
@@ -1037,6 +1119,19 @@ class SupabaseAuthSession {
   final String displayName;
   final bool isAnonymous;
   final String projectUrl;
+
+  /// Long-lived token used to mint a new [accessToken] once it expires.
+  /// Defaults to '' for sessions built before this field existed (e.g. old
+  /// persisted sessions, or test fixtures) -- an empty value just means
+  /// there's nothing to refresh with, so the caller falls back to a full
+  /// sign-in, same as today's behavior.
+  final String refreshToken;
+
+  /// When [accessToken] expires, if known. Null means "unknown" (e.g. a
+  /// session rebuilt from a /auth/v1/user response that doesn't carry
+  /// expiry) -- treated as not-yet-expired so it doesn't force an
+  /// unnecessary refresh; a real 401 later still triggers one.
+  final DateTime? expiresAt;
 
   bool get hasAuthenticatedSession =>
       accessToken.isNotEmpty && userId.isNotEmpty;
@@ -1047,6 +1142,17 @@ class SupabaseAuthSession {
         email != null &&
         email!.isNotEmpty &&
         !isAnonymous;
+  }
+
+  /// True once [accessToken] is at or within [buffer] of its expiry.
+  /// Supabase access tokens default to a 1-hour lifetime; a 60s buffer
+  /// avoids a request racing an access token that expires mid-flight.
+  bool isExpired({Duration buffer = const Duration(seconds: 60)}) {
+    final expiry = expiresAt;
+    if (expiry == null) {
+      return false;
+    }
+    return !DateTime.now().toUtc().isBefore(expiry.subtract(buffer));
   }
 
   factory SupabaseAuthSession.fromJson(
@@ -1080,18 +1186,43 @@ class SupabaseAuthSession {
           json['access_token'] as String? ??
           session['access_token'] as String? ??
           '',
+      refreshToken:
+          json['refresh_token'] as String? ??
+          session['refresh_token'] as String? ??
+          '',
+      expiresAt: _parseExpiresAt(json) ?? _parseExpiresAt(session),
       displayName: displayName,
       isAnonymous: email == null || email.isEmpty,
       projectUrl: projectUrl,
     );
   }
 
+  static DateTime? _parseExpiresAt(Map<String, dynamic> json) {
+    final expiresAt = json['expires_at'];
+    if (expiresAt is num) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        (expiresAt * 1000).round(),
+        isUtc: true,
+      );
+    }
+    final expiresIn = json['expires_in'];
+    if (expiresIn is num) {
+      return DateTime.now().toUtc().add(Duration(seconds: expiresIn.round()));
+    }
+    return null;
+  }
+
   factory SupabaseAuthSession.fromJsonString(String value) {
     final decoded = Uri.splitQueryString(value);
+    final expiresAtRaw = decoded['expiresAt'];
     return SupabaseAuthSession(
       userId: decoded['userId'] ?? '',
       email: decoded['email']?.isEmpty == true ? null : decoded['email'],
       accessToken: decoded['accessToken'] ?? '',
+      refreshToken: decoded['refreshToken'] ?? '',
+      expiresAt: expiresAtRaw == null || expiresAtRaw.isEmpty
+          ? null
+          : DateTime.tryParse(expiresAtRaw),
       displayName: decoded['displayName'] ?? 'Collector',
       isAnonymous: decoded['isAnonymous'] == 'true',
       projectUrl: decoded['projectUrl'] ?? '',
@@ -1104,6 +1235,8 @@ class SupabaseAuthSession {
         'userId': userId,
         'email': email ?? '',
         'accessToken': accessToken,
+        'refreshToken': refreshToken,
+        'expiresAt': expiresAt?.toIso8601String() ?? '',
         'displayName': displayName,
         'isAnonymous': isAnonymous.toString(),
         'projectUrl': projectUrl,
