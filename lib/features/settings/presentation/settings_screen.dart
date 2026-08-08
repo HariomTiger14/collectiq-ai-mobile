@@ -48,6 +48,13 @@ const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
 );
 
+// Shared "Pro" badge treatment (Plan & Usage status chip + the identity
+// header's plan pill) -- emerald, deliberately a shade deeper/richer than
+// HomeTokens.positive so it doesn't read as an identical duplicate of the
+// nearby product row's plain "Active" tag.
+const _proGradientColors = [Color(0xFF10B981), Color(0xFF047857)];
+const _proGlowColor = Color(0xFF047857);
+
 enum _AvatarSourceChoice { camera, gallery, remove }
 
 /// Settings screen for account, app preferences, and supported local/cloud state.
@@ -193,7 +200,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Country & Currency',
         subtitle:
             '${profile?.countryName ?? CollectorProfile.countryNameFor(CollectorProfile.defaultCountryCode)} pricing display.',
-        trailing: profile?.preferredCurrency ??
+        trailing:
+            profile?.preferredCurrency ??
             CollectorProfile.defaultPreferredCurrency,
         onTap: () => _showCurrencyPicker(context),
       ),
@@ -337,6 +345,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   profile: profile,
                   isLoadingProfile: profileState.isLoading,
                   planLabel: subscriptionState.entitlements.plan.displayName,
+                  isPaidPlan: subscriptionState.entitlements.isPaid,
                   onEditProfile: () => _showProfileEditor(context),
                 ),
                 padding: const EdgeInsets.fromLTRB(
@@ -617,8 +626,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (isSaving) {
                 return;
               }
-              final hasAvatar =
-                  currentProfile.avatarPath?.isNotEmpty ?? false;
+              final hasAvatar = currentProfile.avatarPath?.isNotEmpty ?? false;
               final choice = await _chooseAvatarSource(
                 sheetContext,
                 hasAvatar: hasAvatar,
@@ -930,7 +938,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'subject=${Uri.encodeComponent(subject)}',
       if (body.isNotEmpty) 'body=${Uri.encodeComponent(body)}',
     ].join('&');
-    final uri = Uri.parse('mailto:${_HelpAndFeedbackSheet._supportEmail}?$query');
+    final uri = Uri.parse(
+      'mailto:${_HelpAndFeedbackSheet._supportEmail}?$query',
+    );
     var launched = false;
     try {
       launched = await launchUrl(uri);
@@ -1089,11 +1099,18 @@ class _SubscriptionPlanPanel extends StatelessWidget {
             _SubscriptionStatusChip(
               label: state.paymentStatusLabel,
               icon: state.entitlements.isPaid
-                  ? Icons.verified_rounded
+                  ? Icons.workspace_premium_rounded
                   : Icons.tune_rounded,
-              color: state.isBillingAvailable
-                  ? HomeTokens.positive
-                  : HomeTokens.warning,
+              // Reflects plan tier, not billing configuration -- previously
+              // this colored by state.isBillingAvailable, so a Free and a
+              // Pro user with the same billing setup saw an identically
+              // colored chip.
+              color: state.entitlements.isPaid
+                  ? HomeTokens.accent
+                  : HomeTokens.textSecondary,
+              gradientColors: state.entitlements.isPaid
+                  ? _proGradientColors
+                  : null,
             ),
             _SubscriptionStatusChip(
               label: state.entitlements.usageLimit.isUnlimited
@@ -1354,25 +1371,53 @@ class _SubscriptionStatusChip extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
+    this.gradientColors,
   });
 
   final String label;
   final IconData icon;
   final Color color;
 
+  /// When set, renders a bold filled gradient pill instead of the plain
+  /// alpha-tinted outline -- used for the Pro plan chip so it actually
+  /// reads as a distinct, premium status rather than looking like every
+  /// other muted status chip (which is what a Free user sees too).
+  final List<Color>? gradientColors;
+
   @override
   Widget build(BuildContext context) {
+    final isFilled = gradientColors != null;
+    final foreground = isFilled ? Colors.white : color;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isFilled ? null : color.withValues(alpha: 0.12),
+        gradient: isFilled
+            ? LinearGradient(
+                colors: gradientColors!,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
         borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
-        border: Border.all(color: color.withValues(alpha: 0.34)),
+        border: isFilled
+            ? null
+            : Border.all(color: color.withValues(alpha: 0.34)),
+        boxShadow: isFilled
+            ? [
+                BoxShadow(
+                  color: gradientColors!.last.withValues(alpha: 0.38),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
+          Icon(icon, size: 15, color: foreground),
           const SizedBox(width: 6),
           // Flexible + ellipsis so the chip shrinks instead of overflowing at
           // narrow widths / large text (e.g. 320px with 1.3x accessibility text).
@@ -1382,7 +1427,7 @@ class _SubscriptionStatusChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: HomeTokens.textPrimary,
+                color: isFilled ? Colors.white : HomeTokens.textPrimary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1736,6 +1781,7 @@ class IdentityBlock extends StatelessWidget {
     required this.authState,
     required this.onEditProfile,
     required this.planLabel,
+    this.isPaidPlan = false,
     this.profile,
     this.isLoadingProfile = false,
   });
@@ -1744,6 +1790,7 @@ class IdentityBlock extends StatelessWidget {
   final CollectorProfile? profile;
   final bool isLoadingProfile;
   final String planLabel;
+  final bool isPaidPlan;
   final VoidCallback onEditProfile;
 
   @override
@@ -1919,42 +1966,68 @@ class IdentityBlock extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         // One consolidated status chip (replaces the redundant check icon +
-        // "Cloud identity connected" line).
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: statusColor.withValues(alpha: 0.34)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isSignedIn)
-                Icon(
-                  Icons.workspace_premium_outlined,
-                  size: 14,
-                  color: statusColor,
-                )
-              else
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              const SizedBox(width: 7),
-              Text(
-                isSignedIn ? '$planLabel plan' : 'Local access',
-                style: textTheme.labelMedium?.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w800,
-                ),
+        // "Cloud identity connected" line). Pro gets a bold filled gradient
+        // instead of the same muted outline as Free/local, so plan tier is
+        // actually visible here, not just as text.
+        Builder(
+          builder: (context) {
+            final isPro = isSignedIn && isPaidPlan;
+            final pillForeground = isPro ? Colors.white : statusColor;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isPro ? null : statusColor.withValues(alpha: 0.12),
+                gradient: isPro
+                    ? const LinearGradient(
+                        colors: _proGradientColors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(999),
+                border: isPro
+                    ? null
+                    : Border.all(color: statusColor.withValues(alpha: 0.34)),
+                boxShadow: isPro
+                    ? [
+                        BoxShadow(
+                          color: _proGlowColor.withValues(alpha: 0.38),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
-            ],
-          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSignedIn)
+                    Icon(
+                      Icons.workspace_premium_rounded,
+                      size: 14,
+                      color: pillForeground,
+                    )
+                  else
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 7),
+                  Text(
+                    isSignedIn ? '$planLabel plan' : 'Local access',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: pillForeground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
