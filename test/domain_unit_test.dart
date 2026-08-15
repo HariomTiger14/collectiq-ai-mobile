@@ -98,6 +98,7 @@ import 'package:collectiq_ai/features/subscription/domain/entities/user_entitlem
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_exception.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/purchase_result.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/apple_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/entitlement_repository.dart';
@@ -4920,6 +4921,28 @@ void main() {
       expect(usage.canAnalyze, isTrue);
       expect(usage.isUnlimited, isTrue);
       expect(usage.remainingScans, config.monthlyFreeScanLimit);
+    });
+
+    test('AppleBillingConfig maps product ids to plans and back', () {
+      const config = AppleBillingConfig(
+        enabled: true,
+        proProductId: 'apple_pro',
+        premiumProductId: 'apple_premium',
+      );
+
+      expect(config.planForProductId('apple_pro'), SubscriptionPlan.pro);
+      expect(
+        config.planForProductId('apple_premium'),
+        SubscriptionPlan.premium,
+      );
+      expect(config.planForProductId('unrelated_product'), isNull);
+      expect(config.productIdForPlan(SubscriptionPlan.pro), 'apple_pro');
+      expect(
+        config.productIdForPlan(SubscriptionPlan.premium),
+        'apple_premium',
+      );
+      expect(config.productIdForPlan(SubscriptionPlan.free), isNull);
+      expect(config.productIds, {'apple_pro', 'apple_premium'});
     });
 
     test('usage controller increments successful analyses', () async {
