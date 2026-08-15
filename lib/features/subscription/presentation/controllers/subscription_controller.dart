@@ -478,7 +478,11 @@ class SubscriptionController extends Notifier<SubscriptionState> {
   Future<void> _applyPurchaseResult(PurchaseResult result) async {
     if (result.grantsEntitlement) {
       final plan = result.plan!;
-      await _entitlementRepository.savePlan(plan);
+      await _entitlementRepository.savePlan(
+        plan,
+        source: result.source,
+        purchaseToken: result.purchaseToken,
+      );
       final entitlements = UserEntitlements.forPlan(
         plan: plan,
         freeLimit: _usageConfig.usageLimit,

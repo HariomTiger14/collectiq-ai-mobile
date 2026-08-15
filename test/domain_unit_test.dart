@@ -7440,7 +7440,11 @@ class _MemoryEntitlementRepository implements EntitlementRepository {
   }
 
   @override
-  Future<void> savePlan(SubscriptionPlan plan) async {
+  Future<void> savePlan(
+    SubscriptionPlan plan, {
+    String? source,
+    String? purchaseToken,
+  }) async {
     this.plan = plan;
   }
 }

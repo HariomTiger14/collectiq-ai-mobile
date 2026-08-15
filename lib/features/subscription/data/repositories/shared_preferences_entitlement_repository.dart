@@ -16,7 +16,11 @@ class SharedPreferencesEntitlementRepository implements EntitlementRepository {
   }
 
   @override
-  Future<void> savePlan(SubscriptionPlan plan) async {
+  Future<void> savePlan(
+    SubscriptionPlan plan, {
+    String? source,
+    String? purchaseToken,
+  }) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_planKey, plan.name);
   }
