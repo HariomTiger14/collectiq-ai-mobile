@@ -69,7 +69,11 @@ class CloudEntitlementRepository implements EntitlementRepository {
   }
 
   @override
-  Future<void> savePlan(SubscriptionPlan plan) async {
+  Future<void> savePlan(
+    SubscriptionPlan plan, {
+    String? source,
+    String? purchaseToken,
+  }) async {
     // Optimistic local cache first so the UI reflects the change immediately.
     await cache.savePlan(plan);
     final token = await _accessToken();
@@ -79,7 +83,11 @@ class CloudEntitlementRepository implements EntitlementRepository {
     try {
       await _dio.post<Map<String, dynamic>>(
         '$baseUrl/subscription/verify',
-        data: {'plan': plan.name, 'source': 'mock'},
+        data: {
+          'plan': plan.name,
+          'source': source ?? 'mock',
+          if (purchaseToken != null) 'purchaseToken': purchaseToken,
+        },
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           sendTimeout: _timeout,
