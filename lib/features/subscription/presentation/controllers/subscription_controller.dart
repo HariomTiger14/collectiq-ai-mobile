@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart' as net;
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/apple_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/cloud_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_entitlement_repository.dart';
@@ -80,6 +82,11 @@ final googlePlayBillingConfigProvider = Provider<GooglePlayBillingConfig>((
   return GooglePlayBillingConfig.fromEnvironment();
 });
 
+/// Provides Apple App Store Billing config.
+final appleBillingConfigProvider = Provider<AppleBillingConfig>((ref) {
+  return AppleBillingConfig.fromEnvironment();
+});
+
 /// Provides SIT dummy billing config.
 final sitDummyBillingConfigProvider = Provider<SitDummyBillingConfig>((ref) {
   return SitDummyBillingConfig.fromEnvironment();
@@ -88,14 +95,25 @@ final sitDummyBillingConfigProvider = Provider<SitDummyBillingConfig>((ref) {
 /// Whether this build has any billing provider configured.
 final paymentsConfiguredProvider = Provider<bool>((ref) {
   return ref.watch(sitDummyBillingConfigProvider).enabled ||
-      ref.watch(googlePlayBillingConfigProvider).enabled;
+      ref.watch(googlePlayBillingConfigProvider).enabled ||
+      ref.watch(appleBillingConfigProvider).enabled;
 });
 
-/// Provides billing repository.
+/// Provides billing repository. Platform-specific below the SIT/unavailable
+/// checks -- iOS gets StoreKit2 via AppleBillingRepository, everything else
+/// (Android, and any other Platform.isIOS-false target) gets Play Billing.
 final billingRepositoryProvider = Provider<BillingRepository>((ref) {
   final sitConfig = ref.watch(sitDummyBillingConfigProvider);
   if (sitConfig.enabled) {
     return SitDummyBillingRepository(config: sitConfig);
+  }
+
+  if (Platform.isIOS) {
+    final appleConfig = ref.watch(appleBillingConfigProvider);
+    if (!appleConfig.enabled) {
+      return const UnavailableBillingRepository();
+    }
+    return AppleBillingRepository(config: appleConfig);
   }
 
   final config = ref.watch(googlePlayBillingConfigProvider);
