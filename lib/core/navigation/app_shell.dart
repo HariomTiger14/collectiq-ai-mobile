@@ -22,6 +22,7 @@ import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.d
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/features/support/presentation/screens/support_ticket_thread_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -193,7 +194,31 @@ class _AppShellState extends ConsumerState<AppShell>
         _popToShellRoot();
       case PushNotificationNavigationTarget.portfolioItem:
         await _openPortfolioItemFromPush(intent.portfolioItemId);
+      case PushNotificationNavigationTarget.supportTicket:
+        _openSupportTicketFromPush(intent.ticketId);
     }
+  }
+
+  void _openSupportTicketFromPush(String? ticketId) {
+    if (ticketId == null || ticketId.isEmpty) {
+      return;
+    }
+    _selectTab(
+      AppShellTabController.settingsTab,
+      reason: 'push-notification-support-ticket',
+    );
+    _popToShellRoot();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SupportTicketThreadScreen(ticketId: ticketId),
+          settings: RouteSettings(name: '/support/$ticketId'),
+        ),
+      );
+    });
   }
 
   Future<void> _openPortfolioItemFromPush(String? itemId) async {

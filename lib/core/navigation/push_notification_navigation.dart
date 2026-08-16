@@ -57,13 +57,19 @@ Future<void> _ensureFirebaseInitialized() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
-enum PushNotificationNavigationTarget { portfolioItem, settings, home }
+enum PushNotificationNavigationTarget {
+  portfolioItem,
+  settings,
+  home,
+  supportTicket,
+}
 
 class PushNotificationNavigationIntent {
   const PushNotificationNavigationIntent._({
     required this.target,
     this.portfolioItemId,
     this.priceAlertId,
+    this.ticketId,
   });
 
   factory PushNotificationNavigationIntent.portfolioItem({
@@ -77,6 +83,15 @@ class PushNotificationNavigationIntent {
     );
   }
 
+  factory PushNotificationNavigationIntent.supportTicket({
+    required String ticketId,
+  }) {
+    return PushNotificationNavigationIntent._(
+      target: PushNotificationNavigationTarget.supportTicket,
+      ticketId: ticketId,
+    );
+  }
+
   const PushNotificationNavigationIntent.settings()
     : this._(target: PushNotificationNavigationTarget.settings);
 
@@ -86,9 +101,15 @@ class PushNotificationNavigationIntent {
   final PushNotificationNavigationTarget target;
   final String? portfolioItemId;
   final String? priceAlertId;
+  final String? ticketId;
 
   String get dedupeKey {
-    return [target.name, portfolioItemId ?? '', priceAlertId ?? ''].join(':');
+    return [
+      target.name,
+      portfolioItemId ?? '',
+      priceAlertId ?? '',
+      ticketId ?? '',
+    ].join(':');
   }
 }
 
@@ -105,6 +126,14 @@ PushNotificationNavigationIntent? pushNotificationNavigationIntentFromData(
       return PushNotificationNavigationIntent.portfolioItem(
         portfolioItemId: portfolioItemId,
         priceAlertId: _string(data['priceAlertId']),
+      );
+    case 'support_ticket_reply':
+      final ticketId = _string(data['ticketId']);
+      if (ticketId == null || ticketId.isEmpty) {
+        return const PushNotificationNavigationIntent.settings();
+      }
+      return PushNotificationNavigationIntent.supportTicket(
+        ticketId: ticketId,
       );
     case 'test_push':
       return const PushNotificationNavigationIntent.settings();
