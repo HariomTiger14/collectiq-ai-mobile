@@ -17,6 +17,7 @@ class CatalogSearchResult {
     this.attribution,
     this.reasonCode,
     this.displayMessage,
+    this.imageUrl,
     this.history = const <CatalogPriceHistoryPoint>[],
   });
 
@@ -65,6 +66,10 @@ class CatalogSearchResult {
   /// Backend/user-safe message when trusted pricing is unavailable.
   final String? displayMessage;
 
+  /// Real catalog product photo, when the source provides one (KicksDB
+  /// today — PriceCharting's bulk catalog import has no image field).
+  final String? imageUrl;
+
   /// Observed catalog valuation history, newest first when supplied.
   final List<CatalogPriceHistoryPoint> history;
 
@@ -85,6 +90,7 @@ class CatalogSearchResult {
     String? attribution,
     String? reasonCode,
     String? displayMessage,
+    String? imageUrl,
     List<CatalogPriceHistoryPoint>? history,
   }) {
     return CatalogSearchResult(
@@ -103,6 +109,7 @@ class CatalogSearchResult {
       attribution: attribution ?? this.attribution,
       reasonCode: reasonCode ?? this.reasonCode,
       displayMessage: displayMessage ?? this.displayMessage,
+      imageUrl: imageUrl ?? this.imageUrl,
       history: history ?? this.history,
     );
   }
@@ -174,6 +181,7 @@ class CatalogSearchResult {
           _string(json['display_message']) ??
           _string(pricing['displayMessage']) ??
           _string(pricing['pricingExplanation']),
+      imageUrl: _string(json['imageUrl']) ?? _string(json['image_url']),
       history: _historyFromJson(json['history']),
     );
   }
