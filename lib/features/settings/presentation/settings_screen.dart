@@ -26,6 +26,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.da
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
 import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
+import 'package:collectiq_ai/features/settings/data/repositories/data_request_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -253,6 +254,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final privacyTiles = [
+      if (authState.isSignedIn) ...[
+        _SettingsRow(
+          icon: Icons.download_outlined,
+          title: 'Export my data',
+          subtitle: 'Get a full copy of your account data.',
+          trailing: 'Request',
+          onTap: () => _requestDataExport(context),
+        ),
+        _SettingsRow(
+          icon: Icons.delete_forever_outlined,
+          title: 'Delete my account',
+          subtitle: 'Request permanent account + data erasure.',
+          trailing: 'Request',
+          onTap: () => _requestAccountDeletion(context),
+        ),
+      ],
+    ];
+
     final dangerTiles = [
       _SettingsRow(
         icon: Icons.restart_alt_outlined,
@@ -372,6 +392,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
             ...sectionSlivers(infoTiles, topSpacing: 14),
+            if (privacyTiles.isNotEmpty)
+              ...sectionSlivers(privacyTiles, topSpacing: 14),
             ...sectionSlivers(dangerTiles, topSpacing: 14),
             const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
@@ -818,6 +840,76 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       const SnackBar(
         content: Text('Onboarding will show the next time you open PackLox.'),
       ),
+    );
+  }
+
+  Future<void> _requestDataExport(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Export my data?'),
+        content: const Text(
+          'PackLox will prepare a full copy of your account data '
+          '(portfolio, wishlist, alerts, devices, profile) and email you '
+          'a download link within 30 days.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Request export'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    try {
+      await ref.read(dataRequestRepositoryProvider).requestExport();
+      if (!context.mounted) {
+        return;
+      }
+      _showSettingsSnackBar(
+        "Export requested — you'll receive a download link within 30 days.",
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      _showSettingsSnackBar('Could not request an export: $error');
+    }
+  }
+
+  Future<void> _requestAccountDeletion(BuildContext context) async {
+    await _confirmDangerAction(
+      context,
+      title: 'Delete my account?',
+      message:
+          'This files a request to permanently erase your account: '
+          'portfolio, images, alerts, devices, and profile. An admin '
+          'reviews every deletion request before it runs, and it cannot be '
+          'undone once processed.',
+      confirmLabel: 'Request deletion',
+      action: () async {
+        try {
+          await ref.read(dataRequestRepositoryProvider).requestDeletion();
+          if (!context.mounted) {
+            return;
+          }
+          _showSettingsSnackBar(
+            'Deletion requested — an admin will review and confirm it.',
+          );
+        } catch (error) {
+          if (!context.mounted) {
+            return;
+          }
+          _showSettingsSnackBar('Could not request deletion: $error');
+        }
+      },
     );
   }
 }
