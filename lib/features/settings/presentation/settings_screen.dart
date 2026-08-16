@@ -27,6 +27,7 @@ import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible
 import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/settings/data/repositories/data_request_repository.dart';
+import 'package:collectiq_ai/features/support/presentation/screens/my_support_tickets_screen.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
@@ -783,6 +784,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 navigator.pop();
                 _showSettingsSnackBar('Support details copied.');
               },
+              onOpenSupportTickets: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MySupportTicketsScreen(),
+                  ),
+                );
+              },
             ),
           ),
         );
@@ -1504,11 +1513,13 @@ class _SettingsSurface extends StatelessWidget {
 }
 
 class _HelpAndFeedbackSheet extends StatelessWidget {
-  const _HelpAndFeedbackSheet({required this.onCopy});
+  const _HelpAndFeedbackSheet({
+    required this.onCopy,
+    required this.onOpenSupportTickets,
+  });
 
   final Future<void> Function(String message) onCopy;
-
-  static const _supportEmail = 'support@packlox.com';
+  final VoidCallback onOpenSupportTickets;
 
   @override
   Widget build(BuildContext context) {
@@ -1539,11 +1550,11 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
           SettingsCardGroup(
             children: [
               _HelpActionRow(
-                icon: Icons.mail_outline_rounded,
+                icon: Icons.chat_bubble_outline_rounded,
                 title: 'Contact support',
-                subtitle: _supportEmail,
-                trailing: 'Copy',
-                onTap: () => onCopy(_supportEmail),
+                subtitle: 'Open a ticket and chat with the PackLox team.',
+                trailing: 'Open',
+                onTap: onOpenSupportTickets,
               ),
               _HelpActionRow(
                 icon: Icons.document_scanner_outlined,
