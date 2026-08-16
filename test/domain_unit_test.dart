@@ -1078,6 +1078,31 @@ void main() {
       expect(result.lowEstimate, 10.0);
       expect(result.highEstimate, 25.32);
     });
+
+    test('parses a real KicksDB catalog image URL', () {
+      final result = CatalogSearchResult.fromJson({
+        'id': 'kdb-1',
+        'title': 'Air Jordan 1 Retro High OG',
+        'category': 'Sneakers',
+        'source': 'KicksDB',
+        'setName': 'Jordan',
+        'imageUrl': 'https://images.kicks.dev/air-jordan-1.png',
+        'pricing': {'currency': 'USD', 'marketValue': 310.0},
+      });
+
+      expect(result.imageUrl, 'https://images.kicks.dev/air-jordan-1.png');
+    });
+
+    test('has no image when the backend does not provide one', () {
+      final result = CatalogSearchResult.fromJson({
+        'id': '10769851',
+        'title': 'Pikachu',
+        'category': 'Pokemon Cards',
+        'source': 'PriceCharting',
+      });
+
+      expect(result.imageUrl, isNull);
+    });
   });
 
   group('RecognitionResult', () {

@@ -95,6 +95,53 @@ void main() {
     );
   });
 
+  testWidgets('catalog result with a real image renders it instead of the placeholder', (
+    tester,
+  ) async {
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'kdb-air-jordan-1',
+        title: 'Air Jordan 1 Retro High OG',
+        category: 'Sneakers',
+        source: 'KicksDB',
+        setName: 'Jordan',
+        currency: 'USD',
+        marketValue: 310,
+        attribution: 'Pricing data by KicksDB',
+        imageUrl: 'https://images.kicks.dev/air-jordan-1.png',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'air jordan',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Air Jordan 1 Retro High OG'), findsOneWidget);
+    final image = tester.widget<Image>(
+      find
+          .descendant(
+            of: find.byKey(
+              const ValueKey('discover-catalog-placeholder-kdb-air-jordan-1'),
+            ),
+            matching: find.byType(Image),
+          )
+          .first,
+    );
+    expect(image.image, isA<NetworkImage>());
+    expect(
+      (image.image as NetworkImage).url,
+      'https://images.kicks.dev/air-jordan-1.png',
+    );
+  });
+
   testWidgets('catalog result detail saves a portfolio snapshot', (
     tester,
   ) async {

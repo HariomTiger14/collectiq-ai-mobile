@@ -651,6 +651,7 @@ class _CatalogResultCard extends StatelessWidget {
                   category: result.category,
                   title: result.title,
                   setName: result.setName,
+                  imageUrl: result.imageUrl,
                 ),
               ),
               const SizedBox(width: 12),
@@ -927,6 +928,7 @@ class _CatalogResultDetailPageState
                                   category: result.category,
                                   title: result.title,
                                   setName: result.setName,
+                                  imageUrl: result.imageUrl,
                                 ),
                               ),
                             ),
@@ -1502,12 +1504,17 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
     required this.category,
     required this.title,
     required this.setName,
+    this.imageUrl,
     super.key,
   });
 
   final String category;
   final String title;
   final String? setName;
+
+  /// Real catalog product photo (KicksDB today). Falls back to the
+  /// bucketed illustration below on null/empty or a failed load.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1525,6 +1532,7 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
           category: category,
           title: title,
           setName: setName,
+          imageUrl: imageUrl,
         ),
       ),
     );
@@ -1536,15 +1544,30 @@ class _CatalogPlaceholderArt extends StatelessWidget {
     required this.category,
     required this.title,
     required this.setName,
+    this.imageUrl,
   });
 
   final String category;
   final String title;
   final String? setName;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final style = _placeholderStyle(category, title, setName);
+    final photoUrl = imageUrl;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return Image.network(
+        photoUrl,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => _catalogArtFallback(style),
+      );
+    }
+    return _catalogArtFallback(style);
+  }
+
+  Widget _catalogArtFallback(_PlaceholderStyle style) {
     if (style.assetPath != null) {
       return Image.asset(
         style.assetPath!,
@@ -2022,6 +2045,7 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
   final confidence = (result.confidence?.clamp(0, 1) ?? 0.72).toDouble();
   final attribution = result.attribution ?? 'Pricing data by ${result.source}';
   final imagePath =
+      result.imageUrl ??
       _placeholderStyle(
         result.category,
         result.title,
