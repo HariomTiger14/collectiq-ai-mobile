@@ -101,6 +101,20 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                       const SizedBox(height: 32),
                       const AboutBrandCard(),
                       const SizedBox(height: 32),
+                      SectionCard(
+                        title: 'Legal',
+                        child: Text(
+                          'PackLox is an independent, unofficial app. It is '
+                          'not affiliated with, endorsed by, or sponsored by '
+                          'any card game publisher, coin mint, toy maker, or '
+                          'other product manufacturer. All product and card '
+                          'imagery displayed in the app belongs to its '
+                          'respective copyright and trademark holders.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
