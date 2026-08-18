@@ -12,6 +12,7 @@ import 'package:collectiq_ai/features/search/domain/entities/catalog_search_resu
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1025,7 +1026,9 @@ class _CatalogResultDetailPageState
                                   size: 16,
                                 ),
                                 label: Text(
-                                  link.isImage
+                                  link.url == (result.imageUrl ?? '').trim()
+                                      ? 'View full image'
+                                      : link.isImage
                                       ? 'View image'
                                       : 'View original listing',
                                 ),
@@ -1047,6 +1050,13 @@ class _CatalogResultDetailPageState
                           _CatalogValuePanel(result: result, value: value),
                           const SizedBox(height: 14),
                           _CatalogTrustPanel(result: result),
+                          const SizedBox(height: 14),
+                          _CatalogHistoryChartPanel(
+                            history: result.history,
+                            isLoading: _isLoadingDetail,
+                            errorMessage: _detailError,
+                            currency: result.currency,
+                          ),
                           const SizedBox(height: 14),
                           _CatalogHistoryPanel(
                             history: result.history,
@@ -1268,67 +1278,6 @@ class _CatalogValuePanel extends StatelessWidget {
               height: 1,
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _CatalogEstimateChip(
-                label: 'Low',
-                value: _formatOptionalCatalogValue(
-                  result.lowEstimate,
-                  result.currency,
-                ),
-              ),
-              _CatalogEstimateChip(
-                label: 'High',
-                value: _formatOptionalCatalogValue(
-                  result.highEstimate,
-                  result.currency,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CatalogEstimateChip extends StatelessWidget {
-  const _CatalogEstimateChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PackLoxTokens.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
         ],
       ),
     );
@@ -1362,7 +1311,7 @@ class _CatalogTrustPanel extends StatelessWidget {
       if (_clean(result.setName) != null || _clean(result.identifier) != null)
         _CatalogDetailRowData('Match basis', _catalogMatchBasis(result)),
       _CatalogDetailRowData(
-        'Value range',
+        'Loose / Graded',
         '${_formatOptionalCatalogValue(result.lowEstimate, result.currency)} - ${_formatOptionalCatalogValue(result.highEstimate, result.currency)}',
       ),
       if (result.lastUpdated != null)
@@ -1434,6 +1383,427 @@ class _CatalogTrustPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A dated point for the [_CatalogHistoryChart].
+class _CatalogChartPoint {
+  const _CatalogChartPoint({required this.date, required this.value});
+
+  final DateTime date;
+  final double value;
+}
+
+/// Sorts [history] chronologically (oldest first) and drops points with no
+/// usable market value, since the backend documents [history] as
+/// "newest first when supplied" -- never assume that ordering holds.
+List<_CatalogChartPoint> _catalogChartPoints(
+  List<CatalogPriceHistoryPoint> history,
+) {
+  final points =
+      [
+          for (final point in history)
+            if (point.marketValue != null && point.marketValue! > 0)
+              _CatalogChartPoint(date: point.validFrom, value: point.marketValue!),
+        ]
+        ..sort((a, b) => a.date.compareTo(b.date));
+  return points;
+}
+
+/// Card wrapping [_CatalogHistoryChart] with the surrounding loading/error/
+/// empty states, matching the visual language of the portfolio detail
+/// screen's value-history chart (see `_ValueHistoryChart` in
+/// `collectible_detail_page.dart`) but sourced from catalog-level
+/// [CatalogPriceHistoryPoint] data instead of portfolio snapshots.
+class _CatalogHistoryChartPanel extends StatelessWidget {
+  const _CatalogHistoryChartPanel({
+    required this.history,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.currency,
+  });
+
+  final List<CatalogPriceHistoryPoint> history;
+  final bool isLoading;
+  final String? errorMessage;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = _catalogChartPoints(history);
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _SectionTitle('Value trend')),
+              if (isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (points.isEmpty)
+            Container(
+              height: 120,
+              width: double.infinity,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: PackLoxTokens.background.withValues(alpha: 0.48),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: PackLoxTokens.border.withValues(alpha: 0.62),
+                ),
+              ),
+              child: Text(
+                isLoading
+                    ? 'Loading observed catalog history...'
+                    : errorMessage ??
+                          'History starts after daily catalog refreshes.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: _CatalogHistoryChart(points: points, currency: currency),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Real axis-labeled trend chart for a catalog item's observed valuation
+/// history -- dates along the bottom, price along the left. Styled to match
+/// `_ValueHistoryChart` in `collectible_detail_page.dart` (same gridlines,
+/// gradient fill, tooltip shape), using [PackLoxTokens] since this screen
+/// uses that token set rather than `HomeTokens`.
+class _CatalogHistoryChart extends StatelessWidget {
+  const _CatalogHistoryChart({required this.points, required this.currency});
+
+  final List<_CatalogChartPoint> points;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final axisLabelStyle = textTheme.labelSmall?.copyWith(
+      color: PackLoxTokens.textSecondary,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+    );
+    const color = PackLoxTokens.cyan;
+
+    if (points.length == 1) {
+      // A single observed point can't draw a meaningful line -- render it as
+      // a flat single-dot chart instead of feeding fl_chart a zero-width
+      // x-axis range, which would otherwise force awkward interval math.
+      final value = points.first.value;
+      final (minY, maxY, yInterval) = _niceCatalogAxisBounds(
+        value - (value.abs() * 0.1) - 1,
+        value + (value.abs() * 0.1) + 1,
+      );
+      return LineChart(
+        LineChartData(
+          minX: 0,
+          maxX: 1,
+          minY: minY,
+          maxY: maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: yInterval,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: PackLoxTokens.border.withValues(alpha: 0.4),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 46,
+                interval: yInterval,
+                getTitlesWidget: (value, meta) => Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    _compactCatalogChartMoney(value),
+                    style: axisLabelStyle,
+                  ),
+                ),
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 26,
+                interval: 1,
+                getTitlesWidget: (rawValue, meta) {
+                  if (rawValue.round() != 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _axisCatalogChartDate(points.first.date),
+                      style: axisLabelStyle,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                return LineTooltipItem(
+                  '${_formatOptionalCatalogValue(value, currency)}\n'
+                  '${_formatShortDate(points.first.date)}',
+                  textTheme.labelSmall!.copyWith(
+                    color: PackLoxTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: [FlSpot(0, value), FlSpot(1, value)],
+              isCurved: false,
+              color: color,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                checkToShowDot: (spot, _) => spot.x == 0,
+              ),
+              belowBarData: BarAreaData(show: false),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final values = points.map((point) => point.value).toList();
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final rawRange = maxValue - minValue;
+    final padding = rawRange > 0 ? rawRange * 0.15 : (maxValue.abs() * 0.1) + 1;
+    final (minY, maxY, yInterval) = _niceCatalogAxisBounds(
+      (minValue - padding).clamp(0, double.infinity).toDouble(),
+      maxValue + padding,
+    );
+    final lastIndex = points.length - 1;
+    final labelIndices = _pickCatalogChartLabelIndices(points);
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: lastIndex.toDouble(),
+        minY: minY,
+        maxY: maxY,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: yInterval,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: PackLoxTokens.border.withValues(alpha: 0.4),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              interval: yInterval,
+              getTitlesWidget: (value, meta) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  _compactCatalogChartMoney(value),
+                  style: axisLabelStyle,
+                ),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.round();
+                if (!labelIndices.contains(index)) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _axisCatalogChartDate(points[index].date),
+                    style: axisLabelStyle,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+              final point = points[spot.x.round().clamp(0, lastIndex)];
+              return LineTooltipItem(
+                '${_formatOptionalCatalogValue(point.value, currency)}\n'
+                '${_formatShortDate(point.date)}',
+                textTheme.labelSmall!.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var index = 0; index <= lastIndex; index += 1)
+                FlSpot(index.toDouble(), points[index].value),
+            ],
+            isCurved: true,
+            curveSmoothness: 0.22,
+            color: color,
+            barWidth: 2.5,
+            dotData: FlDotData(show: points.length <= 6),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  color.withValues(alpha: 0.28),
+                  color.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact axis-tick money label (e.g. "$1.2k"), unlike
+/// [_formatOptionalCatalogValue] which renders "Not supplied" for
+/// zero/negative inputs -- axis gridlines can legitimately land on zero.
+String _compactCatalogChartMoney(double value) {
+  if (value >= 1000) {
+    final thousands = value / 1000;
+    final formatted = thousands.toStringAsFixed(thousands < 10 ? 1 : 0);
+    return '\$${formatted}k';
+  }
+  // Exact, not rounded to the nearest dollar: this chart's gridlines often
+  // land on sub-dollar steps for low-value catalog items (e.g. $3.50,
+  // $4.50), and rounding those to whole dollars produced visibly
+  // duplicated adjacent labels ("$4", "$4"). Only drop the decimals when
+  // the gridline value genuinely is a whole number.
+  final isWhole = value == value.roundToDouble();
+  return '\$${value.toStringAsFixed(isWhole ? 0 : 2)}';
+}
+
+/// Short axis-only date label ("15 Aug", no year) -- distinct from
+/// [_formatShortDate] (used in tooltips/detail rows), which includes the
+/// year and is too wide for the chart's bottom axis, causing the last
+/// label to overflow past the chart's right edge.
+String _axisCatalogChartDate(DateTime date) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]}';
+}
+
+/// Rounds a raw (min, max) range out to "nice" gridline values (multiples of
+/// 1/2/5 * 10^n) with an evenly-spaced interval, mirroring the
+/// `_niceAxisBounds` helper used by the portfolio detail chart so both
+/// charts avoid fl_chart's default from-zero tick generation crowding
+/// labels near the bottom of the axis.
+(double, double, double) _niceCatalogAxisBounds(double rawMin, double rawMax) {
+  final range = (rawMax - rawMin) <= 0 ? rawMax.abs() + 1 : rawMax - rawMin;
+  final roughStep = range / 4;
+  final magnitude = math
+      .pow(10, (math.log(roughStep) / math.ln10).floor())
+      .toDouble();
+  final residual = roughStep / magnitude;
+  final niceResidual = residual <= 1
+      ? 1.0
+      : residual <= 2
+      ? 2.0
+      : residual <= 5
+      ? 5.0
+      : 10.0;
+  final step = niceResidual * magnitude;
+  final minY = (rawMin / step).floor() * step;
+  final maxY = (rawMax / step).ceil() * step;
+  return (math.max(0, minY), maxY == minY ? minY + step : maxY, step);
+}
+
+/// Picks which point indices get an x-axis date label, evenly spaced but
+/// collapsing consecutive candidates that would render the same short date.
+Set<int> _pickCatalogChartLabelIndices(List<_CatalogChartPoint> points) {
+  final lastIndex = points.length - 1;
+  if (lastIndex <= 0) {
+    return {0};
+  }
+  const targetLabelCount = 4;
+  final rawCandidates = <int>{
+    for (var i = 0; i < targetLabelCount; i += 1)
+      (lastIndex * i / (targetLabelCount - 1)).round(),
+  }.toList()..sort();
+
+  final chosen = <int>[];
+  for (final index in rawCandidates) {
+    final label = _axisCatalogChartDate(points[index].date);
+    if (chosen.isNotEmpty &&
+        _axisCatalogChartDate(points[chosen.last].date) == label) {
+      chosen[chosen.length - 1] = index;
+    } else {
+      chosen.add(index);
+    }
+  }
+  return chosen.toSet();
 }
 
 class _CatalogHistoryPanel extends StatelessWidget {
@@ -2373,6 +2743,15 @@ Future<void> _launchExternalLink(BuildContext context, String url) async {
 /// pipeline exists), otherwise a fallback to the source's product page.
 /// Returns null when neither is available.
 ({String url, bool isImage})? _catalogExternalLink(CatalogSearchResult result) {
+  // result.imageUrl is only ever set by the detail() endpoint (a real,
+  // confirmed match, already rendered inline above -- but cropped to fit
+  // the thumbnail frame). Prefer it here so there's always a way to open
+  // the same photo full-size externally, not just when no inline image
+  // exists.
+  final inlineImageUrl = (result.imageUrl ?? '').trim();
+  if (inlineImageUrl.isNotEmpty) {
+    return (url: inlineImageUrl, isImage: true);
+  }
   final externalImageUrl = (result.externalImageUrl ?? '').trim();
   if (externalImageUrl.isNotEmpty) {
     return (url: externalImageUrl, isImage: true);
