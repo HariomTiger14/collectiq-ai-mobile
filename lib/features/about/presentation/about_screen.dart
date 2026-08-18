@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends ConsumerStatefulWidget {
   const AboutScreen({super.key});
@@ -103,15 +104,38 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                       const SizedBox(height: 32),
                       SectionCard(
                         title: 'Legal',
-                        child: Text(
-                          'PackLox is an independent, unofficial app. It is '
-                          'not affiliated with, endorsed by, or sponsored by '
-                          'any card game publisher, coin mint, toy maker, or '
-                          'other product manufacturer. All product and card '
-                          'imagery displayed in the app belongs to its '
-                          'respective copyright and trademark holders.',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PackLox is an independent, unofficial app. It '
+                              'is not affiliated with, endorsed by, or '
+                              'sponsored by any card game publisher, coin '
+                              'mint, toy maker, or other product '
+                              'manufacturer. All product and card imagery '
+                              'displayed in the app belongs to its '
+                              'respective copyright and trademark holders.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 12),
+                            InkWell(
+                              onTap: () => _launchAboutLink(
+                                context,
+                                'https://rawg.io',
+                              ),
+                              child: Text(
+                                'Video game data and cover art via RAWG.io',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -124,6 +148,25 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
         ],
       ),
     );
+  }
+}
+
+Future<void> _launchAboutLink(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return;
+  try {
+    final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unable to open link')));
+    }
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unable to open link')));
+    }
   }
 }
 
