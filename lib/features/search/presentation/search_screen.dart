@@ -15,6 +15,7 @@ import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
 
@@ -702,6 +703,17 @@ class _CatalogResultCard extends StatelessWidget {
                                   label:
                                       '${(result.confidence!.clamp(0, 1) * 100).round()}% match',
                                 ),
+                              if (_catalogExternalLink(result) case final link?)
+                                _CatalogListingLink(
+                                  key: ValueKey(
+                                    'discover-catalog-listing-link-${result.id}',
+                                  ),
+                                  label: link.isImage
+                                      ? 'View image'
+                                      : 'View listing',
+                                  onTap: () =>
+                                      _launchExternalLink(context, link.url),
+                                ),
                             ],
                           ),
                         ),
@@ -798,6 +810,52 @@ class _CatalogMetaPill extends StatelessWidget {
             color: PackLoxTokens.textSecondary,
             fontWeight: FontWeight.w800,
             height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small, unobtrusive "View listing"/"View image" affordance shown on
+/// catalog cards so users can see a real photo of the item -- either its
+/// original source page or, when available, a direct link straight to a
+/// publisher-sourced product image -- without the app hosting/rendering
+/// the image itself.
+class _CatalogListingLink extends StatelessWidget {
+  const _CatalogListingLink({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: PackLoxTokens.cyan,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.north_east_rounded,
+                size: 12,
+                color: PackLoxTokens.cyan,
+              ),
+            ],
           ),
         ),
       ),
@@ -952,6 +1010,39 @@ class _CatalogResultDetailPageState
                               _SearchPill(label: result.source),
                             ],
                           ),
+                          if (_catalogExternalLink(result) case final link?) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                key: const ValueKey(
+                                  'catalog-detail-view-listing',
+                                ),
+                                onPressed: () =>
+                                    _launchExternalLink(context, link.url),
+                                icon: const Icon(
+                                  Icons.north_east_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  link.isImage
+                                      ? 'View image'
+                                      : 'View original listing',
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: PackLoxTokens.cyan,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  textStyle: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 18),
                           _CatalogValuePanel(result: result, value: value),
                           const SizedBox(height: 14),
@@ -2249,6 +2340,48 @@ class _PlaceholderStyle {
   final Color accent;
   final Color background;
   final String? assetPath;
+}
+
+/// Opens a catalog item's source product page -- or, when available, a
+/// direct link to a publisher-sourced product image -- in an in-app
+/// browser tab (SFSafariViewController on iOS, Chrome Custom Tabs on
+/// Android), failing silently with a brief snackbar if the link cannot be
+/// opened.
+Future<void> _launchExternalLink(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    return;
+  }
+  final messenger = ScaffoldMessenger.of(context);
+  var launched = false;
+  try {
+    launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+  } catch (_) {
+    launched = false;
+  }
+  if (!launched) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Unable to open link')),
+    );
+  }
+}
+
+/// Picks the outbound link target for a catalog result: a direct
+/// publisher-sourced image link when available (preferred, since
+/// PriceCharting's own product page frequently has no image at all for
+/// TCG categories -- the entire reason a separate image-enrichment
+/// pipeline exists), otherwise a fallback to the source's product page.
+/// Returns null when neither is available.
+({String url, bool isImage})? _catalogExternalLink(CatalogSearchResult result) {
+  final externalImageUrl = (result.externalImageUrl ?? '').trim();
+  if (externalImageUrl.isNotEmpty) {
+    return (url: externalImageUrl, isImage: true);
+  }
+  final productUrl = (result.productUrl ?? '').trim();
+  if (productUrl.isNotEmpty) {
+    return (url: productUrl, isImage: false);
+  }
+  return null;
 }
 
 String _formatCatalogValue(CatalogSearchResult result) {

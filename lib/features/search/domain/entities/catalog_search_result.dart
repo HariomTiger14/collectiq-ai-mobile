@@ -18,6 +18,8 @@ class CatalogSearchResult {
     this.reasonCode,
     this.displayMessage,
     this.imageUrl,
+    this.productUrl,
+    this.externalImageUrl,
     this.history = const <CatalogPriceHistoryPoint>[],
   });
 
@@ -70,6 +72,18 @@ class CatalogSearchResult {
   /// today — PriceCharting's bulk catalog import has no image field).
   final String? imageUrl;
 
+  /// The source's own product page URL for this item (e.g. PriceCharting),
+  /// used to let users view the original listing outside the app.
+  final String? productUrl;
+
+  /// Link-only publisher-sourced card/product image URL (Funko/Pokemon/
+  /// LEGO/Magic/Yu-Gi-Oh/Lorcana/One Piece), meant to be opened in an
+  /// external/in-app browser tab -- never rendered inline via
+  /// Image.network. Preferred over [productUrl] as a link target when
+  /// present, since PriceCharting's own product page frequently has no
+  /// image at all for these categories.
+  final String? externalImageUrl;
+
   /// Observed catalog valuation history, newest first when supplied.
   final List<CatalogPriceHistoryPoint> history;
 
@@ -91,6 +105,8 @@ class CatalogSearchResult {
     String? reasonCode,
     String? displayMessage,
     String? imageUrl,
+    String? productUrl,
+    String? externalImageUrl,
     List<CatalogPriceHistoryPoint>? history,
   }) {
     return CatalogSearchResult(
@@ -110,6 +126,8 @@ class CatalogSearchResult {
       reasonCode: reasonCode ?? this.reasonCode,
       displayMessage: displayMessage ?? this.displayMessage,
       imageUrl: imageUrl ?? this.imageUrl,
+      productUrl: productUrl ?? this.productUrl,
+      externalImageUrl: externalImageUrl ?? this.externalImageUrl,
       history: history ?? this.history,
     );
   }
@@ -182,6 +200,10 @@ class CatalogSearchResult {
           _string(pricing['displayMessage']) ??
           _string(pricing['pricingExplanation']),
       imageUrl: _string(json['imageUrl']) ?? _string(json['image_url']),
+      productUrl: _string(json['productUrl']) ?? _string(json['product_url']),
+      externalImageUrl:
+          _string(json['externalImageUrl']) ??
+          _string(json['external_image_url']),
       history: _historyFromJson(json['history']),
     );
   }
