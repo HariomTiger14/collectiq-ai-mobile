@@ -21,6 +21,109 @@ import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
 
+/// A category filter option: [key] is the value sent to the backend
+/// (matches PRICECHARTING_CATEGORY_GROUPS / PRICECHARTING_PLATFORM_GROUPS
+/// in catalog_search_service.py), [label] is the display text.
+typedef CatalogFilterGroup = ({String key, String label});
+
+/// Mirrors PRICECHARTING_CATEGORY_GROUPS -- keys must match exactly.
+const kCatalogCategoryGroups = <CatalogFilterGroup>[
+  (key: 'sports-cards', label: 'Sports Cards'),
+  (key: 'trading-card-games', label: 'Trading Card Games'),
+  (key: 'comics', label: 'Comics'),
+  (key: 'funko-pops', label: 'Funko Pops'),
+  (key: 'lego-sets', label: 'Lego Sets'),
+  (key: 'coins', label: 'Coins'),
+];
+
+/// Mirrors PRICECHARTING_PLATFORM_GROUPS -- keys must match exactly. Video
+/// Games has no coarse category taxonomy on the backend (category holds a
+/// real per-game genre), so it's filtered by platform instead, against the
+/// precomputed platform_group column -- same category_group param, just a
+/// different set of keys.
+const kCatalogPlatformGroups = <CatalogFilterGroup>[
+  (key: 'playstation', label: 'PlayStation'),
+  (key: 'xbox', label: 'Xbox'),
+  (key: 'nintendo', label: 'Nintendo'),
+  (key: 'sega', label: 'Sega'),
+  (key: 'atari', label: 'Atari'),
+  (key: 'pc', label: 'PC'),
+  (key: 'retro-other', label: 'Other retro'),
+];
+
+const _unsetFilterField = Object();
+
+/// Immutable draft/applied state for the Discover filter sheet.
+class _CatalogFilterSelection {
+  const _CatalogFilterSelection({
+    this.categoryGroup,
+    this.minPrice,
+    this.maxPrice,
+    this.source,
+  });
+
+  const _CatalogFilterSelection.defaults()
+    : categoryGroup = null,
+      minPrice = null,
+      maxPrice = null,
+      source = null;
+
+  final String? categoryGroup;
+  final double? minPrice;
+  final double? maxPrice;
+  final String? source;
+
+  int get activeCount => [
+    categoryGroup,
+    minPrice,
+    maxPrice,
+    source,
+  ].where((value) => value != null).length;
+
+  String get categoryLabel {
+    if (categoryGroup == null) {
+      return 'All categories';
+    }
+    for (final group in kCatalogCategoryGroups) {
+      if (group.key == categoryGroup) {
+        return group.label;
+      }
+    }
+    for (final group in kCatalogPlatformGroups) {
+      if (group.key == categoryGroup) {
+        return group.label;
+      }
+    }
+    return 'All categories';
+  }
+
+  // Object? + a sentinel default lets a field be explicitly reset to null
+  // (e.g. clearing the category) while every other field stays unchanged --
+  // a plain `T? field` param can't distinguish "not passed" from "passed
+  // null" the way this needs to.
+  _CatalogFilterSelection copyWith({
+    Object? categoryGroup = _unsetFilterField,
+    Object? minPrice = _unsetFilterField,
+    Object? maxPrice = _unsetFilterField,
+    Object? source = _unsetFilterField,
+  }) {
+    return _CatalogFilterSelection(
+      categoryGroup: identical(categoryGroup, _unsetFilterField)
+          ? this.categoryGroup
+          : categoryGroup as String?,
+      minPrice: identical(minPrice, _unsetFilterField)
+          ? this.minPrice
+          : minPrice as double?,
+      maxPrice: identical(maxPrice, _unsetFilterField)
+          ? this.maxPrice
+          : maxPrice as double?,
+      source: identical(source, _unsetFilterField)
+          ? this.source
+          : source as String?,
+    );
+  }
+}
+
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
     this.previewState = SearchPreviewState.defaultView,
@@ -41,6 +144,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _lastCatalogQuery = '';
   int _catalogRequestId = 0;
   Timer? _catalogDebounceTimer;
+  var _filters = const _CatalogFilterSelection.defaults();
 
   @override
   void initState() {
@@ -126,6 +230,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             // as a quick-filter tap so results disappear
                             // immediately instead of after the typing delay.
                             onClear: () => _setQuery(''),
+                          ),
+                          const SizedBox(height: 10),
+                          _CatalogFilterButton(
+                            filters: _filters,
+                            onTap: () => _openFilterSheet(context),
                           ),
                           const SizedBox(height: 18),
                           _CatalogStatusCard(
@@ -225,7 +334,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     try {
       final results = await ref
           .read(catalogSearchRepositoryProvider)
-          .searchCatalog(query: trimmed);
+          .searchCatalog(
+            query: trimmed,
+            categoryGroup: _filters.categoryGroup,
+            minPrice: _filters.minPrice,
+            maxPrice: _filters.maxPrice,
+            source: _filters.source,
+          );
       if (!mounted || requestId != _catalogRequestId) {
         return;
       }
@@ -243,6 +358,159 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _catalogError = 'Catalog search is not connected yet.';
       });
     }
+  }
+
+  Future<void> _openFilterSheet(BuildContext context) async {
+    var draft = _filters;
+    final minController = TextEditingController(
+      text: draft.minPrice == null ? '' : draft.minPrice!.toStringAsFixed(0),
+    );
+    final maxController = TextEditingController(
+      text: draft.maxPrice == null ? '' : draft.maxPrice!.toStringAsFixed(0),
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: .58),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void update(_CatalogFilterSelection next) {
+              setSheetState(() => draft = next);
+            }
+
+            return _CatalogFilterSheet(
+              children: [
+                _CatalogSheetGroup(
+                  title: 'Category',
+                  children: [
+                    _CatalogSheetOptionChip(
+                      key: const ValueKey('catalog-filter-category-all'),
+                      label: 'All categories',
+                      selected: draft.categoryGroup == null,
+                      onTap: () => update(draft.copyWith(categoryGroup: null)),
+                    ),
+                    for (final group in kCatalogCategoryGroups)
+                      _CatalogSheetOptionChip(
+                        key: ValueKey('catalog-filter-category-${group.key}'),
+                        label: group.label,
+                        selected: draft.categoryGroup == group.key,
+                        onTap: () =>
+                            update(draft.copyWith(categoryGroup: group.key)),
+                      ),
+                  ],
+                ),
+                _CatalogSheetGroup(
+                  title: 'Video Games platform',
+                  children: [
+                    for (final group in kCatalogPlatformGroups)
+                      _CatalogSheetOptionChip(
+                        key: ValueKey('catalog-filter-platform-${group.key}'),
+                        label: group.label,
+                        selected: draft.categoryGroup == group.key,
+                        onTap: () =>
+                            update(draft.copyWith(categoryGroup: group.key)),
+                      ),
+                  ],
+                ),
+                _CatalogSheetGroup(
+                  title: 'Source',
+                  children: [
+                    _CatalogSheetOptionChip(
+                      key: const ValueKey('catalog-filter-source-all'),
+                      label: 'All sources',
+                      selected: draft.source == null,
+                      onTap: () => update(draft.copyWith(source: null)),
+                    ),
+                    _CatalogSheetOptionChip(
+                      key: const ValueKey('catalog-filter-source-pricecharting'),
+                      label: 'PriceCharting',
+                      selected: draft.source == 'pricecharting',
+                      onTap: () =>
+                          update(draft.copyWith(source: 'pricecharting')),
+                    ),
+                    _CatalogSheetOptionChip(
+                      key: const ValueKey('catalog-filter-source-kicksdb'),
+                      label: 'KicksDB',
+                      selected: draft.source == 'kicksdb',
+                      onTap: () => update(draft.copyWith(source: 'kicksdb')),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Price range',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: PackLoxTokens.textSecondary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _CatalogFilterPriceField(
+                        key: const ValueKey('catalog-filter-min-price'),
+                        controller: minController,
+                        hintText: 'Min \$',
+                        onChanged: (value) => update(
+                          draft.copyWith(minPrice: double.tryParse(value)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _CatalogFilterPriceField(
+                        key: const ValueKey('catalog-filter-max-price'),
+                        controller: maxController,
+                        hintText: 'Max \$',
+                        onChanged: (value) => update(
+                          draft.copyWith(maxPrice: double.tryParse(value)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const ValueKey('catalog-filter-reset'),
+                        onPressed: () {
+                          minController.clear();
+                          maxController.clear();
+                          update(const _CatalogFilterSelection.defaults());
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const ValueKey('catalog-filter-apply'),
+                        onPressed: () {
+                          setState(() => _filters = draft);
+                          Navigator.of(context).pop();
+                          final query = _queryController.text.trim();
+                          if (query.length >= 2) {
+                            _runCatalogSearch(query);
+                          }
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Apply'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    minController.dispose();
+    maxController.dispose();
   }
 
   Future<void> _openCatalogResult(
@@ -614,6 +882,271 @@ class _QuickFilterChip extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Row that opens the filter sheet -- shows a summary of active filters
+/// (category + a count badge for price/source) so the current state is
+/// visible without opening the sheet.
+class _CatalogFilterButton extends StatelessWidget {
+  const _CatalogFilterButton({required this.filters, required this.onTap});
+
+  final _CatalogFilterSelection filters;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = filters.activeCount > 0;
+    return GestureDetector(
+      key: const ValueKey('discover-filter-button'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+            width: isActive ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: isActive
+                  ? PackLoxTokens.cyan
+                  : PackLoxTokens.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                filters.categoryGroup == null
+                    ? 'Filters'
+                    : filters.categoryLabel,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: isActive
+                      ? PackLoxTokens.textPrimary
+                      : PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (filters.activeCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: PackLoxTokens.cyan.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${filters.activeCount}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: PackLoxTokens.cyan,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(width: 6),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: PackLoxTokens.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogFilterSheet extends StatelessWidget {
+  const _CatalogFilterSheet({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .78,
+        minChildSize: .42,
+        maxChildSize: .92,
+        builder: (context, scrollController) {
+          return Container(
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surfaceRaised,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: PackLoxTokens.border),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: PackLoxTokens.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Filter catalog',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: PackLoxTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Changes apply only when you tap Apply.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: PackLoxTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...children,
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CatalogSheetGroup extends StatelessWidget {
+  const _CatalogSheetGroup({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: children),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogSheetOptionChip extends StatelessWidget {
+  const _CatalogSheetOptionChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selected) ...[
+            const Icon(
+              Icons.check,
+              size: 16,
+              color: PackLoxTokens.textPrimary,
+            ),
+            const SizedBox(width: 6),
+          ],
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: PackLoxTokens.cyan.withValues(alpha: 0.28),
+      backgroundColor: PackLoxTokens.surface,
+      labelStyle: TextStyle(
+        color: selected
+            ? PackLoxTokens.textPrimary
+            : PackLoxTokens.textSecondary,
+        fontWeight: FontWeight.w900,
+      ),
+      side: BorderSide(
+        color: selected ? PackLoxTokens.cyan : PackLoxTokens.border,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    );
+  }
+}
+
+class _CatalogFilterPriceField extends StatelessWidget {
+  const _CatalogFilterPriceField({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PackLoxTokens.border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: PackLoxTokens.textPrimary,
+          fontWeight: FontWeight.w800,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: hintText,
+          hintStyle: TextStyle(color: PackLoxTokens.textSecondary),
         ),
       ),
     );
