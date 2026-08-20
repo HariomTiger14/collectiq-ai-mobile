@@ -7,6 +7,7 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -1050,6 +1051,10 @@ class _CatalogResultDetailPageState
                           _CatalogValuePanel(result: result, value: value),
                           const SizedBox(height: 14),
                           _CatalogTrustPanel(result: result),
+                          if (result.marketplaceListings.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _CatalogMarketplaceListingsPanel(result: result),
+                          ],
                           const SizedBox(height: 14),
                           _CatalogHistoryChartPanel(
                             history: result.history,
@@ -1196,9 +1201,19 @@ class _CatalogResultDetailPageState
 
   Future<void> _loadCatalogDetail() async {
     try {
+      // preferredCurrency drives both price display and which eBay
+      // marketplace's listings the backend matches -- see
+      // CatalogSearchRepository.getCatalogDetail's own doc comment.
+      final profileState = ref.read(profileControllerProvider);
+      final preferredCurrency = profileState.hasValue
+          ? profileState.requireValue.preferredCurrency
+          : null;
       final detail = await ref
           .read(catalogSearchRepositoryProvider)
-          .getCatalogDetail(result: widget.result);
+          .getCatalogDetail(
+            result: widget.result,
+            currency: preferredCurrency,
+          );
       if (!mounted) {
         return;
       }
@@ -1379,6 +1394,108 @@ class _CatalogTrustPanel extends StatelessWidget {
             if (row != rows.last)
               const Divider(color: PackLoxTokens.border, height: 18),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Real, currently-available eBay listings for this catalog item, when
+/// any exist -- link-out only (opens the real eBay listing in-browser),
+/// never a purchase flow inside PackLox itself. Hides entirely when empty
+/// rather than showing an empty/error state: most items won't have a live
+/// listing at any given moment (eBay's marketplace is large but not
+/// exhaustive), and that's a normal, expected outcome, not a failure.
+class _CatalogMarketplaceListingsPanel extends StatelessWidget {
+  const _CatalogMarketplaceListingsPanel({required this.result});
+
+  final CatalogSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final listings = result.marketplaceListings;
+    if (listings.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Buy on eBay',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final listing in listings) ...[
+            _CatalogMarketplaceListingRow(listing: listing),
+            if (listing != listings.last)
+              const Divider(color: PackLoxTokens.border, height: 18),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogMarketplaceListingRow extends StatelessWidget {
+  const _CatalogMarketplaceListingRow({required this.listing});
+
+  final MarketplaceListing listing;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _launchExternalLink(context, listing.url),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  listing.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: PackLoxTokens.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (listing.condition.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    listing.condition,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: PackLoxTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatOptionalCatalogValue(listing.price, listing.currency),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Icon(
+                Icons.north_east_rounded,
+                size: 14,
+                color: PackLoxTokens.cyan,
+              ),
+            ],
+          ),
         ],
       ),
     );
