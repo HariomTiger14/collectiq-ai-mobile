@@ -541,6 +541,10 @@ class _QaCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     return [_qaCatalogResult];
   }

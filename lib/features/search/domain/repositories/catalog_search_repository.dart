@@ -3,9 +3,21 @@ import 'package:collectiq_ai/features/search/domain/entities/catalog_search_resu
 /// Repository boundary for PackLox catalog search.
 abstract class CatalogSearchRepository {
   /// Searches the backend pricing/catalog index.
+  ///
+  /// [categoryGroup] narrows to one of the backend's curated category
+  /// groups (sports-cards/trading-card-games/comics/funko-pops/lego-sets/
+  /// coins), or a Video Games platform key (playstation/xbox/nintendo/
+  /// sega/atari/pc/retro-other) -- same taxonomy as the admin Catalog
+  /// screen. [minPrice]/[maxPrice] filter by price range. [source]
+  /// restricts to a single provider ('pricecharting' or 'kicksdb');
+  /// omitting it searches both, merged and re-ranked together as today.
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   });
 
   /// Loads a catalog item with richer detail/history when available.

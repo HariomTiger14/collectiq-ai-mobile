@@ -55,6 +55,122 @@ void main() {
     expect(find.text('Charizard #4 Base Set'), findsOneWidget);
   });
 
+  testWidgets(
+    'filter sheet applies category and source to the catalog search',
+    (tester) async {
+      final catalogRepository = _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'pc-mario',
+          title: 'Mario & Luigi RPG',
+          category: 'Video Games',
+          source: 'PriceCharting',
+          setName: 'Nintendo 64',
+          currency: 'USD',
+          marketValue: 40,
+          attribution: 'Pricing data by PriceCharting',
+        ),
+      ]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'mario',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      // The debounced query search already ran once with no filters --
+      // clear it so the assertion below only reflects the filtered search.
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      );
+      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-filter-source-pricecharting')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-source-pricecharting'),
+        ),
+      );
+      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-filter-apply')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['mario']);
+      expect(catalogRepository.lastCategoryGroup, 'nintendo');
+      expect(catalogRepository.lastSource, 'pricecharting');
+      // The filter button now shows the platform's label and an active
+      // count badge, confirming the applied state is reflected in the UI.
+      expect(find.text('Nintendo'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet reset clears every field back to defaults',
+    (tester) async {
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'mario',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      );
+      await tester.pump();
+      // Reset within the same open sheet session (rather than closing and
+      // reopening) -- selecting Nintendo, then resetting, then applying,
+      // all in one session, still exercises Reset's actual clearing
+      // behavior without depending on the sheet's scroll position surviving
+      // a close/reopen cycle.
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-filter-reset')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-reset')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.lastCategoryGroup, isNull);
+      expect(catalogRepository.lastSource, isNull);
+      expect(find.text('Filters'), findsOneWidget);
+    },
+  );
+
   testWidgets('catalog search shows backend catalog results', (tester) async {
     final catalogRepository = _MemoryCatalogSearchRepository([
       const CatalogSearchResult(
@@ -588,13 +704,25 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
 
   final List<CatalogSearchResult> results;
   final List<String> queries = [];
+  String? lastCategoryGroup;
+  double? lastMinPrice;
+  double? lastMaxPrice;
+  String? lastSource;
 
   @override
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     queries.add(query);
+    lastCategoryGroup = categoryGroup;
+    lastMinPrice = minPrice;
+    lastMaxPrice = maxPrice;
+    lastSource = source;
     return results;
   }
 
@@ -616,6 +744,10 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     throw StateError('Catalog endpoint missing');
   }

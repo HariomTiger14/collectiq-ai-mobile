@@ -22,10 +22,22 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     final response = await _apiClient.get(
       ApiConstants.pricingCatalogSearchPath,
-      queryParameters: {'q': query, 'limit': limit},
+      queryParameters: {
+        'q': query,
+        'limit': limit,
+        if (categoryGroup != null && categoryGroup.isNotEmpty)
+          'categoryGroup': categoryGroup,
+        if (minPrice != null) 'minPrice': minPrice,
+        if (maxPrice != null) 'maxPrice': maxPrice,
+        if (source != null && source.isNotEmpty) 'source': source,
+      },
     );
     final data = response.data;
     final rows = switch (data) {
