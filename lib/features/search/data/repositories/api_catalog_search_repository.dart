@@ -43,7 +43,7 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
     String? currency,
   }) async {
     final response = await _apiClient.get(

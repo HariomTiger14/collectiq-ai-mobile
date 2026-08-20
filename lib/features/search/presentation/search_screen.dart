@@ -1064,6 +1064,7 @@ class _CatalogResultDetailPageState
                           ),
                           const SizedBox(height: 14),
                           _CatalogHistoryPanel(
+                            itemTitle: result.title,
                             history: result.history,
                             isLoading: _isLoadingDetail,
                             errorMessage: _detailError,
@@ -1923,19 +1924,30 @@ Set<int> _pickCatalogChartLabelIndices(List<_CatalogChartPoint> points) {
   return chosen.toSet();
 }
 
+/// How many entries show inline on the detail screen before the list
+/// hands off to the dedicated full-history page -- the trend chart above
+/// this panel already uses the complete fetched history (up to 90, see
+/// CatalogSearchRepository.getCatalogDetail's default), so this is purely
+/// a display cap, not a data-fetching one.
+const int _kInlinePriceHistoryLimit = 5;
+
 class _CatalogHistoryPanel extends StatelessWidget {
   const _CatalogHistoryPanel({
+    required this.itemTitle,
     required this.history,
     required this.isLoading,
     required this.errorMessage,
   });
 
+  final String itemTitle;
   final List<CatalogPriceHistoryPoint> history;
   final bool isLoading;
   final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
+    final visible = history.take(_kInlinePriceHistoryLimit).toList();
+    final hasMore = history.length > visible.length;
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1952,11 +1964,46 @@ class _CatalogHistoryPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (history.isNotEmpty) ...[
-            for (final point in history.take(4)) ...[
+          if (visible.isNotEmpty) ...[
+            for (final point in visible) ...[
               _CatalogHistoryRow(point: point),
-              if (point != history.take(4).last)
+              if (point != visible.last)
                 const Divider(color: PackLoxTokens.border, height: 18),
+            ],
+            if (hasMore) ...[
+              const Divider(color: PackLoxTokens.border, height: 18),
+              InkWell(
+                key: const ValueKey('catalog-view-full-price-history'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _CatalogFullPriceHistoryPage(
+                      itemTitle: itemTitle,
+                      history: history,
+                    ),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'View full price history (${history.length})',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: PackLoxTokens.cyan,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: PackLoxTokens.cyan,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ] else
             Text(
@@ -1971,6 +2018,69 @@ class _CatalogHistoryPanel extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full, scrollable price-change history for a catalog item -- reuses
+/// whatever the detail screen already fetched (up to 90 entries, see
+/// CatalogSearchRepository.getCatalogDetail) with no second network call.
+class _CatalogFullPriceHistoryPage extends StatelessWidget {
+  const _CatalogFullPriceHistoryPage({
+    required this.itemTitle,
+    required this.history,
+  });
+
+  final String itemTitle;
+  final List<CatalogPriceHistoryPoint> history;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PackLoxTokens.background,
+      appBar: AppBar(
+        backgroundColor: PackLoxTokens.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: PackLoxTokens.textPrimary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Price history',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          children: [
+            Text(
+              itemTitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final point in history) ...[
+                    _CatalogHistoryRow(point: point),
+                    if (point != history.last)
+                      const Divider(color: PackLoxTokens.border, height: 18),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

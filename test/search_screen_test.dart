@@ -275,6 +275,76 @@ void main() {
     expect(find.text('pokemon'), findsWidgets);
   });
 
+  testWidgets(
+    'catalog result detail shows only 5 history entries inline, with a '
+    'link to the full history',
+    (tester) async {
+      // Newest first, matching the real API's own ordering
+      // (order: valid_from.desc) -- the panel takes the list as-is, it
+      // doesn't re-sort.
+      final history = List.generate(
+        8,
+        (index) => CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 7, 27 - index),
+          isCurrent: index == 0,
+          currency: 'USD',
+          marketValue: 107 - index.toDouble(),
+          sourceFile: 'pokemon.csv',
+        ),
+      );
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-charizard',
+            title: 'Charizard #4 Base Set',
+            category: 'Pokemon Cards',
+            source: 'PriceCharting',
+            setName: 'Base Set',
+            currency: 'USD',
+            marketValue: 107,
+            attribution: 'Pricing data by PriceCharting',
+            history: history,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
+      );
+      await tester.pumpAndSettle();
+
+      // Inline: only the 5 most recent history rows, newest first.
+      expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
+      expect(find.text('23 Jul 2026 - ended'), findsOneWidget);
+      expect(find.text('22 Jul 2026 - ended'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-view-full-price-history')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('View full price history (8)'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-view-full-price-history')),
+      );
+      await tester.pumpAndSettle();
+
+      // Full page: every entry is now reachable, no second network call
+      // (the memory repository only returns data once, on getCatalogDetail).
+      expect(find.text('Charizard #4 Base Set'), findsOneWidget);
+      expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
+      expect(find.text('22 Jul 2026 - ended'), findsOneWidget);
+      expect(find.text('20 Jul 2026 - ended'), findsOneWidget);
+    },
+  );
+
   testWidgets('catalog result detail shows real eBay listings when present', (
     tester,
   ) async {
@@ -463,7 +533,7 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
     String? currency,
   }) async {
     return results.firstWhere(
@@ -485,7 +555,7 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
     String? currency,
   }) async {
     throw StateError('Catalog endpoint missing');
