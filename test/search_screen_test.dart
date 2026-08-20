@@ -275,6 +275,87 @@ void main() {
     expect(find.text('pokemon'), findsWidgets);
   });
 
+  testWidgets('catalog result detail shows real eBay listings when present', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'pc-god-of-war',
+          title: 'God of War',
+          category: 'Video Games',
+          source: 'PriceCharting',
+          setName: 'Playstation 4',
+          currency: 'AUD',
+          marketValue: 19.74,
+          attribution: 'Pricing data by PriceCharting',
+          marketplaceListings: [
+            MarketplaceListing(
+              title: 'God of War PS4 Brand New',
+              price: 21.49,
+              currency: 'AUD',
+              condition: 'New',
+              url: 'https://www.ebay.com/itm/12345',
+            ),
+          ],
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'god of war',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-pc-god-of-war')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Buy on eBay'), findsOneWidget);
+    expect(find.text('God of War PS4 Brand New'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
+    expect(find.text('\$21.49 AUD'), findsOneWidget);
+  });
+
+  testWidgets(
+    'catalog result detail hides the eBay panel when there are no listings',
+    (tester) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          const CatalogSearchResult(
+            id: 'pc-obscure-game',
+            title: 'Obscure Game',
+            category: 'Video Games',
+            source: 'PriceCharting',
+            setName: 'Playstation 4',
+            currency: 'AUD',
+            marketValue: 5,
+            attribution: 'Pricing data by PriceCharting',
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'obscure game',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-obscure-game')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Buy on eBay'), findsNothing);
+    },
+  );
+
   testWidgets('catalog search has a clear unavailable state', (tester) async {
     await _pumpSearch(
       tester,
@@ -383,6 +464,7 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
     int historyLimit = 30,
+    String? currency,
   }) async {
     return results.firstWhere(
       (candidate) => candidate.id == result.id,
@@ -404,6 +486,7 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
     int historyLimit = 30,
+    String? currency,
   }) async {
     throw StateError('Catalog endpoint missing');
   }

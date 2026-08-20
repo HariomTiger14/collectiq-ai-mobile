@@ -549,6 +549,7 @@ class _QaCatalogSearchRepository implements CatalogSearchRepository {
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
     int historyLimit = 30,
+    String? currency,
   }) async {
     return _qaCatalogResult;
   }

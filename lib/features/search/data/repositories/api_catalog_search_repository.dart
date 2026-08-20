@@ -44,10 +44,14 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
     int historyLimit = 30,
+    String? currency,
   }) async {
     final response = await _apiClient.get(
       '${ApiConstants.pricingCatalogDetailPath}/${Uri.encodeComponent(result.id)}',
-      queryParameters: {'historyLimit': historyLimit},
+      queryParameters: {
+        'historyLimit': historyLimit,
+        if (currency != null && currency.isNotEmpty) 'currency': currency,
+      },
     );
     final data = response.data;
     if (data is! Map<String, dynamic>) {
@@ -62,6 +66,15 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
               .map(CatalogPriceHistoryPoint.fromJson)
               .toList(growable: false)
         : detail.history;
-    return detail.copyWith(history: history);
+    final marketplaceListings = data['marketplaceListings'] is List<dynamic>
+        ? (data['marketplaceListings'] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map(MarketplaceListing.fromJson)
+              .toList(growable: false)
+        : detail.marketplaceListings;
+    return detail.copyWith(
+      history: history,
+      marketplaceListings: marketplaceListings,
+    );
   }
 }
