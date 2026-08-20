@@ -1422,7 +1422,7 @@ class _CatalogMarketplaceListingsPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Buy on eBay',
+            'Where to buy',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: PackLoxTokens.textSecondary,
               fontWeight: FontWeight.w800,
@@ -1465,15 +1465,23 @@ class _CatalogMarketplaceListingRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (listing.condition.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    listing.condition,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: PackLoxTokens.textSecondary,
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _SearchPill(label: listing.source),
+                    if (listing.condition.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          listing.condition,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: PackLoxTokens.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
