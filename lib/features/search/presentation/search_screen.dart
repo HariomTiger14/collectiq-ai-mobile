@@ -1533,7 +1533,10 @@ class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final listing in listings) ...[
-                    _CatalogMarketplaceListingRow(listing: listing),
+                    _CatalogMarketplaceListingRow(
+                      listing: listing,
+                      truncateTitle: false,
+                    ),
                     if (listing != listings.last)
                       const Divider(color: PackLoxTokens.border, height: 18),
                   ],
@@ -1548,9 +1551,18 @@ class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
 }
 
 class _CatalogMarketplaceListingRow extends StatelessWidget {
-  const _CatalogMarketplaceListingRow({required this.listing});
+  const _CatalogMarketplaceListingRow({
+    required this.listing,
+    this.truncateTitle = true,
+  });
 
   final MarketplaceListing listing;
+
+  /// Compact contexts (the inline "Where to buy" preview) clip long
+  /// titles to 2 lines since row height there needs to stay predictable
+  /// -- the full listings page has nothing else competing for space, so
+  /// it shows the whole title instead.
+  final bool truncateTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1565,8 +1577,8 @@ class _CatalogMarketplaceListingRow extends StatelessWidget {
               children: [
                 Text(
                   listing.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: truncateTitle ? 2 : null,
+                  overflow: truncateTitle ? TextOverflow.ellipsis : null,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: PackLoxTokens.textPrimary,
                     fontWeight: FontWeight.w700,
