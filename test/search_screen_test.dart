@@ -426,6 +426,74 @@ void main() {
     },
   );
 
+  testWidgets(
+    'catalog result detail shows only 3 marketplace listings inline, with '
+    'a link to view all',
+    (tester) async {
+      final listings = List.generate(
+        5,
+        (index) => MarketplaceListing(
+          title: 'God of War listing #$index',
+          price: 20.0 + index,
+          currency: 'AUD',
+          condition: index.isEven ? 'New' : 'Used',
+          url: 'https://www.ebay.com/itm/$index',
+          source: index.isEven ? 'eBay' : 'PriceCharting',
+        ),
+      );
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-god-of-war',
+            title: 'God of War',
+            category: 'Video Games',
+            source: 'PriceCharting',
+            setName: 'Playstation 4',
+            currency: 'AUD',
+            marketValue: 19.74,
+            attribution: 'Pricing data by PriceCharting',
+            marketplaceListings: listings,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'god of war',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-god-of-war')),
+      );
+      await tester.pumpAndSettle();
+
+      // Inline: only the 3 most recent listings.
+      expect(find.text('God of War listing #0'), findsOneWidget);
+      expect(find.text('God of War listing #1'), findsOneWidget);
+      expect(find.text('God of War listing #2'), findsOneWidget);
+      expect(find.text('God of War listing #3'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-view-full-marketplace-listings')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('View all listings (5)'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-view-full-marketplace-listings')),
+      );
+      await tester.pumpAndSettle();
+
+      // Full page: every listing is now reachable, no second network call
+      // (the memory repository only returns data once, on getCatalogDetail).
+      expect(find.text('Where to buy'), findsOneWidget);
+      expect(find.text('God of War'), findsOneWidget);
+      expect(find.text('God of War listing #4'), findsOneWidget);
+    },
+  );
+
   testWidgets('catalog search has a clear unavailable state', (tester) async {
     await _pumpSearch(
       tester,
