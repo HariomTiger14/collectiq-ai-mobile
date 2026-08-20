@@ -1053,7 +1053,10 @@ class _CatalogResultDetailPageState
                           _CatalogTrustPanel(result: result),
                           if (result.marketplaceListings.isNotEmpty) ...[
                             const SizedBox(height: 14),
-                            _CatalogMarketplaceListingsPanel(result: result),
+                            _CatalogMarketplaceListingsPanel(
+                              itemTitle: result.title,
+                              result: result,
+                            ),
                           ],
                           const SizedBox(height: 14),
                           _CatalogHistoryChartPanel(
@@ -1407,9 +1410,12 @@ class _CatalogTrustPanel extends StatelessWidget {
 /// rather than showing an empty/error state: most items won't have a live
 /// listing at any given moment (eBay's marketplace is large but not
 /// exhaustive), and that's a normal, expected outcome, not a failure.
-class _CatalogMarketplaceListingsPanel extends StatelessWidget {
-  const _CatalogMarketplaceListingsPanel({required this.result});
+const int _kInlineMarketplaceListingsLimit = 3;
 
+class _CatalogMarketplaceListingsPanel extends StatelessWidget {
+  const _CatalogMarketplaceListingsPanel({required this.itemTitle, required this.result});
+
+  final String itemTitle;
   final CatalogSearchResult result;
 
   @override
@@ -1418,6 +1424,8 @@ class _CatalogMarketplaceListingsPanel extends StatelessWidget {
     if (listings.isEmpty) {
       return const SizedBox.shrink();
     }
+    final visible = listings.take(_kInlineMarketplaceListingsLimit).toList();
+    final hasMore = listings.length > visible.length;
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1430,12 +1438,110 @@ class _CatalogMarketplaceListingsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          for (final listing in listings) ...[
+          for (final listing in visible) ...[
             _CatalogMarketplaceListingRow(listing: listing),
-            if (listing != listings.last)
+            if (listing != visible.last)
               const Divider(color: PackLoxTokens.border, height: 18),
           ],
+          if (hasMore) ...[
+            const Divider(color: PackLoxTokens.border, height: 18),
+            InkWell(
+              key: const ValueKey('catalog-view-full-marketplace-listings'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => _CatalogFullMarketplaceListingsPage(
+                    itemTitle: itemTitle,
+                    listings: listings,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'View all listings (${listings.length})',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: PackLoxTokens.cyan,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: PackLoxTokens.cyan,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Full list of marketplace listings for a catalog item -- reuses whatever
+/// the detail screen already fetched (up to 8 per source, see
+/// CatalogSearchService._fetch_marketplace_listings) with no second
+/// network call.
+class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
+  const _CatalogFullMarketplaceListingsPage({
+    required this.itemTitle,
+    required this.listings,
+  });
+
+  final String itemTitle;
+  final List<MarketplaceListing> listings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PackLoxTokens.background,
+      appBar: AppBar(
+        backgroundColor: PackLoxTokens.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: PackLoxTokens.textPrimary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Where to buy',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          children: [
+            Text(
+              itemTitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final listing in listings) ...[
+                    _CatalogMarketplaceListingRow(listing: listing),
+                    if (listing != listings.last)
+                      const Divider(color: PackLoxTokens.border, height: 18),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
