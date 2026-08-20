@@ -315,7 +315,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Buy on eBay'), findsOneWidget);
+    expect(find.text('Where to buy'), findsOneWidget);
     expect(find.text('God of War PS4 Brand New'), findsOneWidget);
     expect(find.text('New'), findsOneWidget);
     expect(find.text('\$21.49 AUD'), findsOneWidget);
@@ -352,7 +352,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Buy on eBay'), findsNothing);
+      expect(find.text('Where to buy'), findsNothing);
     },
   );
 
