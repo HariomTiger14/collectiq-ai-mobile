@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -329,8 +332,14 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final effectiveSearchQuery = _effectiveSearchQuery(previewScenario);
     final orderedItems = _orderedItems(portfolioState.items);
     final visibleItems = _visibleItems(orderedItems, effectiveSearchQuery);
+    final displayCurrency = isPreview ? 'AUD' : ref.watch(displayCurrencyProvider);
+    final fxRates = isPreview
+        ? FxRateSnapshot.empty
+        : ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
     final portfolioAnalytics = const CollectorDashboardAnalyticsService().build(
       orderedItems,
+      displayCurrency: displayCurrency,
+      currentRates: fxRates.currentRates,
     );
     final hasItems = portfolioState.items.isNotEmpty;
     final isFilteredEmpty = hasItems && visibleItems.isEmpty;
@@ -494,10 +503,12 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                     if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioMetrics(
-                          totalValue: _displayTotalValue(portfolioState.items),
-                          displayCurrency: dominantDisplayCurrency(
+                          totalValue: _displayTotalValue(
                             portfolioState.items,
+                            displayCurrency: displayCurrency,
+                            currentRates: fxRates.currentRates,
                           ),
+                          displayCurrency: displayCurrency,
                           itemCount: portfolioState.items.length,
                           valuedItemCount: _valuedItemCount(
                             portfolioState.items,
@@ -2048,13 +2059,22 @@ class _PortfolioTopValueList extends StatelessWidget {
   }
 }
 
-class _PortfolioTopValueRow extends StatelessWidget {
+class _PortfolioTopValueRow extends ConsumerWidget {
   const _PortfolioTopValueRow({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+    final convertedValue = convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    );
     return Row(
       children: [
         Expanded(
@@ -2070,7 +2090,7 @@ class _PortfolioTopValueRow extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(
-          _formatAud(item.estimatedValue, currencyForItem(item)),
+          _formatAud(convertedValue, displayCurrency),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: HomeTokens.positive,
             fontWeight: FontWeight.w900,
@@ -2284,7 +2304,7 @@ class _PortfolioContent extends StatelessWidget {
   }
 }
 
-class _PortfolioItemRow extends StatelessWidget {
+class _PortfolioItemRow extends ConsumerWidget {
   const _PortfolioItemRow({
     required this.item,
     required this.onTap,
@@ -2296,13 +2316,24 @@ class _PortfolioItemRow extends StatelessWidget {
   final VoidCallback onEdit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
     final hasValue = _hasDisplayableValuation(item);
     final needsValue = !hasValue;
     final statusColor = needsValue ? HomeTokens.warning : HomeTokens.positive;
     final statusLabel = needsValue ? 'Needs value' : 'Valued';
     final valueLabel = hasValue
-        ? _formatAud(item.estimatedValue, currencyForItem(item))
+        ? _formatAud(
+            convertCurrent(
+              item.estimatedValue,
+              from: currencyForItem(item),
+              to: displayCurrency,
+              currentRates: currentRates,
+            ),
+            displayCurrency,
+          )
         : _valuationDisplayLabel(item);
 
     return MotionTapScale(
@@ -3019,10 +3050,20 @@ int _pendingItemCount(List<CollectibleItem> items) {
   return items.where(_isPendingItem).length;
 }
 
-double _displayTotalValue(List<CollectibleItem> items) {
-  return items
-      .where(_hasDisplayableValuation)
-      .fold<double>(0, (total, item) => total + item.estimatedValue);
+double _displayTotalValue(
+  List<CollectibleItem> items, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
+  return items.where(_hasDisplayableValuation).fold<double>(
+    0,
+    (total, item) => total + convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    ),
+  );
 }
 
 bool _hasDisplayableValuation(CollectibleItem item) {

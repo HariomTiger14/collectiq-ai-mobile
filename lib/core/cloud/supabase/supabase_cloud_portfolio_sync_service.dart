@@ -403,6 +403,7 @@ Map<String, dynamic> supabaseValuationSnapshotRowForItem(
     'value_aud': value,
     'low_estimate_aud': pricing?.lowEstimate ?? market?.lowPrice,
     'high_estimate_aud': pricing?.highEstimate ?? market?.highPrice,
+    'currency': currency,
     'display_string': value == null ? null : _snapshotDisplay(value, currency),
     'valuation_status': item.valuationStatus.wireValue,
     'reason_code': item.valuationStatus.wireValue,

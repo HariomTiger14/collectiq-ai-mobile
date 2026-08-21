@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
@@ -20,6 +23,64 @@ void main() {
   setUp(() {
     _seedPortfolio(_portfolioItems());
   });
+
+  testWidgets(
+    'switching display currency converts the portfolio value hero, not just its label',
+    (tester) async {
+      // A single USD-priced item. With the reported bug, switching the
+      // Settings currency to AUD would only relabel the same raw number
+      // ("US$150" -> "$150") instead of actually converting it.
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            ..._item(
+              id: 'usd-item',
+              title: 'Imported Booster Box',
+              category: 'Trading Card',
+              value: 150,
+              createdAt: DateTime.now(),
+            ),
+            'pricing': {
+              'estimatedMarketValue': 150,
+              'lowEstimate': 150,
+              'highEstimate': 150,
+              'currency': 'USD',
+              'pricingSource': 'test',
+              'pricingConfidence': 0.9,
+              'valuationStatus': 'market_estimated',
+            },
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homeLastAutoSyncProvider.overrideWith(
+              _AlreadyAutoSyncedController.new,
+            ),
+            fxRatesRepositoryProvider.overrideWithValue(
+              // 1 USD = 1.5 AUD -> 150 USD should display as $225, not $150.
+              const _FixedRateFxRatesRepository({'USD': 1.0, 'AUD': 1.5}),
+            ),
+            displayCurrencyProvider.overrideWithValue('AUD'),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            home: const HomePage(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // Shows up twice: the portfolio value hero and the recent-item card's
+      // own value label -- both correctly converted, not just the hero.
+      expect(find.text('\$225'), findsNWidgets(2));
+      expect(find.text('\$150'), findsNothing);
+      expect(find.text('US\$150'), findsNothing);
+    },
+  );
 
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
@@ -491,6 +552,10 @@ Widget _homeApp({
       // Mark Home as recently auto-synced so the throttled on-appear background
       // sync stays out of these deterministic tests.
       homeLastAutoSyncProvider.overrideWith(_AlreadyAutoSyncedController.new),
+      // Keeps FX-rate fetching out of these tests entirely (no real network
+      // call, no pending Dio timer left behind when the widget tree is torn
+      // down).
+      fxRatesRepositoryProvider.overrideWithValue(const _FakeFxRatesRepository()),
     ],
     child: MaterialApp(
       theme: AppTheme.light,
@@ -506,6 +571,26 @@ Widget _homeApp({
 class _AlreadyAutoSyncedController extends HomeLastAutoSyncController {
   @override
   DateTime? build() => DateTime.now();
+}
+
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
+}
+
+class _FixedRateFxRatesRepository implements FxRatesRepository {
+  const _FixedRateFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
 }
 
 Widget _previewHomeApp(HomePreviewScenario scenario) {

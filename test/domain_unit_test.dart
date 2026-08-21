@@ -7,6 +7,8 @@ import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
 import 'package:collectiq_ai/core/cloud/services/analytics_service.dart';
 import 'package:collectiq_ai/core/cloud/services/auth_service.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_storage_service.dart';
 import 'package:collectiq_ai/core/cloud/services/crash_reporting_service.dart';
 import 'package:collectiq_ai/core/cloud/services/noop_cloud_services.dart';
@@ -6620,7 +6622,13 @@ void main() {
           createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
         ),
       ];
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [
+          fxRatesRepositoryProvider.overrideWithValue(
+            const _FakeFxRatesRepository(),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       final performance = await container.read(
@@ -7263,6 +7271,15 @@ ScanResult _testScanResult() {
     cardNumber: '4/102',
     playerOrCharacter: 'Charizard',
   );
+}
+
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
 }
 
 class _FailingMarketPricingProvider implements MarketPricingProvider {

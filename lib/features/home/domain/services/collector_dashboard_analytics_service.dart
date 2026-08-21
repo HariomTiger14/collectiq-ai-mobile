@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -5,7 +7,11 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 class CollectorDashboardAnalyticsService {
   const CollectorDashboardAnalyticsService();
 
-  CollectorDashboardAnalytics build(List<CollectibleItem> orderedItems) {
+  CollectorDashboardAnalytics build(
+    List<CollectibleItem> orderedItems, {
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
+  }) {
     final items = List<CollectibleItem>.unmodifiable(orderedItems);
     final itemCount = items.length;
     final totalValue = items.fold<double>(
@@ -89,7 +95,11 @@ class CollectorDashboardAnalyticsService {
       topLowestConfidence: analytics.topLowestConfidence,
       newestAdditions: analytics.newestAdditions,
       collectionHealth: analytics.collectionHealth,
-      insights: _insights(analytics),
+      insights: _insights(
+        analytics,
+        displayCurrency: displayCurrency,
+        currentRates: currentRates,
+      ),
       recommendations: _recommendations(analytics),
       dailySnapshots: analytics.dailySnapshots,
       weeklySnapshots: analytics.weeklySnapshots,
@@ -186,7 +196,11 @@ class CollectorDashboardAnalyticsService {
     );
   }
 
-  List<CollectionInsight> _insights(CollectorDashboardAnalytics analytics) {
+  List<CollectionInsight> _insights(
+    CollectorDashboardAnalytics analytics, {
+    required String displayCurrency,
+    required Map<String, double> currentRates,
+  }) {
     if (analytics.isEmpty) {
       return const [
         CollectionInsight(
@@ -197,11 +211,25 @@ class CollectorDashboardAnalyticsService {
       ];
     }
 
+    // analytics.totalValue is a raw cross-currency sum (pre-existing,
+    // unrelated to display-currency conversion), so it can't be converted
+    // as a single number here -- recomputed per-item, converted, then
+    // summed, same as _HomeViewData.fromInsights does for the hero total.
+    final convertedTotal = analytics.items.fold<double>(
+      0,
+      (sum, item) => sum + convertCurrent(
+        item.estimatedValue,
+        from: currencyForItem(item),
+        to: displayCurrency,
+        currentRates: currentRates,
+      ),
+    );
+
     return [
       CollectionInsight(
         title: 'Collection value increased',
         message:
-            'Your tracked value is ${_aud(analytics.totalValue)} across ${analytics.itemCount} items.',
+            'Your tracked value is ${_formatValue(convertedTotal, displayCurrency)} across ${analytics.itemCount} items.',
         type: CollectionInsightType.positive,
       ),
       if (analytics.lowConfidenceItems.isNotEmpty)
@@ -222,7 +250,7 @@ class CollectorDashboardAnalyticsService {
         CollectionInsight(
           title: 'Highest value item',
           message:
-              '${analytics.highestValueItem!.title} leads at ${_aud(analytics.highestValueItem!.estimatedValue)}.',
+              '${analytics.highestValueItem!.title} leads at ${_formatValue(convertCurrent(analytics.highestValueItem!.estimatedValue, from: currencyForItem(analytics.highestValueItem!), to: displayCurrency, currentRates: currentRates), displayCurrency)}.',
           type: CollectionInsightType.highlight,
         ),
       if (analytics.largestCategory != null)
@@ -486,7 +514,7 @@ class CollectorDashboardAnalyticsService {
     return best;
   }
 
-  String _aud(double value) {
-    return 'AUD ${value.toStringAsFixed(0)}';
+  String _formatValue(double value, String currencyCode) {
+    return formatCollectionValue(value, currencyCode: currencyCode);
   }
 }

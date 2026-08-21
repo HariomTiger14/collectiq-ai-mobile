@@ -2,6 +2,9 @@ import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/api_client.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -88,7 +91,11 @@ void main() {
       expect(find.text('Gain/Loss'), findsOneWidget);
       expect(find.text('USD \$200'), findsWidgets);
       expect(find.text('USD \$245'), findsWidgets);
-      expect(find.text('+USD \$45'), findsOneWidget);
+      // Converted to the display currency (AUD, the default with no profile
+      // override) at parity, not left in the item's own USD -- this is the
+      // exact bug being fixed: a value/movement label must respect the
+      // user's chosen display currency, not just the item's stored one.
+      expect(find.text('+\$45 AUD'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
       await _revealText(tester, 'Pricing evidence');
       expect(find.text('Pricing evidence'), findsOneWidget);
@@ -960,6 +967,19 @@ Future<void> _pumpDetail(
           valuationSnapshotRepositoryProvider.overrideWithValue(
             valuationSnapshotRepository,
           ),
+        // Fixed, no-network rates so currency-display tests are
+        // deterministic. Parity (1.0 for every tracked currency) keeps
+        // every pre-existing dollar-amount assertion in this file valid --
+        // converting at parity only changes which currency label is shown,
+        // never the number.
+        fxRatesRepositoryProvider.overrideWithValue(
+          const _FixedRateFxRatesRepository({
+            'USD': 1.0,
+            'AUD': 1.0,
+            'CAD': 1.0,
+            'GBP': 1.0,
+          }),
+        ),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -970,6 +990,17 @@ Future<void> _pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _FixedRateFxRatesRepository implements FxRatesRepository {
+  const _FixedRateFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
 }
 
 class _RecordingValuationSnapshotRepository

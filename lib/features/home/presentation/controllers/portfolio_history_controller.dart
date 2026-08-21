@@ -1,4 +1,6 @@
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/features/home/data/repositories/shared_preferences_portfolio_history_repository.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/repositories/portfolio_history_repository.dart';
@@ -26,8 +28,19 @@ final portfolioPerformanceProvider =
     ) async {
       final repository = ref.watch(portfolioHistoryRepositoryProvider);
       final service = ref.watch(portfolioHistoryServiceProvider);
+      final displayCurrency = ref.watch(displayCurrencyProvider);
+      FxRateSnapshot rates;
+      try {
+        rates = await ref.watch(fxRatesProvider.future);
+      } catch (_) {
+        rates = FxRateSnapshot.empty;
+      }
       final orderedItems = collectiblesNewestFirst(items);
-      final currentSnapshots = service.createCurrentSnapshots(orderedItems);
+      final currentSnapshots = service.createCurrentSnapshots(
+        orderedItems,
+        displayCurrency: displayCurrency,
+        currentRates: rates.currentRates,
+      );
       for (final snapshot in currentSnapshots) {
         await repository.upsertSnapshot(snapshot);
       }
@@ -46,6 +59,8 @@ final portfolioPerformanceProvider =
         history = service.historyFromCloudSnapshots(
           cloudSnapshots,
           orderedItems,
+          displayCurrency: displayCurrency,
+          rates: rates,
         );
       } catch (_) {
         // Cloud unavailable (offline, signed out, etc.) — fall through to

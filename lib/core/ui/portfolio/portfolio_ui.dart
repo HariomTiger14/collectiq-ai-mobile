@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -7,6 +9,7 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class PortfolioHeroHeader extends StatelessWidget {
   const PortfolioHeroHeader({
@@ -632,16 +635,19 @@ class _PortfolioImagePlaceholder extends StatelessWidget {
   }
 }
 
-class _PortfolioItemDetails extends StatelessWidget {
+class _PortfolioItemDetails extends ConsumerWidget {
   const _PortfolioItemDetails({required this.item, this.wishlistStatusLabel});
 
   final CollectibleItem item;
   final String? wishlistStatusLabel;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,7 +673,13 @@ class _PortfolioItemDetails extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _MetadataPill(label: _portfolioValueLabel(item)),
+            _MetadataPill(
+              label: _portfolioValueLabel(
+                item,
+                displayCurrency: displayCurrency,
+                currentRates: currentRates,
+              ),
+            ),
             if (_sourceMarketValueLabel(item.pricing) != null)
               _MetadataPill(label: _sourceMarketValueLabel(item.pricing)!),
             _MetadataPill(label: 'Category ${item.category}'),
@@ -804,7 +816,11 @@ String _formatDate(DateTime date) {
   return '$day/$month/${date.year}';
 }
 
-String _portfolioValueLabel(CollectibleItem item) {
+String _portfolioValueLabel(
+  CollectibleItem item, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
   final pricing = item.pricing;
   final value =
       pricing?.estimatedMarketValue == null ||
@@ -815,7 +831,13 @@ String _portfolioValueLabel(CollectibleItem item) {
   if (value <= 0) {
     return _portfolioValueUnavailableLabel(item.valuationStatus);
   }
-  return _formatMoney(value, currency);
+  final converted = convertCurrent(
+    value,
+    from: currency,
+    to: displayCurrency,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted, displayCurrency);
 }
 
 String _portfolioValueUnavailableLabel(ValuationStatus status) {

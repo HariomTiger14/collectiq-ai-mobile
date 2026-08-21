@@ -4,6 +4,9 @@ import 'dart:math' as math;
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -1384,13 +1387,16 @@ class _DetailAuthorityBadge extends StatelessWidget {
   }
 }
 
-class _DetailAuthorityValueBlock extends StatelessWidget {
+class _DetailAuthorityValueBlock extends ConsumerWidget {
   const _DetailAuthorityValueBlock({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
     final textTheme = Theme.of(context).textTheme;
     final isPending = _isValuationPending(item);
     final accentColor = isPending
@@ -1417,7 +1423,12 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _detailValueLabel(context, item),
+            _detailValueLabel(
+              context,
+              item,
+              displayCurrency: displayCurrency,
+              currentRates: currentRates,
+            ),
             key: const ValueKey('collectible-detail-value-card-value'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -2201,10 +2212,27 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       data: (value) => value,
       orElse: () => const <PortfolioValuationSnapshot>[],
     );
-    final chartPoints = _valueHistoryPoints(item, snapshots);
-    final currency = item.pricing?.currency ?? 'AUD';
-    final scanValue = _valueAtScanFor(item);
-    final currentValue = _currentValueFor(item);
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final fxRates = ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    final chartPoints = _valueHistoryPoints(
+      item,
+      snapshots,
+      displayCurrency: displayCurrency,
+      rates: fxRates,
+    );
+    final itemCurrency = item.pricing?.currency ?? 'AUD';
+    final scanValue = convertCurrent(
+      _valueAtScanFor(item),
+      from: itemCurrency,
+      to: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
+    final currentValue = convertCurrent(
+      _currentValueFor(item),
+      from: itemCurrency,
+      to: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
     final delta = currentValue - scanValue;
     final hasMovement = scanValue > 0 && currentValue > 0 && delta.abs() > 0.01;
     final isPositive = delta >= 0;
@@ -2214,7 +2242,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         ? HomeTokens.positive
         : Theme.of(context).colorScheme.error;
     final movementLabel = hasMovement
-        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), currency)}'
+        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), displayCurrency)}'
         : null;
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
@@ -2254,14 +2282,14 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'At scan',
-                  value: _formatMoney(scanValue, currency),
+                  value: _formatMoney(scanValue, displayCurrency),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'Current',
-                  value: _formatMoney(currentValue, currency),
+                  value: _formatMoney(currentValue, displayCurrency),
                 ),
               ),
             ],
@@ -2353,7 +2381,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                 child: _ValueHistoryChart(
                   points: chartPoints,
                   color: movementColor,
-                  currency: currency,
+                  currency: displayCurrency,
                 ),
               ),
           ],
@@ -3447,23 +3475,59 @@ double _currentValueFor(CollectibleItem item) {
 /// aggregate), and the current value, sorted chronologically.
 List<_ValueHistoryPoint> _valueHistoryPoints(
   CollectibleItem item,
-  List<PortfolioValuationSnapshot> snapshots,
-) {
+  List<PortfolioValuationSnapshot> snapshots, {
+  String displayCurrency = 'AUD',
+  FxRateSnapshot rates = FxRateSnapshot.empty,
+}) {
+  final itemCurrency = item.pricing?.currency ?? 'AUD';
   final points = <_ValueHistoryPoint>[];
   final scanValue = _valueAtScanFor(item);
   if (scanValue > 0) {
-    points.add(_ValueHistoryPoint(date: item.createdAt, value: scanValue));
+    points.add(
+      _ValueHistoryPoint(
+        date: item.createdAt,
+        value: convertHistorical(
+          scanValue,
+          from: itemCurrency,
+          to: displayCurrency,
+          date: item.createdAt,
+          rates: rates,
+        ),
+      ),
+    );
   }
   for (final snapshot in snapshots) {
     final value = snapshot.valueAud;
     if (value != null && value > 0) {
-      points.add(_ValueHistoryPoint(date: snapshot.pricedAt, value: value));
+      points.add(
+        _ValueHistoryPoint(
+          date: snapshot.pricedAt,
+          value: convertHistorical(
+            value,
+            from: snapshot.currency,
+            to: displayCurrency,
+            date: snapshot.pricedAt,
+            rates: rates,
+          ),
+        ),
+      );
     }
   }
   final currentValue = _currentValueFor(item);
   if (currentValue > 0) {
     final currentDate = item.lastValueRefreshedAt ?? DateTime.now();
-    points.add(_ValueHistoryPoint(date: currentDate, value: currentValue));
+    points.add(
+      _ValueHistoryPoint(
+        date: currentDate,
+        value: convertHistorical(
+          currentValue,
+          from: itemCurrency,
+          to: displayCurrency,
+          date: currentDate,
+          rates: rates,
+        ),
+      ),
+    );
   }
   points.sort((left, right) => left.date.compareTo(right.date));
 
@@ -3573,15 +3637,25 @@ Color _purchaseGainColor(CollectibleItem item) {
       : HomeTokens.negative;
 }
 
-String _detailValueLabel(BuildContext context, CollectibleItem item) {
+String _detailValueLabel(
+  BuildContext context,
+  CollectibleItem item, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
   if (!_shouldShowDetailValue(item)) {
     return 'Value unavailable';
   }
-  final currency = item.pricing?.currency ?? 'AUD';
   if (item.estimatedValue == 0) {
-    return _formatZeroMoney(currency);
+    return _formatZeroMoney(displayCurrency);
   }
-  return _formatMoney(item.estimatedValue, currency);
+  final converted = convertCurrent(
+    item.estimatedValue,
+    from: item.pricing?.currency ?? 'AUD',
+    to: displayCurrency,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted, displayCurrency);
 }
 
 String _formatZeroMoney(String currency) {
