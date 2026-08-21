@@ -56,8 +56,15 @@ void main() {
   });
 
   testWidgets(
-    'filter sheet applies category and source to the catalog search',
+    'filter sheet applies a category, deriving the right source for search',
     (tester) async {
+      // The default 800x600 test surface is far smaller than a real phone
+      // and leaves no room for the category dropdown's popup menu to
+      // render within the viewport -- use a realistic phone size so the
+      // popup lays out the way it does on-device.
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final catalogRepository = _MemoryCatalogSearchRepository([
         const CatalogSearchResult(
           id: 'pc-mario',
@@ -89,44 +96,207 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      // Category = Video Games (near the bottom of the flat top-level
+      // list, below the popup's own capped height -- scroll its internal
+      // list into view before tapping).
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
-      );
-      await tester.pump();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('catalog-filter-source-pricecharting')),
+      await tester.dragUntilVisible(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-video-games'),
+        ),
+        find.byType(Scrollable).last,
+        const Offset(0, -60),
       );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(
-          const ValueKey('catalog-filter-source-pricecharting'),
+          const ValueKey('catalog-filter-category-option-video-games'),
         ),
       );
-      await tester.pump();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('catalog-filter-apply')),
+      await tester.pumpAndSettle();
+
+      // Subcategory (labeled "Platform" for Video Games) = Nintendo.
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-subcategory-option-nintendo'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The Apply button is pinned outside the scrollable body now, so no
+      // ensureVisible/scroll is needed to reach it.
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['mario']);
+      expect(catalogRepository.lastCategoryGroup, 'video-games');
+      expect(catalogRepository.lastSubcategory, 'nintendo');
+      // There's no user-facing source picker -- picking a real PriceCharting
+      // category/platform must still pin the search to that source so
+      // KicksDB (sneakers) results don't quietly mix into a filtered view.
+      expect(catalogRepository.lastSource, 'pricecharting');
+      // The filter button shows "Category · Subcategory" and an active
+      // count badge of 2 (category + subcategory -- source is derived, not
+      // a separate active filter the user picked).
+      expect(find.text('Video Games · Nintendo'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet applies a Sports Cards subcategory (sport) to search',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'trout',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-dropdown'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sports-cards'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-subcategory-option-baseball'),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
       await tester.pumpAndSettle();
 
-      expect(catalogRepository.queries, ['mario']);
-      expect(catalogRepository.lastCategoryGroup, 'nintendo');
-      expect(catalogRepository.lastSource, 'pricecharting');
-      // The filter button now shows the platform's label and an active
-      // count badge, confirming the applied state is reflected in the UI.
-      expect(find.text('Nintendo'), findsOneWidget);
-      expect(find.text('2'), findsOneWidget);
+      expect(catalogRepository.queries, ['trout']);
+      expect(catalogRepository.lastCategoryGroup, 'sports-cards');
+      expect(catalogRepository.lastSubcategory, 'baseball');
+      expect(find.text('Sports Cards · Baseball'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet hides the subcategory dropdown for categories with no drill-down',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-option-comics')),
+      );
+      await tester.pumpAndSettle();
+
+      // Comics has no subcategory taxonomy -- the dropdown must not appear
+      // at all, not just be empty/disabled.
+      expect(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'filter sheet Sneakers category pins search to the kicksdb source',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'jordan',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sneakers'),
+        ),
+        find.byType(Scrollable).last,
+        const Offset(0, -60),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sneakers'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['jordan']);
+      // Sneakers has no PriceCharting category_group of its own -- it must
+      // resolve to categoryGroup: null, source: 'kicksdb'.
+      expect(catalogRepository.lastCategoryGroup, isNull);
+      expect(catalogRepository.lastSource, 'kicksdb');
+      expect(find.text('Sneakers'), findsOneWidget);
     },
   );
 
   testWidgets(
     'filter sheet reset clears every field back to defaults',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final catalogRepository = _MemoryCatalogSearchRepository([]);
       await _pumpSearch(
         tester,
@@ -143,23 +313,21 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
       );
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('catalog-filter-platform-nintendo')),
-      );
-      await tester.pump();
-      // Reset within the same open sheet session (rather than closing and
-      // reopening) -- selecting Nintendo, then resetting, then applying,
-      // all in one session, still exercises Reset's actual clearing
-      // behavior without depending on the sheet's scroll position surviving
-      // a close/reopen cycle.
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('catalog-filter-reset')),
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sports-cards'),
+        ),
       );
       await tester.pumpAndSettle();
+      // Reset within the same open sheet session (rather than closing and
+      // reopening) -- selecting a category, then resetting, then applying,
+      // all in one session, still exercises Reset's actual clearing
+      // behavior. Reset/Apply are pinned outside the scrollable body, so
+      // no ensureVisible/scroll is needed to reach them.
       await tester.tap(find.byKey(const ValueKey('catalog-filter-reset')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
@@ -705,6 +873,7 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
   final List<CatalogSearchResult> results;
   final List<String> queries = [];
   String? lastCategoryGroup;
+  String? lastSubcategory;
   double? lastMinPrice;
   double? lastMaxPrice;
   String? lastSource;
@@ -714,12 +883,14 @@ class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
     required String query,
     int limit = 20,
     String? categoryGroup,
+    String? subcategory,
     double? minPrice,
     double? maxPrice,
     String? source,
   }) async {
     queries.add(query);
     lastCategoryGroup = categoryGroup;
+    lastSubcategory = subcategory;
     lastMinPrice = minPrice;
     lastMaxPrice = maxPrice;
     lastSource = source;
@@ -745,6 +916,7 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
     required String query,
     int limit = 20,
     String? categoryGroup,
+    String? subcategory,
     double? minPrice,
     double? maxPrice,
     String? source,

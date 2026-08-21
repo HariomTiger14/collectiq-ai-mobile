@@ -542,6 +542,7 @@ class _QaCatalogSearchRepository implements CatalogSearchRepository {
     required String query,
     int limit = 20,
     String? categoryGroup,
+    String? subcategory,
     double? minPrice,
     double? maxPrice,
     String? source,

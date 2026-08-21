@@ -21,12 +21,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
 
-/// A category filter option: [key] is the value sent to the backend
-/// (matches PRICECHARTING_CATEGORY_GROUPS / PRICECHARTING_PLATFORM_GROUPS
-/// in catalog_search_service.py), [label] is the display text.
+/// A category/subcategory filter option: [key] is the value sent to the
+/// backend (matches PRICECHARTING_CATEGORY_GROUPS/
+/// PRICECHARTING_SUBCATEGORY_GROUPS/PRICECHARTING_PLATFORM_GROUPS in
+/// catalog_search_service.py), [label] is the display text.
 typedef CatalogFilterGroup = ({String key, String label});
 
-/// Mirrors PRICECHARTING_CATEGORY_GROUPS -- keys must match exactly.
+/// Top-level categories -- mirrors PRICECHARTING_CATEGORY_GROUPS plus the
+/// video-games key (PRICECHARTING_VIDEO_GAMES_CATEGORY_KEY). Keys must
+/// match exactly.
 const kCatalogCategoryGroups = <CatalogFilterGroup>[
   (key: 'sports-cards', label: 'Sports Cards'),
   (key: 'trading-card-games', label: 'Trading Card Games'),
@@ -34,13 +37,14 @@ const kCatalogCategoryGroups = <CatalogFilterGroup>[
   (key: 'funko-pops', label: 'Funko Pops'),
   (key: 'lego-sets', label: 'Lego Sets'),
   (key: 'coins', label: 'Coins'),
+  (key: 'video-games', label: 'Video Games'),
 ];
 
 /// Mirrors PRICECHARTING_PLATFORM_GROUPS -- keys must match exactly. Video
 /// Games has no coarse category taxonomy on the backend (category holds a
 /// real per-game genre), so it's filtered by platform instead, against the
-/// precomputed platform_group column -- same category_group param, just a
-/// different set of keys.
+/// precomputed platform_group column. Used as the Subcategory options when
+/// Category is Video Games; picking none means any platform.
 const kCatalogPlatformGroups = <CatalogFilterGroup>[
   (key: 'playstation', label: 'PlayStation'),
   (key: 'xbox', label: 'Xbox'),
@@ -51,36 +55,83 @@ const kCatalogPlatformGroups = <CatalogFilterGroup>[
   (key: 'retro-other', label: 'Other retro'),
 ];
 
+/// Subcategory options when Category is Sports Cards -- mirrors
+/// PRICECHARTING_SUBCATEGORY_GROUPS['sports-cards']. Picking none searches
+/// every sport combined, same as today.
+const kCatalogSportsCardsSubgroups = <CatalogFilterGroup>[
+  (key: 'baseball', label: 'Baseball'),
+  (key: 'basketball', label: 'Basketball'),
+  (key: 'football', label: 'Football'),
+  (key: 'hockey', label: 'Hockey'),
+  (key: 'soccer', label: 'Soccer'),
+];
+
+/// Subcategory options when Category is Trading Card Games -- mirrors
+/// PRICECHARTING_SUBCATEGORY_GROUPS['trading-card-games'].
+const kCatalogTradingCardGamesSubgroups = <CatalogFilterGroup>[
+  (key: 'magic', label: 'Magic'),
+  (key: 'pokemon', label: 'Pokémon'),
+  (key: 'yugioh', label: 'Yu-Gi-Oh!'),
+  (key: 'lorcana', label: 'Lorcana'),
+];
+
+/// Sneakers has no PriceCharting category_group -- it's an entirely
+/// separate catalog (kicksdb_catalog) picked by the `source` request param
+/// instead. This key exists only in the filter UI, so users pick it the
+/// same way as any other category; source/pricecharting-vs-kicksdb is
+/// backend plumbing they never need to see or choose directly. It never
+/// has subcategory options.
+const kSneakersCategoryKey = 'sneakers';
+
+/// The Subcategory options for a given top-level Category, or null if that
+/// category has nothing to drill into (Comics/Funko Pops/Lego Sets/Coins/
+/// Sneakers are each a single flat bucket).
+List<CatalogFilterGroup>? kCatalogSubgroupsFor(String? category) {
+  return switch (category) {
+    'sports-cards' => kCatalogSportsCardsSubgroups,
+    'trading-card-games' => kCatalogTradingCardGamesSubgroups,
+    'video-games' => kCatalogPlatformGroups,
+    _ => null,
+  };
+}
+
 const _unsetFilterField = Object();
 
-/// Immutable draft/applied state for the Discover filter sheet.
+/// Immutable draft/applied state for the Discover filter sheet. Users pick
+/// a top-level category (which includes "Sneakers") and, for categories
+/// that have one, a subcategory drill-down -- the PriceCharting-vs-KicksDB
+/// `source` request param is derived from the category choice, never
+/// exposed as its own control.
 class _CatalogFilterSelection {
   const _CatalogFilterSelection({
     this.categoryGroup,
+    this.subcategory,
     this.minPrice,
     this.maxPrice,
-    this.source,
   });
 
   const _CatalogFilterSelection.defaults()
     : categoryGroup = null,
+      subcategory = null,
       minPrice = null,
-      maxPrice = null,
-      source = null;
+      maxPrice = null;
 
   final String? categoryGroup;
+  final String? subcategory;
   final double? minPrice;
   final double? maxPrice;
-  final String? source;
 
   int get activeCount => [
     categoryGroup,
+    subcategory,
     minPrice,
     maxPrice,
-    source,
   ].where((value) => value != null).length;
 
   String get categoryLabel {
+    if (categoryGroup == kSneakersCategoryKey) {
+      return 'Sneakers';
+    }
     if (categoryGroup == null) {
       return 'All categories';
     }
@@ -89,12 +140,62 @@ class _CatalogFilterSelection {
         return group.label;
       }
     }
-    for (final group in kCatalogPlatformGroups) {
-      if (group.key == categoryGroup) {
+    return 'All categories';
+  }
+
+  /// The Subcategory options available for the current category, or null
+  /// if this category has none.
+  List<CatalogFilterGroup>? get subcategoryGroups =>
+      kCatalogSubgroupsFor(categoryGroup);
+
+  String get subcategoryLabel {
+    final groups = subcategoryGroups;
+    if (groups == null) {
+      return 'All';
+    }
+    for (final group in groups) {
+      if (group.key == subcategory) {
         return group.label;
       }
     }
-    return 'All categories';
+    return categoryGroup == 'video-games' ? 'All platforms' : 'All';
+  }
+
+  /// The Filters button's summary text: just the category once applied, or
+  /// "Category · Subcategory" when a subcategory is also picked.
+  String get summaryLabel {
+    if (categoryGroup == null) {
+      return 'Filters';
+    }
+    if (subcategory != null) {
+      return '$categoryLabel · $subcategoryLabel';
+    }
+    return categoryLabel;
+  }
+
+  /// The category_group value to send to the search API -- null for
+  /// Sneakers, since it isn't a PriceCharting category_group at all.
+  String? get effectiveCategoryGroup =>
+      categoryGroup == kSneakersCategoryKey ? null : categoryGroup;
+
+  /// The subcategory value to send -- only meaningful alongside a category
+  /// that actually has subcategory options; dropped otherwise so a stale
+  /// value can never leak into an unrelated category's request.
+  String? get effectiveSubcategory =>
+      subcategoryGroups == null ? null : subcategory;
+
+  /// The `source` value to send: Sneakers pins to kicksdb; any real
+  /// PriceCharting category or Video Games platform pins to pricecharting
+  /// (so results from the other catalog don't quietly mix into a filtered
+  /// view); "All categories" leaves it unset so both sources merge.
+  String? get effectiveSource {
+    if (categoryGroup == kSneakersCategoryKey) {
+      return 'kicksdb';
+    }
+    if (categoryGroup != null) {
+      return 'pricecharting';
+    }
+    return null;
   }
 
   // Object? + a sentinel default lets a field be explicitly reset to null
@@ -103,23 +204,23 @@ class _CatalogFilterSelection {
   // null" the way this needs to.
   _CatalogFilterSelection copyWith({
     Object? categoryGroup = _unsetFilterField,
+    Object? subcategory = _unsetFilterField,
     Object? minPrice = _unsetFilterField,
     Object? maxPrice = _unsetFilterField,
-    Object? source = _unsetFilterField,
   }) {
     return _CatalogFilterSelection(
       categoryGroup: identical(categoryGroup, _unsetFilterField)
           ? this.categoryGroup
           : categoryGroup as String?,
+      subcategory: identical(subcategory, _unsetFilterField)
+          ? this.subcategory
+          : subcategory as String?,
       minPrice: identical(minPrice, _unsetFilterField)
           ? this.minPrice
           : minPrice as double?,
       maxPrice: identical(maxPrice, _unsetFilterField)
           ? this.maxPrice
           : maxPrice as double?,
-      source: identical(source, _unsetFilterField)
-          ? this.source
-          : source as String?,
     );
   }
 }
@@ -336,10 +437,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           .read(catalogSearchRepositoryProvider)
           .searchCatalog(
             query: trimmed,
-            categoryGroup: _filters.categoryGroup,
+            categoryGroup: _filters.effectiveCategoryGroup,
+            subcategory: _filters.effectiveSubcategory,
             minPrice: _filters.minPrice,
             maxPrice: _filters.maxPrice,
-            source: _filters.source,
+            source: _filters.effectiveSource,
           );
       if (!mounted || requestId != _catalogRequestId) {
         return;
@@ -381,63 +483,130 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             }
 
             return _CatalogFilterSheet(
+              // Pinned outside the scrollable body so Apply is always
+              // reachable without scrolling -- users were selecting a
+              // filter, missing the Apply button below the fold, and
+              // dismissing the sheet without it ever taking effect.
+              footer: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('catalog-filter-reset'),
+                      onPressed: () {
+                        minController.clear();
+                        maxController.clear();
+                        update(const _CatalogFilterSelection.defaults());
+                      },
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('catalog-filter-apply'),
+                      onPressed: () {
+                        setState(() => _filters = draft);
+                        Navigator.of(context).pop();
+                        final query = _queryController.text.trim();
+                        if (query.length >= 2) {
+                          _runCatalogSearch(query);
+                        }
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
               children: [
-                _CatalogSheetGroup(
-                  title: 'Category',
-                  children: [
-                    _CatalogSheetOptionChip(
-                      key: const ValueKey('catalog-filter-category-all'),
-                      label: 'All categories',
-                      selected: draft.categoryGroup == null,
-                      onTap: () => update(draft.copyWith(categoryGroup: null)),
+                _CatalogFilterDropdown(
+                  dropdownKey: const ValueKey(
+                    'catalog-filter-category-dropdown',
+                  ),
+                  label: 'Category',
+                  valueLabel: draft.categoryLabel,
+                  isActive: draft.categoryGroup != null,
+                  itemBuilder: (context) => [
+                    CheckedPopupMenuItem<String>(
+                      key: const ValueKey(
+                        'catalog-filter-category-option-all',
+                      ),
+                      value: 'all',
+                      checked: draft.categoryGroup == null,
+                      child: const Text('All categories'),
                     ),
                     for (final group in kCatalogCategoryGroups)
-                      _CatalogSheetOptionChip(
-                        key: ValueKey('catalog-filter-category-${group.key}'),
-                        label: group.label,
-                        selected: draft.categoryGroup == group.key,
-                        onTap: () =>
-                            update(draft.copyWith(categoryGroup: group.key)),
+                      CheckedPopupMenuItem<String>(
+                        key: ValueKey(
+                          'catalog-filter-category-option-${group.key}',
+                        ),
+                        value: group.key,
+                        checked: draft.categoryGroup == group.key,
+                        child: Text(group.label),
                       ),
-                  ],
-                ),
-                _CatalogSheetGroup(
-                  title: 'Video Games platform',
-                  children: [
-                    for (final group in kCatalogPlatformGroups)
-                      _CatalogSheetOptionChip(
-                        key: ValueKey('catalog-filter-platform-${group.key}'),
-                        label: group.label,
-                        selected: draft.categoryGroup == group.key,
-                        onTap: () =>
-                            update(draft.copyWith(categoryGroup: group.key)),
+                    CheckedPopupMenuItem<String>(
+                      key: const ValueKey(
+                        'catalog-filter-category-option-$kSneakersCategoryKey',
                       ),
-                  ],
-                ),
-                _CatalogSheetGroup(
-                  title: 'Source',
-                  children: [
-                    _CatalogSheetOptionChip(
-                      key: const ValueKey('catalog-filter-source-all'),
-                      label: 'All sources',
-                      selected: draft.source == null,
-                      onTap: () => update(draft.copyWith(source: null)),
-                    ),
-                    _CatalogSheetOptionChip(
-                      key: const ValueKey('catalog-filter-source-pricecharting'),
-                      label: 'PriceCharting',
-                      selected: draft.source == 'pricecharting',
-                      onTap: () =>
-                          update(draft.copyWith(source: 'pricecharting')),
-                    ),
-                    _CatalogSheetOptionChip(
-                      key: const ValueKey('catalog-filter-source-kicksdb'),
-                      label: 'KicksDB',
-                      selected: draft.source == 'kicksdb',
-                      onTap: () => update(draft.copyWith(source: 'kicksdb')),
+                      value: kSneakersCategoryKey,
+                      checked: draft.categoryGroup == kSneakersCategoryKey,
+                      child: const Text('Sneakers'),
                     ),
                   ],
+                  // Changing category always clears subcategory -- the
+                  // previous category's subcategory options (e.g. a chosen
+                  // sport under Sports Cards) have no meaning under a
+                  // different category and must never leak into its
+                  // request.
+                  onSelected: (value) => update(
+                    draft.copyWith(
+                      categoryGroup: value == 'all' ? null : value,
+                      subcategory: null,
+                    ),
+                  ),
                 ),
+                if (draft.subcategoryGroups case final subgroups?) ...[
+                  const SizedBox(height: 16),
+                  _CatalogFilterDropdown(
+                    dropdownKey: const ValueKey(
+                      'catalog-filter-subcategory-dropdown',
+                    ),
+                    label: draft.categoryGroup == 'video-games'
+                        ? 'Platform'
+                        : 'Subcategory',
+                    valueLabel: draft.subcategoryLabel,
+                    isActive: draft.subcategory != null,
+                    itemBuilder: (context) => [
+                      CheckedPopupMenuItem<String>(
+                        key: const ValueKey(
+                          'catalog-filter-subcategory-option-all',
+                        ),
+                        value: 'all',
+                        checked: draft.subcategory == null,
+                        child: Text(
+                          draft.categoryGroup == 'video-games'
+                              ? 'All platforms'
+                              : 'All',
+                        ),
+                      ),
+                      for (final group in subgroups)
+                        CheckedPopupMenuItem<String>(
+                          key: ValueKey(
+                            'catalog-filter-subcategory-option-${group.key}',
+                          ),
+                          value: group.key,
+                          checked: draft.subcategory == group.key,
+                          child: Text(group.label),
+                        ),
+                    ],
+                    onSelected: (value) => update(
+                      draft.copyWith(
+                        subcategory: value == 'all' ? null : value,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
                 Text(
                   'Price range',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -467,38 +636,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         onChanged: (value) => update(
                           draft.copyWith(maxPrice: double.tryParse(value)),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        key: const ValueKey('catalog-filter-reset'),
-                        onPressed: () {
-                          minController.clear();
-                          maxController.clear();
-                          update(const _CatalogFilterSelection.defaults());
-                        },
-                        child: const Text('Reset'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        key: const ValueKey('catalog-filter-apply'),
-                        onPressed: () {
-                          setState(() => _filters = draft);
-                          Navigator.of(context).pop();
-                          final query = _queryController.text.trim();
-                          if (query.length >= 2) {
-                            _runCatalogSearch(query);
-                          }
-                        },
-                        icon: const Icon(Icons.check),
-                        label: const Text('Apply'),
                       ),
                     ),
                   ],
@@ -926,9 +1063,7 @@ class _CatalogFilterButton extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                filters.categoryGroup == null
-                    ? 'Filters'
-                    : filters.categoryLabel,
+                filters.summaryLabel,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: isActive
@@ -972,9 +1107,16 @@ class _CatalogFilterButton extends StatelessWidget {
 }
 
 class _CatalogFilterSheet extends StatelessWidget {
-  const _CatalogFilterSheet({required this.children});
+  const _CatalogFilterSheet({required this.children, required this.footer});
 
   final List<Widget> children;
+
+  /// Rendered below the scrollable body, outside its ListView, so Reset/
+  /// Apply stay reachable regardless of scroll position -- previously they
+  /// scrolled away with the rest of the content and users were dismissing
+  /// the sheet without ever reaching Apply, silently discarding their
+  /// selection.
+  final Widget footer;
 
   @override
   Widget build(BuildContext context) {
@@ -982,7 +1124,7 @@ class _CatalogFilterSheet extends StatelessWidget {
       top: false,
       child: DraggableScrollableSheet(
         expand: false,
-        initialChildSize: .78,
+        initialChildSize: .72,
         minChildSize: .42,
         maxChildSize: .92,
         builder: (context, scrollController) {
@@ -996,37 +1138,39 @@ class _CatalogFilterSheet extends StatelessWidget {
             ),
             child: Material(
               type: MaterialType.transparency,
-              child: ListView(
-                controller: scrollController,
+              child: Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: PackLoxTokens.border,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: PackLoxTokens.border,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Filter catalog',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(
+                            color: PackLoxTokens.textPrimary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...children,
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    'Filter catalog',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: PackLoxTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Changes apply only when you tap Apply.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: PackLoxTokens.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ...children,
+                  footer,
                 ],
               ),
             ),
@@ -1037,78 +1181,82 @@ class _CatalogFilterSheet extends StatelessWidget {
   }
 }
 
-class _CatalogSheetGroup extends StatelessWidget {
-  const _CatalogSheetGroup({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: children),
-        ],
-      ),
-    );
-  }
-}
-
-class _CatalogSheetOptionChip extends StatelessWidget {
-  const _CatalogSheetOptionChip({
+class _CatalogFilterDropdown extends StatelessWidget {
+  const _CatalogFilterDropdown({
+    required this.dropdownKey,
     required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
+    required this.valueLabel,
+    required this.isActive,
+    required this.itemBuilder,
+    required this.onSelected,
   });
 
+  final Key dropdownKey;
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final String valueLabel;
+  final bool isActive;
+  final List<PopupMenuEntry<String>> Function(BuildContext) itemBuilder;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (selected) ...[
-            const Icon(
-              Icons.check,
-              size: 16,
-              color: PackLoxTokens.textPrimary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        PopupMenuButton<String>(
+          key: dropdownKey,
+          itemBuilder: itemBuilder,
+          onSelected: onSelected,
+          constraints: const BoxConstraints(maxHeight: 420, minWidth: 260),
+          color: PackLoxTokens.surfaceRaised,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: PackLoxTokens.border),
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+                width: isActive ? 1.4 : 1,
+              ),
             ),
-            const SizedBox(width: 6),
-          ],
-          Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
-        ],
-      ),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      showCheckmark: false,
-      selectedColor: PackLoxTokens.cyan.withValues(alpha: 0.28),
-      backgroundColor: PackLoxTokens.surface,
-      labelStyle: TextStyle(
-        color: selected
-            ? PackLoxTokens.textPrimary
-            : PackLoxTokens.textSecondary,
-        fontWeight: FontWeight.w900,
-      ),
-      side: BorderSide(
-        color: selected ? PackLoxTokens.cyan : PackLoxTokens.border,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    valueLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: isActive
+                          ? PackLoxTokens.textPrimary
+                          : PackLoxTokens.textSecondary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: PackLoxTokens.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1144,7 +1292,15 @@ class _CatalogFilterPriceField extends StatelessWidget {
         ),
         decoration: InputDecoration(
           isDense: true,
+          filled: false,
+          // The app's global InputDecorationTheme sets enabledBorder/
+          // focusedBorder independently of border, so those must be
+          // overridden too -- otherwise the theme's own outline box still
+          // renders inside this field's outer Container, showing as a
+          // nested double box.
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           hintText: hintText,
           hintStyle: TextStyle(color: PackLoxTokens.textSecondary),
         ),
