@@ -1660,28 +1660,51 @@ class _CatalogResultDetailPageState
                             onBack: () => Navigator.of(context).maybePop(),
                           ),
                           const SizedBox(height: 18),
-                          Center(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Container(
-                                width: 180,
-                                height: 180,
-                                decoration: BoxDecoration(
-                                  color: PackLoxTokens.surfaceRaised,
-                                  borderRadius: BorderRadius.circular(28),
-                                  border: Border.all(
-                                    color: PackLoxTokens.border,
+                          Builder(
+                            builder: (context) {
+                              final hasRealPhoto =
+                                  (result.imageUrl ?? '').trim().isNotEmpty;
+                              // A real photo (RAWG video-game covers/
+                              // screenshots especially) is almost always
+                              // widescreen -- give it a frame shaped to
+                              // match, filling edge to edge, rather than
+                              // squeezing it into the square the bucketed
+                              // placeholder illustrations use. The square
+                              // stays for the no-photo fallback case, since
+                              // those illustrations are designed square.
+                              final frame = ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: PackLoxTokens.surfaceRaised,
+                                    borderRadius: BorderRadius.circular(28),
+                                    border: Border.all(
+                                      color: PackLoxTokens.border,
+                                    ),
+                                  ),
+                                  child: _CatalogPlaceholderArt(
+                                    category: result.category,
+                                    title: result.title,
+                                    setName: result.setName,
+                                    imageUrl: result.imageUrl,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
-                                child: _CatalogPlaceholderArt(
-                                  category: result.category,
-                                  title: result.title,
-                                  setName: result.setName,
-                                  imageUrl: result.imageUrl,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
+                              );
+                              if (!hasRealPhoto) {
+                                return Center(
+                                  child: SizedBox(
+                                    width: 180,
+                                    height: 180,
+                                    child: frame,
+                                  ),
+                                );
+                              }
+                              return AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: frame,
+                              );
+                            },
                           ),
                           const SizedBox(height: 24),
                           Text(
