@@ -1,3 +1,5 @@
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
@@ -59,12 +61,27 @@ class _UpgradeSheet extends ConsumerWidget {
   /// Falls back to the static copy when there's no value yet.
   ({String title, String subtitle}) _resolveCopy(WidgetRef ref) {
     if (reason == PaywallReason.collectionFull) {
-      final total = ref.watch(portfolioControllerProvider).totalValue;
+      final items = ref.watch(portfolioControllerProvider).orderedItems;
+      final profileAsync = ref.watch(profileControllerProvider);
+      final currency = profileAsync.hasValue
+          ? profileAsync.requireValue.preferredCurrency
+          : CollectorProfile.defaultPreferredCurrency;
+      final currentRates =
+          ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+      // Each item converted from its own currency before summing -- the raw
+      // PortfolioController.totalValue getter sums mixed currencies as if
+      // they were one, which previously got relabeled with whatever
+      // currency the user picked (fabricating up to a ~1.5x overstatement).
+      final total = items.fold<double>(
+        0,
+        (sum, item) => sum + convertCurrent(
+          item.estimatedValue,
+          from: currencyForItem(item),
+          to: currency,
+          currentRates: currentRates,
+        ),
+      );
       if (total > 0) {
-        final profileAsync = ref.watch(profileControllerProvider);
-        final currency = profileAsync.hasValue
-            ? profileAsync.requireValue.preferredCurrency
-            : CollectorProfile.defaultPreferredCurrency;
         final formatted = formatCollectionValue(total, currencyCode: currency);
         return (
           title: "You've secured $formatted in collectibles",

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
@@ -931,6 +933,15 @@ void main() {
   });
 }
 
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
+}
+
 Future<void> _pumpPortfolio(
   WidgetTester tester, {
   Size size = const Size(430, 844),
@@ -952,6 +963,9 @@ Future<void> _pumpPortfolio(
               freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 25),
             ),
           ),
+        fxRatesRepositoryProvider.overrideWithValue(
+          const _FakeFxRatesRepository(),
+        ),
       ],
       child: MaterialApp(
         theme: AppTheme.dark,

@@ -4,6 +4,9 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
@@ -314,10 +317,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     final triggeredAlertCount = isPreview
         ? 0
         : ref.watch(homeTriggeredAlertCountProvider).asData?.value ?? 0;
+    final displayCurrency = isPreview ? 'AUD' : ref.watch(displayCurrencyProvider);
+    final fxRates = isPreview
+        ? FxRateSnapshot.empty
+        : ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
     final homeData = _HomeViewData.fromInsights(
-      const CollectorDashboardAnalyticsService().build(portfolio.orderedItems),
+      const CollectorDashboardAnalyticsService().build(
+        portfolio.orderedItems,
+        displayCurrency: displayCurrency,
+        currentRates: fxRates.currentRates,
+      ),
       performance: performance,
       triggeredAlertCount: triggeredAlertCount,
+      displayCurrency: displayCurrency,
+      currentRates: fxRates.currentRates,
     );
     final hasBlockingError = portfolio.errorMessage != null && homeData.isEmpty;
     final isInitialLoading = portfolio.isLoading && homeData.isEmpty;
@@ -1051,7 +1064,11 @@ class _RecentItemsPreview extends StatelessWidget {
                     imagePath:
                         recentItems[index].cloudImageUrl ??
                         recentItems[index].imagePath,
-                    valueLabel: _valueLabelFor(recentItems[index]),
+                    valueLabel: _valueLabelFor(
+                      recentItems[index],
+                      displayCurrency: data.displayCurrency,
+                      currentRates: data.currentRates,
+                    ),
                     valueUnavailable: !_hasDisplayValue(recentItems[index]),
                     condition: recentItems[index].condition,
                     addedLabel: _relativeAddedLabel(recentItems[index]),
@@ -1782,6 +1799,8 @@ class _HomeViewData {
     required this.recentItems,
     required this.valueSeries,
     required this.collectionHealth,
+    this.displayCurrency = 'AUD',
+    this.currentRates = const {'USD': 1.0},
     this.triggeredAlertCount = 0,
     this.topGainer,
     this.topLoser,
@@ -1836,9 +1855,15 @@ class _HomeViewData {
     ];
   }
 
-  /// Honest currency for the aggregate total: the dominant currency among the
-  /// valued items (never a fabricated conversion). AUD when nothing is valued.
-  String get displayCurrency => dominantDisplayCurrency(items);
+  /// The user's chosen display currency (Settings -> Country & Currency).
+  /// `totalValuedAmount` and every history point are already converted into
+  /// this currency by `fromInsights`/the history providers -- see
+  /// currency_conversion.dart.
+  final String displayCurrency;
+
+  /// Today's live FX rates, for widgets (like per-item labels) that convert
+  /// a single item's value on demand rather than through `fromInsights`.
+  final Map<String, double> currentRates;
 
   bool get isEmpty => itemCount == 0;
   bool get hasValuedItems => valuedItemCount > 0;
@@ -1873,14 +1898,28 @@ class _HomeViewData {
     CollectorDashboardAnalytics insights, {
     PortfolioPerformance? performance,
     int triggeredAlertCount = 0,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     final items = insights.items;
     final valuedItems = items.where(_hasDisplayValue).toList(growable: false);
+    // Every item is converted from its own currency to displayCurrency
+    // before summing -- a mixed-currency portfolio summed as raw numbers
+    // would be a meaningless total (this is the bug: previously nothing
+    // read the user's chosen currency at all).
     final totalValuedAmount = valuedItems.fold<double>(
       0,
-      (sum, item) => sum + item.estimatedValue,
+      (sum, item) => sum + convertCurrent(
+        item.estimatedValue,
+        from: currencyForItem(item),
+        to: displayCurrency,
+        currentRates: currentRates,
+      ),
     );
     // Real persisted daily value history drives the trend chart + period delta.
+    // Already converted to displayCurrency upstream, per-point, using the
+    // rate in effect on each point's own date -- see
+    // portfolio_history_service.dart's historyFromCloudSnapshots.
     final dailySnapshots =
         performance?.dailySnapshots ?? const <PortfolioSnapshot>[];
     return _HomeViewData(
@@ -1891,6 +1930,8 @@ class _HomeViewData {
       unvaluedCount: items.length - valuedItems.length,
       recentItems: items,
       valueSeries: _seriesFromSnapshots(dailySnapshots),
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
       topGainer: performance?.topGainer,
       topLoser: performance?.topLoser,
       collectionHealth: insights.collectionHealth,
@@ -2002,11 +2043,21 @@ bool _hasDisplayValue(CollectibleItem item) {
   return item.hasTrustedValuation;
 }
 
-String _valueLabelFor(CollectibleItem item) {
+String _valueLabelFor(
+  CollectibleItem item, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
   if (!_hasDisplayValue(item)) {
     return 'No price';
   }
-  return _formatCurrency(item.estimatedValue, currencyForItem(item));
+  final converted = convertCurrent(
+    item.estimatedValue,
+    from: currencyForItem(item),
+    to: displayCurrency,
+    currentRates: currentRates,
+  );
+  return _formatCurrency(converted, displayCurrency);
 }
 
 String _formatCurrency(double value, [String currencyCode = 'AUD']) {

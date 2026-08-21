@@ -100,6 +100,10 @@ class ApiConstants {
   /// Price/catalog detail endpoint prefix.
   static const pricingCatalogDetailPath = '/api/pricing/catalog';
 
+  /// FX rate history endpoint, used to convert stored values into the
+  /// user's chosen display currency.
+  static const pricingFxRatesPath = '/api/pricing/fx-rates';
+
   /// Portfolio endpoint.
   static const portfolioPath = '/portfolio';
 

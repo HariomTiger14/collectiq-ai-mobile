@@ -1,4 +1,7 @@
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -17,6 +20,8 @@ class PortfolioHistoryService {
   List<PortfolioSnapshot> createCurrentSnapshots(
     List<CollectibleItem> items, {
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     if (items.isEmpty) {
       return const [];
@@ -25,7 +30,13 @@ class PortfolioHistoryService {
     final now = capturedAt ?? DateTime.now();
     return [
       for (final period in TrendSnapshotPeriod.values)
-        createSnapshot(items, period: period, capturedAt: now),
+        createSnapshot(
+          items,
+          period: period,
+          capturedAt: now,
+          displayCurrency: displayCurrency,
+          currentRates: currentRates,
+        ),
     ];
   }
 
@@ -33,9 +44,30 @@ class PortfolioHistoryService {
     List<CollectibleItem> items, {
     required TrendSnapshotPeriod period,
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     final now = capturedAt ?? DateTime.now();
     final periodStart = bucketDate(now, period);
+    // Every downstream total here must be in one common currency before
+    // summing -- a mixed-currency portfolio summed as raw numbers produces
+    // a meaningless total. Converts each item from its own currency
+    // (currencyForItem) to displayCurrency using today's live rate; a
+    // same-currency item is a currency==currency no-op (convertCurrent
+    // returns the value unchanged).
+    double convertedValue(CollectibleItem item) => convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    );
+    final convertedItems = {
+      for (final item in items) item.id: convertedValue(item),
+    };
+    final totalValue = convertedItems.values.fold<double>(
+      0,
+      (sum, value) => sum + value,
+    );
     final analytics = analyticsService.build(items);
     final intelligence = smartInsightsService.build(analytics);
     final categoryTotals = {
@@ -47,7 +79,7 @@ class PortfolioHistoryService {
             item.category,
           );
       categoryTotals[category] =
-          (categoryTotals[category] ?? 0) + item.estimatedValue;
+          (categoryTotals[category] ?? 0) + convertedValue(item);
     }
 
     return PortfolioSnapshot(
@@ -55,12 +87,14 @@ class PortfolioHistoryService {
       period: period,
       periodStart: periodStart,
       capturedAt: now,
-      totalPortfolioValue: analytics.totalValue,
+      totalPortfolioValue: totalValue,
       totalItems: analytics.itemCount,
-      averageValue: analytics.averageItemValue,
+      averageValue: analytics.itemCount == 0
+          ? 0
+          : totalValue / analytics.itemCount,
       categoryTotals: categoryTotals,
       collectionScore: intelligence.collectionScore.score,
-      itemValues: {for (final item in items) item.id: item.estimatedValue},
+      itemValues: convertedItems,
       itemTitles: {for (final item in items) item.id: item.title},
       itemCategories: {for (final item in items) item.id: item.category},
     );
@@ -77,6 +111,8 @@ class PortfolioHistoryService {
     List<PortfolioValuationSnapshot> cloudSnapshots,
     List<CollectibleItem> currentItems, {
     DateTime? now,
+    String displayCurrency = 'AUD',
+    FxRateSnapshot rates = FxRateSnapshot.empty,
   }) {
     if (cloudSnapshots.isEmpty || currentItems.isEmpty) {
       return const [];
@@ -109,7 +145,13 @@ class PortfolioHistoryService {
     final dailySnapshots = <PortfolioSnapshot>[];
     for (var offset = 0; offset <= dayCount; offset++) {
       final day = earliest.add(Duration(days: offset));
-      final snapshot = _snapshotAsOf(day, byItem, itemById);
+      final snapshot = _snapshotAsOf(
+        day,
+        byItem,
+        itemById,
+        displayCurrency: displayCurrency,
+        rates: rates,
+      );
       if (snapshot != null) {
         dailySnapshots.add(snapshot);
       }
@@ -146,8 +188,10 @@ class PortfolioHistoryService {
   PortfolioSnapshot? _snapshotAsOf(
     DateTime day,
     Map<String, List<PortfolioValuationSnapshot>> byItem,
-    Map<String, CollectibleItem> itemById,
-  ) {
+    Map<String, CollectibleItem> itemById, {
+    required String displayCurrency,
+    required FxRateSnapshot rates,
+  }) {
     final itemValues = <String, double>{};
     final itemTitles = <String, String>{};
     final itemCategories = <String, String>{};
@@ -179,10 +223,21 @@ class PortfolioHistoryService {
           break;
         }
       }
-      final value = asOf?.valueAud;
-      if (asOf == null || value == null) {
+      final rawValue = asOf?.valueAud;
+      if (asOf == null || rawValue == null) {
         continue;
       }
+      // Converted using the rate that was actually in effect ON `day`, not
+      // today's rate applied backward -- see currency_conversion.dart's
+      // convertHistorical doc comment for why that distinction matters for
+      // a chart's shape, not just its scale.
+      final value = convertHistorical(
+        rawValue,
+        from: asOf.currency,
+        to: displayCurrency,
+        date: day,
+        rates: rates,
+      );
       final title = item?.title ?? entry.key;
       final category = item?.category ?? 'Collectible';
       itemValues[entry.key] = value;
