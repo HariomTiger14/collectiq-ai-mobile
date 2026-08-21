@@ -1678,6 +1678,7 @@ class _CatalogResultDetailPageState
                                   title: result.title,
                                   setName: result.setName,
                                   imageUrl: result.imageUrl,
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                             ),
@@ -3048,12 +3049,20 @@ class _CatalogPlaceholderArt extends StatelessWidget {
     required this.title,
     required this.setName,
     this.imageUrl,
+    this.fit = BoxFit.cover,
   });
 
   final String category;
   final String title;
   final String? setName;
   final String? imageUrl;
+
+  /// BoxFit.cover (the default) fills the frame and crops -- right for the
+  /// small, fixed-aspect thumbnails this is normally used in. The catalog
+  /// detail hero passes BoxFit.contain instead so the full real photo is
+  /// visible uncropped, since that image is the whole point of the screen,
+  /// not a grid tile.
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -3062,7 +3071,7 @@ class _CatalogPlaceholderArt extends StatelessWidget {
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return Image.network(
         photoUrl,
-        fit: BoxFit.cover,
+        fit: fit,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => _catalogArtFallback(style),
       );
