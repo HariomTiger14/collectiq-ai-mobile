@@ -629,6 +629,94 @@ void main() {
     },
   );
 
+  testWidgets(
+    'catalog result detail merges consecutive same-price history rows',
+    (tester) async {
+      // Newest first, matching the real API's own ordering. Four
+      // consecutive $190 entries in the middle of the run (a price
+      // holding steady across several daily SCD2 snapshots) must
+      // collapse into one row spanning their combined date range,
+      // instead of four separate rows all showing "$190".
+      final history = [
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 17),
+          isCurrent: true,
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 13),
+          validTo: DateTime(2026, 8, 17),
+          currency: 'AUD',
+          marketValue: 179.36,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 12),
+          validTo: DateTime(2026, 8, 13),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 11),
+          validTo: DateTime(2026, 8, 12),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 10),
+          validTo: DateTime(2026, 8, 11),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 9),
+          validTo: DateTime(2026, 8, 10),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+      ];
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-merge-history',
+            title: 'Nike A\'ja Wilson A\'One #1 Draft Pick',
+            category: 'Sneakers',
+            source: 'KicksDB',
+            currency: 'AUD',
+            marketValue: 190,
+            attribution: 'Pricing data by KicksDB',
+            history: history,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'merge history',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-merge-history')),
+      );
+      await tester.pumpAndSettle();
+
+      // The four consecutive $190 rows collapse into one, spanning from
+      // the oldest (9 Aug) to the newest of that steady run (13 Aug,
+      // where the $179.36 row starts) -- not shown as four separate
+      // "X Aug 2026 - Y Aug 2026" rows. All 3 merged rows (current,
+      // $179.36, merged $190) fit within the inline 5-row cap, so no
+      // "View full price history" link is needed to see this.
+      expect(find.text('9 Aug 2026 - 13 Aug 2026'), findsOneWidget);
+      expect(find.text('10 Aug 2026 - 11 Aug 2026'), findsNothing);
+      expect(find.text('11 Aug 2026 - 12 Aug 2026'), findsNothing);
+      expect(find.text('12 Aug 2026 - 13 Aug 2026'), findsNothing);
+      expect(find.byKey(const ValueKey('catalog-view-full-price-history')), findsNothing);
+    },
+  );
+
   testWidgets('catalog result detail shows real eBay listings when present', (
     tester,
   ) async {

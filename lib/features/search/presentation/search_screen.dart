@@ -2770,6 +2770,46 @@ Set<int> _pickCatalogChartLabelIndices(List<_CatalogChartPoint> points) {
 /// a display cap, not a data-fetching one.
 const int _kInlinePriceHistoryLimit = 5;
 
+/// Merges consecutive history entries that share the same price into one
+/// row spanning the full date range, instead of a run of identical-
+/// looking rows -- history is a daily SCD2 snapshot, so a price holding
+/// steady for a week produces one row per day even though nothing
+/// changed. Assumes [history] is sorted newest-first (validFrom
+/// descending), matching what the backend already returns; each merged
+/// row keeps the newest entry's isCurrent/validTo/estimates and only
+/// widens validFrom back to the oldest entry in that steady run.
+List<CatalogPriceHistoryPoint> _mergeConsecutiveSamePriceHistory(
+  List<CatalogPriceHistoryPoint> history,
+) {
+  if (history.isEmpty) {
+    return history;
+  }
+  final merged = <CatalogPriceHistoryPoint>[];
+  for (final point in history) {
+    final last = merged.isEmpty ? null : merged.last;
+    final samePrice =
+        last != null &&
+        last.marketValue == point.marketValue &&
+        last.currency == point.currency;
+    if (last != null && samePrice) {
+      merged[merged.length - 1] = CatalogPriceHistoryPoint(
+        validFrom: point.validFrom,
+        validTo: last.validTo,
+        isCurrent: last.isCurrent,
+        currency: last.currency,
+        marketValue: last.marketValue,
+        lowEstimate: last.lowEstimate,
+        highEstimate: last.highEstimate,
+        sourceFile: last.sourceFile,
+        sourceDownloadedAt: last.sourceDownloadedAt,
+      );
+    } else {
+      merged.add(point);
+    }
+  }
+  return merged;
+}
+
 class _CatalogHistoryPanel extends StatelessWidget {
   const _CatalogHistoryPanel({
     required this.itemTitle,
@@ -2785,8 +2825,9 @@ class _CatalogHistoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = history.take(_kInlinePriceHistoryLimit).toList();
-    final hasMore = history.length > visible.length;
+    final mergedHistory = _mergeConsecutiveSamePriceHistory(history);
+    final visible = mergedHistory.take(_kInlinePriceHistoryLimit).toList();
+    final hasMore = mergedHistory.length > visible.length;
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2827,7 +2868,7 @@ class _CatalogHistoryPanel extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'View full price history (${history.length})',
+                          'View full price history (${mergedHistory.length})',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: PackLoxTokens.cyan,
@@ -2876,6 +2917,7 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mergedHistory = _mergeConsecutiveSamePriceHistory(history);
     return Scaffold(
       backgroundColor: PackLoxTokens.background,
       appBar: AppBar(
@@ -2910,9 +2952,9 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final point in history) ...[
+                  for (final point in mergedHistory) ...[
                     _CatalogHistoryRow(point: point),
-                    if (point != history.last)
+                    if (point != mergedHistory.last)
                       const Divider(color: PackLoxTokens.border, height: 18),
                   ],
                 ],
