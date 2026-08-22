@@ -7,3 +7,5 @@ Widget buildPlatformLocalPortfolioImage({
 }) {
   return placeholderBuilder();
 }
+
+bool platformLocalPortfolioImageExists(String imagePath) => false;

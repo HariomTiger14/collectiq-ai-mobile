@@ -1090,9 +1090,8 @@ class _RecentItemsPreview extends StatelessWidget {
                     id: recentItems[index].id,
                     title: recentItems[index].title,
                     category: recentItems[index].category,
-                    imagePath:
-                        recentItems[index].cloudImageUrl ??
-                        recentItems[index].imagePath,
+                    imagePath: recentItems[index].imagePath,
+                    imageStoragePath: recentItems[index].imageStoragePath,
                     valueLabel: _valueLabelFor(
                       recentItems[index],
                       displayCurrency: data.displayCurrency,

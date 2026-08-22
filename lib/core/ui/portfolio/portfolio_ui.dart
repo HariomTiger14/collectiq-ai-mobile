@@ -3,8 +3,8 @@ import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
@@ -539,7 +539,10 @@ class _PortfolioItemContent extends StatelessWidget {
         wishlistStatusLabel: wishlistStatusLabel,
       ),
     );
-    final image = _PortfolioItemImage(imagePath: item.imagePath);
+    final image = _PortfolioItemImage(
+      imagePath: item.imagePath,
+      storagePath: item.imageStoragePath,
+    );
 
     if (isCompact) {
       return Column(
@@ -569,40 +572,20 @@ class _PortfolioItemContent extends StatelessWidget {
 }
 
 class _PortfolioItemImage extends StatelessWidget {
-  const _PortfolioItemImage({required this.imagePath});
+  const _PortfolioItemImage({required this.imagePath, this.storagePath});
 
   final String imagePath;
+  final String? storagePath;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final normalizedPath = imagePath.trim();
-
-    Widget image;
-    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
-      image = const _PortfolioImagePlaceholder();
-    } else if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      image = Image.network(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    } else if (normalizedPath.startsWith('assets/')) {
-      image = Image.asset(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    } else {
-      image = buildLocalPortfolioImage(
-        imagePath: normalizedPath,
-        fit: BoxFit.cover,
-        placeholderBuilder: () => const _PortfolioImagePlaceholder(),
-      );
-    }
+    final image = ResilientCollectibleImage(
+      localPath: imagePath,
+      storagePath: storagePath,
+      fit: BoxFit.cover,
+      placeholderBuilder: () => const _PortfolioImagePlaceholder(),
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),

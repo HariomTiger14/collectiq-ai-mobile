@@ -15,3 +15,11 @@ Widget buildLocalPortfolioImage({
     placeholderBuilder: placeholderBuilder,
   );
 }
+
+/// Cheap, synchronous existence check for a local portfolio image path.
+/// Always false on web (there is no local filesystem there). Used to decide
+/// upfront whether a local render is worth attempting at all, rather than
+/// only finding out via [Image]'s async error callback.
+bool localPortfolioImageExists(String imagePath) {
+  return platformLocalPortfolioImageExists(imagePath);
+}

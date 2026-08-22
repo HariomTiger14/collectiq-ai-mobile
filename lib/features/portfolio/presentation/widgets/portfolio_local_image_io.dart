@@ -14,3 +14,11 @@ Widget buildPlatformLocalPortfolioImage({
     errorBuilder: (_, _, _) => placeholderBuilder(),
   );
 }
+
+bool platformLocalPortfolioImageExists(String imagePath) {
+  try {
+    return File(imagePath).existsSync();
+  } on Object {
+    return false;
+  }
+}

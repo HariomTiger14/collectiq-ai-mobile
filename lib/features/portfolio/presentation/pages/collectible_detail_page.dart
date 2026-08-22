@@ -19,7 +19,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_n
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
+import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
@@ -3846,28 +3846,15 @@ class _DetailImageSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imagePath = (image?.path ?? item.cloudImageUrl ?? item.imagePath)
-        .trim();
+    final localPath = (image?.path ?? item.imagePath).trim();
+    final storagePath = image?.imageStoragePath ?? item.imageStoragePath;
     final placeholder = _DetailImagePlaceholder(item: item, image: image);
-    if (imagePath.isEmpty || imagePath.startsWith('sample://')) {
+    if (localPath.isEmpty && (storagePath == null || storagePath.isEmpty)) {
       return placeholder;
     }
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return Image.network(
-        imagePath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-      );
-    }
-    if (imagePath.startsWith('assets/')) {
-      return Image.asset(
-        imagePath,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-      );
-    }
-    return buildLocalPortfolioImage(
-      imagePath: imagePath,
+    return ResilientCollectibleImage(
+      localPath: localPath,
+      storagePath: storagePath,
       fit: BoxFit.cover,
       placeholderBuilder: () => placeholder,
     );
@@ -4131,25 +4118,13 @@ class _DetailGalleryImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = image.path.trim();
     final placeholder = _DetailImagePlaceholder(item: item);
-    if (path.isEmpty || path.startsWith('sample://')) {
+    if (path.isEmpty &&
+        (image.imageStoragePath == null || image.imageStoragePath!.isEmpty)) {
       return placeholder;
     }
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-      );
-    }
-    if (path.startsWith('assets/')) {
-      return Image.asset(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-      );
-    }
-    return buildLocalPortfolioImage(
-      imagePath: path,
+    return ResilientCollectibleImage(
+      localPath: path,
+      storagePath: image.imageStoragePath,
       fit: BoxFit.cover,
       placeholderBuilder: () => placeholder,
     );
