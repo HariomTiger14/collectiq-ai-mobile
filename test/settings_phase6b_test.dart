@@ -39,7 +39,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Contact support'), findsOneWidget);
-    expect(find.text('support@packlox.com'), findsOneWidget);
+    expect(
+      find.text('Open a ticket and chat with the PackLox team.'),
+      findsOneWidget,
+    );
     expect(find.text('Report scan issue'), findsOneWidget);
     expect(find.text('Privacy note'), findsOneWidget);
     expect(find.text('Help and feedback are coming soon.'), findsNothing);
