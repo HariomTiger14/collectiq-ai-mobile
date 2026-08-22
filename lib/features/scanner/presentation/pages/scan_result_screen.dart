@@ -4,6 +4,8 @@ import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/free_collectible_counter.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +49,9 @@ class ScanResultScreen extends StatelessWidget {
     required this.onScanAnother,
     required this.onViewPortfolio,
     required this.onApplyReviewEdits,
+    this.savedItemCount,
+    this.freeItemCap,
+    this.onUpgrade,
     this.qaInitialScrollOffset = 0,
     super.key,
   });
@@ -61,6 +66,15 @@ class ScanResultScreen extends StatelessWidget {
   final VoidCallback? onViewPortfolio;
   final Future<bool> Function(ScanResultReviewEdits) onApplyReviewEdits;
   final double qaInitialScrollOffset;
+
+  // Live free-tier usage, shown near "Add to Portfolio" so the cap is
+  // visible before the user taps it, not only after they're blocked.
+  // Null (or a cap at/above the unlimited threshold, i.e. a Pro user)
+  // hides the indicator entirely -- scanning/analysis above always stays
+  // available regardless of this; it only informs the save action.
+  final int? savedItemCount;
+  final int? freeItemCap;
+  final VoidCallback? onUpgrade;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +250,9 @@ class ScanResultScreen extends StatelessWidget {
           onScanAnother: onScanAnother,
           onViewPortfolio: onViewPortfolio,
           onApplyReviewEdits: onApplyReviewEdits,
+          savedItemCount: savedItemCount,
+          freeItemCap: freeItemCap,
+          onUpgrade: onUpgrade,
         ),
       ),
     );
@@ -775,6 +792,9 @@ class _ResultActionBar extends StatelessWidget {
     required this.onScanAnother,
     required this.onViewPortfolio,
     required this.onApplyReviewEdits,
+    this.savedItemCount,
+    this.freeItemCap,
+    this.onUpgrade,
   });
 
   final ScanResult result;
@@ -785,6 +805,18 @@ class _ResultActionBar extends StatelessWidget {
   final VoidCallback onScanAnother;
   final VoidCallback? onViewPortfolio;
   final Future<bool> Function(ScanResultReviewEdits) onApplyReviewEdits;
+  final int? savedItemCount;
+  final int? freeItemCap;
+  final VoidCallback? onUpgrade;
+
+  bool get _showsFreeCounter {
+    final cap = freeItemCap;
+    final count = savedItemCount;
+    return cap != null &&
+        count != null &&
+        onUpgrade != null &&
+        cap < kUnlimitedLabelThreshold;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -867,6 +899,14 @@ class _ResultActionBar extends StatelessWidget {
                               : 'Review details',
                         ),
                       ),
+                      if (_showsFreeCounter) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        FreeCollectibleCounter(
+                          savedCount: savedItemCount!,
+                          cap: freeItemCap!,
+                          onUpgrade: onUpgrade!,
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.sm),
                       FilledButton.icon(
                         key: const ValueKey('result-primary-add-to-portfolio'),

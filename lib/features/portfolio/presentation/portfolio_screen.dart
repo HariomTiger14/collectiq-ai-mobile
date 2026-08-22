@@ -20,6 +20,7 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/free_collectible_counter.dart';
 import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -396,7 +397,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                       planLimits.maxPortfolioItems < kUnlimitedLabelThreshold)
                     HomeSection(
                       topPadding: AppSpacing.sm,
-                      child: _FreePlanCollectibleCounter(
+                      child: FreeCollectibleCounter(
                         savedCount: portfolioState.items.length,
                         cap: planLimits.maxPortfolioItems,
                         onUpgrade: () => showUpgradeSheet(
@@ -1131,81 +1132,6 @@ String _exportDateStamp(DateTime dateTime) {
 /// "N of CAP free collectibles" under the cap and "Collection full — Upgrade"
 /// once at/over it (covers users grandfathered above a lowered cap). Always
 /// tappable to the upgrade sheet.
-class _FreePlanCollectibleCounter extends StatelessWidget {
-  const _FreePlanCollectibleCounter({
-    required this.savedCount,
-    required this.cap,
-    required this.onUpgrade,
-  });
-
-  final int savedCount;
-  final int cap;
-  final VoidCallback onUpgrade;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final atCap = savedCount >= cap;
-    final accent = atCap ? HomeTokens.accent : HomeTokens.textSecondary;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onUpgrade,
-      child: Container(
-        key: const ValueKey('portfolio-free-collectible-counter'),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: atCap
-              ? HomeTokens.accent.withValues(alpha: 0.10)
-              : HomeTokens.surfaceInteractive.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
-          border: Border.all(
-            color: atCap
-                ? HomeTokens.accent.withValues(alpha: 0.34)
-                : HomeTokens.border,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              atCap ? Icons.lock_outline_rounded : Icons.inventory_2_outlined,
-              size: 17,
-              color: accent,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                atCap
-                    ? 'Collection full — upgrade to save more'
-                    : '$savedCount of $cap free collectibles',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelLarge?.copyWith(
-                  color: atCap
-                      ? HomeTokens.textPrimary
-                      : HomeTokens.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            if (atCap)
-              Text(
-                'Pro',
-                style: textTheme.labelLarge?.copyWith(
-                  color: HomeTokens.accent,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _PortfolioTitleBlock extends StatelessWidget {
   const _PortfolioTitleBlock();
 

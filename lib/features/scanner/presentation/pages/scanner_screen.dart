@@ -18,6 +18,9 @@ import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_sugge
 import 'package:collectiq_ai/features/scanner/presentation/widgets/capture_workspace.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/enhance_button.dart';
 import 'package:collectiq_ai/features/scanner/presentation/widgets/exposure_slider.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -390,6 +393,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
       isSaved: scannerState.isSavedToPortfolio,
       isSaving: scannerState.isSavingToPortfolio,
       isRefreshingPricing: scannerState.isRefreshingPricing,
+      savedItemCount: ref.watch(portfolioControllerProvider).items.length,
+      freeItemCap: ref.watch(activePlanLimitsProvider).maxPortfolioItems,
+      onUpgrade: () =>
+          showUpgradeSheet(context, reason: PaywallReason.collectionFull),
       onSave: () async {
         final didSave = await scannerController.saveScanResultToPortfolio();
         if (!context.mounted || !didSave) {
