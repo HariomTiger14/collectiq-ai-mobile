@@ -119,9 +119,17 @@ class PortfolioHistoryService {
     }
 
     final today = bucketDate(now ?? DateTime.now(), TrendSnapshotPeriod.daily);
+    final currentItemIds = {for (final item in currentItems) item.id};
     final byItem = <String, List<PortfolioValuationSnapshot>>{};
     for (final snapshot in cloudSnapshots) {
-      if (snapshot.valueAud == null) {
+      // A removed item's valuation history stays in the cloud table (it's
+      // priced-history, not portfolio membership), but it must never count
+      // toward "my portfolio" again once I no longer own it -- without this
+      // filter a deleted item kept contributing to the total/movers/category
+      // totals on every historical day, and showed up as an ID-only
+      // "mover" entry today since it has no CollectibleItem to name it.
+      if (snapshot.valueAud == null ||
+          !currentItemIds.contains(snapshot.portfolioItemId)) {
         continue;
       }
       (byItem[snapshot.portfolioItemId] ??= []).add(snapshot);
