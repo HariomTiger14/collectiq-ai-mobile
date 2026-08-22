@@ -82,6 +82,87 @@ void main() {
     },
   );
 
+  testWidgets(
+    'MAX period shows true price return, not collection growth from '
+    'adding items (real bug found live: an account with one \$15 item and '
+    'items added months later showed a many-thousand-percent "MAX" gain)',
+    (tester) async {
+      // A local history snapshot from two months ago, when the portfolio
+      // held only the tiny old item -- this is exactly the shape of data
+      // that produced the real bug: the chart's own first point is a tiny
+      // early total, so comparing it to today's much larger total (after
+      // adding a real item) reported collection growth as a price gain.
+      final oldSnapshotDate = DateTime.now().subtract(const Duration(days: 60));
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            ..._item(
+              id: 'old-item',
+              title: 'Early Pikachu',
+              category: 'Trading Card',
+              value: 20,
+              createdAt: oldSnapshotDate,
+            ),
+            'valueAtScan': 15,
+          },
+          {
+            ..._item(
+              id: 'new-item',
+              title: 'Black Lotus',
+              category: 'Trading Card',
+              value: 6000,
+              createdAt: DateTime.now(),
+            ),
+            'valueAtScan': 6000,
+          },
+        ]),
+        'portfolio_value_history_snapshots': jsonEncode([
+          {
+            'id': 'daily-old',
+            'period': 'daily',
+            'periodStart': oldSnapshotDate.toIso8601String(),
+            'capturedAt': oldSnapshotDate.toIso8601String(),
+            'totalPortfolioValue': 15,
+            'totalItems': 1,
+            'averageValue': 15,
+            'categoryTotals': <String, double>{},
+            'collectionScore': 0,
+            'itemValues': {'old-item': 15},
+            'itemTitles': {'old-item': 'Early Pikachu'},
+            'itemCategories': {'old-item': 'Trading Card'},
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(_homeApp());
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      await tester.tap(find.byKey(const ValueKey('home-period-MAX')));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // The old bug would show roughly ($6020-$15)/$15 =~ 39,900%. The
+      // correct real gain here is $5 on $6,015 -- under 1%.
+      expect(find.textContaining('39,900'), findsNothing);
+      expect(find.textContaining('%'), findsWidgets);
+      final percentFinder = find.textContaining(RegExp(r'^\d[\d,.]*%\z'));
+      final percentTexts = tester
+          .widgetList<Text>(percentFinder)
+          .map((widget) => widget.data ?? '')
+          .toList();
+      for (final text in percentTexts) {
+        final value = double.tryParse(text.replaceAll('%', ''));
+        if (value != null) {
+          expect(
+            value,
+            lessThan(100),
+            reason: 'MAX period percent "$text" looks like the old bug (collection growth counted as price gain), not a real return',
+          );
+        }
+      }
+    },
+  );
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {

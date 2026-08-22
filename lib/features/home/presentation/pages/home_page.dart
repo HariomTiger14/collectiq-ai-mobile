@@ -581,8 +581,25 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
         : const <TrendSnapshot>[];
     final showChart = windowPoints.length >= 2;
 
-    final baseline = showChart ? windowPoints.first.totalValue : 0.0;
-    final latest = showChart
+    // MAX uses true price return (current value vs. each item's own
+    // value-at-scan) instead of the chart's first-vs-last point. For every
+    // other period that's a fine approximation of price movement over a
+    // short window, but for MAX the chart's first point is whatever the
+    // portfolio's total happened to be on day one -- often just one or two
+    // items -- so comparing it to today's total (after months of adding
+    // items) reports collection growth as if it were a price gain. Real bug
+    // found live: an account with one $15 item and several added later
+    // showed a many-thousand-percent "Overall" gain.
+    final overallChange = data.overallChange;
+    final useTrueOverallChange = effectivePeriod.isMax && overallChange != null;
+    final baseline = useTrueOverallChange
+        ? overallChange.previousValue
+        : showChart
+        ? windowPoints.first.totalValue
+        : 0.0;
+    final latest = useTrueOverallChange
+        ? overallChange.currentValue
+        : showChart
         ? windowPoints.last.totalValue
         : data.totalValuedAmount;
     final change = latest - baseline;
@@ -599,7 +616,11 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       deltaPeriodLabel = null;
       deltaColor = HomeTokens.textSecondary;
       deltaIcon = Icons.timeline_rounded;
-    } else if (!showChart) {
+    } else if (!showChart && !useTrueOverallChange) {
+      // The chart itself still shows "Building value history" below (gated
+      // separately by showChart) -- but MAX's true-overall number doesn't
+      // depend on snapshot history at all, so it can be shown even before
+      // there's enough history for a chart.
       deltaText = 'Building value history';
       deltaPeriodLabel = null;
       deltaColor = HomeTokens.textSecondary;
@@ -1804,6 +1825,7 @@ class _HomeViewData {
     this.triggeredAlertCount = 0,
     this.topGainer,
     this.topLoser,
+    this.overallChange,
   });
 
   final List<CollectibleItem> items;
@@ -1817,6 +1839,15 @@ class _HomeViewData {
   final PortfolioValueMover? topLoser;
   final CollectionHealthScore collectionHealth;
   final int triggeredAlertCount;
+
+  /// True price return since each item was added (current value vs. its own
+  /// value-at-scan), not "today's total minus whatever the total happened
+  /// to be on day one" -- see PortfolioHistoryService._trueOverallChange for
+  /// why that naive comparison is wrong (it conflates adding new items with
+  /// existing items appreciating). Used specifically for the MAX period tab;
+  /// shorter periods (1D/7D/1M/3M/6M) still use the chart's own first/last
+  /// point, which is a reasonable approximation over a short window.
+  final PortfolioValueChange? overallChange;
 
   /// Category mix from canonicalized real categories: card variants merge into
   /// "Cards", but distinct types (Video Games, LEGO, Sneakers, Watches, …) stay
@@ -1932,6 +1963,7 @@ class _HomeViewData {
       valueSeries: _seriesFromSnapshots(dailySnapshots),
       displayCurrency: displayCurrency,
       currentRates: currentRates,
+      overallChange: performance?.overallChange,
       topGainer: performance?.topGainer,
       topLoser: performance?.topLoser,
       collectionHealth: insights.collectionHealth,

@@ -5464,6 +5464,45 @@ void main() {
       },
     );
 
+    test(
+      'deleteItem sends a filtered PATCH, not an upsert with a partial row',
+      () async {
+        // A partial-row upsert (only id/user_id/sync_status) fails against
+        // portfolio_items' NOT NULL title/category columns even though the
+        // row already exists -- Postgres validates the INSERT column list
+        // before it ever reaches the ON CONFLICT DO UPDATE path. A real
+        // PATCH filtered by eq.id/eq.user_id avoids that entirely.
+        final gateway = _FakeSupabaseDataGateway(
+          session: const SupabaseAuthSession(
+            userId: 'email-user-123',
+            email: 'collector@example.com',
+            accessToken: 'email-token',
+            displayName: 'Collector',
+            isAnonymous: false,
+            projectUrl: 'https://example.supabase.co',
+          ),
+        );
+        final service = SupabaseCloudPortfolioSyncService(
+          bootstrap: _configuredSupabaseBootstrap(),
+          authService: const _SignedInCloudAuthService(
+            userId: 'email-user-123',
+            email: 'collector@example.com',
+          ),
+          supabaseDataGateway: gateway,
+        );
+
+        await service.deleteItem('catalog-item-1');
+
+        expect(gateway.lastPatchPath, '/rest/v1/portfolio_items');
+        expect(gateway.lastPatchQueryParameters, {
+          'id': 'eq.catalog-item-1',
+          'user_id': 'eq.email-user-123',
+        });
+        expect(gateway.lastPatchedData?['sync_status'], 'deleted');
+        expect(gateway.lastPostPath, isNull);
+      },
+    );
+
     test('sync failure becomes retryable and local items remain', () async {
       SharedPreferences.setMockInitialValues({});
       const portfolioRepository = SharedPreferencesPortfolioRepository();
@@ -6362,6 +6401,74 @@ void main() {
       },
     );
 
+    test(
+      'historyFromCloudSnapshots shows an item that never finished syncing '
+      'consistently across the whole chart, not only on the most recent '
+      'point (real bug: a failed-sync item was invisible on every '
+      'historical day, then suddenly appeared only in today\'s total, '
+      'producing a fake spike that was never a real price move)',
+      () {
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Synced Card',
+            category: 'Trading Card',
+            value: 10,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+          // Never produced a real cloud snapshot -- e.g. a failed image
+          // upload, same shape as the real bug found live.
+          _analyticsItem(
+            id: 'never-synced',
+            title: 'Air Force 1',
+            category: 'Sneakers',
+            value: 620,
+            confidence: 0.55,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+        ];
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-1',
+            portfolioItemId: 'card-a',
+            valueAud: 10,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-2',
+            portfolioItemId: 'card-a',
+            valueAud: 12,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        // The never-synced item appears on EVERY day from its own creation
+        // date, flat at its own value -- not just the last one. Old buggy
+        // behavior: day 1 total would have been 10 (never-synced invisible),
+        // then jumped to 632 only on the final day -- a fake $620 "spike"
+        // that was really just an item becoming visible, not a price move.
+        expect(daily, hasLength(3));
+        expect(daily[0].totalPortfolioValue, 630); // 10 + 620, day one
+        expect(daily[1].totalPortfolioValue, 630); // still forward-filled
+        expect(daily[2].totalPortfolioValue, 632); // card-a's new price + 620
+        for (final day in daily) {
+          expect(day.itemValues['never-synced'], 620);
+        }
+      },
+    );
+
     test('historyFromCloudSnapshots returns empty when there is no data', () {
       expect(service.historyFromCloudSnapshots(const [], const []), isEmpty);
     });
@@ -6512,6 +6619,63 @@ void main() {
       expect(performance.weeklyChange.absoluteChange, 400);
       expect(performance.overallChange.currentValue, 1200);
     });
+
+    test(
+      'overallChange reflects price appreciation, not collection growth from '
+      'adding new items (real bug: an account with one \$15 item and several '
+      'items added later showed a many-thousand-percent "Overall" gain)',
+      () {
+        final performance = service.buildPerformance(
+          currentItems: [
+            // Owned since day one, priced at $15 when scanned, still worth
+            // about the same today -- a real (tiny) gain of $5.
+            CollectibleItem(
+              id: 'old-item',
+              title: 'Early Pikachu',
+              category: 'Trading Card',
+              estimatedValue: 20,
+              valueAtScan: 15,
+              confidence: 0.9,
+              condition: 'Near Mint',
+              recommendation: '',
+              imagePath: 'sample://old-item',
+              createdAt: DateTime.parse('2026-06-01T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+            // Added much later, at a real market value of $6,000 -- this is
+            // new collection value, not a $6,000 "gain" on anything.
+            CollectibleItem(
+              id: 'new-item',
+              title: 'Black Lotus',
+              category: 'Trading Card',
+              estimatedValue: 6000,
+              valueAtScan: 6000,
+              confidence: 0.9,
+              condition: 'Near Mint',
+              recommendation: '',
+              imagePath: 'sample://new-item',
+              createdAt: DateTime.parse('2026-08-20T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: const [],
+          capturedAt: DateTime.parse('2026-08-22T00:00:00Z'),
+        );
+
+        // The old naive calculation (today's total minus the total on the
+        // portfolio's very first day, when only the $15 item existed) would
+        // report ~$5,985 gained on a $15 base -- a ~39,900% "Overall"
+        // return. The correct number is a real $5 gain: $20-$15 on the held
+        // item, $0 on the item bought at its own current price.
+        expect(performance.overallChange.currentValue, 6020);
+        expect(performance.overallChange.previousValue, 6015);
+        expect(performance.overallChange.absoluteChange, 5);
+        expect(
+          performance.overallChange.percentageChange,
+          lessThan(0.01),
+        );
+      },
+    );
 
     test('calculates top gainers and top losers', () {
       final previous = service.createSnapshot(
@@ -7914,6 +8078,9 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
   Map<String, dynamic>? lastGetQueryParameters;
   String? lastPostPath;
   List<Map<String, dynamic>> lastPostedRows = const [];
+  String? lastPatchPath;
+  Map<String, dynamic>? lastPatchQueryParameters;
+  Map<String, dynamic>? lastPatchedData;
 
   @override
   SupabaseConfig get config => const SupabaseConfig(
@@ -8032,6 +8199,29 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
     lastPostedRows = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: <dynamic>[] as T,
+      statusCode: 200,
+    );
+  }
+
+  @override
+  Future<Response<T>> authenticatedPatchWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    final error = postError;
+    if (error != null) {
+      throw error;
+    }
+
+    lastPatchPath = path;
+    lastPatchQueryParameters = queryParameters;
+    lastPatchedData = data as Map<String, dynamic>;
     return Response<T>(
       requestOptions: RequestOptions(path: path),
       data: <dynamic>[] as T,

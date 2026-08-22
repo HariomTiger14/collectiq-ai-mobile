@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
@@ -383,7 +384,10 @@ class PortfolioController extends Notifier<PortfolioState> {
         registry: ref.read(cloudServiceRegistryProvider),
         portfolioRepository: _repository,
       ).deleteCloudItem(id);
-    } catch (_) {}
+    } on Object catch (error, stackTrace) {
+      debugPrint('[PortfolioController] cloud delete failed for $id: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 }
 

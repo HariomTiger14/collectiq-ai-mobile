@@ -129,6 +129,31 @@ class PortfolioHistoryService {
     if (byItem.isEmpty) {
       return const [];
     }
+    // An item that never finished syncing (a failed image upload, still
+    // pendingUpload, or local-only) has no real cloud snapshot history at
+    // all -- without this, it's invisible on every historical point and
+    // then suddenly appears only in TODAY's point (which is computed
+    // separately, from every current item regardless of sync status),
+    // producing a fake spike/drop at the very end of the chart that isn't
+    // a real price move, just a change in which items happen to be
+    // counted. Give it a single flat synthetic point at its own value from
+    // the day it was added, so it participates in the same forward-fill
+    // below consistently across the whole chart, not just today.
+    for (final item in currentItems) {
+      if (byItem.containsKey(item.id) || item.estimatedValue <= 0) {
+        continue;
+      }
+      byItem[item.id] = [
+        PortfolioValuationSnapshot(
+          id: '${item.id}-synthetic-unsynced',
+          portfolioItemId: item.id,
+          valuationStatus: item.valuationStatus,
+          pricedAt: item.createdAt,
+          valueAud: item.estimatedValue,
+          currency: currencyForItem(item),
+        ),
+      ];
+    }
     for (final history in byItem.values) {
       history.sort((a, b) => a.pricedAt.compareTo(b.pricedAt));
     }
@@ -294,10 +319,14 @@ class PortfolioHistoryService {
     required List<CollectibleItem> currentItems,
     required List<PortfolioSnapshot> history,
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     final currentSnapshots = createCurrentSnapshots(
       currentItems,
       capturedAt: capturedAt,
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
     );
     final allSnapshots = _mergeCurrentSnapshots(history, currentSnapshots);
     final now = capturedAt ?? DateTime.now();
@@ -320,10 +349,6 @@ class PortfolioHistoryService {
     final todayPrevious = _previousSnapshot(currentDaily, allSnapshots);
     final weekPrevious = _previousSnapshot(currentWeekly, allSnapshots);
     final monthPrevious = _previousSnapshot(currentMonthly, allSnapshots);
-    final firstSnapshot = _firstSnapshot(
-      allSnapshots,
-      TrendSnapshotPeriod.daily,
-    );
     final movers = _movers(currentDaily, todayPrevious);
     final topGainers =
         movers.where((mover) => mover.absoluteChange > 0).toList()
@@ -348,7 +373,11 @@ class PortfolioHistoryService {
       todayChange: _change('Today', currentDaily, todayPrevious),
       weeklyChange: _change('This Week', currentWeekly, weekPrevious),
       monthlyChange: _change('This Month', currentMonthly, monthPrevious),
-      overallChange: _change('Overall', currentDaily, firstSnapshot),
+      overallChange: _trueOverallChange(
+        currentItems,
+        displayCurrency: displayCurrency,
+        currentRates: currentRates,
+      ),
       topGainers: topGainers.take(5).toList(growable: false),
       topLosers: topLosers.take(5).toList(growable: false),
       recentlyAppreciated: topGainers.take(3).toList(growable: false),
@@ -433,14 +462,6 @@ class PortfolioHistoryService {
     return previous.isEmpty ? null : previous.last;
   }
 
-  PortfolioSnapshot? _firstSnapshot(
-    List<PortfolioSnapshot> snapshots,
-    TrendSnapshotPeriod period,
-  ) {
-    final filtered = _snapshotsFor(snapshots, period);
-    return filtered.isEmpty ? null : filtered.first;
-  }
-
   PortfolioSnapshot? _lastSnapshot(
     List<PortfolioSnapshot> snapshots,
     TrendSnapshotPeriod period,
@@ -470,6 +491,52 @@ class PortfolioHistoryService {
       label: label,
       currentValue: currentValue,
       previousValue: previousValue,
+    );
+  }
+
+  /// "Overall" must measure price appreciation on items actually held, not
+  /// today's total minus whatever the portfolio's total happened to be on
+  /// the very first day a snapshot exists. That naive comparison conflates
+  /// *adding new items* with *existing items going up in value* -- a
+  /// collector who started with one $15 item and has since added dozens
+  /// more would show a many-thousand-percent "gain" that's really just
+  /// collection growth, not returns. Real bug found live: a test/seed
+  /// account showed a portfolio worth less than its own claimed gain.
+  ///
+  /// Fixed by summing each currently-held item's OWN baseline (its value
+  /// at scan) against its current value, rather than comparing two
+  /// portfolio-wide totals from different points in the collection's size.
+  PortfolioValueChange _trueOverallChange(
+    List<CollectibleItem> currentItems, {
+    required String displayCurrency,
+    required Map<String, double> currentRates,
+  }) {
+    double currentTotal = 0;
+    double baselineTotal = 0;
+    for (final item in currentItems) {
+      final currency = currencyForItem(item);
+      final current = convertCurrent(
+        item.estimatedValue,
+        from: currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      );
+      final baselineRaw = item.valueAtScan != null && item.valueAtScan! > 0
+          ? item.valueAtScan!
+          : item.estimatedValue;
+      final baseline = convertCurrent(
+        baselineRaw,
+        from: currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      );
+      currentTotal += current;
+      baselineTotal += baseline;
+    }
+    return PortfolioValueChange(
+      label: 'Overall',
+      currentValue: currentTotal,
+      previousValue: baselineTotal,
     );
   }
 

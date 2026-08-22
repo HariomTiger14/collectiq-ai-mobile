@@ -92,6 +92,14 @@ abstract interface class SupabaseDataGateway implements SupabaseAuthGateway {
     Map<String, dynamic>? queryParameters,
     Options? options,
   });
+
+  Future<Response<T>> authenticatedPatchWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  });
 }
 
 class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
@@ -200,9 +208,13 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
   }
 
   /// Exchanges [session]'s refresh token for a new access token. Throws
-  /// [SupabaseSessionExpiredException] (and clears the stored session) when
-  /// there's no refresh token to use, or the refresh token itself has been
-  /// revoked/expired -- the only case that should force a real sign-in.
+  /// [SupabaseSessionExpiredException] (and clears the stored session) only
+  /// when there's no refresh token to use, or the auth server actively
+  /// rejected the refresh token (it was revoked/expired) -- the only cases
+  /// that should force a real sign-in. A network-level failure (timeout,
+  /// no connection, a 5xx from the server) leaves the cached session in
+  /// place and rethrows the original error instead, so a single flaky
+  /// request can't silently sign the user out mid-operation.
   Future<SupabaseAuthSession> _refreshSession(
     SupabaseAuthSession session,
   ) async {
@@ -226,14 +238,31 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
       await _saveSession(refreshed);
       debugPrint('[Supabase] session refreshed for user ${refreshed.userId}');
       return refreshed;
-    } on Object catch (error) {
-      if (error is DioException) {
-        logDioException(error);
+    } on DioException catch (error) {
+      logDioException(error);
+      if (_isAuthRejection(error)) {
+        debugPrint(
+          '[Supabase] refresh token rejected by server; clearing session: '
+          '$error',
+        );
+        await clearSession();
+        throw const SupabaseSessionExpiredException();
       }
-      debugPrint('[Supabase] refresh failed; clearing session: $error');
-      await clearSession();
-      throw const SupabaseSessionExpiredException();
+      debugPrint(
+        '[Supabase] refresh failed transiently (network/server error); '
+        'keeping cached session for a later retry: $error',
+      );
+      rethrow;
     }
+  }
+
+  /// True only when the auth server actually responded to the refresh
+  /// request and rejected it (the refresh token itself is invalid) -- as
+  /// opposed to the request never reaching/completing against the server,
+  /// which is a transient condition and should not be treated the same way.
+  bool _isAuthRejection(DioException error) {
+    final status = error.response?.statusCode;
+    return status != null && status >= 400 && status < 500;
   }
 
   @override
@@ -697,6 +726,37 @@ class SupabaseService implements SupabaseDataGateway, SupabaseOtpSignupGateway {
         debugPrint('[Supabase] POST $path got 401; refreshing and retrying');
         final refreshed = await _refreshSession(session);
         return _dio.post<T>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: _mergeAuthOptions(refreshed, options),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Response<T>> authenticatedPatchWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    try {
+      return await _dio.patch<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _mergeAuthOptions(session, options),
+      );
+    } on DioException catch (error) {
+      logDioException(error, payload: data);
+      if (_isUnauthorized(error)) {
+        debugPrint('[Supabase] PATCH $path got 401; refreshing and retrying');
+        final refreshed = await _refreshSession(session);
+        return _dio.patch<T>(
           path,
           data: data,
           queryParameters: queryParameters,

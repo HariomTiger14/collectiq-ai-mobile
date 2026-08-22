@@ -73,5 +73,7 @@ final portfolioPerformanceProvider =
       return service.buildPerformance(
         currentItems: orderedItems,
         history: history,
+        displayCurrency: displayCurrency,
+        currentRates: rates.currentRates,
       );
     });

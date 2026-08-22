@@ -243,21 +243,22 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     if (gateway == null || session == null) {
       return false;
     }
-    await gateway.authenticatedPostWithSession<List<dynamic>>(
+    // A PATCH (not the upsert-via-POST used elsewhere) is required here:
+    // portfolio_items has NOT NULL columns (title, category) with no
+    // default, and PostgREST's "INSERT ... ON CONFLICT DO UPDATE" upsert
+    // validates those NOT NULL constraints against the INSERT column list
+    // before it ever reaches the conflict/update path -- so a partial
+    // payload like this one would fail even though the row already exists
+    // and only needs an update.
+    await gateway.authenticatedPatchWithSession<List<dynamic>>(
       '/rest/v1/$tableName',
       session: session,
-      queryParameters: const {'on_conflict': 'id,user_id'},
-      data: [
-        {
-          'id': itemId,
-          'user_id': session.userId,
-          'sync_status': 'deleted',
-          'updated_at': _nowIso(),
-        },
-      ],
-      options: Options(
-        headers: const {'Prefer': 'resolution=merge-duplicates,return=minimal'},
-      ),
+      queryParameters: {
+        'id': 'eq.$itemId',
+        'user_id': 'eq.${session.userId}',
+      },
+      data: {'sync_status': 'deleted', 'updated_at': _nowIso()},
+      options: Options(headers: const {'Prefer': 'return=minimal'}),
     );
     return true;
   }
