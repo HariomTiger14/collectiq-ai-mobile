@@ -12,110 +12,332 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('searches saved portfolio items by title and metadata', (
+  // Discover is Catalog-only (market-price lookup) — searching your own
+  // saved items lives in Portfolio, which already has a richer search/sort/
+  // filter system, so Discover no longer duplicates it. See
+  // search_screen.dart for the rationale.
+
+  testWidgets('quick filters fill the query and trigger a catalog search', (
     tester,
   ) async {
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-charizard',
+        title: 'Charizard #4 Base Set',
+        category: 'Pokemon Cards',
+        source: 'PriceCharting',
+        setName: 'Base Set',
+        identifier: '4/102',
+        currency: 'USD',
+        marketValue: 161,
+        confidence: 0.91,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
     await _pumpSearch(
       tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-          brand: 'Mattel',
-        ),
-        _item(
-          id: 'charizard',
-          title: 'Charizard Base Set',
-          category: 'Pokemon Cards',
-          setName: 'Base Set',
-          cardNumber: '4/102',
-        ),
-      ]),
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
     );
 
-    expect(find.text('2 saved items searchable'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('discover-search-input')),
-      '4/102',
-    );
-    await tester.pump();
-
-    expect(find.text('1 saved match'), findsOneWidget);
-    expect(find.text('Charizard Base Set'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('discover-portfolio-image-charizard')),
-      findsOneWidget,
-    );
-    expect(find.text('Hot Wheels Mazda MX-5'), findsNothing);
-  });
-
-  testWidgets('quick filters fill the query from saved categories', (
-    tester,
-  ) async {
-    await _pumpSearch(
-      tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-        ),
-      ]),
-    );
-
-    await tester.tap(find.text('Toy Cars'));
+    await tester.tap(find.text('Pokemon Cards'));
     await tester.pump();
 
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Toy Cars');
-    expect(find.text('Hot Wheels Mazda MX-5'), findsOneWidget);
-  });
+    expect(input.controller?.text, 'Pokemon Cards');
 
-  testWidgets('result cards open the saved item detail screen', (tester) async {
-    await _pumpSearch(
-      tester,
-      repository: _MemoryPortfolioRepository([
-        _item(
-          id: 'hot-wheels',
-          title: 'Hot Wheels Mazda MX-5',
-          category: 'Toy Cars',
-        ),
-      ]),
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('discover-search-input')),
-      'mazda',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('discover-result-hot-wheels')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.byType(CollectibleDetailPage), findsOneWidget);
-  });
-
-  testWidgets('portfolio load failure shows retryable search error state', (
-    tester,
-  ) async {
-    final repository = _FailingOncePortfolioRepository([
-      _item(id: 'coin', title: 'Silver Eagle', category: 'Coins'),
-    ]);
-    await _pumpSearch(tester, repository: repository);
-
-    expect(find.byKey(const ValueKey('discover-error-state')), findsOneWidget);
-    expect(find.text('Search is unavailable'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('discover-retry')));
+    // A quick-filter tap is a deliberate action, not a keystroke, so it
+    // searches immediately rather than waiting out the typing debounce.
     await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('discover-error-state')), findsNothing);
-    expect(find.text('1 saved item searchable'), findsOneWidget);
+    expect(catalogRepository.queries, ['Pokemon Cards']);
+    expect(find.text('Charizard #4 Base Set'), findsOneWidget);
   });
+
+  testWidgets(
+    'filter sheet applies a category, deriving the right source for search',
+    (tester) async {
+      // The default 800x600 test surface is far smaller than a real phone
+      // and leaves no room for the category dropdown's popup menu to
+      // render within the viewport -- use a realistic phone size so the
+      // popup lays out the way it does on-device.
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'pc-mario',
+          title: 'Mario & Luigi RPG',
+          category: 'Video Games',
+          source: 'PriceCharting',
+          setName: 'Nintendo 64',
+          currency: 'USD',
+          marketValue: 40,
+          attribution: 'Pricing data by PriceCharting',
+        ),
+      ]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'mario',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      // The debounced query search already ran once with no filters --
+      // clear it so the assertion below only reflects the filtered search.
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+
+      // Category = Video Games (near the bottom of the flat top-level
+      // list, below the popup's own capped height -- scroll its internal
+      // list into view before tapping).
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-video-games'),
+        ),
+        find.byType(Scrollable).last,
+        const Offset(0, -60),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-video-games'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Subcategory (labeled "Platform" for Video Games) = Nintendo.
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-subcategory-option-nintendo'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The Apply button is pinned outside the scrollable body now, so no
+      // ensureVisible/scroll is needed to reach it.
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['mario']);
+      expect(catalogRepository.lastCategoryGroup, 'video-games');
+      expect(catalogRepository.lastSubcategory, 'nintendo');
+      // There's no user-facing source picker -- picking a real PriceCharting
+      // category/platform must still pin the search to that source so
+      // KicksDB (sneakers) results don't quietly mix into a filtered view.
+      expect(catalogRepository.lastSource, 'pricecharting');
+      // The filter button shows "Category · Subcategory" and an active
+      // count badge of 2 (category + subcategory -- source is derived, not
+      // a separate active filter the user picked).
+      expect(find.text('Video Games · Nintendo'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet applies a Sports Cards subcategory (sport) to search',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'trout',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-dropdown'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sports-cards'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-subcategory-option-baseball'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['trout']);
+      expect(catalogRepository.lastCategoryGroup, 'sports-cards');
+      expect(catalogRepository.lastSubcategory, 'baseball');
+      expect(find.text('Sports Cards · Baseball'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet hides the subcategory dropdown for categories with no drill-down',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-option-comics')),
+      );
+      await tester.pumpAndSettle();
+
+      // Comics has no subcategory taxonomy -- the dropdown must not appear
+      // at all, not just be empty/disabled.
+      expect(
+        find.byKey(const ValueKey('catalog-filter-subcategory-dropdown')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'filter sheet Sneakers category pins search to the kicksdb source',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'jordan',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      catalogRepository.queries.clear();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sneakers'),
+        ),
+        find.byType(Scrollable).last,
+        const Offset(0, -60),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sneakers'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.queries, ['jordan']);
+      // Sneakers has no PriceCharting category_group of its own -- it must
+      // resolve to categoryGroup: null, source: 'kicksdb'.
+      expect(catalogRepository.lastCategoryGroup, isNull);
+      expect(catalogRepository.lastSource, 'kicksdb');
+      expect(find.text('Sneakers'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'filter sheet reset clears every field back to defaults',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'mario',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('discover-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-filter-category-dropdown')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('catalog-filter-category-option-sports-cards'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Reset within the same open sheet session (rather than closing and
+      // reopening) -- selecting a category, then resetting, then applying,
+      // all in one session, still exercises Reset's actual clearing
+      // behavior. Reset/Apply are pinned outside the scrollable body, so
+      // no ensureVisible/scroll is needed to reach them.
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-reset')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('catalog-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(catalogRepository.lastCategoryGroup, isNull);
+      expect(catalogRepository.lastSource, isNull);
+      expect(find.text('Filters'), findsOneWidget);
+    },
+  );
 
   testWidgets('catalog search shows backend catalog results', (tester) async {
     final catalogRepository = _MemoryCatalogSearchRepository([
@@ -138,12 +360,13 @@ void main() {
       catalogRepository: catalogRepository,
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(catalogRepository.queries, ['charizard']);
@@ -153,6 +376,53 @@ void main() {
     expect(
       find.byKey(const ValueKey('discover-catalog-placeholder-pc-charizard')),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('catalog result with a real image renders it instead of the placeholder', (
+    tester,
+  ) async {
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'kdb-air-jordan-1',
+        title: 'Air Jordan 1 Retro High OG',
+        category: 'Sneakers',
+        source: 'KicksDB',
+        setName: 'Jordan',
+        currency: 'USD',
+        marketValue: 310,
+        attribution: 'Pricing data by KicksDB',
+        imageUrl: 'https://images.kicks.dev/air-jordan-1.png',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'air jordan',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Air Jordan 1 Retro High OG'), findsOneWidget);
+    final image = tester.widget<Image>(
+      find
+          .descendant(
+            of: find.byKey(
+              const ValueKey('discover-catalog-placeholder-kdb-air-jordan-1'),
+            ),
+            matching: find.byType(Image),
+          )
+          .first,
+    );
+    expect(image.image, isA<NetworkImage>());
+    expect(
+      (image.image as NetworkImage).url,
+      'https://images.kicks.dev/air-jordan-1.png',
     );
   });
 
@@ -181,12 +451,13 @@ void main() {
       ]),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'mario kart',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('discover-catalog-result-pc-mario-kart')),
@@ -201,8 +472,9 @@ void main() {
     expect(find.text('USD \$82'), findsOneWidget);
     expect(find.text('Low'), findsOneWidget);
     expect(find.text('High'), findsOneWidget);
-    expect(find.text('Pricing confidence'), findsOneWidget);
-    expect(find.text('Provider-backed catalog value'), findsOneWidget);
+    expect(find.text('Pricing evidence'), findsOneWidget);
+    expect(find.text('Trusted provider value'), findsOneWidget);
+    expect(find.text('Currency'), findsWidgets);
     expect(find.text('High (87%)'), findsOneWidget);
     expect(find.text('Matched by title, set/product family'), findsOneWidget);
     expect(find.text('USD \$70 - USD \$96'), findsOneWidget);
@@ -267,12 +539,13 @@ void main() {
       ]),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'charizard',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
@@ -286,6 +559,313 @@ void main() {
     expect(find.text('pokemon'), findsWidgets);
   });
 
+  testWidgets(
+    'catalog result detail shows only 5 history entries inline, with a '
+    'link to the full history',
+    (tester) async {
+      // Newest first, matching the real API's own ordering
+      // (order: valid_from.desc) -- the panel takes the list as-is, it
+      // doesn't re-sort.
+      final history = List.generate(
+        8,
+        (index) => CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 7, 27 - index),
+          isCurrent: index == 0,
+          currency: 'USD',
+          marketValue: 107 - index.toDouble(),
+          sourceFile: 'pokemon.csv',
+        ),
+      );
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-charizard',
+            title: 'Charizard #4 Base Set',
+            category: 'Pokemon Cards',
+            source: 'PriceCharting',
+            setName: 'Base Set',
+            currency: 'USD',
+            marketValue: 107,
+            attribution: 'Pricing data by PriceCharting',
+            history: history,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
+      );
+      await tester.pumpAndSettle();
+
+      // Inline: only the 5 most recent history rows, newest first.
+      expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
+      expect(find.text('23 Jul 2026 - ended'), findsOneWidget);
+      expect(find.text('22 Jul 2026 - ended'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-view-full-price-history')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('View full price history (8)'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-view-full-price-history')),
+      );
+      await tester.pumpAndSettle();
+
+      // Full page: every entry is now reachable, no second network call
+      // (the memory repository only returns data once, on getCatalogDetail).
+      expect(find.text('Charizard #4 Base Set'), findsOneWidget);
+      expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
+      expect(find.text('22 Jul 2026 - ended'), findsOneWidget);
+      expect(find.text('20 Jul 2026 - ended'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'catalog result detail merges consecutive same-price history rows',
+    (tester) async {
+      // Newest first, matching the real API's own ordering. Four
+      // consecutive $190 entries in the middle of the run (a price
+      // holding steady across several daily SCD2 snapshots) must
+      // collapse into one row spanning their combined date range,
+      // instead of four separate rows all showing "$190".
+      final history = [
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 17),
+          isCurrent: true,
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 13),
+          validTo: DateTime(2026, 8, 17),
+          currency: 'AUD',
+          marketValue: 179.36,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 12),
+          validTo: DateTime(2026, 8, 13),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 11),
+          validTo: DateTime(2026, 8, 12),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 10),
+          validTo: DateTime(2026, 8, 11),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime(2026, 8, 9),
+          validTo: DateTime(2026, 8, 10),
+          currency: 'AUD',
+          marketValue: 190,
+        ),
+      ];
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-merge-history',
+            title: 'Nike A\'ja Wilson A\'One #1 Draft Pick',
+            category: 'Sneakers',
+            source: 'KicksDB',
+            currency: 'AUD',
+            marketValue: 190,
+            attribution: 'Pricing data by KicksDB',
+            history: history,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'merge history',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-merge-history')),
+      );
+      await tester.pumpAndSettle();
+
+      // The four consecutive $190 rows collapse into one, spanning from
+      // the oldest (9 Aug) to the newest of that steady run (13 Aug,
+      // where the $179.36 row starts) -- not shown as four separate
+      // "X Aug 2026 - Y Aug 2026" rows. All 3 merged rows (current,
+      // $179.36, merged $190) fit within the inline 5-row cap, so no
+      // "View full price history" link is needed to see this.
+      expect(find.text('9 Aug 2026 - 13 Aug 2026'), findsOneWidget);
+      expect(find.text('10 Aug 2026 - 11 Aug 2026'), findsNothing);
+      expect(find.text('11 Aug 2026 - 12 Aug 2026'), findsNothing);
+      expect(find.text('12 Aug 2026 - 13 Aug 2026'), findsNothing);
+      expect(find.byKey(const ValueKey('catalog-view-full-price-history')), findsNothing);
+    },
+  );
+
+  testWidgets('catalog result detail shows real eBay listings when present', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'pc-god-of-war',
+          title: 'God of War',
+          category: 'Video Games',
+          source: 'PriceCharting',
+          setName: 'Playstation 4',
+          currency: 'AUD',
+          marketValue: 19.74,
+          attribution: 'Pricing data by PriceCharting',
+          marketplaceListings: [
+            MarketplaceListing(
+              title: 'God of War PS4 Brand New',
+              price: 21.49,
+              currency: 'AUD',
+              condition: 'New',
+              url: 'https://www.ebay.com/itm/12345',
+            ),
+          ],
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'god of war',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-pc-god-of-war')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Where to buy'), findsOneWidget);
+    expect(find.text('God of War PS4 Brand New'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
+    expect(find.text('\$21.49 AUD'), findsOneWidget);
+  });
+
+  testWidgets(
+    'catalog result detail hides the eBay panel when there are no listings',
+    (tester) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          const CatalogSearchResult(
+            id: 'pc-obscure-game',
+            title: 'Obscure Game',
+            category: 'Video Games',
+            source: 'PriceCharting',
+            setName: 'Playstation 4',
+            currency: 'AUD',
+            marketValue: 5,
+            attribution: 'Pricing data by PriceCharting',
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'obscure game',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-obscure-game')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Where to buy'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'catalog result detail shows only 3 marketplace listings inline, with '
+    'a link to view all',
+    (tester) async {
+      final listings = List.generate(
+        5,
+        (index) => MarketplaceListing(
+          title: 'God of War listing #$index',
+          price: 20.0 + index,
+          currency: 'AUD',
+          condition: index.isEven ? 'New' : 'Used',
+          url: 'https://www.ebay.com/itm/$index',
+          source: index.isEven ? 'eBay' : 'PriceCharting',
+        ),
+      );
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-god-of-war',
+            title: 'God of War',
+            category: 'Video Games',
+            source: 'PriceCharting',
+            setName: 'Playstation 4',
+            currency: 'AUD',
+            marketValue: 19.74,
+            attribution: 'Pricing data by PriceCharting',
+            marketplaceListings: listings,
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'god of war',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-god-of-war')),
+      );
+      await tester.pumpAndSettle();
+
+      // Inline: only the 3 most recent listings.
+      expect(find.text('God of War listing #0'), findsOneWidget);
+      expect(find.text('God of War listing #1'), findsOneWidget);
+      expect(find.text('God of War listing #2'), findsOneWidget);
+      expect(find.text('God of War listing #3'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-view-full-marketplace-listings')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('View all listings (5)'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-view-full-marketplace-listings')),
+      );
+      await tester.pumpAndSettle();
+
+      // Full page: every listing is now reachable, no second network call
+      // (the memory repository only returns data once, on getCatalogDetail).
+      expect(find.text('Where to buy'), findsOneWidget);
+      expect(find.text('God of War'), findsOneWidget);
+      expect(find.text('God of War listing #4'), findsOneWidget);
+    },
+  );
+
   testWidgets('catalog search has a clear unavailable state', (tester) async {
     await _pumpSearch(
       tester,
@@ -293,12 +873,13 @@ void main() {
       catalogRepository: _FailingCatalogSearchRepository(),
     );
 
-    await tester.tap(find.byKey(const ValueKey('discover-scope-catalog')));
-    await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('discover-search-input')),
       'nintendo',
     );
+    // Catalog search is debounced; advance past the debounce window before
+    // settling the resulting async search.
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(
@@ -325,30 +906,6 @@ Future<void> _pumpSearch(
     ),
   );
   await tester.pumpAndSettle();
-}
-
-CollectibleItem _item({
-  required String id,
-  required String title,
-  required String category,
-  String? brand,
-  String? setName,
-  String? cardNumber,
-}) {
-  return CollectibleItem(
-    id: id,
-    title: title,
-    category: category,
-    estimatedValue: id == 'hot-wheels' ? 18 : 0,
-    confidence: 0.88,
-    condition: 'Good',
-    recommendation: 'Saved test item.',
-    imagePath: '',
-    createdAt: DateTime(2026, 7, 26, 12),
-    brand: brand,
-    setName: setName,
-    cardNumber: cardNumber,
-  );
 }
 
 class _MemoryPortfolioRepository implements PortfolioRepository {
@@ -398,40 +955,41 @@ class _MemoryPortfolioRepository implements PortfolioRepository {
   }
 }
 
-class _FailingOncePortfolioRepository extends _MemoryPortfolioRepository {
-  _FailingOncePortfolioRepository(super.items);
-
-  var _hasFailed = false;
-
-  @override
-  Future<List<CollectibleItem>> getItems() async {
-    if (!_hasFailed) {
-      _hasFailed = true;
-      throw StateError('Search test failure');
-    }
-    return super.getItems();
-  }
-}
-
 class _MemoryCatalogSearchRepository implements CatalogSearchRepository {
   _MemoryCatalogSearchRepository(this.results);
 
   final List<CatalogSearchResult> results;
   final List<String> queries = [];
+  String? lastCategoryGroup;
+  String? lastSubcategory;
+  double? lastMinPrice;
+  double? lastMaxPrice;
+  String? lastSource;
 
   @override
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    String? subcategory,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     queries.add(query);
+    lastCategoryGroup = categoryGroup;
+    lastSubcategory = subcategory;
+    lastMinPrice = minPrice;
+    lastMaxPrice = maxPrice;
+    lastSource = source;
     return results;
   }
 
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
+    String? currency,
   }) async {
     return results.firstWhere(
       (candidate) => candidate.id == result.id,
@@ -445,6 +1003,11 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    String? subcategory,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     throw StateError('Catalog endpoint missing');
   }
@@ -452,7 +1015,8 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
+    String? currency,
   }) async {
     throw StateError('Catalog endpoint missing');
   }

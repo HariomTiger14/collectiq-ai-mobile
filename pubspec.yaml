@@ -45,6 +45,7 @@ dependencies:
   dio: ^5.9.2
   http_parser: ^4.1.2
   path_provider: ^2.1.6
+  url_launcher: ^6.3.2
   in_app_purchase: ^3.2.1
   supabase_flutter: ^2.10.3
   url_launcher: ^6.3.1
@@ -52,6 +53,8 @@ dependencies:
   share_plus: ^13.3.0
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
+  package_info_plus: ^10.2.1
+  fl_chart: ^1.1.1
 
 dev_dependencies:
   flutter_test:
@@ -88,6 +91,7 @@ flutter:
     - assets/packlox/icons/categories/packlox_icon_category_coins_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_figures_v1.svg
     - assets/packlox/icons/categories/packlox_icon_category_more_v1.svg
+    - assets/packlox/icons/categories/colorful/
     - assets/packlox/icons/categories/3d/
     - assets/packlox/icons/navigation/packlox_icon_nav_home_v1.svg
     - assets/packlox/icons/navigation/packlox_icon_nav_portfolio_v1.svg
@@ -97,6 +101,7 @@ flutter:
     - assets/packlox/portfolio/portfolio_detail_pending_valuation.png
     - assets/packlox/portfolio/portfolio_detail_missing_image.png
     - assets/packlox/s01_hero_premium_collectibles_v0_7.png
+    - assets/packlox/s01_hero_premium_collectibles_clean_original_slab_v1.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

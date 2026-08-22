@@ -37,6 +37,7 @@ class SmartScanGuidanceService {
     required List<CapturedScanImage> images,
     required ScanGoal goal,
     String? selectedCategoryLabel,
+    List<ScanCaptureRole>? planOptionalRoles,
   }) {
     final roleCounts = <ScanCaptureRole, int>{};
     for (final image in images) {
@@ -62,6 +63,7 @@ class SmartScanGuidanceService {
       category: category,
       goal: goal,
       capturedRoles: capturedRoles,
+      planOptionalRoles: planOptionalRoles,
     );
 
     if (!hasFront) {
@@ -102,6 +104,7 @@ class SmartScanGuidanceService {
     required CollectibleCategory category,
     required ScanGoal goal,
     required Set<ScanCaptureRole> capturedRoles,
+    List<ScanCaptureRole>? planOptionalRoles,
   }) {
     final roles = switch (category) {
       CollectibleCategory.toyCar => const [
@@ -130,7 +133,15 @@ class SmartScanGuidanceService {
     final detailedExtra = goal == ScanGoal.identifyValue
         ? roles
         : [...roles, ScanCaptureRole.angledReflective];
+    // Never recommend a role the workspace checklist can't actually offer —
+    // this list is a general per-category heuristic, but the capture plan
+    // (which drives the checklist rows) is the source of truth for what's
+    // actually capturable for this goal/category combination.
+    final offeredRoles = planOptionalRoles?.toSet();
     for (final role in detailedExtra) {
+      if (offeredRoles != null && !offeredRoles.contains(role)) {
+        continue;
+      }
       if (!capturedRoles.contains(role)) {
         return role;
       }

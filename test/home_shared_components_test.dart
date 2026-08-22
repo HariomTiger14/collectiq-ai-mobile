@@ -144,12 +144,18 @@ void main() {
       find.bySemanticsLabel('Popular category More, more categories grid'),
       findsOneWidget,
     );
+    // The key is on the CategoryArtwork wrapper, not the SvgPicture it
+    // renders internally — look up the descendant rather than casting the
+    // keyed widget directly.
     final moreIcon = tester.widget<SvgPicture>(
-      find.byKey(const ValueKey('home-popular-category-more-icon')),
+      find.descendant(
+        of: find.byKey(const ValueKey('home-popular-category-more-icon')),
+        matching: find.byType(SvgPicture),
+      ),
     );
     expect(
       (moreIcon.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.categoryMore,
+      PackLoxAssets.categoryColorLego,
     );
   });
 
@@ -158,34 +164,36 @@ void main() {
   ) async {
     await tester.pumpHomeComponent(HomeCategoryGrid.popular());
 
-    final cardsIcon = tester.widget<SvgPicture>(
-      find.byKey(const ValueKey('home-popular-category-cards-icon')),
-    );
-    final coinsIcon = tester.widget<SvgPicture>(
-      find.byKey(const ValueKey('home-popular-category-coins-icon')),
-    );
-    final figuresIcon = tester.widget<SvgPicture>(
-      find.byKey(const ValueKey('home-popular-category-figures-icon')),
-    );
-    final moreIcon = tester.widget<SvgPicture>(
-      find.byKey(const ValueKey('home-popular-category-more-icon')),
+    SvgPicture svgFor(String key) => tester.widget<SvgPicture>(
+      find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(SvgPicture),
+      ),
     );
 
+    final cardsIcon = svgFor('home-popular-category-cards-icon');
+    final coinsIcon = svgFor('home-popular-category-coins-icon');
+    final figuresIcon = svgFor('home-popular-category-figures-icon');
+    final moreIcon = svgFor('home-popular-category-more-icon');
+
+    // Home renders the "colorful v2" illustrated set (see
+    // lib/core/ui/product_language/category_visual.dart), not the older
+    // plain v1 icons — assert against what's actually shipped.
     expect(
       (cardsIcon.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.categoryCards,
+      PackLoxAssets.categoryColorCards,
     );
     expect(
       (coinsIcon.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.categoryCoins,
+      PackLoxAssets.categoryColorCoins,
     );
     expect(
       (figuresIcon.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.categoryFigures,
+      PackLoxAssets.categoryColorFunko,
     );
     expect(
       (moreIcon.bytesLoader as SvgAssetLoader).assetName,
-      PackLoxAssets.categoryMore,
+      PackLoxAssets.categoryColorLego,
     );
   });
 
@@ -239,7 +247,7 @@ void main() {
   testWidgets('Recent item renders missing-image fallback', (tester) async {
     await tester.pumpHomeComponent(_recentItem(imagePath: ''));
 
-    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
   });
 
   testWidgets('Recent item keeps unavailable value unavailable', (

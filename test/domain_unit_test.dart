@@ -7,6 +7,8 @@ import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
 import 'package:collectiq_ai/core/cloud/services/analytics_service.dart';
 import 'package:collectiq_ai/core/cloud/services/auth_service.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_storage_service.dart';
 import 'package:collectiq_ai/core/cloud/services/crash_reporting_service.dart';
 import 'package:collectiq_ai/core/cloud/services/noop_cloud_services.dart';
@@ -98,6 +100,7 @@ import 'package:collectiq_ai/features/subscription/domain/entities/user_entitlem
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_exception.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/purchase_result.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/apple_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/domain/repositories/entitlement_repository.dart';
@@ -1077,6 +1080,31 @@ void main() {
       expect(result.lowEstimate, 10.0);
       expect(result.highEstimate, 25.32);
     });
+
+    test('parses a real KicksDB catalog image URL', () {
+      final result = CatalogSearchResult.fromJson({
+        'id': 'kdb-1',
+        'title': 'Air Jordan 1 Retro High OG',
+        'category': 'Sneakers',
+        'source': 'KicksDB',
+        'setName': 'Jordan',
+        'imageUrl': 'https://images.kicks.dev/air-jordan-1.png',
+        'pricing': {'currency': 'USD', 'marketValue': 310.0},
+      });
+
+      expect(result.imageUrl, 'https://images.kicks.dev/air-jordan-1.png');
+    });
+
+    test('has no image when the backend does not provide one', () {
+      final result = CatalogSearchResult.fromJson({
+        'id': '10769851',
+        'title': 'Pikachu',
+        'category': 'Pokemon Cards',
+        'source': 'PriceCharting',
+      });
+
+      expect(result.imageUrl, isNull);
+    });
   });
 
   group('RecognitionResult', () {
@@ -1536,11 +1564,17 @@ void main() {
       expect(result.alternativeMatches.single.title, 'Unknown alternative');
       expect(result.alternativeMatches.single.confidence, 0.73);
 
+      // A fully-defaulted parsed response ("Unknown collectible", 0
+      // confidence) is the same shape the real backend legitimately returns
+      // for a photo that isn't a recognizable collectible. validateResponse
+      // must accept it as a valid low-confidence result (the result screen's
+      // "Needs Review" banner handles telling the user), not reject it as a
+      // contract violation — raw field presence is enforced separately by
+      // validateResponsePayload before parsing ever happens.
       final validation = const AiBackendContractValidator().validateResponse(
         response,
       );
-      expect(validation.isValid, isFalse);
-      expect(validation.issues, contains('itemName is missing or defaulted.'));
+      expect(validation.isValid, isTrue);
     });
 
     test('backend error parses safe defaults', () {
@@ -2804,7 +2838,7 @@ void main() {
       expect(missingKey, 'Supabase anon key is missing from SIT config.');
       expect(
         network,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
       expect(
         confirmationRequired,
@@ -2819,7 +2853,7 @@ void main() {
       );
       expect(
         unmappedHttpError,
-        'Supabase is temporarily unavailable. Please try again soon.',
+        'The service is temporarily unavailable. Please try again soon.',
       );
       expect(unmappedHttpError, isNot(contains('Unable to connect')));
     });
@@ -2899,7 +2933,7 @@ void main() {
         expect(invalidEmail, 'Please enter a valid email address.');
         expect(
           network,
-          'Unable to reach Supabase. Check your internet connection.',
+          'Unable to reach the server. Check your internet connection.',
         );
       },
     );
@@ -3595,6 +3629,51 @@ void main() {
     );
 
     test(
+      'portfolio_items row parser restores valued status from Supabase pricing columns',
+      () {
+        final item = itemFromSupabaseRow({
+          'id': 'scan-priced-row',
+          'user_id': 'user-1',
+          'title': 'Cloud Priced Card',
+          'category': 'Trading Card',
+          'manufacturer': null,
+          'series': null,
+          'year': null,
+          'country': null,
+          'estimated_value_low': 80,
+          'estimated_value_high': 120,
+          'image_local_path': 'sample://card',
+          'image_storage_path': null,
+          'cloud_image_url': null,
+          'sync_status': 'synced',
+          'last_synced_at': null,
+          'raw_json': {
+            'id': 'scan-priced-row',
+            'title': 'Cloud Priced Card',
+            'category': 'Trading Card',
+            'estimatedValue': 0,
+            'confidence': .72,
+            'condition': 'Review needed',
+            'recommendation': 'Review this synced collectible.',
+            'imagePath': 'sample://card',
+            'createdAt': '2026-07-30T00:00:00Z',
+            'valuationStatus': 'unavailable',
+            'valuationSource': 'unknown',
+          },
+          'created_at': '2026-07-30T00:00:00Z',
+          'updated_at': null,
+        });
+
+        expect(item, isNotNull);
+        final parsedItem = item!;
+        expect(parsedItem.estimatedValue, 120);
+        expect(parsedItem.valuationStatus, ValuationStatus.marketEstimated);
+        expect(parsedItem.pricing?.lowEstimate, 80);
+        expect(parsedItem.pricing?.highEstimate, 120);
+      },
+    );
+
+    test(
       'Supabase storage service is disabled when config is missing',
       () async {
         final service = SupabaseCloudStorageService(
@@ -3615,6 +3694,139 @@ void main() {
         );
 
         expect(reference, isNull);
+      },
+    );
+  });
+
+  group('SupabaseAuthSession refresh token', () {
+    test('fromJson captures refresh_token and expires_at from the top level', () {
+      final session = SupabaseAuthSession.fromJson({
+        'access_token': 'access-1',
+        'refresh_token': 'refresh-1',
+        'expires_at': 1700000000,
+        'user': {'id': 'user-1', 'email': 'harry@example.com'},
+      }, projectUrl: 'https://example.supabase.co');
+
+      expect(session.accessToken, 'access-1');
+      expect(session.refreshToken, 'refresh-1');
+      expect(
+        session.expiresAt,
+        DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000, isUtc: true),
+      );
+    });
+
+    test('fromJson falls back to expires_in when expires_at is absent', () {
+      final before = DateTime.now().toUtc();
+      final session = SupabaseAuthSession.fromJson({
+        'access_token': 'access-1',
+        'refresh_token': 'refresh-1',
+        'expires_in': 3600,
+        'user': {'id': 'user-1', 'email': 'harry@example.com'},
+      }, projectUrl: 'https://example.supabase.co');
+
+      final expiry = session.expiresAt;
+      expect(expiry, isNotNull);
+      expect(
+        expiry!.difference(before).inSeconds,
+        closeTo(3600, 2),
+      );
+    });
+
+    test('fromJson reads refresh_token and expiry from a nested session map', () {
+      final session = SupabaseAuthSession.fromJson({
+        'session': {
+          'access_token': 'access-1',
+          'refresh_token': 'refresh-1',
+          'expires_in': 3600,
+          'user': {'id': 'user-1', 'email': 'harry@example.com'},
+        },
+      }, projectUrl: 'https://example.supabase.co');
+
+      expect(session.accessToken, 'access-1');
+      expect(session.refreshToken, 'refresh-1');
+      expect(session.expiresAt, isNotNull);
+    });
+
+    test('a session with no expiry info is treated as not expired', () {
+      const session = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      expect(session.expiresAt, isNull);
+      expect(session.isExpired(), isFalse);
+    });
+
+    test('isExpired is true once past expiry, honoring the safety buffer', () {
+      final justExpired = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: DateTime.now().toUtc().add(const Duration(seconds: 30)),
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+      final wellInFuture = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 30)),
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      // Within the 60s safety buffer -> treated as expired so a refresh
+      // happens before the token actually dies mid-request.
+      expect(justExpired.isExpired(), isTrue);
+      expect(wellInFuture.isExpired(), isFalse);
+    });
+
+    test('toJsonString/fromJsonString round-trips refreshToken and expiresAt', () {
+      final expiresAt = DateTime.now().toUtc().add(const Duration(hours: 1));
+      final session = SupabaseAuthSession(
+        userId: 'user-1',
+        email: 'harry@example.com',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresAt: expiresAt,
+        displayName: 'Harry',
+        isAnonymous: false,
+        projectUrl: 'https://example.supabase.co',
+      );
+
+      final restored = SupabaseAuthSession.fromJsonString(
+        session.toJsonString(),
+      );
+
+      expect(restored.refreshToken, 'refresh-1');
+      expect(restored.expiresAt, expiresAt);
+    });
+
+    test(
+      'a persisted session from before this field existed restores with an '
+      'empty refresh token and unknown (not-expired) expiry',
+      () {
+        // Simulates a session saved by an older build: no refreshToken/
+        // expiresAt keys in the query string at all.
+        const legacyEncoded =
+            'userId=user-1&email=harry%40example.com&accessToken=access-1&'
+            'displayName=Harry&isAnonymous=false&'
+            'projectUrl=https%3A%2F%2Fexample.supabase.co';
+
+        final restored = SupabaseAuthSession.fromJsonString(legacyEncoded);
+
+        expect(restored.refreshToken, isEmpty);
+        expect(restored.expiresAt, isNull);
+        expect(restored.isExpired(), isFalse);
       },
     );
   });
@@ -3957,7 +4169,7 @@ void main() {
     test('password reset failure shows user-safe error', () async {
       final repository = _ScriptedAuthRepository(
         passwordResetError: const SupabaseAuthException(
-          'Unable to reach Supabase. Check your internet connection.',
+          'Unable to reach the server. Check your internet connection.',
         ),
       );
       final container = ProviderContainer(
@@ -3973,7 +4185,7 @@ void main() {
       expect(state.infoMessage, isNull);
       expect(
         state.errorMessage,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
       expect(repository.passwordResetCalls, 1);
     });
@@ -4106,7 +4318,7 @@ void main() {
           authRepositoryProvider.overrideWithValue(
             _ScriptedAuthRepository(
               signUpError: const SupabaseAuthException(
-                'Unable to reach Supabase. Check your internet connection.',
+                'Unable to reach the server. Check your internet connection.',
               ),
             ),
           ),
@@ -4127,7 +4339,7 @@ void main() {
       expect(state.infoMessage, isNull);
       expect(
         state.errorMessage,
-        'Unable to reach Supabase. Check your internet connection.',
+        'Unable to reach the server. Check your internet connection.',
       );
     });
 
@@ -4614,7 +4826,7 @@ void main() {
       expect(state.status, AuthFlowStatus.configurationError);
       expect(
         state.errorMessage,
-        'Supabase configuration is missing or invalid.',
+        "Sign-in isn't available right now. Please try again later.",
       );
     });
 
@@ -4728,14 +4940,36 @@ void main() {
       const config = UsageLimitConfig();
       final usage = UsageTracker.fromLimit(
         limit: config.usageLimit,
-        scansUsedToday: 999,
+        scansUsedThisMonth: 999,
       );
 
       expect(UserEntitlements.developmentFree.plan, SubscriptionPlan.free);
       expect(config.developmentUnlimited, isTrue);
       expect(usage.canAnalyze, isTrue);
       expect(usage.isUnlimited, isTrue);
-      expect(usage.remainingScans, config.dailyFreeScanLimit);
+      expect(usage.remainingScans, config.monthlyFreeScanLimit);
+    });
+
+    test('AppleBillingConfig maps product ids to plans and back', () {
+      const config = AppleBillingConfig(
+        enabled: true,
+        proProductId: 'apple_pro',
+        premiumProductId: 'apple_premium',
+      );
+
+      expect(config.planForProductId('apple_pro'), SubscriptionPlan.pro);
+      expect(
+        config.planForProductId('apple_premium'),
+        SubscriptionPlan.premium,
+      );
+      expect(config.planForProductId('unrelated_product'), isNull);
+      expect(config.productIdForPlan(SubscriptionPlan.pro), 'apple_pro');
+      expect(
+        config.productIdForPlan(SubscriptionPlan.premium),
+        'apple_premium',
+      );
+      expect(config.productIdForPlan(SubscriptionPlan.free), isNull);
+      expect(config.productIds, {'apple_pro', 'apple_premium'});
     });
 
     test('usage controller increments successful analyses', () async {
@@ -4746,7 +4980,7 @@ void main() {
           usageLimitConfigProvider.overrideWithValue(
             const UsageLimitConfig(
               developmentUnlimited: false,
-              dailyFreeScanLimit: 2,
+              monthlyFreeScanLimit: 2,
             ),
           ),
         ],
@@ -4763,7 +4997,7 @@ void main() {
 
       final state = container.read(subscriptionControllerProvider);
       expect(repository.count, 1);
-      expect(state.usage.scansUsedToday, 1);
+      expect(state.usage.scansUsedThisMonth, 1);
       expect(state.usage.remainingScans, 1);
     });
 
@@ -4775,7 +5009,7 @@ void main() {
           usageLimitConfigProvider.overrideWithValue(
             const UsageLimitConfig(
               developmentUnlimited: false,
-              dailyFreeScanLimit: 1,
+              monthlyFreeScanLimit: 1,
             ),
           ),
         ],
@@ -5227,6 +5461,45 @@ void main() {
 
         expect(status.state, SyncState.localOnly);
         expect(status.isCloudConnected, isFalse);
+      },
+    );
+
+    test(
+      'deleteItem sends a filtered PATCH, not an upsert with a partial row',
+      () async {
+        // A partial-row upsert (only id/user_id/sync_status) fails against
+        // portfolio_items' NOT NULL title/category columns even though the
+        // row already exists -- Postgres validates the INSERT column list
+        // before it ever reaches the ON CONFLICT DO UPDATE path. A real
+        // PATCH filtered by eq.id/eq.user_id avoids that entirely.
+        final gateway = _FakeSupabaseDataGateway(
+          session: const SupabaseAuthSession(
+            userId: 'email-user-123',
+            email: 'collector@example.com',
+            accessToken: 'email-token',
+            displayName: 'Collector',
+            isAnonymous: false,
+            projectUrl: 'https://example.supabase.co',
+          ),
+        );
+        final service = SupabaseCloudPortfolioSyncService(
+          bootstrap: _configuredSupabaseBootstrap(),
+          authService: const _SignedInCloudAuthService(
+            userId: 'email-user-123',
+            email: 'collector@example.com',
+          ),
+          supabaseDataGateway: gateway,
+        );
+
+        await service.deleteItem('catalog-item-1');
+
+        expect(gateway.lastPatchPath, '/rest/v1/portfolio_items');
+        expect(gateway.lastPatchQueryParameters, {
+          'id': 'eq.catalog-item-1',
+          'user_id': 'eq.email-user-123',
+        });
+        expect(gateway.lastPatchedData?['sync_status'], 'deleted');
+        expect(gateway.lastPostPath, isNull);
       },
     );
 
@@ -6058,6 +6331,202 @@ void main() {
       expect(snapshots.first.itemValues['card'], 1800);
     });
 
+    test(
+      'historyFromCloudSnapshots forward-fills each item to its last known '
+      'value and excludes items that did not exist yet',
+      () {
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Card A',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+          _analyticsItem(
+            id: 'card-b',
+            title: 'Card B',
+            category: 'Coin',
+            value: 50,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-02T00:00:00Z'),
+          ),
+        ];
+        // Card A: priced day 1 ($100) and day 3 ($150), no day-2 event.
+        // Card B: only priced on day 2 ($50) — didn't exist on day 1.
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-1',
+            portfolioItemId: 'card-a',
+            valueAud: 100,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'b-1',
+            portfolioItemId: 'card-b',
+            valueAud: 50,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-02T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-2',
+            portfolioItemId: 'card-a',
+            valueAud: 150,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        expect(daily, hasLength(3));
+        expect(daily[0].periodStart, DateTime(2026, 7, 1));
+        expect(daily[0].totalPortfolioValue, 100); // only card-a exists
+        expect(daily[0].itemValues.containsKey('card-b'), isFalse);
+
+        expect(daily[1].periodStart, DateTime(2026, 7, 2));
+        expect(daily[1].totalPortfolioValue, 150); // card-a forward-filled + b
+
+        expect(daily[2].periodStart, DateTime(2026, 7, 3));
+        expect(daily[2].totalPortfolioValue, 200); // card-a's new price + b
+      },
+    );
+
+    test(
+      'historyFromCloudSnapshots shows an item that never finished syncing '
+      'consistently across the whole chart, not only on the most recent '
+      'point (real bug: a failed-sync item was invisible on every '
+      'historical day, then suddenly appeared only in today\'s total, '
+      'producing a fake spike that was never a real price move)',
+      () {
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Synced Card',
+            category: 'Trading Card',
+            value: 10,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+          // Never produced a real cloud snapshot -- e.g. a failed image
+          // upload, same shape as the real bug found live.
+          _analyticsItem(
+            id: 'never-synced',
+            title: 'Air Force 1',
+            category: 'Sneakers',
+            value: 620,
+            confidence: 0.55,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+        ];
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-1',
+            portfolioItemId: 'card-a',
+            valueAud: 10,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-2',
+            portfolioItemId: 'card-a',
+            valueAud: 12,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        // The never-synced item appears on EVERY day from its own creation
+        // date, flat at its own value -- not just the last one. Old buggy
+        // behavior: day 1 total would have been 10 (never-synced invisible),
+        // then jumped to 632 only on the final day -- a fake $620 "spike"
+        // that was really just an item becoming visible, not a price move.
+        expect(daily, hasLength(3));
+        expect(daily[0].totalPortfolioValue, 630); // 10 + 620, day one
+        expect(daily[1].totalPortfolioValue, 630); // still forward-filled
+        expect(daily[2].totalPortfolioValue, 632); // card-a's new price + 620
+        for (final day in daily) {
+          expect(day.itemValues['never-synced'], 620);
+        }
+      },
+    );
+
+    test('historyFromCloudSnapshots returns empty when there is no data', () {
+      expect(service.historyFromCloudSnapshots(const [], const []), isEmpty);
+    });
+
+    test(
+      'historyFromCloudSnapshots ignores a backfilled snapshot dated before '
+      'the item actually entered the portfolio',
+      () {
+        // Card A was added on day 3, but has a catalog-history-backfilled
+        // snapshot from day 1 (real market price, before the user owned
+        // it) plus its real at-scan snapshot on day 3. The portfolio total
+        // must not count card-a's value on day 1/2 -- the user never
+        // experienced that gain.
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Card A',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-03T00:00:00Z'),
+          ),
+        ];
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-backfilled',
+            portfolioItemId: 'card-a',
+            valueAud: 40,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'a-at-scan',
+            portfolioItemId: 'card-a',
+            valueAud: 150,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-03T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-03T18:00:00Z'),
+        );
+        final daily =
+            history.where((s) => s.period == TrendSnapshotPeriod.daily).toList()
+              ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
+
+        // Only day 3 (the real add date) should carry any value at all --
+        // days 1-2 have a backfilled snapshot but no owned items, so no
+        // daily snapshot is produced for them.
+        expect(daily, hasLength(1));
+        expect(daily.single.periodStart, DateTime(2026, 7, 3));
+        expect(daily.single.totalPortfolioValue, 150);
+      },
+    );
+
     test('persists and upserts history snapshots', () async {
       const repository = SharedPreferencesPortfolioHistoryRepository();
       final first = service.createSnapshot(
@@ -6150,6 +6619,63 @@ void main() {
       expect(performance.weeklyChange.absoluteChange, 400);
       expect(performance.overallChange.currentValue, 1200);
     });
+
+    test(
+      'overallChange reflects price appreciation, not collection growth from '
+      'adding new items (real bug: an account with one \$15 item and several '
+      'items added later showed a many-thousand-percent "Overall" gain)',
+      () {
+        final performance = service.buildPerformance(
+          currentItems: [
+            // Owned since day one, priced at $15 when scanned, still worth
+            // about the same today -- a real (tiny) gain of $5.
+            CollectibleItem(
+              id: 'old-item',
+              title: 'Early Pikachu',
+              category: 'Trading Card',
+              estimatedValue: 20,
+              valueAtScan: 15,
+              confidence: 0.9,
+              condition: 'Near Mint',
+              recommendation: '',
+              imagePath: 'sample://old-item',
+              createdAt: DateTime.parse('2026-06-01T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+            // Added much later, at a real market value of $6,000 -- this is
+            // new collection value, not a $6,000 "gain" on anything.
+            CollectibleItem(
+              id: 'new-item',
+              title: 'Black Lotus',
+              category: 'Trading Card',
+              estimatedValue: 6000,
+              valueAtScan: 6000,
+              confidence: 0.9,
+              condition: 'Near Mint',
+              recommendation: '',
+              imagePath: 'sample://new-item',
+              createdAt: DateTime.parse('2026-08-20T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: const [],
+          capturedAt: DateTime.parse('2026-08-22T00:00:00Z'),
+        );
+
+        // The old naive calculation (today's total minus the total on the
+        // portfolio's very first day, when only the $15 item existed) would
+        // report ~$5,985 gained on a $15 base -- a ~39,900% "Overall"
+        // return. The correct number is a real $5 gain: $20-$15 on the held
+        // item, $0 on the item bought at its own current price.
+        expect(performance.overallChange.currentValue, 6020);
+        expect(performance.overallChange.previousValue, 6015);
+        expect(performance.overallChange.absoluteChange, 5);
+        expect(
+          performance.overallChange.percentageChange,
+          lessThan(0.01),
+        );
+      },
+    );
 
     test('calculates top gainers and top losers', () {
       final previous = service.createSnapshot(
@@ -6260,7 +6786,13 @@ void main() {
           createdAt: DateTime.parse('2026-06-30T00:00:00Z'),
         ),
       ];
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [
+          fxRatesRepositoryProvider.overrideWithValue(
+            const _FakeFxRatesRepository(),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       final performance = await container.read(
@@ -6274,43 +6806,114 @@ void main() {
       expect(snapshots, hasLength(3));
     });
 
-    test('local valuation snapshot repository records refreshed item value', () async {
+    test(
+      'local valuation snapshot repository records refreshed item value',
+      () async {
+        final repository = SharedPreferencesValuationSnapshotRepository();
+        final item =
+            _analyticsItem(
+              id: 'card',
+              title: 'Charizard Holo',
+              category: 'Trading Card',
+              value: 150,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+            ).copyWith(
+              pricing: PricingInfo(
+                estimatedMarketValue: 150,
+                lowEstimate: 120,
+                highEstimate: 180,
+                currency: 'AUD',
+                pricingSource: 'PriceCharting',
+                pricingConfidence: 0.82,
+                lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+                valuationStatus: ValuationStatus.marketEstimated,
+                valuationSource: 'PriceCharting',
+              ),
+              valuationStatus: ValuationStatus.marketEstimated,
+              valuationSource: 'PriceCharting',
+              lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+            );
+
+        await repository.recordSnapshot(item);
+        final snapshots = await repository.getSnapshots('card');
+
+        expect(snapshots, hasLength(1));
+        expect(snapshots.single.portfolioItemId, 'card');
+        expect(snapshots.single.valueAud, 150);
+        expect(snapshots.single.lowEstimateAud, 120);
+        expect(snapshots.single.highEstimateAud, 180);
+        expect(snapshots.single.displayString, 'AUD 150.00');
+        expect(snapshots.single.pricingProvider, 'PriceCharting');
+        expect(
+          snapshots.single.valuationStatus,
+          ValuationStatus.marketEstimated,
+        );
+      },
+    );
+
+    test('local valuation snapshots skip unchanged trusted values', () async {
       final repository = SharedPreferencesValuationSnapshotRepository();
-      final item = _analyticsItem(
-        id: 'card',
-        title: 'Charizard Holo',
-        category: 'Trading Card',
-        value: 150,
-        confidence: 0.9,
-        createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
-      ).copyWith(
+      final baseItem =
+          _analyticsItem(
+            id: 'card',
+            title: 'Charizard Holo',
+            category: 'Trading Card',
+            value: 150,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          ).copyWith(
+            pricing: PricingInfo(
+              estimatedMarketValue: 150,
+              lowEstimate: 120,
+              highEstimate: 180,
+              currency: 'AUD',
+              pricingSource: 'PriceCharting',
+              pricingConfidence: 0.82,
+              lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+              valuationSource: 'PriceCharting',
+            ),
+            valuationStatus: ValuationStatus.marketEstimated,
+            valuationSource: 'PriceCharting',
+            lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+          );
+      final unchangedItem = baseItem.copyWith(
+        lastValueRefreshedAt: DateTime.parse('2026-07-01T08:00:00Z'),
+      );
+      final changedItem = baseItem.copyWith(
+        estimatedValue: 165,
         pricing: PricingInfo(
-          estimatedMarketValue: 150,
-          lowEstimate: 120,
-          highEstimate: 180,
+          estimatedMarketValue: 165,
+          lowEstimate: 130,
+          highEstimate: 190,
           currency: 'AUD',
           pricingSource: 'PriceCharting',
           pricingConfidence: 0.82,
-          lastUpdated: DateTime.parse('2026-06-30T08:00:00Z'),
+          lastUpdated: DateTime.parse('2026-07-02T08:00:00Z'),
           valuationStatus: ValuationStatus.marketEstimated,
           valuationSource: 'PriceCharting',
         ),
-        valuationStatus: ValuationStatus.marketEstimated,
-        valuationSource: 'PriceCharting',
-        lastValueRefreshedAt: DateTime.parse('2026-06-30T08:00:00Z'),
+        lastValueRefreshedAt: DateTime.parse('2026-07-02T08:00:00Z'),
       );
 
-      await repository.recordSnapshot(item);
+      final firstRecorded = await repository.recordSnapshotIfValueChanged(
+        baseItem,
+      );
+      final duplicateRecorded = await repository.recordSnapshotIfValueChanged(
+        unchangedItem,
+      );
+      final changedRecorded = await repository.recordSnapshotIfValueChanged(
+        changedItem,
+      );
       final snapshots = await repository.getSnapshots('card');
 
-      expect(snapshots, hasLength(1));
-      expect(snapshots.single.portfolioItemId, 'card');
-      expect(snapshots.single.valueAud, 150);
-      expect(snapshots.single.lowEstimateAud, 120);
-      expect(snapshots.single.highEstimateAud, 180);
-      expect(snapshots.single.displayString, 'AUD 150.00');
-      expect(snapshots.single.pricingProvider, 'PriceCharting');
-      expect(snapshots.single.valuationStatus, ValuationStatus.marketEstimated);
+      expect(firstRecorded, isTrue);
+      expect(duplicateRecorded, isFalse);
+      expect(changedRecorded, isTrue);
+      expect(snapshots, hasLength(2));
+      expect(snapshots.first.valueAud, 150);
+      expect(snapshots.last.valueAud, 165);
     });
   });
 
@@ -6834,6 +7437,15 @@ ScanResult _testScanResult() {
   );
 }
 
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
+}
+
 class _FailingMarketPricingProvider implements MarketPricingProvider {
   const _FailingMarketPricingProvider();
 
@@ -7018,12 +7630,12 @@ class _MemoryUsageRepository implements UsageRepository {
   int refreshCount;
 
   @override
-  Future<int> scansUsedToday() async {
+  Future<int> scansUsedThisMonth() async {
     return count;
   }
 
   @override
-  Future<int> incrementScansUsedToday() async {
+  Future<int> incrementScansUsedThisMonth() async {
     count += 1;
     return count;
   }
@@ -7057,7 +7669,11 @@ class _MemoryEntitlementRepository implements EntitlementRepository {
   }
 
   @override
-  Future<void> savePlan(SubscriptionPlan plan) async {
+  Future<void> savePlan(
+    SubscriptionPlan plan, {
+    String? source,
+    String? purchaseToken,
+  }) async {
     this.plan = plan;
   }
 }
@@ -7252,6 +7868,7 @@ CloudServiceRegistry _cloudRegistry({
     authService: authService,
     cloudStorageService: storageService,
     cloudPortfolioSyncService: syncService,
+    cloudProfileSyncService: const NoOpCloudProfileSyncService(),
     analyticsService: analyticsService,
     crashReportingService: crashReportingService,
     remoteConfigService: remoteConfigService,
@@ -7461,6 +8078,9 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
   Map<String, dynamic>? lastGetQueryParameters;
   String? lastPostPath;
   List<Map<String, dynamic>> lastPostedRows = const [];
+  String? lastPatchPath;
+  Map<String, dynamic>? lastPatchQueryParameters;
+  Map<String, dynamic>? lastPatchedData;
 
   @override
   SupabaseConfig get config => const SupabaseConfig(
@@ -7579,6 +8199,29 @@ class _FakeSupabaseDataGateway implements SupabaseDataGateway {
     lastPostedRows = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: <dynamic>[] as T,
+      statusCode: 200,
+    );
+  }
+
+  @override
+  Future<Response<T>> authenticatedPatchWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    final error = postError;
+    if (error != null) {
+      throw error;
+    }
+
+    lastPatchPath = path;
+    lastPatchQueryParameters = queryParameters;
+    lastPatchedData = data as Map<String, dynamic>;
     return Response<T>(
       requestOptions: RequestOptions(path: path),
       data: <dynamic>[] as T,

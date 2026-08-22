@@ -1,10 +1,10 @@
 /// Stores local scan usage counters.
 abstract interface class UsageRepository {
-  /// Loads today's usage.
-  Future<int> scansUsedToday();
+  /// Loads this month's scan usage.
+  Future<int> scansUsedThisMonth();
 
-  /// Increments successful analysis usage and returns the new tracker.
-  Future<int> incrementScansUsedToday();
+  /// Increments successful analysis usage and returns the new count.
+  Future<int> incrementScansUsedThisMonth();
 
   /// Loads this month's manual price refresh usage.
   Future<int> priceRefreshesUsedThisMonth();

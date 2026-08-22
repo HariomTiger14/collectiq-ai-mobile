@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
-import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -21,6 +24,145 @@ void main() {
     _seedPortfolio(_portfolioItems());
   });
 
+  testWidgets(
+    'switching display currency converts the portfolio value hero, not just its label',
+    (tester) async {
+      // A single USD-priced item. With the reported bug, switching the
+      // Settings currency to AUD would only relabel the same raw number
+      // ("US$150" -> "$150") instead of actually converting it.
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            ..._item(
+              id: 'usd-item',
+              title: 'Imported Booster Box',
+              category: 'Trading Card',
+              value: 150,
+              createdAt: DateTime.now(),
+            ),
+            'pricing': {
+              'estimatedMarketValue': 150,
+              'lowEstimate': 150,
+              'highEstimate': 150,
+              'currency': 'USD',
+              'pricingSource': 'test',
+              'pricingConfidence': 0.9,
+              'valuationStatus': 'market_estimated',
+            },
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homeLastAutoSyncProvider.overrideWith(
+              _AlreadyAutoSyncedController.new,
+            ),
+            fxRatesRepositoryProvider.overrideWithValue(
+              // 1 USD = 1.5 AUD -> 150 USD should display as $225, not $150.
+              const _FixedRateFxRatesRepository({'USD': 1.0, 'AUD': 1.5}),
+            ),
+            displayCurrencyProvider.overrideWithValue('AUD'),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            home: const HomePage(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // Shows up twice: the portfolio value hero and the recent-item card's
+      // own value label -- both correctly converted, not just the hero.
+      expect(find.text('\$225'), findsNWidgets(2));
+      expect(find.text('\$150'), findsNothing);
+      expect(find.text('US\$150'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MAX period shows true price return, not collection growth from '
+    'adding items (real bug found live: an account with one \$15 item and '
+    'items added months later showed a many-thousand-percent "MAX" gain)',
+    (tester) async {
+      // A local history snapshot from two months ago, when the portfolio
+      // held only the tiny old item -- this is exactly the shape of data
+      // that produced the real bug: the chart's own first point is a tiny
+      // early total, so comparing it to today's much larger total (after
+      // adding a real item) reported collection growth as a price gain.
+      final oldSnapshotDate = DateTime.now().subtract(const Duration(days: 60));
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            ..._item(
+              id: 'old-item',
+              title: 'Early Pikachu',
+              category: 'Trading Card',
+              value: 20,
+              createdAt: oldSnapshotDate,
+            ),
+            'valueAtScan': 15,
+          },
+          {
+            ..._item(
+              id: 'new-item',
+              title: 'Black Lotus',
+              category: 'Trading Card',
+              value: 6000,
+              createdAt: DateTime.now(),
+            ),
+            'valueAtScan': 6000,
+          },
+        ]),
+        'portfolio_value_history_snapshots': jsonEncode([
+          {
+            'id': 'daily-old',
+            'period': 'daily',
+            'periodStart': oldSnapshotDate.toIso8601String(),
+            'capturedAt': oldSnapshotDate.toIso8601String(),
+            'totalPortfolioValue': 15,
+            'totalItems': 1,
+            'averageValue': 15,
+            'categoryTotals': <String, double>{},
+            'collectionScore': 0,
+            'itemValues': {'old-item': 15},
+            'itemTitles': {'old-item': 'Early Pikachu'},
+            'itemCategories': {'old-item': 'Trading Card'},
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(_homeApp());
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      await tester.tap(find.byKey(const ValueKey('home-period-MAX')));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // The old bug would show roughly ($6020-$15)/$15 =~ 39,900%. The
+      // correct real gain here is $5 on $6,015 -- under 1%.
+      expect(find.textContaining('39,900'), findsNothing);
+      expect(find.textContaining('%'), findsWidgets);
+      final percentFinder = find.textContaining(RegExp(r'^\d[\d,.]*%\z'));
+      final percentTexts = tester
+          .widgetList<Text>(percentFinder)
+          .map((widget) => widget.data ?? '')
+          .toList();
+      for (final text in percentTexts) {
+        final value = double.tryParse(text.replaceAll('%', ''));
+        if (value != null) {
+          expect(
+            value,
+            lessThan(100),
+            reason: 'MAX period percent "$text" looks like the old bug (collection growth counted as price gain), not a real return',
+          );
+        }
+      }
+    },
+  );
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {
@@ -32,33 +174,67 @@ void main() {
     expect(find.text('Pack  Lox'), findsNothing);
     expect(find.text('Home'), findsOneWidget);
     expect(
-      find.text('Some collection values are still pending.'),
+      find.text('Here\'s how your collection is tracking.'),
       findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('home-authority-hero')), findsOneWidget);
-    expect(find.text('Know what your collection is worth'), findsOneWidget);
-    expect(find.text('Scan next item'), findsOneWidget);
-    expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$2,275'), findsOneWidget);
-    expect(find.text('Collection items'), findsOneWidget);
-    expect(find.text('5'), findsOneWidget);
-    await _scrollUntilVisible(
-      tester,
-      find.byKey(const ValueKey('home-action-scan-collectible')),
     );
     expect(
-      find.byKey(const ValueKey('home-action-scan-collectible')),
+      find.byKey(const ValueKey('home-portfolio-value-hero')),
       findsOneWidget,
+    );
+    expect(find.text('Portfolio value'), findsOneWidget);
+    expect(find.text('\$2,275'), findsOneWidget);
+    expect(find.text('3 of 5 items trusted'), findsOneWidget);
+    // The "needs value" count is no longer duplicated as a chip in the card;
+    // the attention strip below is the single actionable surface for it.
+    expect(find.text('2 need value'), findsNothing);
+    expect(find.text('Review portfolio'), findsOneWidget);
+    // No persisted value history yet, so the trend chart + period tabs are not
+    // shown and the card reports the building-history state.
+    expect(find.text('Building value history'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-value-hero-trend')), findsNothing);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-recent-items-preview')),
+    );
+    expect(find.text('Recent items'), findsOneWidget);
+    expect(find.text('Premium Charizard'), findsWidgets);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-collection-health')),
+    );
+    expect(find.text('Collection health'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
+    expect(find.text('Cards'), findsWidgets);
+
+    // Supported categories is demoted to the bottom reference zone.
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-category-explorer')),
+    );
+    expect(find.text('Supported categories'), findsOneWidget);
+    // Assert the labels unique to the grid (the rest also appear in the
+    // collection-health mix above, which is still built at this scroll).
+    expect(find.text('Pokémon'), findsOneWidget);
+    expect(find.text('MTG'), findsOneWidget);
+    expect(find.text('Yu-Gi-Oh'), findsOneWidget);
+    expect(find.text('One Piece'), findsOneWidget);
+    expect(find.text('Funko'), findsOneWidget);
+    expect(find.text('Sports'), findsOneWidget);
+    expect(find.text('Watches'), findsNothing);
+    expect(find.text('Toys'), findsNothing);
+    expect(find.text('Memorabilia'), findsNothing);
+
+    // Recent scan was removed (it duplicated the top of Recent items).
+    expect(
+      find.byKey(const ValueKey('home-action-recent-scan')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('home-action-market-insights')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(
-      find.byKey(const ValueKey('home-action-recent-scan')),
-      findsOneWidget,
-    );
-    expect(find.text('Premium Charizard'), findsWidgets);
   });
 
   testWidgets(
@@ -78,49 +254,82 @@ void main() {
       expect(find.text('Add first item'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('home-action-start-first-item')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('home-action-guided-scan')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(
-        find.byKey(const ValueKey('home-action-supported-categories')),
-        findsOneWidget,
-      );
-      final firstItemChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-start-first-item-chevron')),
-      );
-      expect(firstItemChevron.color, const Color(0xFF8BC7FF));
-      final guidedScanChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-guided-scan-chevron')),
-      );
-      expect(guidedScanChevron.color, const Color(0xFF8BC7FF));
-      final categoriesChevron = tester.widget<Icon>(
-        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
-      );
-      expect(categoriesChevron.color, HomeTokens.textSecondary);
-      expect(find.text('Collection value'), findsNothing);
-      expect(find.text('Collection items'), findsNothing);
-      expect(find.text('\$0'), findsNothing);
-      expect(find.text('REPRESENTATIVE DESIGN DATA'), findsNothing);
-      expect(find.text('READY FOR REVIEW / NOT FROZEN'), findsNothing);
-      expect(find.text('HOME FLOW AUTHORITY'), findsNothing);
-      expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
-
       await tester.tap(find.byKey(const ValueKey('home-primary-scan')));
       await tester.pump();
 
       expect(scanTaps, 1);
+      expect(
+        find.byKey(const ValueKey('home-floating-scan-button')),
+        findsOneWidget,
+      );
 
       await _scrollUntilVisible(
         tester,
-        find.byKey(const ValueKey('home-action-guided-scan')),
+        find.byKey(const ValueKey('home-section-category-explorer')),
       );
-      await tester.tap(find.byKey(const ValueKey('home-action-guided-scan')));
+      expect(
+        find.byKey(const ValueKey('home-section-category-explorer')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-popular-category-pokémon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-recent-items-preview')),
+      );
+      expect(find.text('No items yet'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('home-action-recent-items-empty')),
+      );
       await tester.pump();
-
       expect(scanTaps, 2);
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-insights-preview')),
+      );
+      expect(find.text('Collection value'), findsOneWidget);
+      expect(find.text('Pending'), findsWidgets);
+      expect(find.text('\$0'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-recent-items-empty-chevron')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-trusted-valuation-chevron')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('home-action-supported-categories-chevron')),
+        findsNothing,
+      );
+      expect(find.text('REPRESENTATIVE DESIGN DATA'), findsNothing);
+      expect(find.text('READY FOR REVIEW / NOT FROZEN'), findsNothing);
+      expect(find.text('HOME FLOW AUTHORITY'), findsNothing);
+      expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
     },
   );
 
@@ -146,26 +355,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 120));
 
       expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
-      expect(find.text('\$50'), findsOneWidget);
-      expect(find.text('2'), findsOneWidget);
-      expect(find.text('1 valued'), findsOneWidget);
-      final valueSupportingText = tester.widget<Text>(
-        find.byKey(const ValueKey('home-metric-supporting-collection-value')),
-      );
-      expect(valueSupportingText.style?.color, HomeTokens.warning);
-      final itemSupportingText = tester.widget<Text>(
-        find.byKey(const ValueKey('home-metric-supporting-collection-items')),
-      );
-      expect(itemSupportingText.style?.color, HomeTokens.positive);
       await _scrollUntilVisible(
         tester,
-        find.byKey(const ValueKey('home-action-partial-valuation')),
+        find.byKey(const ValueKey('home-surface-attention-strip')),
       );
       expect(
-        find.byKey(const ValueKey('home-action-partial-valuation')),
+        find.byKey(const ValueKey('home-surface-attention-strip')),
         findsOneWidget,
       );
-      expect(find.text('1 item needs a real valuation.'), findsOneWidget);
+      expect(find.text('1 item needs a valuation'), findsOneWidget);
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const ValueKey('home-section-collection-health')),
+      );
+      expect(find.text('Collection health'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
       expect(find.text('Value unavailable'), findsNothing);
     },
   );
@@ -185,11 +389,14 @@ void main() {
     await tester.pumpWidget(_homeApp());
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.text('Collection items'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('Collection value'), findsNothing);
-    expect(find.text('\$0'), findsNothing);
     expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-collection-health')),
+    );
+    expect(find.text('Collection health'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-health-ring')), findsOneWidget);
+    expect(find.text('\$0'), findsNothing);
   });
 
   testWidgets('loading state renders v0.3 skeletons without sample values', (
@@ -253,7 +460,7 @@ void main() {
     expect(find.text('Your collection is waiting'), findsOneWidget);
   });
 
-  testWidgets('recent scan row opens the existing collectible detail route', (
+  testWidgets('recent item card opens the existing collectible detail route', (
     tester,
   ) async {
     await tester.pumpWidget(_homeApp());
@@ -261,9 +468,9 @@ void main() {
 
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-recent-scan')),
+      find.byKey(const ValueKey('home-section-recent-items-preview')),
     );
-    await tester.tap(find.byKey(const ValueKey('home-action-recent-scan')));
+    await tester.tap(find.text('Premium Charizard').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(CollectibleDetailPage), findsOneWidget);
@@ -340,9 +547,14 @@ void main() {
       find.byKey(const ValueKey('home-preview-scenario-picker')),
       findsNothing,
     );
-    expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$2,275'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-alert-button')), findsNothing);
+    // The bell is a persistent inbox entry point whenever a collection exists
+    // (checked at the top before scrolling it out of the lazy list).
+    expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const ValueKey('home-section-collection-health')),
+    );
+    expect(find.text('Collection health'), findsOneWidget);
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.loading));
     await tester.pump(const Duration(milliseconds: 120));
@@ -367,23 +579,50 @@ void main() {
     expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
     await _scrollUntilVisible(
       tester,
-      find.byKey(const ValueKey('home-action-partial-valuation')),
+      find.byKey(const ValueKey('home-surface-attention-strip')),
     );
     expect(
-      find.byKey(const ValueKey('home-action-partial-valuation')),
+      find.byKey(const ValueKey('home-surface-attention-strip')),
       findsOneWidget,
     );
 
     await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.guest));
     await tester.pump(const Duration(milliseconds: 120));
+    await _scrollUntilVisible(
+      tester,
+      find.text('Your collection is waiting'),
+    );
     expect(find.text('Your collection is waiting'), findsOneWidget);
+  });
+
+  testWidgets('alert bell opens the notification inbox', (tester) async {
+    await tester.pumpWidget(_previewHomeApp(HomePreviewScenario.partial));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.byKey(const ValueKey('notification-inbox-screen')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('home-alert-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('notification-inbox-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Notifications'), findsOneWidget);
+  });
+
+  testWidgets('home is pull-to-refresh enabled', (tester) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
   });
 }
 
 Widget _homeApp({
   VoidCallback? onScanPressed,
-  VoidCallback? onSampleScanPressed,
-  VoidCallback? onImportPhotoPressed,
   VoidCallback? onPortfolioPressed,
   PortfolioRepository? repository,
 }) {
@@ -391,29 +630,67 @@ Widget _homeApp({
     overrides: [
       if (repository != null)
         portfolioRepositoryProvider.overrideWithValue(repository),
+      // Mark Home as recently auto-synced so the throttled on-appear background
+      // sync stays out of these deterministic tests.
+      homeLastAutoSyncProvider.overrideWith(_AlreadyAutoSyncedController.new),
+      // Keeps FX-rate fetching out of these tests entirely (no real network
+      // call, no pending Dio timer left behind when the widget tree is torn
+      // down).
+      fxRatesRepositoryProvider.overrideWithValue(const _FakeFxRatesRepository()),
     ],
     child: MaterialApp(
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: HomePage(
         onScanPressed: onScanPressed,
-        onSampleScanPressed: onSampleScanPressed,
-        onImportPhotoPressed: onImportPhotoPressed,
         onPortfolioPressed: onPortfolioPressed,
       ),
     ),
   );
 }
 
+class _AlreadyAutoSyncedController extends HomeLastAutoSyncController {
+  @override
+  DateTime? build() => DateTime.now();
+}
+
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
+}
+
+class _FixedRateFxRatesRepository implements FxRatesRepository {
+  const _FixedRateFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
+}
+
 Widget _previewHomeApp(HomePreviewScenario scenario) {
-  return MaterialApp(
-    theme: AppTheme.light,
-    darkTheme: AppTheme.dark,
-    home: HomePage(
-      previewScenario: scenario,
-      onScanPressed: () {},
-      onSampleScanPressed: () {},
-      onPortfolioPressed: () {},
+  // ProviderScope so routes pushed from Home (e.g. the notification inbox,
+  // which always reads providers) resolve a container. HomePage itself
+  // short-circuits ref access in preview mode.
+  return ProviderScope(
+    child: MaterialApp(
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      // Key per scenario so swapping scenarios recreates the HomePage state
+      // (fresh scroll controller at offset 0) rather than reusing the previous
+      // scenario's scroll position.
+      home: HomePage(
+        key: ValueKey(scenario),
+        previewScenario: scenario,
+        onScanPressed: () {},
+        onPortfolioPressed: () {},
+      ),
     ),
   );
 }

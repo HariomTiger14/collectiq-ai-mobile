@@ -3,10 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:collectiq_ai/features/auth/domain/entities/app_user.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_entry_tile.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
-import 'package:collectiq_ai/core/ui/product_language/packlox_hero.dart';
-import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/camera_capture_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_hub_page.dart';
 import 'package:collectiq_ai/features/scanner/services/camera_service.dart';
@@ -25,12 +22,9 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.byType(ScanHubPage), findsOneWidget);
-    expect(find.text('Good morning'), findsOneWidget);
-    expect(find.text('Collector'), findsOneWidget);
-    expect(find.byType(PackLoxHeader), findsOneWidget);
-    expect(find.byType(PackLoxHero), findsOneWidget);
-    expect(find.byType(PackLoxEntryTile), findsNWidgets(2));
-    expect(find.text('Ready when your item is.'), findsOneWidget);
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.byType(HomeActionRow), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,
@@ -51,7 +45,7 @@ void main() {
     expect(find.textContaining('Analyze'), findsNothing);
   });
 
-  testWidgets('greeting uses authenticated first name and local time period', (
+  testWidgets('scan identity is not personalized by account name', (
     WidgetTester tester,
   ) async {
     const authState = AuthState(
@@ -70,18 +64,9 @@ void main() {
       now: () => DateTime(2026, 7, 12, 15),
     );
 
-    expect(find.text('Good afternoon'), findsOneWidget);
-    expect(find.text('Avery'), findsOneWidget);
-    expect(find.textContaining('Harry'), findsNothing);
-  });
-
-  testWidgets('greeting uses evening period and fallback without a name', (
-    WidgetTester tester,
-  ) async {
-    await _pumpHub(tester, now: () => DateTime(2026, 7, 12, 20));
-
-    expect(find.text('Good evening'), findsOneWidget);
-    expect(find.text('Collector'), findsOneWidget);
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.text('Avery'), findsNothing);
+    expect(find.text('Collector'), findsNothing);
   });
 
   testWidgets(
@@ -106,7 +91,7 @@ void main() {
       expect(cameraService.isAlive, isFalse);
       expect(find.byType(CameraCapturePage), findsNothing);
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.text('Ready when your item is.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     },
   );
 
@@ -121,32 +106,33 @@ void main() {
       await _pumpHub(tester);
 
       expect(find.byType(ScanHubPage), findsOneWidget);
-      expect(find.byType(PackLoxHero), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
       expect(find.text('Choose from gallery'), findsOneWidget);
       expect(tester.takeException(), isNull, reason: 'logical width $width');
     });
   }
 
-  testWidgets('S01 composes approved shared component variants', (
+  testWidgets('S01 composes approved brand and scanner tile variants', (
     WidgetTester tester,
   ) async {
     await _pumpHub(tester);
 
+    expect(find.byKey(const ValueKey('scan-hub-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
+    expect(find.byType(HomeActionRow), findsNWidgets(2));
     expect(
-      tester.widget<PackLoxHero>(find.byType(PackLoxHero)).variant,
-      PackLoxHeroVariant.scanner,
+      find.byKey(const ValueKey('home-action-scan-take-photo')),
+      findsOneWidget,
     );
-    for (final tile in tester.widgetList<PackLoxEntryTile>(
-      find.byType(PackLoxEntryTile),
-    )) {
-      expect(tile.variant, PackLoxEntryTileVariant.scanner);
-      expect(tile.onTap, isNotNull);
-    }
+    expect(
+      find.byKey(const ValueKey('home-action-scan-gallery')),
+      findsOneWidget,
+    );
     expect(
       tester
           .widget<SizedBox>(find.byKey(const ValueKey('scan-hub-tile-gap-1')))
           .height,
-      6,
+      10,
     );
     expect(find.byKey(const ValueKey('scan-hub-tile-gap-2')), findsNothing);
     expect(
@@ -155,26 +141,18 @@ void main() {
     );
   });
 
-  testWidgets('long profile name and emoji reflow without clipping', (
+  testWidgets('scan hub header reflows without clipping', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(360, 760);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    const authState = AuthState(
-      status: AuthFlowStatus.signedIn,
-      user: AppUser(
-        id: 'long-profile',
-        displayName: 'Alexandria-Cassandra Collector',
-        email: 'alexandria@example.com',
-        provider: AuthProviderType.emailPassword,
-      ),
-    );
 
-    await _pumpHub(tester, authState: authState);
+    await _pumpHub(tester);
 
-    expect(find.text('Alexandria-Cassandra'), findsOneWidget);
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.byKey(const ValueKey('scan-hub-reticle')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -191,6 +169,14 @@ void main() {
     await _pumpHub(tester);
 
     expect(find.byKey(const ValueKey('scan-hub-scroll-view')), findsOneWidget);
+    await tester.drag(
+      find.byKey(const ValueKey('scan-hub-scroll-view')),
+      const Offset(0, -700),
+    );
+    // Note: pump (not pumpAndSettle) — the scan reticle animates continuously,
+    // so the tree never fully settles.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(
       find.byKey(const ValueKey('scan-hub-capture-button')),
       findsOneWidget,
@@ -202,7 +188,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('scan hub uses dark scanner visual mode', (
+  testWidgets('scan hub uses shared dark shell mode', (
     WidgetTester tester,
   ) async {
     await _pumpHub(tester);
@@ -210,7 +196,7 @@ void main() {
     final scaffold = tester.widget<Scaffold>(
       find.byKey(const ValueKey('scan-hub-page')),
     );
-    expect(scaffold.backgroundColor, PackLoxTokens.background);
+    expect(scaffold.backgroundColor, HomeTokens.background);
     expect(
       find.byKey(const ValueKey('scanner-dark-background')),
       findsOneWidget,
@@ -224,7 +210,10 @@ void main() {
     final gallery = _TrackingGalleryService();
     await _pumpHub(tester, galleryService: gallery);
 
-    await tester.tap(find.byKey(const ValueKey('scan-hub-gallery-button')));
+    final galleryButton = find.byKey(const ValueKey('scan-hub-gallery-button'));
+    await tester.ensureVisible(galleryButton);
+    await tester.pump();
+    await tester.tap(galleryButton);
     await tester.pump();
     expect(gallery.pickCount, 1);
   });
@@ -235,7 +224,10 @@ void main() {
     final semantics = tester.ensureSemantics();
     await _pumpHub(tester);
 
-    expect(find.bySemanticsLabel('Notifications'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('scan-hub-notifications-button')),
+      findsNothing,
+    );
     expect(
       find.bySemanticsLabel('Take a photo. Use your camera to scan an item.'),
       findsOneWidget,

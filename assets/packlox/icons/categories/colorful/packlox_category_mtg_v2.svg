@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Fantasy card</title>
+  <defs>
+    <linearGradient id="frame" x1="15" y1="9" x2="49" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/><stop offset=".5" stop-color="#F472B6"/><stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 30) rotate(90) scale(12)">
+      <stop stop-color="#FFFFFF"/><stop offset=".45" stop-color="#DDD6FE"/><stop offset="1" stop-color="#7C3AED"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="18" ry="5" fill="#020617" opacity=".42"/>
+  <rect x="17" y="10" width="30" height="42" rx="6" fill="#111827" stroke="url(#frame)" stroke-width="3"/>
+  <rect x="21" y="15" width="22" height="31" rx="4" fill="#1E1633"/>
+  <path d="M32 17l4.2 9.5 10.3 2.5-10.3 2.4L32 42l-4.2-9.6L17.5 30l10.3-2.5L32 17Z" fill="url(#frame)"/>
+  <circle cx="32" cy="30" r="7.5" fill="url(#orb)"/>
+  <path d="M23 47h18" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+</svg>

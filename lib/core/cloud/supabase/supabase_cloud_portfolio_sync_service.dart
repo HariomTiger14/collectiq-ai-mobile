@@ -99,6 +99,29 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
   }
 
   @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
+    final restSnapshots = await _fetchAllValuationSnapshotsWithRestSession();
+    if (restSnapshots != null) {
+      return restSnapshots;
+    }
+
+    final userId = await _signedInUserId();
+    if (userId == null) {
+      return const [];
+    }
+    final rows = await bootstrap.client!
+        .from(valuationSnapshotTableName)
+        .select()
+        .eq('user_id', userId)
+        .order('priced_at');
+
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(PortfolioValuationSnapshot.fromJson)
+        .toList(growable: false);
+  }
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async {
     final restItems = await _fetchItemsWithRestSession();
     if (restItems != null) {
@@ -144,12 +167,12 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
         return const CloudPortfolioSyncStatus(
           enabled: false,
           message:
-              'Sign in to enable Supabase cloud sync. Local portfolio is active.',
+              'Sign in to back up your collection. It stays on this device for now.',
         );
       }
       return CloudPortfolioSyncStatus(
         enabled: true,
-        message: 'Supabase portfolio sync ready.',
+        message: 'Your collection is backed up to the cloud.',
         userId: session.userId,
       );
     }
@@ -162,12 +185,12 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     if (userId == null || userId.trim().isEmpty) {
       return const CloudPortfolioSyncStatus(
         enabled: false,
-        message: 'Cloud sync skipped: no signed-in Supabase user.',
+        message: 'Sign in to back up your collection to the cloud.',
       );
     }
     return CloudPortfolioSyncStatus(
       enabled: true,
-      message: 'Supabase portfolio sync ready.',
+      message: 'Your collection is backed up to the cloud.',
       userId: userId,
     );
   }
@@ -220,21 +243,22 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
     if (gateway == null || session == null) {
       return false;
     }
-    await gateway.authenticatedPostWithSession<List<dynamic>>(
+    // A PATCH (not the upsert-via-POST used elsewhere) is required here:
+    // portfolio_items has NOT NULL columns (title, category) with no
+    // default, and PostgREST's "INSERT ... ON CONFLICT DO UPDATE" upsert
+    // validates those NOT NULL constraints against the INSERT column list
+    // before it ever reaches the conflict/update path -- so a partial
+    // payload like this one would fail even though the row already exists
+    // and only needs an update.
+    await gateway.authenticatedPatchWithSession<List<dynamic>>(
       '/rest/v1/$tableName',
       session: session,
-      queryParameters: const {'on_conflict': 'id,user_id'},
-      data: [
-        {
-          'id': itemId,
-          'user_id': session.userId,
-          'sync_status': 'deleted',
-          'updated_at': _nowIso(),
-        },
-      ],
-      options: Options(
-        headers: const {'Prefer': 'resolution=merge-duplicates,return=minimal'},
-      ),
+      queryParameters: {
+        'id': 'eq.$itemId',
+        'user_id': 'eq.${session.userId}',
+      },
+      data: {'sync_status': 'deleted', 'updated_at': _nowIso()},
+      options: Options(headers: const {'Prefer': 'return=minimal'}),
     );
     return true;
   }
@@ -270,6 +294,30 @@ class SupabaseCloudPortfolioSyncService implements CloudPortfolioSyncService {
         'select': '*',
         'user_id': 'eq.${session.userId}',
         'portfolio_item_id': 'eq.$itemId',
+        'order': 'priced_at.asc',
+      },
+    );
+
+    final rows = response.data ?? const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(PortfolioValuationSnapshot.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<PortfolioValuationSnapshot>?>
+  _fetchAllValuationSnapshotsWithRestSession() async {
+    final gateway = supabaseDataGateway;
+    final session = await _signedInRestSession();
+    if (gateway == null || session == null) {
+      return null;
+    }
+    final response = await gateway.authenticatedGetWithSession<List<dynamic>>(
+      '/rest/v1/$valuationSnapshotTableName',
+      session: session,
+      queryParameters: {
+        'select': '*',
+        'user_id': 'eq.${session.userId}',
         'order': 'priced_at.asc',
       },
     );
@@ -356,6 +404,7 @@ Map<String, dynamic> supabaseValuationSnapshotRowForItem(
     'value_aud': value,
     'low_estimate_aud': pricing?.lowEstimate ?? market?.lowPrice,
     'high_estimate_aud': pricing?.highEstimate ?? market?.highPrice,
+    'currency': currency,
     'display_string': value == null ? null : _snapshotDisplay(value, currency),
     'valuation_status': item.valuationStatus.wireValue,
     'reason_code': item.valuationStatus.wireValue,
@@ -392,6 +441,7 @@ CollectibleItem? itemFromSupabaseRow(Map<String, dynamic> row) {
       );
       return CollectibleItem.fromJson({
         ...typedRawJson,
+        ..._valuationOverridesFromSupabaseRow(typedRawJson, row),
         'id': row['id'] ?? typedRawJson['id'],
         'imageStoragePath':
             row['image_storage_path'] ?? typedRawJson['imageStoragePath'],
@@ -425,6 +475,62 @@ CollectibleItem? itemFromSupabaseRow(Map<String, dynamic> row) {
   } on Object {
     return null;
   }
+}
+
+Map<String, dynamic> _valuationOverridesFromSupabaseRow(
+  Map<String, dynamic> rawJson,
+  Map<String, dynamic> row,
+) {
+  final lowEstimate = _number(row['estimated_value_low'])?.toDouble();
+  final highEstimate = _number(row['estimated_value_high'])?.toDouble();
+  final rowValue = highEstimate ?? lowEstimate;
+  if (rowValue == null || rowValue <= 0) {
+    return const {};
+  }
+
+  final rawValue = _number(rawJson['estimatedValue'])?.toDouble() ?? 0;
+  final rawStatus = ValuationStatus.fromJson(rawJson['valuationStatus']);
+  final rawPricing = rawJson['pricing'] is Map
+      ? (rawJson['pricing'] as Map).map(
+          (key, value) => MapEntry(key.toString(), value),
+        )
+      : <String, dynamic>{};
+  final pricingValue =
+      _number(rawPricing['estimatedMarketValue'])?.toDouble() ?? 0;
+  final hasDisplayableRawValue =
+      rawStatus == ValuationStatus.marketEstimated ||
+      rawStatus == ValuationStatus.aiEstimated;
+
+  if (hasDisplayableRawValue && (rawValue > 0 || pricingValue > 0)) {
+    return const {};
+  }
+
+  final estimatedValue = pricingValue > 0
+      ? pricingValue
+      : rawValue > 0
+      ? rawValue
+      : rowValue;
+  final pricingSource =
+      rawPricing['pricingSource'] ?? rawJson['valuationSource'];
+
+  return {
+    'estimatedValue': estimatedValue,
+    'valuationStatus': ValuationStatus.marketEstimated.wireValue,
+    'valuationSource': pricingSource ?? 'synced_market_value',
+    'pricing': {
+      ...rawPricing,
+      'estimatedMarketValue': estimatedValue,
+      'lowEstimate': lowEstimate ?? rawPricing['lowEstimate'] ?? estimatedValue,
+      'highEstimate':
+          highEstimate ?? rawPricing['highEstimate'] ?? estimatedValue,
+      'currency': rawPricing['currency'] ?? 'AUD',
+      'pricingSource': pricingSource ?? 'Synced market value',
+      'pricingConfidence': rawPricing['pricingConfidence'] ?? 0,
+      'lastUpdated': rawPricing['lastUpdated'],
+      'valuationStatus': ValuationStatus.marketEstimated.wireValue,
+      'valuationSource': pricingSource ?? 'synced_market_value',
+    },
+  };
 }
 
 int? _parseYear(String? value) {

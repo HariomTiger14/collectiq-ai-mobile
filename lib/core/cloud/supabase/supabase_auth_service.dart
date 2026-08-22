@@ -59,7 +59,7 @@ class SupabaseAuthService implements AuthService {
     final response = await bootstrap.client!.auth.signInAnonymously();
     final user = response.user ?? bootstrap.client!.auth.currentUser;
     if (user == null) {
-      throw StateError('Supabase anonymous sign-in returned no user.');
+      throw StateError('Anonymous sign-in returned no user.');
     }
     return CloudAuthUser(
       id: user.id,

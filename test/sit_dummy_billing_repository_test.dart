@@ -5,17 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SitDummyBillingRepository', () {
-    test('returns Pro and Premium products when enabled', () async {
+    test('returns the single Pro product when enabled', () async {
       const repository = SitDummyBillingRepository(
         config: SitDummyBillingConfig(enabled: true),
       );
 
       final products = await repository.loadProducts();
 
-      expect(products.map((product) => product.plan), [
-        SubscriptionPlan.pro,
-        SubscriptionPlan.premium,
-      ]);
+      expect(products.map((product) => product.plan), [SubscriptionPlan.pro]);
       expect(products.every((product) => product.currencyCode == 'AUD'), true);
     });
 

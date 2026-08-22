@@ -1,6 +1,34 @@
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
 
+/// Free-tier caps. Dart-defines let us dial these without a code change while
+/// we learn what actually converts. "10 collectibles" is the primary wall and
+/// is enforced on every saved item (scan or catalog-add).
+const kFreeMaxCollectibles = int.fromEnvironment(
+  'PACKLOX_FREE_COLLECTIBLES',
+  defaultValue: 10,
+);
+const kFreeMaxPhotosPerItem = int.fromEnvironment(
+  'PACKLOX_FREE_PHOTOS_PER_ITEM',
+  defaultValue: 2,
+);
+const kFreeMaxActiveAlerts = int.fromEnvironment(
+  'PACKLOX_FREE_ACTIVE_ALERTS',
+  defaultValue: 1,
+);
+const kFreeMonthlyRefreshes = int.fromEnvironment(
+  'PACKLOX_FREE_MONTHLY_REFRESHES',
+  defaultValue: 10,
+);
+
+/// Pro is "Unlimited" in the UI, implemented as a high safety cap so no code
+/// path has to reason about true infinity. Photos stay a real, finite perk.
+const kUnlimitedTierCap = 999999;
+const kProMaxPhotosPerItem = 12;
+
+/// Any cap at or above this reads as "Unlimited" in user-facing labels.
+const kUnlimitedLabelThreshold = 100000;
+
 /// Feature access and quota limits for a subscription plan.
 class PlanLimits {
   /// Creates immutable plan limits.
@@ -59,37 +87,29 @@ class PlanLimits {
     return switch (plan) {
       SubscriptionPlan.free => PlanLimits(
         plan: plan,
+        // The monthly scan limit is only a quiet anti-abuse ceiling; the real
+        // free wall is the saved-collectibles cap below.
         scanLimit: freeScanLimit,
-        maxPortfolioItems: 250,
-        maxPhotosPerItem: 2,
-        maxActivePriceAlerts: 3,
-        monthlyPriceRefreshes: 10,
+        maxPortfolioItems: kFreeMaxCollectibles,
+        maxPhotosPerItem: kFreeMaxPhotosPerItem,
+        maxActivePriceAlerts: kFreeMaxActiveAlerts,
+        monthlyPriceRefreshes: kFreeMonthlyRefreshes,
         canUseFullValueHistory: false,
         canExportPortfolio: false,
         canUseAdvancedFilters: false,
         canBulkRefreshValues: false,
         canUsePortfolioIntelligence: false,
       ),
-      SubscriptionPlan.pro => const PlanLimits(
-        plan: SubscriptionPlan.pro,
-        scanLimit: UsageLimit(dailyFreeScanLimit: 250),
-        maxPortfolioItems: 1000,
-        maxPhotosPerItem: 6,
-        maxActivePriceAlerts: 25,
-        monthlyPriceRefreshes: 100,
-        canUseFullValueHistory: true,
-        canExportPortfolio: true,
-        canUseAdvancedFilters: true,
-        canBulkRefreshValues: false,
-        canUsePortfolioIntelligence: true,
-      ),
-      SubscriptionPlan.premium => const PlanLimits(
-        plan: SubscriptionPlan.premium,
+      // Pro is the single paid tier (old Pro + Premium merged): everything
+      // unlimited. `premium` maps to the same limits for data safety in case
+      // any account still carries that value.
+      SubscriptionPlan.pro || SubscriptionPlan.premium => PlanLimits(
+        plan: plan,
         scanLimit: UsageLimit.unlimited,
-        maxPortfolioItems: 10000,
-        maxPhotosPerItem: 12,
-        maxActivePriceAlerts: 100,
-        monthlyPriceRefreshes: 1000,
+        maxPortfolioItems: kUnlimitedTierCap,
+        maxPhotosPerItem: kProMaxPhotosPerItem,
+        maxActivePriceAlerts: kUnlimitedTierCap,
+        monthlyPriceRefreshes: kUnlimitedTierCap,
         canUseFullValueHistory: true,
         canExportPortfolio: true,
         canUseAdvancedFilters: true,
@@ -121,11 +141,14 @@ class PlanLimits {
   String get scanLimitLabel {
     return scanLimit.isUnlimited
         ? 'Unlimited scans'
-        : '${scanLimit.dailyFreeScanLimit} scans/day';
+        : '${scanLimit.monthlyFreeScanLimit} scans/month';
   }
 
   /// Human-readable portfolio item limit.
   String get portfolioItemsLabel {
+    if (maxPortfolioItems >= kUnlimitedLabelThreshold) {
+      return 'Unlimited';
+    }
     return _limitLabel(maxPortfolioItems, singular: 'item', plural: 'items');
   }
 
@@ -136,6 +159,9 @@ class PlanLimits {
 
   /// Human-readable price alert limit.
   String get priceAlertsLabel {
+    if (maxActivePriceAlerts >= kUnlimitedLabelThreshold) {
+      return 'Unlimited';
+    }
     return _limitLabel(
       maxActivePriceAlerts,
       singular: 'active alert',

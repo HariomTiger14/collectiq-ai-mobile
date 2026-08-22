@@ -6,27 +6,24 @@ import UserNotifications
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let notificationChannelName = "collectiq_ai/notifications"
 
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
-    registerNotificationChannel()
-    return launched
-  }
-
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // Registering this channel in didFinishLaunchingWithOptions (the old
+    // location) raced the implicit engine's own initialization: at that
+    // point window?.rootViewController wasn't a FlutterViewController yet
+    // (GeneratedPluginRegistrant registration above already waits for this
+    // same callback for that exact reason), so the guard silently failed
+    // and the channel was never registered at all -- every Dart-side call
+    // hit MissingPluginException, which getPermissionStatus() maps to
+    // .notSupported. Always showed "Alerts aren't available on this device
+    // yet" in Settings regardless of the real OS permission state.
+    registerNotificationChannel(messenger: engineBridge.applicationRegistrar.messenger())
   }
 
-  private func registerNotificationChannel() {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      return
-    }
-
+  private func registerNotificationChannel(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
       name: notificationChannelName,
-      binaryMessenger: controller.binaryMessenger
+      binaryMessenger: messenger
     )
     channel.setMethodCallHandler { [weak self] call, result in
       switch call.method {

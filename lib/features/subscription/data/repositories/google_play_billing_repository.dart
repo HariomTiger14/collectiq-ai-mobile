@@ -278,6 +278,10 @@ class GooglePlayBillingRepository implements BillingRepository {
     }
 
     final plan = config.planForProductId(details.productID);
+    // The real Play Billing purchase token the backend needs to verify this
+    // purchase against the Play Developer API -- previously read here only
+    // to satisfy completePurchase() above, then discarded.
+    final purchaseToken = details.verificationData.serverVerificationData;
     return switch (details.status) {
       PurchaseStatus.purchased => PurchaseResult(
         status: restored
@@ -285,11 +289,15 @@ class GooglePlayBillingRepository implements BillingRepository {
             : PurchaseResultStatus.success,
         plan: plan,
         message: '${plan?.displayName ?? 'Purchase'} is active.',
+        source: 'google_play',
+        purchaseToken: purchaseToken,
       ),
       PurchaseStatus.restored => PurchaseResult(
         status: PurchaseResultStatus.restored,
         plan: plan,
         message: '${plan?.displayName ?? 'Purchase'} restored.',
+        source: 'google_play',
+        purchaseToken: purchaseToken,
       ),
       PurchaseStatus.pending => const PurchaseResult(
         status: PurchaseResultStatus.pending,

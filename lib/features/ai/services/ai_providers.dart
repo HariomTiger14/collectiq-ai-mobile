@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/network/api_client.dart';
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/ai/data/analyzer/analyzer_provider_factory.dart';
 import 'package:collectiq_ai/features/ai/data/clients/http_ai_backend_client.dart';
 import 'package:collectiq_ai/features/ai/data/clients/noop_ai_backend_client.dart';
@@ -52,6 +53,15 @@ final aiBackendApiServiceProvider = Provider<AiBackendApiService>((ref) {
     return DioAiBackendApiService(
       endpointUrl: config.backendAnalysisEndpointUrl,
       isReleaseMode: kReleaseMode,
+      authToken: () async {
+        final session = await ref.read(supabaseServiceProvider).currentSession();
+        if (session == null ||
+            session.accessToken.isEmpty ||
+            session.isAnonymous) {
+          return null;
+        }
+        return session.accessToken;
+      },
     );
   }
 

@@ -1,3 +1,7 @@
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
@@ -16,6 +20,8 @@ class PortfolioHistoryService {
   List<PortfolioSnapshot> createCurrentSnapshots(
     List<CollectibleItem> items, {
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     if (items.isEmpty) {
       return const [];
@@ -24,7 +30,13 @@ class PortfolioHistoryService {
     final now = capturedAt ?? DateTime.now();
     return [
       for (final period in TrendSnapshotPeriod.values)
-        createSnapshot(items, period: period, capturedAt: now),
+        createSnapshot(
+          items,
+          period: period,
+          capturedAt: now,
+          displayCurrency: displayCurrency,
+          currentRates: currentRates,
+        ),
     ];
   }
 
@@ -32,9 +44,30 @@ class PortfolioHistoryService {
     List<CollectibleItem> items, {
     required TrendSnapshotPeriod period,
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     final now = capturedAt ?? DateTime.now();
     final periodStart = bucketDate(now, period);
+    // Every downstream total here must be in one common currency before
+    // summing -- a mixed-currency portfolio summed as raw numbers produces
+    // a meaningless total. Converts each item from its own currency
+    // (currencyForItem) to displayCurrency using today's live rate; a
+    // same-currency item is a currency==currency no-op (convertCurrent
+    // returns the value unchanged).
+    double convertedValue(CollectibleItem item) => convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    );
+    final convertedItems = {
+      for (final item in items) item.id: convertedValue(item),
+    };
+    final totalValue = convertedItems.values.fold<double>(
+      0,
+      (sum, value) => sum + value,
+    );
     final analytics = analyticsService.build(items);
     final intelligence = smartInsightsService.build(analytics);
     final categoryTotals = {
@@ -46,7 +79,7 @@ class PortfolioHistoryService {
             item.category,
           );
       categoryTotals[category] =
-          (categoryTotals[category] ?? 0) + item.estimatedValue;
+          (categoryTotals[category] ?? 0) + convertedValue(item);
     }
 
     return PortfolioSnapshot(
@@ -54,14 +87,231 @@ class PortfolioHistoryService {
       period: period,
       periodStart: periodStart,
       capturedAt: now,
-      totalPortfolioValue: analytics.totalValue,
+      totalPortfolioValue: totalValue,
       totalItems: analytics.itemCount,
-      averageValue: analytics.averageItemValue,
+      averageValue: analytics.itemCount == 0
+          ? 0
+          : totalValue / analytics.itemCount,
       categoryTotals: categoryTotals,
       collectionScore: intelligence.collectionScore.score,
-      itemValues: {for (final item in items) item.id: item.estimatedValue},
+      itemValues: convertedItems,
       itemTitles: {for (final item in items) item.id: item.title},
       itemCategories: {for (final item in items) item.id: item.category},
+    );
+  }
+
+  /// Builds real day-by-day (plus derived weekly/monthly) history from the
+  /// backend-tracked value snapshots, instead of the device-local-only
+  /// mechanism this used to rely on. For each calendar day from the earliest
+  /// snapshot through today, every item's most-recently-known value *as of*
+  /// that day is carried forward and summed — so a day with no repricing
+  /// activity correctly repeats the prior day's total (a real flat line)
+  /// rather than being skipped or estimated.
+  List<PortfolioSnapshot> historyFromCloudSnapshots(
+    List<PortfolioValuationSnapshot> cloudSnapshots,
+    List<CollectibleItem> currentItems, {
+    DateTime? now,
+    String displayCurrency = 'AUD',
+    FxRateSnapshot rates = FxRateSnapshot.empty,
+  }) {
+    if (cloudSnapshots.isEmpty || currentItems.isEmpty) {
+      return const [];
+    }
+
+    final today = bucketDate(now ?? DateTime.now(), TrendSnapshotPeriod.daily);
+    final byItem = <String, List<PortfolioValuationSnapshot>>{};
+    for (final snapshot in cloudSnapshots) {
+      if (snapshot.valueAud == null) {
+        continue;
+      }
+      (byItem[snapshot.portfolioItemId] ??= []).add(snapshot);
+    }
+    if (byItem.isEmpty) {
+      return const [];
+    }
+    // An item that never finished syncing (a failed image upload, still
+    // pendingUpload, or local-only) has no real cloud snapshot history at
+    // all -- without this, it's invisible on every historical point and
+    // then suddenly appears only in TODAY's point (which is computed
+    // separately, from every current item regardless of sync status),
+    // producing a fake spike/drop at the very end of the chart that isn't
+    // a real price move, just a change in which items happen to be
+    // counted. Give it a single flat synthetic point at its own value from
+    // the day it was added, so it participates in the same forward-fill
+    // below consistently across the whole chart, not just today.
+    for (final item in currentItems) {
+      if (byItem.containsKey(item.id) || item.estimatedValue <= 0) {
+        continue;
+      }
+      byItem[item.id] = [
+        PortfolioValuationSnapshot(
+          id: '${item.id}-synthetic-unsynced',
+          portfolioItemId: item.id,
+          valuationStatus: item.valuationStatus,
+          pricedAt: item.createdAt,
+          valueAud: item.estimatedValue,
+          currency: currencyForItem(item),
+        ),
+      ];
+    }
+    for (final history in byItem.values) {
+      history.sort((a, b) => a.pricedAt.compareTo(b.pricedAt));
+    }
+
+    final earliest = byItem.values
+        .map((history) => bucketDate(history.first.pricedAt, TrendSnapshotPeriod.daily))
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final dayCount = today.difference(earliest).inDays;
+    if (dayCount < 0) {
+      return const [];
+    }
+    final itemById = {for (final item in currentItems) item.id: item};
+
+    final dailySnapshots = <PortfolioSnapshot>[];
+    for (var offset = 0; offset <= dayCount; offset++) {
+      final day = earliest.add(Duration(days: offset));
+      final snapshot = _snapshotAsOf(
+        day,
+        byItem,
+        itemById,
+        displayCurrency: displayCurrency,
+        rates: rates,
+      );
+      if (snapshot != null) {
+        dailySnapshots.add(snapshot);
+      }
+    }
+    if (dailySnapshots.isEmpty) {
+      return const [];
+    }
+
+    final weeklyByBucket = <String, PortfolioSnapshot>{};
+    final monthlyByBucket = <String, PortfolioSnapshot>{};
+    for (final daily in dailySnapshots) {
+      final weekStart = bucketDate(daily.periodStart, TrendSnapshotPeriod.weekly);
+      weeklyByBucket[PortfolioSnapshot.idFor(TrendSnapshotPeriod.weekly, weekStart)] =
+          _asPeriod(daily, TrendSnapshotPeriod.weekly, weekStart);
+
+      final monthStart = bucketDate(
+        daily.periodStart,
+        TrendSnapshotPeriod.monthly,
+      );
+      monthlyByBucket[PortfolioSnapshot.idFor(
+            TrendSnapshotPeriod.monthly,
+            monthStart,
+          )] =
+          _asPeriod(daily, TrendSnapshotPeriod.monthly, monthStart);
+    }
+
+    return [
+      ...dailySnapshots,
+      ...weeklyByBucket.values,
+      ...monthlyByBucket.values,
+    ];
+  }
+
+  PortfolioSnapshot? _snapshotAsOf(
+    DateTime day,
+    Map<String, List<PortfolioValuationSnapshot>> byItem,
+    Map<String, CollectibleItem> itemById, {
+    required String displayCurrency,
+    required FxRateSnapshot rates,
+  }) {
+    final itemValues = <String, double>{};
+    final itemTitles = <String, String>{};
+    final itemCategories = <String, String>{};
+    final categoryTotals = {
+      for (final category in CollectorCategory.values) category: 0.0,
+    };
+    var total = 0.0;
+
+    for (final entry in byItem.entries) {
+      final item = itemById[entry.key];
+      // Anchor each item's contribution to when it actually entered the
+      // portfolio, not to its earliest available valuation snapshot --
+      // catalog-matched items can have snapshots backfilled from real
+      // pre-ownership market history, which must never count toward "my
+      // portfolio's" total/gain before I actually owned the item.
+      if (item != null &&
+          day.isBefore(bucketDate(item.createdAt, TrendSnapshotPeriod.daily))) {
+        continue;
+      }
+
+      PortfolioValuationSnapshot? asOf;
+      for (final candidate in entry.value) {
+        if (!bucketDate(
+          candidate.pricedAt,
+          TrendSnapshotPeriod.daily,
+        ).isAfter(day)) {
+          asOf = candidate;
+        } else {
+          break;
+        }
+      }
+      final rawValue = asOf?.valueAud;
+      if (asOf == null || rawValue == null) {
+        continue;
+      }
+      // Converted using the rate that was actually in effect ON `day`, not
+      // today's rate applied backward -- see currency_conversion.dart's
+      // convertHistorical doc comment for why that distinction matters for
+      // a chart's shape, not just its scale.
+      final value = convertHistorical(
+        rawValue,
+        from: asOf.currency,
+        to: displayCurrency,
+        date: day,
+        rates: rates,
+      );
+      final title = item?.title ?? entry.key;
+      final category = item?.category ?? 'Collectible';
+      itemValues[entry.key] = value;
+      itemTitles[entry.key] = title;
+      itemCategories[entry.key] = category;
+      total += value;
+      final bucket = CollectorDashboardAnalyticsService.categoryForCollectible(
+        category,
+      );
+      categoryTotals[bucket] = (categoryTotals[bucket] ?? 0) + value;
+    }
+
+    if (itemValues.isEmpty) {
+      return null;
+    }
+    return PortfolioSnapshot(
+      id: PortfolioSnapshot.idFor(TrendSnapshotPeriod.daily, day),
+      period: TrendSnapshotPeriod.daily,
+      periodStart: day,
+      capturedAt: day,
+      totalPortfolioValue: total,
+      totalItems: itemValues.length,
+      averageValue: total / itemValues.length,
+      categoryTotals: categoryTotals,
+      collectionScore: 0,
+      itemValues: itemValues,
+      itemTitles: itemTitles,
+      itemCategories: itemCategories,
+    );
+  }
+
+  PortfolioSnapshot _asPeriod(
+    PortfolioSnapshot source,
+    TrendSnapshotPeriod period,
+    DateTime periodStart,
+  ) {
+    return PortfolioSnapshot(
+      id: PortfolioSnapshot.idFor(period, periodStart),
+      period: period,
+      periodStart: periodStart,
+      capturedAt: source.capturedAt,
+      totalPortfolioValue: source.totalPortfolioValue,
+      totalItems: source.totalItems,
+      averageValue: source.averageValue,
+      categoryTotals: source.categoryTotals,
+      collectionScore: source.collectionScore,
+      itemValues: source.itemValues,
+      itemTitles: source.itemTitles,
+      itemCategories: source.itemCategories,
     );
   }
 
@@ -69,10 +319,14 @@ class PortfolioHistoryService {
     required List<CollectibleItem> currentItems,
     required List<PortfolioSnapshot> history,
     DateTime? capturedAt,
+    String displayCurrency = 'AUD',
+    Map<String, double> currentRates = const {'USD': 1.0},
   }) {
     final currentSnapshots = createCurrentSnapshots(
       currentItems,
       capturedAt: capturedAt,
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
     );
     final allSnapshots = _mergeCurrentSnapshots(history, currentSnapshots);
     final now = capturedAt ?? DateTime.now();
@@ -95,10 +349,6 @@ class PortfolioHistoryService {
     final todayPrevious = _previousSnapshot(currentDaily, allSnapshots);
     final weekPrevious = _previousSnapshot(currentWeekly, allSnapshots);
     final monthPrevious = _previousSnapshot(currentMonthly, allSnapshots);
-    final firstSnapshot = _firstSnapshot(
-      allSnapshots,
-      TrendSnapshotPeriod.daily,
-    );
     final movers = _movers(currentDaily, todayPrevious);
     final topGainers =
         movers.where((mover) => mover.absoluteChange > 0).toList()
@@ -123,7 +373,11 @@ class PortfolioHistoryService {
       todayChange: _change('Today', currentDaily, todayPrevious),
       weeklyChange: _change('This Week', currentWeekly, weekPrevious),
       monthlyChange: _change('This Month', currentMonthly, monthPrevious),
-      overallChange: _change('Overall', currentDaily, firstSnapshot),
+      overallChange: _trueOverallChange(
+        currentItems,
+        displayCurrency: displayCurrency,
+        currentRates: currentRates,
+      ),
       topGainers: topGainers.take(5).toList(growable: false),
       topLosers: topLosers.take(5).toList(growable: false),
       recentlyAppreciated: topGainers.take(3).toList(growable: false),
@@ -208,14 +462,6 @@ class PortfolioHistoryService {
     return previous.isEmpty ? null : previous.last;
   }
 
-  PortfolioSnapshot? _firstSnapshot(
-    List<PortfolioSnapshot> snapshots,
-    TrendSnapshotPeriod period,
-  ) {
-    final filtered = _snapshotsFor(snapshots, period);
-    return filtered.isEmpty ? null : filtered.first;
-  }
-
   PortfolioSnapshot? _lastSnapshot(
     List<PortfolioSnapshot> snapshots,
     TrendSnapshotPeriod period,
@@ -245,6 +491,52 @@ class PortfolioHistoryService {
       label: label,
       currentValue: currentValue,
       previousValue: previousValue,
+    );
+  }
+
+  /// "Overall" must measure price appreciation on items actually held, not
+  /// today's total minus whatever the portfolio's total happened to be on
+  /// the very first day a snapshot exists. That naive comparison conflates
+  /// *adding new items* with *existing items going up in value* -- a
+  /// collector who started with one $15 item and has since added dozens
+  /// more would show a many-thousand-percent "gain" that's really just
+  /// collection growth, not returns. Real bug found live: a test/seed
+  /// account showed a portfolio worth less than its own claimed gain.
+  ///
+  /// Fixed by summing each currently-held item's OWN baseline (its value
+  /// at scan) against its current value, rather than comparing two
+  /// portfolio-wide totals from different points in the collection's size.
+  PortfolioValueChange _trueOverallChange(
+    List<CollectibleItem> currentItems, {
+    required String displayCurrency,
+    required Map<String, double> currentRates,
+  }) {
+    double currentTotal = 0;
+    double baselineTotal = 0;
+    for (final item in currentItems) {
+      final currency = currencyForItem(item);
+      final current = convertCurrent(
+        item.estimatedValue,
+        from: currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      );
+      final baselineRaw = item.valueAtScan != null && item.valueAtScan! > 0
+          ? item.valueAtScan!
+          : item.estimatedValue;
+      final baseline = convertCurrent(
+        baselineRaw,
+        from: currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      );
+      currentTotal += current;
+      baselineTotal += baseline;
+    }
+    return PortfolioValueChange(
+      label: 'Overall',
+      currentValue: currentTotal,
+      previousValue: baselineTotal,
     );
   }
 

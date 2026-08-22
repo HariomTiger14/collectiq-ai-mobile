@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
@@ -71,6 +72,32 @@ void main() {
     expect(find.text('Notifications'), findsNothing);
     expect(find.text('Sign in'), findsNothing);
   });
+
+  testWidgets(
+    'foreground resume re-syncs the portfolio (throttle-elapsed) without disrupting the shell',
+    (tester) async {
+      await tester.pumpShell();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(AppShell)),
+      );
+
+      // Pretend the last auto-sync was long ago so the resume isn't throttled.
+      final longAgo = DateTime.now().subtract(const Duration(minutes: 10));
+      container.read(homeLastAutoSyncProvider.notifier).mark(longAgo);
+
+      // App returns to the foreground.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      // The resume handler ran a fresh sync (advanced the shared marker past the
+      // stale time) and the shell is intact — no exception, nav preserved.
+      final marker = container.read(homeLastAutoSyncProvider);
+      expect(marker, isNotNull);
+      expect(marker!.isAfter(longAgo), isTrue);
+      expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'selecting each destination displays the existing feature screen',

@@ -233,6 +233,75 @@ void main() {
       },
     );
 
+    test(
+      'manual sync removes a previously-synced local item that no longer '
+      'exists in the cloud response (real bug: deleting an item server-side '
+      '-- an admin action, another device, a direct data fix -- never '
+      'reached a device that had already cached it, since the old merge '
+      'only ever added/updated, never removed)',
+      () async {
+        final stillCloudSide = _item().copyWithCloudSync(
+          syncStatus: CloudItemSyncStatus.synced,
+        );
+        final removedServerSide = CollectibleItem(
+          id: 'item-2',
+          title: 'Deleted Elsewhere',
+          category: 'Trading Card',
+          estimatedValue: 50,
+          confidence: 0.8,
+          condition: 'Good',
+          recommendation: 'Keep protected.',
+          imagePath: 'test/fixtures/persistent-camera-card.jpg',
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+          syncStatus: CloudItemSyncStatus.synced,
+        );
+        final repository = _MemoryPortfolioRepository([
+          stillCloudSide,
+          removedServerSide,
+        ]);
+        // The cloud response only contains the first item -- the second was
+        // removed server-side and no longer comes back.
+        final sync = _RecordingPortfolioSyncService(
+          cloudItems: [_cloudItem(), stillCloudSide],
+        );
+        final coordinator = CloudPortfolioSyncCoordinator(
+          registry: _registry(syncService: sync),
+          portfolioRepository: repository,
+        );
+
+        await coordinator.syncNow();
+
+        expect(
+          repository.items.map((item) => item.id),
+          isNot(contains('item-2')),
+        );
+        expect(
+          repository.items.map((item) => item.id),
+          containsAll(['item-1', 'cloud-item-1']),
+        );
+      },
+    );
+
+    test(
+      'manual sync never removes a local item that is not yet synced, even '
+      'if it is missing from the cloud response',
+      () async {
+        final unsyncedLocal = _item().copyWithCloudSync(
+          syncStatus: CloudItemSyncStatus.pendingUpload,
+        );
+        final repository = _MemoryPortfolioRepository([unsyncedLocal]);
+        final sync = _RecordingPortfolioSyncService(cloudItems: const []);
+        final coordinator = CloudPortfolioSyncCoordinator(
+          registry: _registry(syncService: sync),
+          portfolioRepository: repository,
+        );
+
+        await coordinator.syncNow();
+
+        expect(repository.items.map((item) => item.id), contains('item-1'));
+      },
+    );
+
     test('updated item is pushed to portfolio sync service', () async {
       final repository = _MemoryPortfolioRepository([_item()]);
       final sync = _RecordingPortfolioSyncService();
@@ -288,6 +357,7 @@ CloudServiceRegistry _registry({
     authService: authService,
     cloudStorageService: storageService,
     cloudPortfolioSyncService: syncService,
+    cloudProfileSyncService: const NoOpCloudProfileSyncService(),
     analyticsService: analyticsService,
     crashReportingService: const NoOpCrashReportingService(),
     remoteConfigService: remoteConfigService,
@@ -442,6 +512,11 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
   Future<List<PortfolioValuationSnapshot>> fetchValuationSnapshots(
     String itemId,
   ) async {
+    return const [];
+  }
+
+  @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
     return const [];
   }
 

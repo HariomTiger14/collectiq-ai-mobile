@@ -18,15 +18,17 @@ class DioAiBackendApiService implements AiBackendApiService {
     required this.endpointUrl,
     Dio? dio,
     this.timeout = const Duration(seconds: 30),
+    this.receiveTimeout = const Duration(seconds: 90),
     this.validator = const AiBackendContractValidator(),
     this.readinessChecker = const AiBackendEndpointReadinessChecker(),
     this.isReleaseMode = false,
+    this.authToken,
   }) : _dio =
            dio ??
            Dio(
              BaseOptions(
                connectTimeout: timeout,
-               receiveTimeout: timeout,
+               receiveTimeout: receiveTimeout,
                sendTimeout: timeout,
                responseType: ResponseType.json,
                headers: const {
@@ -39,8 +41,13 @@ class DioAiBackendApiService implements AiBackendApiService {
   /// Future backend endpoint supplied by build config.
   final String endpointUrl;
 
-  /// Request timeout.
+  /// Connect/send timeout. Kept short so genuine offline fails fast.
   final Duration timeout;
+
+  /// Receive timeout. Held well above the backend's Gemini budget (60s) so a
+  /// real analysis — plus a possible cold-start on the first hit — is not cut
+  /// off mid-response and surfaced as a spurious "Scan interrupted".
+  final Duration receiveTimeout;
 
   /// Contract validator used before and after transport.
   final AiBackendContractValidator validator;
@@ -50,6 +57,11 @@ class DioAiBackendApiService implements AiBackendApiService {
 
   /// Whether the app is running in release mode.
   final bool isReleaseMode;
+
+  /// Supplies the signed-in user's access token so the backend can attribute
+  /// the scan and enforce the per-user quota. Null/empty when signed out (the
+  /// backend then treats the scan as unauthenticated and fails open).
+  final Future<String?> Function()? authToken;
 
   final Dio _dio;
 
@@ -61,6 +73,8 @@ class DioAiBackendApiService implements AiBackendApiService {
   }) async {
     _validateEndpoint();
     _validateRequest(request);
+
+    final token = await authToken?.call();
 
     try {
       final stopwatch = Stopwatch()..start();
@@ -87,11 +101,13 @@ class DioAiBackendApiService implements AiBackendApiService {
         options: Options(
           responseType: ResponseType.json,
           sendTimeout: timeout,
-          receiveTimeout: timeout,
+          receiveTimeout: receiveTimeout,
           validateStatus: (_) => true,
-          headers: const {
+          headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            if (token != null && token.isNotEmpty)
+              'Authorization': 'Bearer $token',
           },
         ),
       );

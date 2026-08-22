@@ -44,7 +44,9 @@ class ScanImageProcessingResult {
 }
 
 class ScanImageProcessor {
-  const ScanImageProcessor({this.maxDimension = 1600, this.jpegQuality = 84});
+  // 1024px longest edge: enough detail for recognition, lighter payload to the
+  // backend/Gemini (faster response, less CPU per scan, lower token cost).
+  const ScanImageProcessor({this.maxDimension = 1024, this.jpegQuality = 84});
 
   final int maxDimension;
   final int jpegQuality;

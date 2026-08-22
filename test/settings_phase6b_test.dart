@@ -22,7 +22,6 @@ void main() {
       'Account',
       'Collection & Backup',
       'Price Alerts',
-      'Appearance',
       'Privacy',
       'About PackLox',
       'Help & Feedback',
@@ -90,7 +89,7 @@ void main() {
     expect(find.text('PackLox Collector'), findsOneWidget);
 
     await tester.revealText('Account');
-    await tester.tap(find.text('Account').first);
+    await tester.tap(find.byKey(const ValueKey('settings-account-row')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('auth-welcome-screen')), findsOneWidget);
@@ -119,10 +118,18 @@ void main() {
     await tester.pumpSettings(repository: repository);
 
     expect(find.text('collector@example.com'), findsWidgets);
-    expect(find.text('Signed in'), findsWidgets);
+    // The identity pill now surfaces the plan instead of a redundant
+    // "Signed in" status (the account row already shows the email).
+    expect(find.text('Free plan'), findsWidgets);
 
     await tester.revealText('Sign Out');
     await tester.tap(find.text('Sign Out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign Out?'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-danger-confirm-button')),
+    );
     await tester.pumpAndSettle();
 
     expect(repository.signOutCalls, 1);
@@ -150,8 +157,8 @@ void main() {
   ) async {
     await tester.pumpSettings();
 
-    await tester.revealText('Clear Local Collection');
-    expect(find.text('Clear Local Collection'), findsOneWidget);
+    await tester.revealText('Reset Onboarding');
+    expect(find.text('Clear Local Collection'), findsNothing);
 
     await tester.tap(find.text('Reset Onboarding'));
     await tester.pumpAndSettle();

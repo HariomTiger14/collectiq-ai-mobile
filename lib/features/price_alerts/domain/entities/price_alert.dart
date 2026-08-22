@@ -1,6 +1,11 @@
 enum PriceAlertStatus {
   active(label: 'Active'),
   triggered(label: 'Triggered'),
+  // Server-side terminal state after a push has been sent for a trigger, so the
+  // dispatcher never re-pushes the same trigger. Treated as "fired" in the app
+  // (see [PriceAlert.isTriggered]); the server re-arms it back to `active` once
+  // the condition clears.
+  notified(label: 'Notified'),
   paused(label: 'Paused');
 
   const PriceAlertStatus({required this.label});
@@ -97,7 +102,12 @@ class PriceAlert {
   final DateTime? triggeredAt;
   final String? message;
 
-  bool get isTriggered => status == PriceAlertStatus.triggered;
+  // "Fired" covers both the freshly-triggered state and the post-push
+  // `notified` state, so the app keeps showing an alert (inbox + Home count)
+  // after the server has sent its push.
+  bool get isTriggered =>
+      status == PriceAlertStatus.triggered ||
+      status == PriceAlertStatus.notified;
 
   factory PriceAlert.fromJson(Map<String, dynamic> json) {
     return PriceAlert(

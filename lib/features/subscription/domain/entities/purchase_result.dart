@@ -25,6 +25,8 @@ class PurchaseResult {
     required this.status,
     required this.message,
     this.plan,
+    this.source,
+    this.purchaseToken,
   });
 
   /// Purchase status.
@@ -35,6 +37,16 @@ class PurchaseResult {
 
   /// User-safe message.
   final String message;
+
+  /// Store this purchase came from (e.g. 'google_play', 'app_store') --
+  /// null for a synthetic/free result that isn't a real store purchase.
+  final String? source;
+
+  /// The store's own verification token for this purchase -- Google
+  /// Play's opaque purchase token, or Apple's signed transaction JWS.
+  /// Sent to the backend so it can verify the purchase actually happened
+  /// rather than trusting the plan name alone.
+  final String? purchaseToken;
 
   /// Whether the result should unlock a plan.
   bool get grantsEntitlement {

@@ -280,6 +280,7 @@ CloudServiceRegistry _registry({
     cloudStorageService: storageService,
     cloudPortfolioSyncService:
         syncService ?? _RecordingPortfolioSyncService(auth: auth),
+    cloudProfileSyncService: const NoOpCloudProfileSyncService(),
     analyticsService: analyticsService,
     crashReportingService: const NoOpCrashReportingService(),
     remoteConfigService: const NoOpRemoteConfigService(),
@@ -474,6 +475,11 @@ class _RecordingPortfolioSyncService implements CloudPortfolioSyncService {
   Future<List<PortfolioValuationSnapshot>> fetchValuationSnapshots(
     String itemId,
   ) async {
+    return const [];
+  }
+
+  @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
     return const [];
   }
 

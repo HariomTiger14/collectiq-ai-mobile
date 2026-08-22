@@ -1,16 +1,26 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/portfolio_export_service.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -44,7 +54,7 @@ enum _PortfolioSortMode {
 enum _PortfolioStatusFilter {
   all(label: 'All'),
   valued(label: 'Valued'),
-  pending(label: 'Pending'),
+  pending(label: 'Needs value'),
   needsAttention(label: 'Needs attention');
 
   const _PortfolioStatusFilter({required this.label});
@@ -55,9 +65,11 @@ enum _PortfolioStatusFilter {
 enum _PortfolioCategoryFilter {
   all(label: 'All'),
   cards(label: 'Cards'),
-  coins(label: 'Coins'),
+  videoGames(label: 'Video Games'),
+  sneakers(label: 'Sneakers'),
   comics(label: 'Comics'),
-  memorabilia(label: 'Memorabilia'),
+  coins(label: 'Coins'),
+  figures(label: 'LEGO / Funko'),
   other(label: 'Other');
 
   const _PortfolioCategoryFilter({required this.label});
@@ -86,10 +98,21 @@ enum _PortfolioTrendFilter {
   final String label;
 }
 
+enum _PortfolioIntelligenceFocus {
+  trustedValue(label: 'Needs trusted value'),
+  refreshPriority(label: 'Refresh priority'),
+  metadataGaps(label: 'Metadata gaps'),
+  lowConfidence(label: 'Low confidence');
+
+  const _PortfolioIntelligenceFocus({required this.label});
+
+  final String label;
+}
+
 enum PortfolioPreviewScenario {
   defaultData(
     label: 'Default',
-    subtitle: 'Saved items with values and pending work.',
+    subtitle: 'Saved items with trusted values and review work.',
   ),
   empty(
     label: 'Empty',
@@ -102,7 +125,7 @@ enum PortfolioPreviewScenario {
   error(label: 'Error', subtitle: 'Retry state for a failed portfolio load.'),
   partial(
     label: 'Partial',
-    subtitle: 'Confirmed values plus pending valuations in amber.',
+    subtitle: 'Confirmed values plus missing valuations in amber.',
   ),
   filteredEmpty(
     label: 'Filtered empty',
@@ -157,6 +180,7 @@ class PortfolioStatePreviewScreen extends ConsumerWidget {
           foregroundColor: HomeTokens.textPrimary,
         ),
         body: HomeStateContainer(
+          storageKey: 'portfolio-preview-scroll-position',
           sections: [
             const HomeSection(child: HomeBrandLockup()),
             HomeSection(
@@ -247,13 +271,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   _PortfolioCategoryFilter _categoryFilter = _PortfolioCategoryFilter.all;
   _PortfolioConfidenceFilter _confidenceFilter = _PortfolioConfidenceFilter.all;
   _PortfolioTrendFilter _trendFilter = _PortfolioTrendFilter.all;
+  _PortfolioIntelligenceFocus? _intelligenceFocus;
 
   @override
   void initState() {
     super.initState();
     _searchQuery = _initialSearchQuery(widget.qaSearchPreview);
     if (widget.qaSearchPreview == PortfolioSearchPreview.filterEmpty) {
-      _categoryFilter = _PortfolioCategoryFilter.coins;
+      _categoryFilter = _PortfolioCategoryFilter.other;
+    }
+    // One-shot focus intent from another surface (e.g. the Home "N items need
+    // a valuation" strip) — open pre-filtered to "Needs value". Read the value
+    // here (mutating a provider during initState is not allowed); it is cleared
+    // in the post-frame callback below so it fires only once.
+    final focus = ref.read(portfolioFocusProvider);
+    if (focus == PortfolioFocus.needsValuation) {
+      _statusFilter = _PortfolioStatusFilter.pending;
     }
     _scrollController = ScrollController(
       initialScrollOffset: widget.qaInitialScrollOffset,
@@ -263,7 +296,18 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       if (!mounted) {
         return;
       }
+      // Consume the one-shot focus intent now that we're past build.
+      if (focus != null) {
+        ref.read(portfolioFocusProvider.notifier).clear();
+      }
       ref.read(portfolioControllerProvider.notifier).ensureLoaded();
+      if (widget.previewScenario == null) {
+        unawaited(
+          ref
+              .read(portfolioControllerProvider.notifier)
+              .syncCloudPortfolioNow(),
+        );
+      }
       if (widget.qaInitialSheet != null) {
         _showSortFilterSheet(context, preview: widget.qaInitialSheet);
       }
@@ -288,12 +332,27 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     final effectiveSearchQuery = _effectiveSearchQuery(previewScenario);
     final orderedItems = _orderedItems(portfolioState.items);
     final visibleItems = _visibleItems(orderedItems, effectiveSearchQuery);
+    final displayCurrency = isPreview ? 'AUD' : ref.watch(displayCurrencyProvider);
+    final fxRates = isPreview
+        ? FxRateSnapshot.empty
+        : ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    final portfolioAnalytics = const CollectorDashboardAnalyticsService().build(
+      orderedItems,
+      displayCurrency: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
     final hasItems = portfolioState.items.isNotEmpty;
     final isFilteredEmpty = hasItems && visibleItems.isEmpty;
+    // Active search = "dedicated search mode": the whole-portfolio overview
+    // chrome (value/metrics, intelligence, export) collapses so results — or a
+    // quiet "no matches" — sit directly under the search field instead of being
+    // pushed below the dashboard.
+    final hasSearchQuery = effectiveSearchQuery.trim().isNotEmpty;
     final showLoading =
         portfolioState.isLoading && portfolioState.items.isEmpty;
     final showError =
         portfolioState.errorMessage != null && portfolioState.items.isEmpty;
+    final planLimits = ref.watch(activePlanLimitsProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -316,15 +375,47 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               key: const ValueKey('portfolio-screen-surface'),
               color: HomeTokens.background,
               child: HomeStateContainer(
+                storageKey: 'portfolio-scroll-position',
                 controller: _scrollController,
                 bottomClearance: GlassBottomNavBar.scrollContentClearance(
                   context,
                 ),
                 sections: [
-                  const HomeSection(child: HomeBrandLockup()),
-                  const HomeSection(child: _PortfolioTitleBlock()),
-                  if (!showError)
+                  const HomeSection(
+                    topPadding: AppSpacing.sm,
+                    child: HomeBrandLockup(),
+                  ),
+                  const HomeSection(
+                    topPadding: AppSpacing.lg,
+                    child: _PortfolioTitleBlock(),
+                  ),
+                  // Free-tier collectible counter: gentle awareness of the cap
+                  // so the limit is visible before the paywall. Hidden for Pro
+                  // (unlimited) and on the empty state (the hero leads there).
+                  if (hasItems &&
+                      planLimits.maxPortfolioItems < kUnlimitedLabelThreshold)
                     HomeSection(
+                      topPadding: AppSpacing.sm,
+                      child: _FreePlanCollectibleCounter(
+                        savedCount: portfolioState.items.length,
+                        cap: planLimits.maxPortfolioItems,
+                        onUpgrade: () => showUpgradeSheet(
+                          context,
+                          reason: PaywallReason.collectionFull,
+                        ),
+                      ),
+                    ),
+                  // The overview hero doubles as the empty/filtered/loading
+                  // state. In the normal populated view it just restates the
+                  // subtitle and adds a redundant Scan CTA (Scan is a nav tab),
+                  // so suppress it there and let the metrics + list lead.
+                  // Only the genuine onboarding / loading states get the big
+                  // hero. A search or filter that yields no matches shows a quiet
+                  // inline empty state below the (anchored) toolbar instead — the
+                  // hero here used to insert above the toolbar and shove it down.
+                  if (!showError && (showLoading || !hasItems))
+                    HomeSection(
+                      key: const ValueKey('portfolio-hero-section'),
                       child: HomeAuthorityHero(
                         eyebrow: 'Portfolio overview',
                         title: _heroTitle(
@@ -387,6 +478,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                   else ...[
                     if (hasItems)
                       HomeSection(
+                        // Stable key so the search field keeps focus even when a
+                        // sibling (the hero above) is inserted/removed as results
+                        // change while typing.
+                        key: const ValueKey('portfolio-toolbar-section'),
                         child: _PortfolioToolbar(
                           searchQuery: effectiveSearchQuery,
                           onSearchChanged: (value) {
@@ -405,10 +500,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               PortfolioSearchPreview.active,
                         ),
                       ),
-                    if (hasItems)
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioMetrics(
-                          totalValue: _displayTotalValue(portfolioState.items),
+                          totalValue: _displayTotalValue(
+                            portfolioState.items,
+                            displayCurrency: displayCurrency,
+                            currentRates: fxRates.currentRates,
+                          ),
+                          displayCurrency: displayCurrency,
                           itemCount: portfolioState.items.length,
                           valuedItemCount: _valuedItemCount(
                             portfolioState.items,
@@ -421,7 +521,26 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                               : null,
                         ),
                       ),
-                    if (hasItems)
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
+                      HomeSection(
+                        child: _PortfolioIntelligencePanel(
+                          analytics: portfolioAnalytics,
+                          valuedItemCount: _valuedItemCount(
+                            portfolioState.items,
+                          ),
+                          pendingItemCount: _pendingItemCount(
+                            portfolioState.items,
+                          ),
+                          isUnlocked: planLimits.canUsePortfolioIntelligence,
+                          onAttentionFocus: _applyIntelligenceFocus,
+                          onAddMoreCollectibles: widget.onScanPressed,
+                          onUpgrade: () => showUpgradeSheet(
+                            context,
+                            reason: PaywallReason.portfolioIntelligence,
+                          ),
+                        ),
+                      ),
+                    if (hasItems && !isFilteredEmpty && !hasSearchQuery)
                       HomeSection(
                         child: _PortfolioExportPanel(
                           itemCount: portfolioState.items.length,
@@ -439,7 +558,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         hasActiveFilters: _activeFilterCount > 0,
                         onScanPressed: widget.onScanPressed,
                         onClearFilters: _clearFilters,
-                        onClearSearch: _clearSearch,
                         onItemTap: _openItem,
                         onItemEdit: _editItem,
                       ),
@@ -515,17 +633,55 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               condition.contains(query);
           final matchesCategory = switch (_categoryFilter) {
             _PortfolioCategoryFilter.all => true,
-            _PortfolioCategoryFilter.cards => category.contains('card'),
-            _PortfolioCategoryFilter.coins => category.contains('coin'),
-            _PortfolioCategoryFilter.comics => category.contains('comic'),
-            _PortfolioCategoryFilter.memorabilia =>
-              category.contains('memorabilia') || category.contains('sport'),
+            _PortfolioCategoryFilter.cards =>
+              category.contains('card') ||
+                  category.contains('pokemon') ||
+                  category.contains('magic') ||
+                  category.contains('yugioh') ||
+                  category.contains('yu-gi-oh') ||
+                  category.contains('one piece'),
+            _PortfolioCategoryFilter.videoGames =>
+              category.contains('video game') || category.contains('game'),
+            _PortfolioCategoryFilter.sneakers =>
+              category.contains('sneaker') ||
+                  category.contains('shoe') ||
+                  category.contains('streetwear'),
+            _PortfolioCategoryFilter.comics =>
+              category.contains('comic') || category.contains('manga'),
+            _PortfolioCategoryFilter.coins =>
+              category.contains('coin') ||
+                  category.contains('numismatic') ||
+                  category.contains('penny') ||
+                  category.contains('cent'),
+            _PortfolioCategoryFilter.figures =>
+              category.contains('lego') ||
+                  category.contains('building set') ||
+                  category.contains('funko') ||
+                  category.contains('pop') ||
+                  category.contains('vinyl figure'),
             _PortfolioCategoryFilter.other =>
               !category.contains('card') &&
-                  !category.contains('coin') &&
+                  !category.contains('pokemon') &&
+                  !category.contains('magic') &&
+                  !category.contains('yugioh') &&
+                  !category.contains('yu-gi-oh') &&
+                  !category.contains('one piece') &&
+                  !category.contains('video game') &&
+                  !category.contains('game') &&
+                  !category.contains('sneaker') &&
+                  !category.contains('shoe') &&
+                  !category.contains('streetwear') &&
                   !category.contains('comic') &&
-                  !category.contains('memorabilia') &&
-                  !category.contains('sport'),
+                  !category.contains('manga') &&
+                  !category.contains('coin') &&
+                  !category.contains('numismatic') &&
+                  !category.contains('penny') &&
+                  !category.contains('cent') &&
+                  !category.contains('lego') &&
+                  !category.contains('building set') &&
+                  !category.contains('funko') &&
+                  !category.contains('pop') &&
+                  !category.contains('vinyl figure'),
           };
           final matchesStatus = switch (_statusFilter) {
             _PortfolioStatusFilter.all => true,
@@ -549,11 +705,22 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
             _PortfolioTrendFilter.stable => trend.contains('stable'),
             _PortfolioTrendFilter.cooling => trend.contains('cooling'),
           };
+          final matchesIntelligenceFocus = switch (_intelligenceFocus) {
+            null => true,
+            _PortfolioIntelligenceFocus.trustedValue => _isPendingItem(item),
+            _PortfolioIntelligenceFocus.refreshPriority => _hasStalePricing(
+              item,
+            ),
+            _PortfolioIntelligenceFocus.metadataGaps =>
+              _hasMissingImportantData(item),
+            _PortfolioIntelligenceFocus.lowConfidence => item.confidence < .75,
+          };
           return matchesSearch &&
               matchesStatus &&
               matchesCategory &&
               matchesConfidence &&
-              matchesTrend;
+              matchesTrend &&
+              matchesIntelligenceFocus;
         })
         .toList(growable: false);
   }
@@ -570,6 +737,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       count += 1;
     }
     if (_trendFilter != _PortfolioTrendFilter.all) {
+      count += 1;
+    }
+    if (_intelligenceFocus != null) {
       count += 1;
     }
     return count;
@@ -590,22 +760,58 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       _categoryFilter = _PortfolioCategoryFilter.all;
       _confidenceFilter = _PortfolioConfidenceFilter.all;
       _trendFilter = _PortfolioTrendFilter.all;
+      _intelligenceFocus = null;
       _sortMode = _PortfolioSortMode.newest;
+    });
+  }
+
+  void _applyIntelligenceFocus(_PortfolioIntelligenceFocus focus) {
+    setState(() {
+      _searchQuery = '';
+      _filteredPreviewCleared = true;
+      _intelligenceFocus = focus;
+      _categoryFilter = _PortfolioCategoryFilter.all;
+      _trendFilter = _PortfolioTrendFilter.all;
+      switch (focus) {
+        case _PortfolioIntelligenceFocus.trustedValue:
+          _statusFilter = _PortfolioStatusFilter.pending;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.status;
+        case _PortfolioIntelligenceFocus.refreshPriority:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.status;
+        case _PortfolioIntelligenceFocus.metadataGaps:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.all;
+          _sortMode = _PortfolioSortMode.newest;
+        case _PortfolioIntelligenceFocus.lowConfidence:
+          _statusFilter = _PortfolioStatusFilter.all;
+          _confidenceFilter = _PortfolioConfidenceFilter.low;
+          _sortMode = _PortfolioSortMode.newest;
+      }
+    });
+    _showPortfolioSnackBar('${focus.label} view applied.');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      final target = (_scrollController.position.maxScrollExtent * .72).clamp(
+        _scrollController.position.minScrollExtent,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
     });
   }
 
   void _openAdvancedFilters() {
     final planLimits = ref.read(activePlanLimitsProvider);
     if (!planLimits.canUseAdvancedFilters) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Advanced filters are included with Pro and Premium.',
-            ),
-          ),
-        );
+      showUpgradeSheet(context, reason: PaywallReason.advancedFilters);
       return;
     }
     _showSortFilterSheet(context);
@@ -614,9 +820,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   Future<void> _startPortfolioExport(List<CollectibleItem> items) async {
     final planLimits = ref.read(activePlanLimitsProvider);
     if (!planLimits.canExportPortfolio) {
-      _showPortfolioSnackBar(
-        'Portfolio export is included with Pro and Premium.',
-      );
+      await showUpgradeSheet(context, reason: PaywallReason.export);
       return;
     }
     if (items.isEmpty) {
@@ -774,7 +978,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         ? const _PortfolioSheetSelection(
             sortMode: _PortfolioSortMode.valueHigh,
             statusFilter: _PortfolioStatusFilter.pending,
-            categoryFilter: _PortfolioCategoryFilter.coins,
+            categoryFilter: _PortfolioCategoryFilter.other,
             confidenceFilter: _PortfolioConfidenceFilter.low,
             trendFilter: _PortfolioTrendFilter.cooling,
           )
@@ -895,6 +1099,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             _categoryFilter = draft.categoryFilter;
                             _confidenceFilter = draft.confidenceFilter;
                             _trendFilter = draft.trendFilter;
+                            _intelligenceFocus = null;
                             _filteredPreviewCleared = true;
                           });
                           Navigator.of(context).pop();
@@ -920,6 +1125,85 @@ String _exportDateStamp(DateTime dateTime) {
   final hour = dateTime.hour.toString().padLeft(2, '0');
   final minute = dateTime.minute.toString().padLeft(2, '0');
   return '${dateTime.year}$month$day-$hour$minute';
+}
+
+/// Free-tier cue showing progress toward the saved-collectible cap. Reads
+/// "N of CAP free collectibles" under the cap and "Collection full — Upgrade"
+/// once at/over it (covers users grandfathered above a lowered cap). Always
+/// tappable to the upgrade sheet.
+class _FreePlanCollectibleCounter extends StatelessWidget {
+  const _FreePlanCollectibleCounter({
+    required this.savedCount,
+    required this.cap,
+    required this.onUpgrade,
+  });
+
+  final int savedCount;
+  final int cap;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final atCap = savedCount >= cap;
+    final accent = atCap ? HomeTokens.accent : HomeTokens.textSecondary;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onUpgrade,
+      child: Container(
+        key: const ValueKey('portfolio-free-collectible-counter'),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: atCap
+              ? HomeTokens.accent.withValues(alpha: 0.10)
+              : HomeTokens.surfaceInteractive.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
+          border: Border.all(
+            color: atCap
+                ? HomeTokens.accent.withValues(alpha: 0.34)
+                : HomeTokens.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              atCap ? Icons.lock_outline_rounded : Icons.inventory_2_outlined,
+              size: 17,
+              color: accent,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                atCap
+                    ? 'Collection full — upgrade to save more'
+                    : '$savedCount of $cap free collectibles',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelLarge?.copyWith(
+                  color: atCap
+                      ? HomeTokens.textPrimary
+                      : HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (atCap)
+              Text(
+                'Pro',
+                style: textTheme.labelLarge?.copyWith(
+                  color: HomeTokens.accent,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PortfolioTitleBlock extends StatelessWidget {
@@ -1036,7 +1320,7 @@ class _ExportDisclosureRow extends StatelessWidget {
   }
 }
 
-class _PortfolioToolbar extends StatelessWidget {
+class _PortfolioToolbar extends StatefulWidget {
   const _PortfolioToolbar({
     required this.searchQuery,
     required this.onSearchChanged,
@@ -1058,6 +1342,40 @@ class _PortfolioToolbar extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<_PortfolioToolbar> createState() => _PortfolioToolbarState();
+}
+
+class _PortfolioToolbarState extends State<_PortfolioToolbar> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PortfolioToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync the field only when the query changes from OUTSIDE the field (the
+    // clear button, or a QA preset). During normal typing the controller text
+    // already matches, so we skip resetting value/selection — resetting on each
+    // keystroke is exactly what used to drop focus after a single character.
+    if (widget.searchQuery != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.searchQuery,
+        selection: TextSelection.collapsed(offset: widget.searchQuery.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return HomeSurface(
       keySeed: 'toolbar',
@@ -1067,11 +1385,13 @@ class _PortfolioToolbar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
-            key: ValueKey('portfolio-search-field-$searchQuery'),
-            initialValue: searchQuery,
-            autofocus: autofocus,
-            onChanged: onSearchChanged,
+          TextField(
+            // Stable key: the key previously embedded the query, so every
+            // keystroke rebuilt the field as a new widget and dropped focus.
+            key: const ValueKey('portfolio-search-field'),
+            controller: _controller,
+            autofocus: widget.autofocus,
+            onChanged: widget.onSearchChanged,
             cursorColor: const Color(0xFF8BE7FF),
             style: const TextStyle(
               color: HomeTokens.textPrimary,
@@ -1080,12 +1400,12 @@ class _PortfolioToolbar extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Search saved items',
               prefixIcon: const Icon(Icons.search, color: Color(0xFF8BC7FF)),
-              suffixIcon: searchQuery.trim().isEmpty
+              suffixIcon: widget.searchQuery.trim().isEmpty
                   ? null
                   : IconButton(
                       key: const ValueKey('portfolio-search-clear'),
                       tooltip: 'Clear search',
-                      onPressed: onSearchCleared,
+                      onPressed: widget.onSearchCleared,
                       icon: const Icon(Icons.close, color: Color(0xFFBEEBFF)),
                     ),
               filled: true,
@@ -1115,8 +1435,8 @@ class _PortfolioToolbar extends StatelessWidget {
                 child: _ToolbarButton(
                   key: const ValueKey('portfolio-action-sort'),
                   icon: Icons.swap_vert_outlined,
-                  label: sortLabel,
-                  onPressed: onSort,
+                  label: widget.sortLabel,
+                  onPressed: widget.onSort,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1124,10 +1444,10 @@ class _PortfolioToolbar extends StatelessWidget {
                 child: _ToolbarButton(
                   key: const ValueKey('portfolio-action-filter'),
                   icon: Icons.tune_outlined,
-                  label: activeFilterCount == 0
+                  label: widget.activeFilterCount == 0
                       ? 'Filter'
-                      : 'Filter ($activeFilterCount)',
-                  onPressed: onFilter,
+                      : 'Filter (${widget.activeFilterCount})',
+                  onPressed: widget.onFilter,
                 ),
               ),
             ],
@@ -1175,6 +1495,7 @@ class _ToolbarButton extends StatelessWidget {
 class _PortfolioMetrics extends StatelessWidget {
   const _PortfolioMetrics({
     required this.totalValue,
+    required this.displayCurrency,
     required this.itemCount,
     required this.valuedItemCount,
     required this.pendingItemCount,
@@ -1182,6 +1503,7 @@ class _PortfolioMetrics extends StatelessWidget {
   });
 
   final double totalValue;
+  final String displayCurrency;
   final int itemCount;
   final int valuedItemCount;
   final int pendingItemCount;
@@ -1189,13 +1511,13 @@ class _PortfolioMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = [
+    final metrics = <Widget>[
       HomeMetricTile(
         label: 'Collection value',
-        value: _formatAud(totalValue),
+        value: _formatAud(totalValue, displayCurrency),
         supportingText: pendingItemCount == 0
             ? 'Estimated'
-            : '$pendingItemCount pending',
+            : '$pendingItemCount need value',
         supportingColor: pendingItemCount == 0
             ? HomeTokens.positive
             : HomeTokens.warning,
@@ -1205,16 +1527,15 @@ class _PortfolioMetrics extends StatelessWidget {
         value: '$itemCount',
         supportingText: '$valuedItemCount valued',
       ),
-      HomeMetricTile(
-        label: filteredCount == null ? 'Pending' : 'Filtered',
-        value: filteredCount == null ? '$pendingItemCount' : '$filteredCount',
-        supportingText: filteredCount == null
-            ? (pendingItemCount == 0 ? 'Healthy' : 'Review')
-            : 'No matches',
-        supportingColor: filteredCount == null && pendingItemCount > 0
-            ? HomeTokens.warning
-            : HomeTokens.positive,
-      ),
+      // The old third "Needs value" tile just restated the sublines above, so it
+      // is dropped. The slot is reused only to report a filtered-empty result.
+      if (filteredCount != null)
+        HomeMetricTile(
+          label: 'Filtered',
+          value: '$filteredCount',
+          supportingText: 'No matches',
+          supportingColor: HomeTokens.positive,
+        ),
     ];
 
     return KeyedSubtree(
@@ -1237,6 +1558,696 @@ class _PortfolioMetrics extends StatelessWidget {
   }
 }
 
+class _PortfolioIntelligencePanel extends StatelessWidget {
+  const _PortfolioIntelligencePanel({
+    required this.analytics,
+    required this.valuedItemCount,
+    required this.pendingItemCount,
+    required this.isUnlocked,
+    required this.onAttentionFocus,
+    required this.onAddMoreCollectibles,
+    this.onUpgrade,
+  });
+
+  final CollectorDashboardAnalytics analytics;
+  final int valuedItemCount;
+  final int pendingItemCount;
+  final bool isUnlocked;
+  final ValueChanged<_PortfolioIntelligenceFocus> onAttentionFocus;
+  final VoidCallback? onAddMoreCollectibles;
+  final VoidCallback? onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final health = analytics.collectionHealth;
+    final attentionCount = _attentionCount;
+    final recommendations = analytics.recommendations
+        .where(
+          (recommendation) =>
+              !isUnlocked ||
+              recommendation.type != CollectionRecommendationType.upgradePlan,
+        )
+        .take(2)
+        .toList();
+    final textTheme = Theme.of(context).textTheme;
+
+    return KeyedSubtree(
+      key: const ValueKey('portfolio-intelligence-panel'),
+      child: HomeSectionSurface(
+        keySeed: 'portfolio-intelligence',
+        title: 'Portfolio intelligence',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        _healthColor(health).withValues(alpha: .95),
+                        HomeTokens.accentStrong.withValues(alpha: .84),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: _healthColor(health).withValues(alpha: .52),
+                    ),
+                  ),
+                  child: Text(
+                    '${health.score}',
+                    key: const ValueKey('portfolio-health-score'),
+                    style: textTheme.titleLarge?.copyWith(
+                      color: HomeTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        health.label,
+                        key: const ValueKey('portfolio-health-label'),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _summaryCopy(attentionCount),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.32,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
+                return Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Pricing coverage',
+                        value: '$valuedItemCount/${analytics.itemCount}',
+                        supportingText: '$pendingItemCount need value',
+                        color: pendingItemCount == 0
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                    SizedBox(
+                      width: tileWidth,
+                      child: _IntelligenceMetricTile(
+                        label: 'Avg confidence',
+                        value:
+                            '${(analytics.averageConfidence * 100).round()}%',
+                        supportingText: analytics.lowConfidenceItems.isEmpty
+                            ? 'Strong signal'
+                            : '${analytics.lowConfidenceItems.length} low',
+                        color: analytics.lowConfidenceItems.isEmpty
+                            ? HomeTokens.positive
+                            : HomeTokens.warning,
+                      ),
+                    ),
+                    // "Stale values" and "Missing details" were dropped here to
+                    // cut stat density — both are low-signal (usually 0), already
+                    // rolled into the health score above and surfaced as review
+                    // signals in the Pro attention queue below.
+                  ],
+                );
+              },
+            ),
+            if (!isUnlocked) ...[
+              const SizedBox(height: AppSpacing.md),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onUpgrade,
+                child: const _PortfolioIntelligenceLockedPreview(),
+              ),
+            ] else ...[
+              const SizedBox(height: AppSpacing.md),
+              _PortfolioAttentionQueue(
+                analytics: analytics,
+                pendingItemCount: pendingItemCount,
+                attentionCount: attentionCount,
+                onFocusSelected: onAttentionFocus,
+              ),
+              if (analytics.topHighestValue.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _PortfolioTopValueList(items: analytics.topHighestValue),
+              ],
+              if (recommendations.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                for (final recommendation in recommendations) ...[
+                  _PortfolioRecommendationRow(
+                    recommendation: recommendation,
+                    onTap:
+                        recommendation.type ==
+                            CollectionRecommendationType.addMoreCollectibles
+                        ? onAddMoreCollectibles
+                        : null,
+                  ),
+                  if (recommendation != recommendations.last)
+                    const SizedBox(height: AppSpacing.sm),
+                ],
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _summaryCopy(int attentionCount) {
+    if (!isUnlocked) {
+      return 'Preview your collection health. Pro unlocks the full attention queue, top value items, and refresh priorities.';
+    }
+    if (attentionCount == 0) {
+      return 'Your saved items have healthy valuation coverage and metadata.';
+    }
+    return '$attentionCount review signals across pricing, confidence, photos, or metadata.';
+  }
+
+  int get _attentionCount {
+    return pendingItemCount +
+        analytics.lowConfidenceItems.length +
+        analytics.collectionHealth.stalePricingCount +
+        analytics.collectionHealth.missingDataCount +
+        analytics.collectionHealth.lowQualityCount;
+  }
+}
+
+class _PortfolioIntelligenceLockedPreview extends StatelessWidget {
+  const _PortfolioIntelligenceLockedPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('portfolio-intelligence-locked-preview'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: HomeTokens.accentStrong.withValues(alpha: .32),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: HomeTokens.accentStrong.withValues(alpha: .16),
+              border: Border.all(
+                color: HomeTokens.accentStrong.withValues(alpha: .34),
+              ),
+            ),
+            child: const Icon(
+              Icons.lock_outline,
+              color: HomeTokens.accentStrong,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pro intelligence preview',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Upgrade to see which items need photos, fresh pricing, confidence review, and the highest value records in your collection.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.32,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioAttentionQueue extends StatelessWidget {
+  const _PortfolioAttentionQueue({
+    required this.analytics,
+    required this.pendingItemCount,
+    required this.attentionCount,
+    required this.onFocusSelected,
+  });
+
+  final CollectorDashboardAnalytics analytics;
+  final int pendingItemCount;
+  final int attentionCount;
+  final ValueChanged<_PortfolioIntelligenceFocus> onFocusSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final health = analytics.collectionHealth;
+    final rows = [
+      _AttentionQueueRowData(
+        icon: Icons.price_check_outlined,
+        focus: _PortfolioIntelligenceFocus.trustedValue,
+        title: 'Needs trusted value',
+        value: pendingItemCount,
+        message: pendingItemCount == 0
+            ? 'All saved items have a displayable value.'
+            : 'Correct item identity and retry trusted pricing.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.refresh_outlined,
+        focus: _PortfolioIntelligenceFocus.refreshPriority,
+        title: 'Refresh priority',
+        value: health.stalePricingCount,
+        message: health.stalePricingCount == 0
+            ? 'Pricing evidence is fresh.'
+            : 'Refresh stale values to create new snapshots.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.fact_check_outlined,
+        focus: _PortfolioIntelligenceFocus.metadataGaps,
+        title: 'Metadata gaps',
+        value: health.missingDataCount,
+        message: health.missingDataCount == 0
+            ? 'Core identity fields look complete.'
+            : 'Add set, brand, year, notes, or identifiers.',
+      ),
+      _AttentionQueueRowData(
+        icon: Icons.center_focus_strong_outlined,
+        focus: _PortfolioIntelligenceFocus.lowConfidence,
+        title: 'Low confidence',
+        value: analytics.lowConfidenceItems.length,
+        message: analytics.lowConfidenceItems.isEmpty
+            ? 'Identification confidence is strong.'
+            : 'Correct details or rescan weak matches.',
+      ),
+    ];
+
+    return Container(
+      key: const ValueKey('portfolio-intelligence-attention-queue'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .62),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Attention queue',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                attentionCount == 0 ? 'Clear' : '$attentionCount signals',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: attentionCount == 0
+                      ? HomeTokens.positive
+                      : HomeTokens.warning,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final row in rows) ...[
+            _PortfolioAttentionRow(
+              data: row,
+              onTap: () => onFocusSelected(row.focus),
+            ),
+            if (row != rows.last) const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionQueueRowData {
+  const _AttentionQueueRowData({
+    required this.icon,
+    required this.focus,
+    required this.title,
+    required this.value,
+    required this.message,
+  });
+
+  final IconData icon;
+  final _PortfolioIntelligenceFocus focus;
+  final String title;
+  final int value;
+  final String message;
+}
+
+class _PortfolioAttentionRow extends StatelessWidget {
+  const _PortfolioAttentionRow({required this.data, required this.onTap});
+
+  final _AttentionQueueRowData data;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data.value == 0 ? HomeTokens.positive : HomeTokens.warning;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('portfolio-intelligence-action-${data.focus.name}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: HomeTokens.background.withValues(alpha: .36),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: HomeTokens.border.withValues(alpha: .72)),
+          ),
+          child: Row(
+            children: [
+              Icon(data.icon, color: color, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: HomeTokens.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: HomeTokens.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${data.value}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF8BC7FF),
+                    size: 20,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioTopValueList extends StatelessWidget {
+  const _PortfolioTopValueList({required this.items});
+
+  final List<CollectibleItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = items.take(3).toList(growable: false);
+    return Container(
+      key: const ValueKey('portfolio-intelligence-top-value'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive.withValues(alpha: .62),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Top value items',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final item in visibleItems) ...[
+            _PortfolioTopValueRow(item: item),
+            if (item != visibleItems.last)
+              const SizedBox(height: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioTopValueRow extends ConsumerWidget {
+  const _PortfolioTopValueRow({required this.item});
+
+  final CollectibleItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+    final convertedValue = convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    );
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          _formatAud(convertedValue, displayCurrency),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: HomeTokens.positive,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntelligenceMetricTile extends StatelessWidget {
+  const _IntelligenceMetricTile({
+    required this.label,
+    required this.value,
+    required this.supportingText,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final String supportingText;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 86),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: HomeTokens.surfaceInteractive,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: HomeTokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: HomeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: HomeTokens.textPrimary,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            supportingText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioRecommendationRow extends StatelessWidget {
+  const _PortfolioRecommendationRow({required this.recommendation, this.onTap});
+
+  final CollectionRecommendation recommendation;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          _recommendationIcon(recommendation.type),
+          color: _recommendationColor(recommendation.type),
+          size: 22,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                recommendation.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                recommendation.message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (onTap != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right, color: Color(0xFF8BC7FF), size: 22),
+        ],
+      ],
+    );
+    if (onTap == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: HomeTokens.border),
+        ),
+        child: content,
+      );
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey(
+          'portfolio-recommendation-action-${recommendation.type.name}',
+        ),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: HomeTokens.surfaceInteractive.withValues(alpha: .82),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
 class _PortfolioContent extends StatelessWidget {
   const _PortfolioContent({
     required this.allItems,
@@ -1246,7 +2257,6 @@ class _PortfolioContent extends StatelessWidget {
     required this.hasActiveFilters,
     required this.onScanPressed,
     required this.onClearFilters,
-    required this.onClearSearch,
     required this.onItemTap,
     required this.onItemEdit,
   });
@@ -1258,7 +2268,6 @@ class _PortfolioContent extends StatelessWidget {
   final bool hasActiveFilters;
   final VoidCallback? onScanPressed;
   final VoidCallback onClearFilters;
-  final VoidCallback onClearSearch;
   final ValueChanged<CollectibleItem> onItemTap;
   final ValueChanged<CollectibleItem> onItemEdit;
 
@@ -1272,7 +2281,6 @@ class _PortfolioContent extends StatelessWidget {
       return _PortfolioFilteredEmptyPanel(
         hasSearchQuery: hasSearchQuery,
         hasActiveFilters: hasActiveFilters,
-        onClearSearch: onClearSearch,
         onClearFilters: onClearFilters,
       );
     }
@@ -1296,7 +2304,7 @@ class _PortfolioContent extends StatelessWidget {
   }
 }
 
-class _PortfolioItemRow extends StatelessWidget {
+class _PortfolioItemRow extends ConsumerWidget {
   const _PortfolioItemRow({
     required this.item,
     required this.onTap,
@@ -1308,16 +2316,25 @@ class _PortfolioItemRow extends StatelessWidget {
   final VoidCallback onEdit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
     final hasValue = _hasDisplayableValuation(item);
-    final pending = _isPendingItem(item);
-    final statusColor = pending ? HomeTokens.warning : HomeTokens.positive;
-    final statusLabel = pending
-        ? item.syncStatus == CloudItemSyncStatus.failed
-              ? 'Sync issue'
-              : 'Needs value'
-        : 'Valued';
-    final valueLabel = hasValue ? _formatAud(item.estimatedValue) : 'Pending';
+    final needsValue = !hasValue;
+    final statusColor = needsValue ? HomeTokens.warning : HomeTokens.positive;
+    final statusLabel = needsValue ? 'Needs value' : 'Valued';
+    final valueLabel = hasValue
+        ? _formatAud(
+            convertCurrent(
+              item.estimatedValue,
+              from: currencyForItem(item),
+              to: displayCurrency,
+              currentRates: currentRates,
+            ),
+            displayCurrency,
+          )
+        : _valuationDisplayLabel(item);
 
     return MotionTapScale(
       onTap: onTap,
@@ -1351,8 +2368,16 @@ class _PortfolioItemRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${item.category} - ${item.condition}',
-                    maxLines: 1,
+                    // For unvalued items the "Needs value" pill already conveys
+                    // status, so drop the placeholder condition (e.g. "Review
+                    // needed") that only repeated it and clipped the line.
+                    hasValue
+                        ? '${item.category} · ${item.condition}'
+                        : item.category,
+                    // A longer category name (e.g. "Trading Card Game") combined
+                    // with "Unknown" could clip mid-word at 1 line ("Unkno...");
+                    // the row's height is a floor, not a cap, so 2 lines is safe.
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: HomeTokens.textSecondary,
@@ -1362,25 +2387,25 @@ class _PortfolioItemRow extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Flexible(
-                        child: _StatusPill(
-                          label: statusLabel,
-                          color: statusColor,
+                      // Pill sizes to its label so "Needs value" never clips.
+                      _StatusPill(label: statusLabel, color: statusColor),
+                      // The trend restates "Needs value" for unvalued items, so
+                      // only show it when there is an actual value to trend.
+                      if (hasValue) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _trendLabel(item),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: HomeTokens.textMuted,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _trendLabel(item),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: HomeTokens.textMuted,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ],
@@ -1405,29 +2430,28 @@ class _PortfolioItemRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox.square(
-                        dimension: 34,
-                        child: IconButton(
-                          key: ValueKey('portfolio-grid-item-edit-${item.id}'),
-                          onPressed: onEdit,
-                          tooltip: 'Edit item',
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.edit_outlined,
-                            color: Color(0xFF8BC7FF),
-                            size: 18,
-                          ),
-                        ),
+                  // The whole row is tappable (opens the item), so no trailing
+                  // chevron. One contextual action remains: edit, or correct &
+                  // reprice for items that still need a value.
+                  SizedBox.square(
+                    dimension: 34,
+                    child: IconButton(
+                      key: ValueKey('portfolio-grid-item-edit-${item.id}'),
+                      onPressed: onEdit,
+                      tooltip: needsValue
+                          ? 'Correct details and reprice'
+                          : 'Edit item',
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        needsValue
+                            ? Icons.manage_search_outlined
+                            : Icons.edit_outlined,
+                        color: needsValue
+                            ? HomeTokens.warning
+                            : const Color(0xFF8BC7FF),
+                        size: 18,
                       ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF8BC7FF),
-                        size: 22,
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -1511,76 +2535,72 @@ class _PortfolioFilteredEmptyPanel extends StatelessWidget {
   const _PortfolioFilteredEmptyPanel({
     required this.hasSearchQuery,
     required this.hasActiveFilters,
-    required this.onClearSearch,
     required this.onClearFilters,
   });
 
   final bool hasSearchQuery;
   final bool hasActiveFilters;
-  final VoidCallback onClearSearch;
   final VoidCallback onClearFilters;
 
   @override
   Widget build(BuildContext context) {
     final title = hasSearchQuery ? 'No matches found' : 'No matching filters';
-    final body = hasSearchQuery && hasActiveFilters
-        ? 'No saved items match this search inside the current filters. Clear search to keep your filters, or reset filters to widen the list.'
+    final hint = hasSearchQuery && hasActiveFilters
+        ? 'Nothing matches this search inside your active filters.'
         : hasSearchQuery
-        ? 'No saved items match this search. Clear the search to return to your current portfolio list.'
-        : 'Your saved items are still here, but the current filters found none.';
+        ? 'Try a different name, set, or category.'
+        : 'None of your saved items match the current filters.';
+    final textTheme = Theme.of(context).textTheme;
 
     return KeyedSubtree(
       key: const ValueKey('portfolio-filtered-empty-state-surface'),
-      child: HomeSectionSurface(
-        keySeed: 'portfolio-filtered-empty',
-        title: title,
+      // Quiet, cardless empty state that sits directly under the anchored search
+      // field. No "clear search" action — the user just edits or clears the
+      // field. Filters keep a lightweight text button since they can't be
+      // dismissed by editing the search text.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xl,
+          horizontal: AppSpacing.lg,
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Icon(
+              hasSearchQuery
+                  ? Icons.search_off_rounded
+                  : Icons.filter_alt_off_rounded,
+              size: 34,
+              color: HomeTokens.textMuted,
+            ),
+            const SizedBox(height: AppSpacing.md),
             Text(
-              body,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              title,
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium?.copyWith(
+                color: HomeTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
                 color: HomeTokens.textSecondary,
                 fontWeight: FontWeight.w600,
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: FilledButton.icon(
-                key: hasSearchQuery
-                    ? const ValueKey('portfolio-clear-search')
-                    : const ValueKey('portfolio-clear-filters'),
-                onPressed: hasSearchQuery ? onClearSearch : onClearFilters,
-                icon: Icon(
-                  hasSearchQuery ? Icons.close : Icons.filter_alt_off_outlined,
+            if (hasActiveFilters) ...[
+              const SizedBox(height: AppSpacing.xs),
+              TextButton(
+                key: const ValueKey('portfolio-clear-filters'),
+                onPressed: onClearFilters,
+                style: TextButton.styleFrom(
+                  foregroundColor: HomeTokens.accent,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                label: Text(hasSearchQuery ? 'Clear search' : 'Clear filters'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: HomeTokens.accentStrong,
-                  foregroundColor: HomeTokens.textPrimary,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ),
-            if (hasSearchQuery && hasActiveFilters) ...[
-              const SizedBox(height: AppSpacing.sm),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('portfolio-clear-filters'),
-                  onPressed: onClearFilters,
-                  icon: const Icon(Icons.filter_alt_off_outlined),
-                  label: const Text('Reset filters'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: HomeTokens.textPrimary,
-                    side: const BorderSide(color: HomeTokens.border),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
+                child: const Text('Clear filters'),
               ),
             ],
           ],
@@ -1875,7 +2895,7 @@ String _heroTitle({
     return 'Start your portfolio';
   }
   if (isPartialState) {
-    return 'Review pending values';
+    return 'Review items needing value';
   }
   return 'Your collection at a glance';
 }
@@ -1900,7 +2920,7 @@ String _heroBody({
     return 'Scan your first collectible to start building a saved portfolio.';
   }
   if (isPartialState) {
-    return 'Confirmed values stay visible while pending items are marked for review.';
+    return 'Confirmed values stay visible while no-value items are marked for review.';
   }
   return 'Review saved collectibles, values, and items that need attention.';
 }
@@ -2030,26 +3050,89 @@ int _pendingItemCount(List<CollectibleItem> items) {
   return items.where(_isPendingItem).length;
 }
 
-double _displayTotalValue(List<CollectibleItem> items) {
-  return items
-      .where(_hasDisplayableValuation)
-      .fold<double>(0, (total, item) => total + item.estimatedValue);
+double _displayTotalValue(
+  List<CollectibleItem> items, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
+  return items.where(_hasDisplayableValuation).fold<double>(
+    0,
+    (total, item) => total + convertCurrent(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    ),
+  );
 }
 
 bool _hasDisplayableValuation(CollectibleItem item) {
-  return switch (item.valuationStatus) {
-    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
-    ValuationStatus.providerNotConfigured ||
-    ValuationStatus.noMarketMatch ||
-    ValuationStatus.lookupFailed ||
-    ValuationStatus.unavailable => false,
-  };
+  // Shared with Home via CollectibleItem.hasTrustedValuation so both screens
+  // report the same value total and valued/trusted counts.
+  return item.hasTrustedValuation;
 }
 
 bool _isPendingItem(CollectibleItem item) {
-  return !_hasDisplayableValuation(item) ||
-      item.syncStatus == CloudItemSyncStatus.pendingUpload ||
-      item.syncStatus == CloudItemSyncStatus.failed;
+  return !_hasDisplayableValuation(item);
+}
+
+bool _hasMissingImportantData(CollectibleItem item) {
+  final fields = [
+    item.year,
+    item.brand,
+    item.setName,
+    item.series,
+    item.cardNumber,
+    item.playerOrCharacter,
+    item.rarity,
+    item.condition,
+    item.notes,
+  ];
+  return fields
+          .where((value) => value != null && value.trim().isNotEmpty)
+          .length <
+      3;
+}
+
+bool _hasStalePricing(CollectibleItem item) {
+  final lastUpdated =
+      item.marketSummary?.lastUpdated ?? item.pricing?.lastUpdated;
+  if (lastUpdated == null) {
+    return true;
+  }
+  return collectibleDisplayTimestamp(item).difference(lastUpdated).inDays > 30;
+}
+
+Color _healthColor(CollectionHealthScore health) {
+  if (health.score >= 70) {
+    return HomeTokens.positive;
+  }
+  if (health.score >= 50) {
+    return HomeTokens.warning;
+  }
+  return const Color(0xFFFF7A9A);
+}
+
+IconData _recommendationIcon(CollectionRecommendationType type) {
+  return switch (type) {
+    CollectionRecommendationType.scanAgain => Icons.document_scanner_outlined,
+    CollectionRecommendationType.improvePhoto => Icons.add_a_photo_outlined,
+    CollectionRecommendationType.upgradePlan =>
+      Icons.workspace_premium_outlined,
+    CollectionRecommendationType.reviewLowConfidence =>
+      Icons.manage_search_outlined,
+    CollectionRecommendationType.addMoreCollectibles => Icons.add_box_outlined,
+  };
+}
+
+Color _recommendationColor(CollectionRecommendationType type) {
+  return switch (type) {
+    CollectionRecommendationType.scanAgain ||
+    CollectionRecommendationType.reviewLowConfidence => HomeTokens.warning,
+    CollectionRecommendationType.improvePhoto ||
+    CollectionRecommendationType.addMoreCollectibles => const Color(0xFF8BC7FF),
+    CollectionRecommendationType.upgradePlan => HomeTokens.positive,
+  };
 }
 
 int _statusSortRank(CollectibleItem item) {
@@ -2063,18 +3146,31 @@ int _statusSortRank(CollectibleItem item) {
   return 2;
 }
 
-String _formatAud(double value) {
-  final rounded = value.round();
-  final formatted = rounded.toString().replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  return '\$$formatted';
+String _formatAud(double value, [String currencyCode = 'AUD']) {
+  return formatCollectionValue(value, currencyCode: currencyCode);
 }
 
 String _trendLabel(CollectibleItem item) {
   if (!_hasDisplayableValuation(item)) {
-    return 'Pending';
+    return switch (item.valuationStatus) {
+      ValuationStatus.noMarketMatch => 'No market match',
+      ValuationStatus.providerNotConfigured => 'Source unavailable',
+      ValuationStatus.lookupFailed => 'Retry value',
+      ValuationStatus.unavailable => 'Review value',
+      ValuationStatus.marketEstimated ||
+      ValuationStatus.aiEstimated => 'Stable',
+    };
   }
   return 'Stable';
+}
+
+String _valuationDisplayLabel(CollectibleItem item) {
+  return switch (item.valuationStatus) {
+    ValuationStatus.noMarketMatch => 'No match',
+    ValuationStatus.providerNotConfigured => 'No source',
+    ValuationStatus.lookupFailed => 'Retry',
+    ValuationStatus.unavailable => 'No value',
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated =>
+      _formatAud(item.estimatedValue, currencyForItem(item)),
+  };
 }

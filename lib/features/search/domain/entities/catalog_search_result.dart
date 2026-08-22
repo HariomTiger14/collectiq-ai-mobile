@@ -17,7 +17,11 @@ class CatalogSearchResult {
     this.attribution,
     this.reasonCode,
     this.displayMessage,
+    this.imageUrl,
+    this.productUrl,
+    this.externalImageUrl,
     this.history = const <CatalogPriceHistoryPoint>[],
+    this.marketplaceListings = const <MarketplaceListing>[],
   });
 
   /// Stable catalog identifier.
@@ -65,8 +69,31 @@ class CatalogSearchResult {
   /// Backend/user-safe message when trusted pricing is unavailable.
   final String? displayMessage;
 
+  /// Real catalog product photo, when the source provides one (KicksDB
+  /// today — PriceCharting's bulk catalog import has no image field).
+  final String? imageUrl;
+
+  /// The source's own product page URL for this item (e.g. PriceCharting),
+  /// used to let users view the original listing outside the app.
+  final String? productUrl;
+
+  /// Link-only publisher-sourced card/product image URL (Funko/Pokemon/
+  /// LEGO/Magic/Yu-Gi-Oh/Lorcana/One Piece), meant to be opened in an
+  /// external/in-app browser tab -- never rendered inline via
+  /// Image.network. Preferred over [productUrl] as a link target when
+  /// present, since PriceCharting's own product page frequently has no
+  /// image at all for these categories.
+  final String? externalImageUrl;
+
   /// Observed catalog valuation history, newest first when supplied.
   final List<CatalogPriceHistoryPoint> history;
+
+  /// Real, currently-available eBay listings for this item (top few
+  /// results, already in [currency] -- the backend picks the eBay
+  /// marketplace matching the requested display currency, so no further
+  /// client-side conversion is needed). Empty when the marketplace
+  /// listings feature is disabled, unmatched, or not yet loaded.
+  final List<MarketplaceListing> marketplaceListings;
 
   /// Creates a copy with updated catalog detail fields.
   CatalogSearchResult copyWith({
@@ -85,7 +112,11 @@ class CatalogSearchResult {
     String? attribution,
     String? reasonCode,
     String? displayMessage,
+    String? imageUrl,
+    String? productUrl,
+    String? externalImageUrl,
     List<CatalogPriceHistoryPoint>? history,
+    List<MarketplaceListing>? marketplaceListings,
   }) {
     return CatalogSearchResult(
       id: id ?? this.id,
@@ -103,7 +134,11 @@ class CatalogSearchResult {
       attribution: attribution ?? this.attribution,
       reasonCode: reasonCode ?? this.reasonCode,
       displayMessage: displayMessage ?? this.displayMessage,
+      imageUrl: imageUrl ?? this.imageUrl,
+      productUrl: productUrl ?? this.productUrl,
+      externalImageUrl: externalImageUrl ?? this.externalImageUrl,
       history: history ?? this.history,
+      marketplaceListings: marketplaceListings ?? this.marketplaceListings,
     );
   }
 
@@ -174,6 +209,11 @@ class CatalogSearchResult {
           _string(json['display_message']) ??
           _string(pricing['displayMessage']) ??
           _string(pricing['pricingExplanation']),
+      imageUrl: _string(json['imageUrl']) ?? _string(json['image_url']),
+      productUrl: _string(json['productUrl']) ?? _string(json['product_url']),
+      externalImageUrl:
+          _string(json['externalImageUrl']) ??
+          _string(json['external_image_url']),
       history: _historyFromJson(json['history']),
     );
   }
@@ -252,6 +292,51 @@ class CatalogPriceHistoryPoint {
       sourceDownloadedAt:
           DateTime.tryParse(_string(json['sourceDownloadedAt']) ?? '') ??
           DateTime.tryParse(_string(json['source_downloaded_at']) ?? ''),
+    );
+  }
+}
+
+/// A real, currently-available listing for this item on an external
+/// marketplace (eBay today), meant to be opened in an external/in-app
+/// browser tab -- never a purchase flow inside PackLox itself.
+class MarketplaceListing {
+  /// Creates a marketplace listing.
+  const MarketplaceListing({
+    required this.title,
+    required this.price,
+    required this.currency,
+    required this.url,
+    this.condition = '',
+    this.source = 'eBay',
+  });
+
+  /// The listing's title, as written by the seller.
+  final String title;
+
+  /// Asking price, already in [currency].
+  final double price;
+
+  /// Currency the price is expressed in.
+  final String currency;
+
+  /// Seller-described condition string (e.g. "New", "Used"), when known.
+  final String condition;
+
+  /// Direct link to the real listing on the source marketplace.
+  final String url;
+
+  /// Which marketplace this listing came from.
+  final String source;
+
+  /// Parses a flexible backend response safely.
+  factory MarketplaceListing.fromJson(Map<String, dynamic> json) {
+    return MarketplaceListing(
+      title: _string(json['title']) ?? '',
+      price: _number(json['price']) ?? 0,
+      currency: (_string(json['currency']) ?? '').toUpperCase(),
+      condition: _string(json['condition']) ?? '',
+      url: _string(json['url']) ?? '',
+      source: _string(json['source']) ?? 'eBay',
     );
   }
 }

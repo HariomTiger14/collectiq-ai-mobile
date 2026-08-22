@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:collectiq_ai/core/app_info/app_info_providers.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
@@ -13,6 +14,7 @@ import 'package:collectiq_ai/features/about/presentation/about_screen.dart';
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
+import 'package:collectiq_ai/features/settings/presentation/account_screen.dart';
 import 'package:collectiq_ai/features/cloud/presentation/cloud_sync_screen.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
 import 'package:collectiq_ai/features/diagnostics/services/diagnostics_providers.dart';
@@ -21,6 +23,13 @@ import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_comp
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/services/demo_price_alert_seed_service.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/screens/price_alerts_screen.dart';
+import 'package:collectiq_ai/features/notifications/data/notification_event_store.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
+import 'package:collectiq_ai/features/home/domain/services/demo_value_history_seed_service.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible_seed_service.dart';
@@ -35,10 +44,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _showDeveloperSurfaces = bool.fromEnvironment(
   'PACKLOX_SHOW_DEVELOPER_TOOLS',
 );
+
+// Shared "Pro" badge treatment (Plan & Usage status chip + the identity
+// header's plan pill) -- emerald, deliberately a shade deeper/richer than
+// HomeTokens.positive so it doesn't read as an identical duplicate of the
+// nearby product row's plain "Active" tag.
+const _proGradientColors = [Color(0xFF10B981), Color(0xFF047857)];
+const _proGlowColor = Color(0xFF047857);
+
+enum _AvatarSourceChoice { camera, gallery, remove }
 
 /// Settings screen for account, app preferences, and supported local/cloud state.
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -140,13 +159,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     List<Widget> sectionSlivers(
       List<Widget> children, {
       double topSpacing = 18,
+      String? title,
     }) {
       return [
+        if (title != null)
+          sliverBox(
+            SettingsSectionHeader(title),
+            padding: EdgeInsets.fromLTRB(
+              HomeTokens.pageGutter,
+              topSpacing,
+              HomeTokens.pageGutter,
+              10,
+            ),
+          ),
         sliverBox(
           SettingsCardGroup(children: children),
           padding: EdgeInsets.fromLTRB(
             HomeTokens.pageGutter,
-            topSpacing,
+            title != null ? 0 : topSpacing,
             HomeTokens.pageGutter,
             0,
           ),
@@ -156,14 +186,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final primaryTiles = [
       _SettingsRow(
+        key: const ValueKey('settings-account-row'),
         icon: Icons.account_circle_outlined,
         title: 'Account',
         subtitle: authState.isSignedIn
             ? authState.user?.email ?? 'Signed in'
             : 'Sign in to enable cloud backup.',
-        trailing: authState.isSignedIn ? 'Signed in' : 'Sign in',
+        trailing: authState.isSignedIn ? 'Manage' : 'Sign in',
         onTap: authState.isSignedIn
-            ? null
+            ? () => Navigator.of(context).push(AccountScreen.route())
             : () => Navigator.of(context).push(AuthWelcomeScreen.route()),
       ),
       _SettingsRow(
@@ -171,17 +202,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Country & Currency',
         subtitle:
             '${profile?.countryName ?? CollectorProfile.countryNameFor(CollectorProfile.defaultCountryCode)} pricing display.',
-        trailing: profile?.preferredCurrency ??
+        trailing:
+            profile?.preferredCurrency ??
             CollectorProfile.defaultPreferredCurrency,
         onTap: () => _showCurrencyPicker(context),
       ),
       _SettingsRow(
         icon: Icons.inventory_2_outlined,
         title: 'Collection & Backup',
-        subtitle: canRunCloudSync
-            ? syncState.errorMessage ?? syncState.status.message
-            : 'Sign in to save and sync your collection.',
-        trailing: canRunCloudSync ? syncState.status.statusLabel : 'Sign in',
+        // Labels key off sign-in state, never off cloud-feature flags, so a
+        // signed-in user is never told to "Sign in".
+        subtitle: !authState.isSignedIn
+            ? 'Sign in to save and sync your collection.'
+            : canRunCloudSync
+            ? (syncState.errorMessage ?? syncState.status.message)
+            : 'Your collection is saved on this device.',
+        trailing: !authState.isSignedIn
+            ? 'Sign in'
+            : canRunCloudSync
+            ? syncState.status.statusLabel
+            : 'On device',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CloudSyncScreen()),
         ),
@@ -191,21 +231,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: 'Price Alerts',
         subtitle: notificationState.settingsSubtitle,
         trailing: notificationState.settingsStatusLabel,
+        trailingWarning: notificationState.settingsStatusNeedsAttention,
+        onTap: () => Navigator.of(context).push(PriceAlertsScreen.route()),
       ),
-      _SettingsRow(
-        icon: Icons.palette_outlined,
-        title: 'Appearance',
-        subtitle: 'PackLox follows your device theme.',
-        trailing: 'System',
-        message: 'Theme follows your device setting.',
-      ),
+      // No Appearance row: PackLox is intentionally dark-only, so a row that
+      // can't be changed would just be filler.
     ];
 
     final subscriptionTiles = [
       _SettingsRow(
         icon: Icons.workspace_premium_outlined,
         title: 'Plan & Usage',
-        subtitle: '${subscriptionState.remainingLabel} scans remaining today.',
+        subtitle:
+            '${subscriptionState.remainingLabel} scans remaining this month.',
         trailing: subscriptionState.entitlements.plan.displayName,
       ),
       _SubscriptionPlanPanel(
@@ -230,6 +268,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
+    final packageInfo = ref.watch(packageInfoProvider).value;
+    final appVersionLabel = packageInfo != null
+        ? 'Version ${packageInfo.version} (${packageInfo.buildNumber})'
+        : 'Version 1.0.0 (1)';
+
     final infoTiles = [
       const _SettingsRow(
         icon: Icons.lock_outline,
@@ -240,7 +283,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _SettingsRow(
         icon: Icons.info_outline_rounded,
         title: 'About PackLox',
-        subtitle: 'Version 1.0.0 (1)',
+        subtitle: appVersionLabel,
         trailing: 'Open',
         onTap: () => Navigator.of(
           context,
@@ -289,33 +332,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           action: () => _resetOnboarding(context),
         ),
       ),
-      _SettingsRow(
-        icon: Icons.cleaning_services_outlined,
-        title: 'Clear Local Collection',
-        subtitle: 'Remove portfolio items stored locally on this device.',
-        trailing: 'Confirm',
-        onTap: () => _confirmDangerAction(
-          context,
-          title: 'Clear Local Collection?',
-          message:
-              'This removes local portfolio items from this device. Cloud account deletion is not supported here.',
-          confirmLabel: 'Clear',
-          action: _clearLocalCollection,
-        ),
-      ),
       if (authState.isSignedIn)
         _SettingsRow(
           icon: Icons.logout_outlined,
           title: 'Sign Out',
           subtitle: 'Sign out of cloud auth. Local data stays on device.',
-          trailing: 'Account',
-          onTap: () => ref.read(authControllerProvider.notifier).signOut(),
+          trailing: 'Confirm',
+          onTap: () => _confirmDangerAction(
+            context,
+            title: 'Sign Out?',
+            message:
+                "You'll need to sign in again to sync or back up your "
+                'collection. Local data on this device is unaffected.',
+            confirmLabel: 'Sign Out',
+            action: () => ref.read(authControllerProvider.notifier).signOut(),
+          ),
         ),
     ];
 
     return Scaffold(
       backgroundColor: HomeTokens.background,
       body: SafeArea(
+        // Let content run to the bottom edge behind the floating nav bar,
+        // matching the other tabs (Portfolio uses the same). Otherwise the
+        // bottom safe-area inset leaves a black gap under the nav bar.
+        bottom: false,
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
@@ -325,6 +366,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   authState: authState,
                   profile: profile,
                   isLoadingProfile: profileState.isLoading,
+                  planLabel: subscriptionState.entitlements.plan.displayName,
+                  isPaidPlan: subscriptionState.entitlements.isPaid,
                   onEditProfile: () => _showProfileEditor(context),
                 ),
                 padding: const EdgeInsets.fromLTRB(
@@ -361,9 +404,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   apiConfig: apiConfig,
                 ),
               ),
-            ...sectionSlivers(primaryTiles),
-            ...sectionSlivers(subscriptionTiles, topSpacing: 14),
-            if (demoSeedEnabled) ...sectionSlivers(demoDataTiles),
+            ...sectionSlivers(primaryTiles, title: 'Account'),
+            ...sectionSlivers(
+              subscriptionTiles,
+              topSpacing: 24,
+              title: 'Subscription',
+            ),
+            if (demoSeedEnabled)
+              ...sectionSlivers(
+                demoDataTiles,
+                topSpacing: 24,
+                title: 'Demo Data',
+              ),
             if (showDeveloperTools) ...[
               sliverBox(
                 SettingsSectionHeader('Developer Tools'),
@@ -392,10 +444,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
-            ...sectionSlivers(infoTiles, topSpacing: 14),
+            ...sectionSlivers(infoTiles, topSpacing: 24, title: 'Support'),
             if (privacyTiles.isNotEmpty)
-              ...sectionSlivers(privacyTiles, topSpacing: 14),
-            ...sectionSlivers(dangerTiles, topSpacing: 14),
+              ...sectionSlivers(privacyTiles, topSpacing: 24),
+            ...sectionSlivers(
+              dangerTiles,
+              topSpacing: 24,
+              title: 'Danger Zone',
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 128)),
           ],
         ),
@@ -419,6 +475,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final count = await ref
           .read(portfolioControllerProvider.notifier)
           .seedDemoItems();
+      // Backfill ~30 days of value history so the Home trend/delta render now.
+      final portfolio = ref.read(portfolioControllerProvider);
+      await const DemoValueHistorySeedService().seed(
+        repository: ref.read(portfolioHistoryRepositoryProvider),
+        currentTotalValue: portfolio.totalValue,
+        itemCount: portfolio.itemCount,
+      );
+      // Seed a few triggered price alerts and mirror them into the notification
+      // event log so the inbox has content.
+      final seededAlerts = await const DemoPriceAlertSeedService().seed(
+        repository: ref.read(priceAlertRepositoryProvider),
+        items: portfolio.items,
+      );
+      const eventStore = NotificationEventStore();
+      for (final alert in seededAlerts) {
+        await eventStore.append(NotificationEvent.fromPriceAlert(alert));
+      }
       if (mounted) {
         _showSettingsSnackBar('Seeded $count demo/mock collectibles locally.');
       }
@@ -438,6 +511,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final count = await ref
           .read(portfolioControllerProvider.notifier)
           .clearDemoItems();
+      await const DemoValueHistorySeedService().clear(
+        ref.read(portfolioHistoryRepositoryProvider),
+      );
+      await const DemoPriceAlertSeedService().clear(
+        ref.read(priceAlertRepositoryProvider),
+      );
+      await const NotificationEventStore().clear();
       if (mounted) {
         _showSettingsSnackBar('Cleared $count demo/mock collectibles.');
       }
@@ -445,13 +525,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         setState(() => _isUpdatingDemoData = false);
       }
-    }
-  }
-
-  Future<void> _clearLocalCollection() async {
-    await ref.read(portfolioControllerProvider.notifier).clearPortfolio();
-    if (mounted) {
-      _showSettingsSnackBar('Local collection cleared on this device.');
     }
   }
 
@@ -474,6 +547,64 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final state = ref.read(subscriptionControllerProvider);
     _showSettingsSnackBar(
       state.purchaseMessage ?? state.errorMessage ?? 'Restore checked.',
+    );
+  }
+
+  Future<_AvatarSourceChoice?> _chooseAvatarSource(
+    BuildContext context, {
+    required bool hasAvatar,
+  }) {
+    Widget tile({
+      required IconData icon,
+      required String label,
+      required _AvatarSourceChoice value,
+      bool destructive = false,
+    }) {
+      final color = destructive ? HomeTokens.warning : HomeTokens.accent;
+      return ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: destructive ? HomeTokens.warning : HomeTokens.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        onTap: () => Navigator.of(context).pop(value),
+      );
+    }
+
+    return showModalBottomSheet<_AvatarSourceChoice>(
+      context: context,
+      backgroundColor: HomeTokens.surfaceRaised,
+      showDragHandle: true,
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              tile(
+                icon: Icons.photo_camera_outlined,
+                label: 'Take photo',
+                value: _AvatarSourceChoice.camera,
+              ),
+              tile(
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                value: _AvatarSourceChoice.gallery,
+              ),
+              if (hasAvatar)
+                tile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Remove photo',
+                  value: _AvatarSourceChoice.remove,
+                  destructive: true,
+                ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -519,8 +650,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (isSaving) {
                 return;
               }
+              final hasAvatar = currentProfile.avatarPath?.isNotEmpty ?? false;
+              final choice = await _chooseAvatarSource(
+                sheetContext,
+                hasAvatar: hasAvatar,
+              );
+              if (choice == null) {
+                return;
+              }
+              if (choice == _AvatarSourceChoice.remove) {
+                setSheetState(() => isSaving = true);
+                try {
+                  await ref
+                      .read(profileControllerProvider.notifier)
+                      .removeAvatar();
+                  if (mounted) {
+                    _showSettingsSnackBar('Profile photo removed.');
+                  }
+                } finally {
+                  if (sheetContext.mounted) {
+                    setSheetState(() => isSaving = false);
+                  }
+                }
+                return;
+              }
               final image = await ImagePicker().pickImage(
-                source: ImageSource.gallery,
+                source: choice == _AvatarSourceChoice.camera
+                    ? ImageSource.camera
+                    : ImageSource.gallery,
                 maxWidth: 900,
                 maxHeight: 900,
                 imageQuality: 86,
@@ -584,6 +741,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
     await showModalBottomSheet<void>(
       context: context,
+      // Size to content (with scroll fallback) so the option list never clips.
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return SafeArea(
@@ -784,6 +943,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 navigator.pop();
                 _showSettingsSnackBar('Support details copied.');
               },
+              onEmail: (subject, body) =>
+                  _launchSupportEmail(sheetContext, subject, body),
               onOpenSupportTickets: () {
                 Navigator.of(sheetContext).pop();
                 Navigator.of(context).push(
@@ -797,6 +958,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _launchSupportEmail(
+    BuildContext sheetContext,
+    String subject,
+    String body,
+  ) async {
+    final navigator = Navigator.of(sheetContext);
+    final query = <String>[
+      'subject=${Uri.encodeComponent(subject)}',
+      if (body.isNotEmpty) 'body=${Uri.encodeComponent(body)}',
+    ].join('&');
+    final uri = Uri.parse(
+      'mailto:${_HelpAndFeedbackSheet._supportEmail}?$query',
+    );
+    var launched = false;
+    try {
+      launched = await launchUrl(uri);
+    } catch (_) {
+      launched = false;
+    }
+    if (!mounted) {
+      return;
+    }
+    navigator.pop();
+    if (!launched) {
+      // Fallback so the user can still reach support without a mail client.
+      await Clipboard.setData(
+        const ClipboardData(text: _HelpAndFeedbackSheet._supportEmail),
+      );
+      _showSettingsSnackBar('No email app found — support address copied.');
+    }
   }
 
   String _maskedEmail(String? email) {
@@ -1008,16 +1201,23 @@ class _SubscriptionPlanPanel extends StatelessWidget {
             _SubscriptionStatusChip(
               label: state.paymentStatusLabel,
               icon: state.entitlements.isPaid
-                  ? Icons.verified_rounded
+                  ? Icons.workspace_premium_rounded
                   : Icons.tune_rounded,
-              color: state.isBillingAvailable
-                  ? HomeTokens.positive
-                  : HomeTokens.warning,
+              // Reflects plan tier, not billing configuration -- previously
+              // this colored by state.isBillingAvailable, so a Free and a
+              // Pro user with the same billing setup saw an identically
+              // colored chip.
+              color: state.entitlements.isPaid
+                  ? HomeTokens.accent
+                  : HomeTokens.textSecondary,
+              gradientColors: state.entitlements.isPaid
+                  ? _proGradientColors
+                  : null,
             ),
             _SubscriptionStatusChip(
               label: state.entitlements.usageLimit.isUnlimited
                   ? 'Unlimited scans'
-                  : '${state.entitlements.usageLimit.dailyFreeScanLimit} scans/day',
+                  : '${state.entitlements.usageLimit.monthlyFreeScanLimit} scans/month',
               icon: Icons.qr_code_scanner_rounded,
               color: HomeTokens.accent,
             ),
@@ -1090,7 +1290,8 @@ class _PlanLimitsSummary extends StatelessWidget {
       if (limits.canUseAdvancedFilters) 'Advanced filters',
       if (limits.canExportPortfolio) 'Export',
       if (limits.canUsePortfolioIntelligence) 'Intelligence',
-      if (limits.canBulkRefreshValues) 'Bulk refresh',
+      // 'Bulk refresh' is intentionally omitted: the capability flag exists but
+      // the feature isn't built yet, so we don't advertise it as a Pro perk.
     ];
     final toolLabel = unlockedTools.isEmpty
         ? 'Basic tools'
@@ -1272,31 +1473,65 @@ class _SubscriptionStatusChip extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
+    this.gradientColors,
   });
 
   final String label;
   final IconData icon;
   final Color color;
 
+  /// When set, renders a bold filled gradient pill instead of the plain
+  /// alpha-tinted outline -- used for the Pro plan chip so it actually
+  /// reads as a distinct, premium status rather than looking like every
+  /// other muted status chip (which is what a Free user sees too).
+  final List<Color>? gradientColors;
+
   @override
   Widget build(BuildContext context) {
+    final isFilled = gradientColors != null;
+    final foreground = isFilled ? Colors.white : color;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isFilled ? null : color.withValues(alpha: 0.12),
+        gradient: isFilled
+            ? LinearGradient(
+                colors: gradientColors!,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
         borderRadius: BorderRadius.circular(HomeTokens.controlRadius),
-        border: Border.all(color: color.withValues(alpha: 0.34)),
+        border: isFilled
+            ? null
+            : Border.all(color: color.withValues(alpha: 0.34)),
+        boxShadow: isFilled
+            ? [
+                BoxShadow(
+                  color: gradientColors!.last.withValues(alpha: 0.38),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
+          Icon(icon, size: 15, color: foreground),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: HomeTokens.textPrimary,
-              fontWeight: FontWeight.w800,
+          // Flexible + ellipsis so the chip shrinks instead of overflowing at
+          // narrow widths / large text (e.g. 320px with 1.3x accessibility text).
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: isFilled ? Colors.white : HomeTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -1485,7 +1720,15 @@ class _AccountPromptCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.close, color: HomeTokens.textMuted, size: 22),
+            // A chevron, not a close icon: the whole card (including this
+            // icon) navigates to sign-in on tap -- there's no dismiss
+            // behavior, so a close "X" here previously misled users into
+            // thinking they could dismiss the prompt.
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: HomeTokens.textMuted,
+              size: 24,
+            ),
           ],
         ),
       ),
@@ -1515,11 +1758,15 @@ class _SettingsSurface extends StatelessWidget {
 class _HelpAndFeedbackSheet extends StatelessWidget {
   const _HelpAndFeedbackSheet({
     required this.onCopy,
+    required this.onEmail,
     required this.onOpenSupportTickets,
   });
 
   final Future<void> Function(String message) onCopy;
+  final Future<void> Function(String subject, String body) onEmail;
   final VoidCallback onOpenSupportTickets;
+
+  static const _supportEmail = 'support@packlox.com';
 
   @override
   Widget build(BuildContext context) {
@@ -1559,9 +1806,9 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
               _HelpActionRow(
                 icon: Icons.document_scanner_outlined,
                 title: 'Report scan issue',
-                subtitle: 'Copies a ready-to-send scan support template.',
-                trailing: 'Copy',
-                onTap: () => onCopy(_scanIssueTemplate),
+                subtitle: 'Opens a ready-to-send scan report email.',
+                trailing: 'Email',
+                onTap: () => onEmail('PackLox scan issue', _scanIssueTemplate),
               ),
               _HelpActionRow(
                 icon: Icons.privacy_tip_outlined,
@@ -1619,11 +1866,29 @@ class _HelpActionRow extends StatelessWidget {
   }
 }
 
+/// Derives a friendly display name from the local part of an email
+/// (e.g. "ada.lovelace@x.com" -> "Ada Lovelace") for signed-in users who
+/// haven't set a custom name yet. Returns null when there's nothing usable.
+String? _nameFromEmail(String? email) {
+  final local = email?.split('@').first.trim();
+  if (local == null || local.isEmpty) {
+    return null;
+  }
+  final words = local
+      .split(RegExp(r'[._\-+]'))
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .toList();
+  return words.isEmpty ? null : words.join(' ');
+}
+
 class IdentityBlock extends StatelessWidget {
   const IdentityBlock({
     super.key,
     required this.authState,
     required this.onEditProfile,
+    required this.planLabel,
+    this.isPaidPlan = false,
     this.profile,
     this.isLoadingProfile = false,
   });
@@ -1631,26 +1896,42 @@ class IdentityBlock extends StatelessWidget {
   final AuthState authState;
   final CollectorProfile? profile;
   final bool isLoadingProfile;
+  final String planLabel;
+  final bool isPaidPlan;
   final VoidCallback onEditProfile;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isSignedIn = authState.isSignedIn;
-    final savedName = profile?.displayName.trim();
-    final authName = authState.user?.displayName.trim();
+    final rawSaved = profile?.displayName.trim();
+    // The profile ships with a generic default name, so treat that as "unset"
+    // and fall through to the person's real identity when they're signed in.
+    final savedName =
+        (rawSaved != null &&
+            rawSaved.isNotEmpty &&
+            rawSaved != CollectorProfile.defaultDisplayName)
+        ? rawSaved
+        : null;
+    final rawAuthName = authState.user?.displayName.trim();
     final email = authState.user?.email;
-    final headline = savedName?.isNotEmpty == true
-        ? savedName!
-        : isSignedIn
-        ? authName?.isNotEmpty == true
-              ? authName!
-              : email ?? 'Collector'
-        : CollectorProfile.defaultDisplayName;
+    // Providers often set the display name to the email; a raw address makes a
+    // poor headline, so only keep a real name and otherwise derive one.
+    final authName =
+        (rawAuthName != null &&
+            rawAuthName.isNotEmpty &&
+            !rawAuthName.contains('@'))
+        ? rawAuthName
+        : null;
+    final headline =
+        savedName ??
+        (isSignedIn
+            ? (authName ?? _nameFromEmail(email) ?? 'Collector')
+            : CollectorProfile.defaultDisplayName);
     final initial = headline.trim().isNotEmpty
         ? headline.trim().substring(0, 1).toUpperCase()
         : 'P';
-    final statusColor = isSignedIn ? HomeTokens.positive : HomeTokens.accent;
+    final statusColor = HomeTokens.accent;
     final avatarPath = profile?.avatarPath;
     final avatarFile = avatarPath == null || avatarPath.isEmpty
         ? null
@@ -1661,6 +1942,36 @@ class IdentityBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const Align(alignment: Alignment.centerLeft, child: HomeBrandLockup()),
+        const SizedBox(height: AppSpacing.lg),
+        // Matches Home/Discover's own title-block convention (brand lockup,
+        // then a left-aligned page title + subtitle) so Settings' tab root
+        // looks consistent with its sibling tabs instead of standing out.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settings',
+                key: const ValueKey('settings-title'),
+                style: textTheme.displaySmall?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Account, subscription, and app preferences',
+                style: textTheme.titleMedium?.copyWith(
+                  color: HomeTokens.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 26),
         GestureDetector(
           onTap: onEditProfile,
@@ -1668,26 +1979,20 @@ class IdentityBlock extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 112,
-                height: 112,
+                width: 84,
+                height: 84,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      HomeTokens.accentStrong.withValues(alpha: 0.95),
-                      HomeTokens.accent.withValues(alpha: 0.70),
+                      HomeTokens.accentStrong.withValues(alpha: 0.85),
+                      HomeTokens.accent.withValues(alpha: 0.58),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: HomeTokens.accent.withValues(alpha: 0.24),
-                      blurRadius: 34,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
+                  border: Border.all(color: HomeTokens.border, width: 2),
                 ),
                 child: avatarFile != null && avatarFile.existsSync()
                     ? Image.file(
@@ -1710,7 +2015,7 @@ class IdentityBlock extends StatelessWidget {
                                 key: const ValueKey(
                                   'settings-profile-avatar-initial',
                                 ),
-                                style: textTheme.displaySmall?.copyWith(
+                                style: textTheme.headlineSmall?.copyWith(
                                   color: HomeTokens.textPrimary,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -1757,30 +2062,79 @@ class IdentityBlock extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: HomeTokens.textPrimary,
-                size: 26,
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                isSignedIn ? Icons.check_circle : Icons.radio_button_checked,
-                color: statusColor,
-                size: 18,
+                Icons.edit_outlined,
+                color: HomeTokens.textMuted,
+                size: 17,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          isSignedIn
-              ? 'Cloud identity connected'
-              : 'Local-first access is active',
-          style: textTheme.bodyMedium?.copyWith(
-            color: HomeTokens.textSecondary,
-            fontWeight: FontWeight.w700,
-          ),
+        const SizedBox(height: 10),
+        // One consolidated status chip (replaces the redundant check icon +
+        // "Cloud identity connected" line). Pro gets a bold filled gradient
+        // instead of the same muted outline as Free/local, so plan tier is
+        // actually visible here, not just as text.
+        Builder(
+          builder: (context) {
+            final isPro = isSignedIn && isPaidPlan;
+            final pillForeground = isPro ? Colors.white : statusColor;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isPro ? null : statusColor.withValues(alpha: 0.12),
+                gradient: isPro
+                    ? const LinearGradient(
+                        colors: _proGradientColors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(999),
+                border: isPro
+                    ? null
+                    : Border.all(color: statusColor.withValues(alpha: 0.34)),
+                boxShadow: isPro
+                    ? [
+                        BoxShadow(
+                          color: _proGlowColor.withValues(alpha: 0.38),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSignedIn)
+                    Icon(
+                      Icons.workspace_premium_rounded,
+                      size: 14,
+                      color: pillForeground,
+                    )
+                  else
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 7),
+                  Text(
+                    isSignedIn ? '$planLabel plan' : 'Local access',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: pillForeground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
@@ -1926,8 +2280,8 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           OutlinedButton.icon(
             key: const ValueKey('settings-profile-photo-button'),
             onPressed: widget.isSaving ? null : widget.onPickAvatar,
-            icon: const Icon(Icons.photo_library_outlined),
-            label: const Text('Choose profile photo'),
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: const Text('Change photo'),
             style: OutlinedButton.styleFrom(
               foregroundColor: HomeTokens.textPrimary,
               side: const BorderSide(color: HomeTokens.border),
@@ -1980,140 +2334,6 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   }
 }
 
-class AboutCard extends StatelessWidget {
-  const AboutCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.24)),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.20),
-            colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 66,
-                height: 66,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.tertiary.withValues(alpha: 0.82),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.22),
-                      blurRadius: 28,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.auto_awesome_outlined,
-                  color: colorScheme.onPrimary,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CollectIQ',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Version 0.1.0',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const ModernSettingsRow(
-            icon: Icons.flutter_dash_outlined,
-            title: 'Made with Flutter',
-            subtitle: 'Native-feeling mobile experience.',
-            trailingText: 'Flutter',
-          ),
-          const SizedBox(height: 16),
-          const ModernSettingsRow(
-            icon: Icons.cloud_done_outlined,
-            title: 'Powered by Supabase',
-            subtitle: 'Cloud auth and sync when configured.',
-            trailingText: 'Ready',
-          ),
-          const SizedBox(height: 16),
-          const ModernSettingsRow(
-            icon: Icons.auto_awesome_outlined,
-            title: 'AI features enabled',
-            subtitle: 'Scanning pipeline is prepared for providers.',
-            trailingText: 'Enabled',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class HelpCard extends StatelessWidget {
-  const HelpCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        ModernSettingsRow(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy',
-          subtitle: 'Images stay local unless cloud services are configured.',
-          trailingText: 'View',
-        ),
-        SizedBox(height: 16),
-        ModernSettingsRow(
-          icon: Icons.description_outlined,
-          title: 'Terms',
-          subtitle: 'Terms will be added before public release.',
-          trailingText: 'Soon',
-        ),
-        SizedBox(height: 16),
-        ModernSettingsRow(
-          icon: Icons.mail_outline,
-          title: 'Contact',
-          subtitle: 'Support contact details will be added before release.',
-          trailingText: 'Soon',
-        ),
-      ],
-    );
-  }
-}
-
 class _SettingsCompatibilityLabels extends StatelessWidget {
   const _SettingsCompatibilityLabels({
     required this.authState,
@@ -2162,7 +2382,7 @@ class _SettingsCompatibilityLabels extends StatelessWidget {
       'Plan & Usage',
       'Current plan',
       subscriptionState.entitlements.plan.displayName,
-      'Scans used today',
+      'Scans used this month',
       'Remaining scans',
       subscriptionState.remainingLabel,
       'Payment status',
@@ -2489,7 +2709,7 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
-    this.message,
+    this.trailingWarning = false,
     this.onTap,
   });
 
@@ -2497,7 +2717,7 @@ class _SettingsRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final String trailing;
-  final String? message;
+  final bool trailingWarning;
   final VoidCallback? onTap;
 
   @override
@@ -2507,30 +2727,8 @@ class _SettingsRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       trailingText: trailing,
-      onTap: onTap ?? (message == null ? null : () => _showRowMessage(context)),
+      trailingWarning: trailingWarning,
+      onTap: onTap,
     );
-  }
-
-  void _showRowMessage(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message ?? _defaultMessage)));
-  }
-
-  String get _defaultMessage {
-    final normalizedTrailing = trailing.toLowerCase();
-    final normalizedSubtitle = subtitle.toLowerCase();
-    if (normalizedTrailing.contains('soon')) {
-      return '$title is coming soon.';
-    }
-    if (normalizedTrailing.contains('requires setup') ||
-        normalizedSubtitle.contains('requires') ||
-        normalizedSubtitle.contains('cloud')) {
-      return '$title requires cloud setup in a dev or staging build.';
-    }
-    if (normalizedTrailing.contains('not configured')) {
-      return '$title is not configured for this local build.';
-    }
-    return '$title: $trailing';
   }
 }

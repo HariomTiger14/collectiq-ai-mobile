@@ -1,6 +1,13 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:collectiq_ai/core/config/environment_config.dart';
+import 'package:collectiq_ai/core/network/api_constants.dart' as net;
+import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
+import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/apple_billing_repository.dart';
+import 'package:collectiq_ai/features/subscription/data/repositories/cloud_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/google_play_billing_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_entitlement_repository.dart';
 import 'package:collectiq_ai/features/subscription/data/repositories/shared_preferences_usage_repository.dart';
@@ -26,14 +33,19 @@ class UsageLimitConfig {
   /// Creates usage limit config.
   const UsageLimitConfig({
     this.developmentUnlimited = true,
-    this.dailyFreeScanLimit = 25,
+    // Quiet monthly anti-abuse ceiling, not a marketed limit. The real free
+    // wall is the saved-collectibles cap (kFreeMaxCollectibles). Matches the
+    // server-side monthly cap enforced on /analyze
+    // (SUBSCRIPTION_FREE_MONTHLY_SCAN_LIMIT, default 30) — this is a
+    // client-side pre-check only, the server is authoritative.
+    this.monthlyFreeScanLimit = 30,
   });
 
   /// Whether local/dev builds should avoid blocking scanner testing.
   final bool developmentUnlimited;
 
-  /// Daily scan limit used when unlimited mode is disabled.
-  final int dailyFreeScanLimit;
+  /// Monthly scan limit used when unlimited mode is disabled.
+  final int monthlyFreeScanLimit;
 
   /// Build config from dart-define values.
   factory UsageLimitConfig.fromEnvironment() {
@@ -42,9 +54,9 @@ class UsageLimitConfig {
         'COLLECTIQ_USAGE_UNLIMITED',
         defaultValue: true,
       ),
-      dailyFreeScanLimit: int.fromEnvironment(
-        'COLLECTIQ_DAILY_FREE_SCAN_LIMIT',
-        defaultValue: 25,
+      monthlyFreeScanLimit: int.fromEnvironment(
+        'COLLECTIQ_MONTHLY_FREE_SCAN_LIMIT',
+        defaultValue: 30,
       ),
     );
   }
@@ -52,7 +64,7 @@ class UsageLimitConfig {
   /// Limit model for the active config.
   UsageLimit get usageLimit {
     return UsageLimit(
-      dailyFreeScanLimit: dailyFreeScanLimit,
+      monthlyFreeScanLimit: monthlyFreeScanLimit,
       isUnlimited: developmentUnlimited,
     );
   }
@@ -70,6 +82,11 @@ final googlePlayBillingConfigProvider = Provider<GooglePlayBillingConfig>((
   return GooglePlayBillingConfig.fromEnvironment();
 });
 
+/// Provides Apple App Store Billing config.
+final appleBillingConfigProvider = Provider<AppleBillingConfig>((ref) {
+  return AppleBillingConfig.fromEnvironment();
+});
+
 /// Provides SIT dummy billing config.
 final sitDummyBillingConfigProvider = Provider<SitDummyBillingConfig>((ref) {
   return SitDummyBillingConfig.fromEnvironment();
@@ -78,14 +95,25 @@ final sitDummyBillingConfigProvider = Provider<SitDummyBillingConfig>((ref) {
 /// Whether this build has any billing provider configured.
 final paymentsConfiguredProvider = Provider<bool>((ref) {
   return ref.watch(sitDummyBillingConfigProvider).enabled ||
-      ref.watch(googlePlayBillingConfigProvider).enabled;
+      ref.watch(googlePlayBillingConfigProvider).enabled ||
+      ref.watch(appleBillingConfigProvider).enabled;
 });
 
-/// Provides billing repository.
+/// Provides billing repository. Platform-specific below the SIT/unavailable
+/// checks -- iOS gets StoreKit2 via AppleBillingRepository, everything else
+/// (Android, and any other Platform.isIOS-false target) gets Play Billing.
 final billingRepositoryProvider = Provider<BillingRepository>((ref) {
   final sitConfig = ref.watch(sitDummyBillingConfigProvider);
   if (sitConfig.enabled) {
     return SitDummyBillingRepository(config: sitConfig);
+  }
+
+  if (Platform.isIOS) {
+    final appleConfig = ref.watch(appleBillingConfigProvider);
+    if (!appleConfig.enabled) {
+      return const UnavailableBillingRepository();
+    }
+    return AppleBillingRepository(config: appleConfig);
   }
 
   final config = ref.watch(googlePlayBillingConfigProvider);
@@ -96,9 +124,20 @@ final billingRepositoryProvider = Provider<BillingRepository>((ref) {
   return GooglePlayBillingRepository(config: config);
 });
 
-/// Provides entitlement persistence.
+/// Provides entitlement persistence. When cloud services are allowed, the plan
+/// is read from and written to the server (per-user, cross-device, tamper-proof)
+/// with the local store as an offline cache. Otherwise it stays purely local.
 final entitlementRepositoryProvider = Provider<EntitlementRepository>((ref) {
-  return const SharedPreferencesEntitlementRepository();
+  const local = SharedPreferencesEntitlementRepository();
+  final cloudAllowed = ref.watch(environmentConfigProvider).allowsCloudServices;
+  if (!cloudAllowed) {
+    return local;
+  }
+  return CloudEntitlementRepository(
+    baseUrl: net.EnvironmentConfig.fromEnvironment().baseUrl,
+    supabaseService: ref.watch(supabaseServiceProvider),
+    cache: local,
+  );
 });
 
 /// Provides user entitlements.
@@ -132,7 +171,7 @@ class SubscriptionState {
            usage ??
            UsageTracker.fromLimit(
              limit: UserEntitlements.developmentFree.usageLimit,
-             scansUsedToday: 0,
+             scansUsedThisMonth: 0,
            );
 
   /// Current entitlements.
@@ -180,7 +219,11 @@ class SubscriptionState {
 
   /// User-facing monthly refresh usage label.
   String get priceRefreshUsageLabel {
-    return '$priceRefreshesUsedThisMonth / ${entitlements.planLimits.monthlyPriceRefreshes}';
+    final limit = entitlements.planLimits.monthlyPriceRefreshes;
+    if (limit >= kUnlimitedLabelThreshold) {
+      return 'Unlimited';
+    }
+    return '$priceRefreshesUsedThisMonth / $limit';
   }
 
   /// Whether another manual price refresh is available.
@@ -238,6 +281,23 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     _paymentsConfigured = ref.watch(paymentsConfiguredProvider);
     _telemetry = ref.watch(appTelemetryServiceProvider);
     final entitlements = ref.watch(userEntitlementsProvider);
+    // Reload the entitlement whenever the signed-in user changes (sign-in,
+    // sign-out, or switching accounts) so the plan always reflects the current
+    // user's server-owned entitlement rather than a stale device value.
+    ref.listen(authControllerProvider.select((state) => state.user?.id), (
+      previous,
+      next,
+    ) {
+      if (previous == next) {
+        return;
+      }
+      Future.microtask(() async {
+        if (!ref.mounted) {
+          return;
+        }
+        await loadUsage();
+      });
+    });
     Future.microtask(() async {
       if (!ref.mounted) {
         return;
@@ -248,7 +308,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
       entitlements: entitlements,
       usage: UsageTracker.fromLimit(
         limit: entitlements.usageLimit,
-        scansUsedToday: 0,
+        scansUsedThisMonth: 0,
       ),
     );
   }
@@ -260,7 +320,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     }
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      final used = await _usageRepository.scansUsedToday();
+      final used = await _usageRepository.scansUsedThisMonth();
       final refreshesUsed = await _usageRepository
           .priceRefreshesUsedThisMonth();
       final plan = await _entitlementRepository.loadPlan();
@@ -290,7 +350,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
         entitlements: entitlements,
         usage: UsageTracker.fromLimit(
           limit: entitlements.usageLimit,
-          scansUsedToday: used,
+          scansUsedThisMonth: used,
         ),
         priceRefreshesUsedThisMonth: refreshesUsed,
         products: products,
@@ -318,18 +378,18 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     }
 
     throw SubscriptionException(
-      'Daily free scan limit reached. Your scans reset ${_formatResetDate(state.usage.resetAt)}.',
+      'Monthly free scan limit reached. Your scans reset ${_formatResetDate(state.usage.resetAt)}.',
     );
   }
 
   /// Records a successful analysis.
   Future<void> recordSuccessfulAnalysis() async {
     try {
-      final used = await _usageRepository.incrementScansUsedToday();
+      final used = await _usageRepository.incrementScansUsedThisMonth();
       state = state.copyWith(
         usage: UsageTracker.fromLimit(
           limit: state.entitlements.usageLimit,
-          scansUsedToday: used,
+          scansUsedThisMonth: used,
         ),
         clearErrorMessage: true,
       );
@@ -436,7 +496,11 @@ class SubscriptionController extends Notifier<SubscriptionState> {
   Future<void> _applyPurchaseResult(PurchaseResult result) async {
     if (result.grantsEntitlement) {
       final plan = result.plan!;
-      await _entitlementRepository.savePlan(plan);
+      await _entitlementRepository.savePlan(
+        plan,
+        source: result.source,
+        purchaseToken: result.purchaseToken,
+      );
       final entitlements = UserEntitlements.forPlan(
         plan: plan,
         freeLimit: _usageConfig.usageLimit,
@@ -446,7 +510,7 @@ class SubscriptionController extends Notifier<SubscriptionState> {
         entitlements: entitlements,
         usage: UsageTracker.fromLimit(
           limit: entitlements.usageLimit,
-          scansUsedToday: state.usage.scansUsedToday,
+          scansUsedThisMonth: state.usage.scansUsedThisMonth,
         ),
         isLoading: false,
         purchaseMessage: result.message,
@@ -467,10 +531,23 @@ class SubscriptionController extends Notifier<SubscriptionState> {
     );
   }
 
+  static const _monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
   String _formatResetDate(DateTime resetAt) {
-    final hour = resetAt.hour.toString().padLeft(2, '0');
-    final minute = resetAt.minute.toString().padLeft(2, '0');
-    return 'at $hour:$minute tomorrow';
+    return 'on ${_monthNames[resetAt.month - 1]} 1';
   }
 
   void _trackTelemetry(

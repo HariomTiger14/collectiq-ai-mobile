@@ -4,6 +4,7 @@ import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/foundation.dart';
 
 class CloudPortfolioSyncCoordinator {
   const CloudPortfolioSyncCoordinator({
@@ -34,6 +35,7 @@ class CloudPortfolioSyncCoordinator {
     final localItems = await portfolioRepository.getItems();
     final localById = {for (final item in localItems) item.id: item};
     final cloudItems = await registry.cloudPortfolioSyncService.fetchItems();
+    final cloudIds = {for (final item in cloudItems) item.id};
     var mergedCount = 0;
     for (final cloudItem in cloudItems) {
       final localItem = localById[cloudItem.id];
@@ -49,6 +51,21 @@ class CloudPortfolioSyncCoordinator {
         ),
       );
       mergedCount += 1;
+    }
+    // A previously-synced local item that no longer appears in the cloud
+    // response has been removed server-side (soft-deleted, an admin
+    // action, a direct data fix, or a delete synced from another device) --
+    // without this, a device that already cached the item would keep
+    // showing it forever, since the loop above only ever adds/updates,
+    // never removes. Only ever touches items already confirmed `synced` --
+    // a `pendingUpload`/`failed`/`localOnly` item is a real local change
+    // that hasn't reached the cloud yet and must never be discarded just
+    // because it isn't in this response.
+    for (final localItem in localItems) {
+      if (localItem.syncStatus == CloudItemSyncStatus.synced &&
+          !cloudIds.contains(localItem.id)) {
+        await portfolioRepository.removeItem(localItem.id);
+      }
     }
     return mergedCount;
   }
@@ -80,10 +97,35 @@ class CloudPortfolioSyncCoordinator {
   }
 
   Future<void> deleteCloudItem(String itemId) async {
-    if (!await _canSync()) {
+    final stopwatch = Stopwatch()..start();
+    final canSync = await _canSync();
+    debugPrint(
+      '[CloudSync] deleteCloudItem($itemId) canSync=$canSync '
+      '(_canSync took ${stopwatch.elapsedMilliseconds}ms)',
+    );
+    if (!canSync) {
       return;
     }
-    await registry.cloudPortfolioSyncService.deleteItem(itemId);
+    stopwatch.reset();
+    // A single flaky request (a slow token refresh, a dropped connection)
+    // shouldn't cost the whole delete -- the local item is already gone by
+    // the time this runs, so on failure the item would otherwise silently
+    // reappear on the next sync. One retry rides out a transient blip
+    // without masking a real, persistent failure.
+    try {
+      await registry.cloudPortfolioSyncService.deleteItem(itemId);
+    } on Object catch (error) {
+      debugPrint(
+        '[CloudSync] deleteCloudItem($itemId) first attempt failed, '
+        'retrying once: $error',
+      );
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await registry.cloudPortfolioSyncService.deleteItem(itemId);
+    }
+    debugPrint(
+      '[CloudSync] deleteCloudItem($itemId) remote call took '
+      '${stopwatch.elapsedMilliseconds}ms',
+    );
   }
 
   Future<void> syncValuationSnapshot(CollectibleItem item) async {

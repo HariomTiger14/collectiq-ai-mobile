@@ -29,6 +29,10 @@ import 'package:collectiq_ai/features/search/domain/entities/catalog_search_resu
 import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/foundation.dart';
@@ -44,6 +48,20 @@ const _qaScroll = String.fromEnvironment('PACKLOX_QA_SCROLL');
 
 const packloxQaCaptureActive =
     kDebugMode && _qaCaptureRequested && _qaAppEnvironment == 'sit';
+
+const _qaProPlanLimits = PlanLimits(
+  plan: SubscriptionPlan.pro,
+  scanLimit: UsageLimit(monthlyFreeScanLimit: 250),
+  maxPortfolioItems: 1000,
+  maxPhotosPerItem: 6,
+  maxActivePriceAlerts: 25,
+  monthlyPriceRefreshes: 100,
+  canUseFullValueHistory: true,
+  canExportPortfolio: true,
+  canUseAdvancedFilters: true,
+  canBulkRefreshValues: false,
+  canUsePortfolioIntelligence: true,
+);
 
 class PackLoxQaCaptureApp extends StatelessWidget {
   const PackLoxQaCaptureApp({super.key});
@@ -74,6 +92,10 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
   static void _noop() {}
 
   double get _scrollOffset {
+    final parsed = double.tryParse(scroll.trim());
+    if (parsed != null) {
+      return parsed;
+    }
     return switch (scroll) {
       'mid' || 'mid_scroll' => 720,
       'bottom' || 'bottom_scroll' => 2400,
@@ -91,8 +113,6 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
         selectedIndex: AppShellTabController.homeTab,
         child: HomePage(
           onScanPressed: _noop,
-          onSampleScanPressed: _noop,
-          onImportPhotoPressed: _noop,
           onPortfolioPressed: _noop,
           previewScenario: HomePreviewScenario.defaultData,
           qaInitialScrollOffset: _scrollOffset,
@@ -130,40 +150,30 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
       ),
       'home_default' => HomePage(
         onScanPressed: _noop,
-        onSampleScanPressed: _noop,
-        onImportPhotoPressed: _noop,
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.defaultData,
         qaInitialScrollOffset: _scrollOffset,
       ),
       'home_empty' => HomePage(
         onScanPressed: _noop,
-        onSampleScanPressed: _noop,
-        onImportPhotoPressed: _noop,
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.empty,
         qaInitialScrollOffset: _scrollOffset,
       ),
       'home_loading' => HomePage(
         onScanPressed: _noop,
-        onSampleScanPressed: _noop,
-        onImportPhotoPressed: _noop,
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.loading,
         qaInitialScrollOffset: _scrollOffset,
       ),
       'home_error' => HomePage(
         onScanPressed: _noop,
-        onSampleScanPressed: _noop,
-        onImportPhotoPressed: _noop,
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.error,
         qaInitialScrollOffset: _scrollOffset,
       ),
       'home_partial' => HomePage(
         onScanPressed: _noop,
-        onSampleScanPressed: _noop,
-        onImportPhotoPressed: _noop,
         onPortfolioPressed: _noop,
         previewScenario: HomePreviewScenario.partial,
         qaInitialScrollOffset: _scrollOffset,
@@ -209,6 +219,16 @@ class PackLoxQaCaptureScreen extends StatelessWidget {
         onScanPressed: _noop,
         previewScenario: PortfolioPreviewScenario.defaultData,
         qaInitialScrollOffset: _scrollOffset,
+      ),
+      'portfolio_default_pro' => ProviderScope(
+        overrides: [
+          activePlanLimitsProvider.overrideWithValue(_qaProPlanLimits),
+        ],
+        child: PortfolioScreen(
+          onScanPressed: _noop,
+          previewScenario: PortfolioPreviewScenario.defaultData,
+          qaInitialScrollOffset: _scrollOffset,
+        ),
       ),
       'portfolio_empty' => PortfolioScreen(
         onScanPressed: _noop,
@@ -521,6 +541,11 @@ class _QaCatalogSearchRepository implements CatalogSearchRepository {
   Future<List<CatalogSearchResult>> searchCatalog({
     required String query,
     int limit = 20,
+    String? categoryGroup,
+    String? subcategory,
+    double? minPrice,
+    double? maxPrice,
+    String? source,
   }) async {
     return [_qaCatalogResult];
   }
@@ -528,7 +553,8 @@ class _QaCatalogSearchRepository implements CatalogSearchRepository {
   @override
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
-    int historyLimit = 30,
+    int historyLimit = 90,
+    String? currency,
   }) async {
     return _qaCatalogResult;
   }
@@ -853,7 +879,7 @@ class _QaScannerWorkspace extends StatelessWidget {
               onSelectRole: (_) {},
               onPreview: (_) {},
               onUseAsPrimary: (_) {},
-              onEnhance: (_, _) async {},
+              onEnhance: (slot, _) async => slot,
               onDelete: (_) {},
               onSample: () {},
               onReset: () {},
@@ -971,7 +997,7 @@ class _QaScannerAnalysisFailure extends StatelessWidget {
                     onSelectRole: (_) {},
                     onPreview: (_) {},
                     onUseAsPrimary: (_) {},
-                    onEnhance: (_, _) async {},
+                    onEnhance: (slot, _) async => slot,
                     onDelete: (_) {},
                     onSample: () {},
                     onReset: () {},

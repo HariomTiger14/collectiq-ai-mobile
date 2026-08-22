@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
@@ -62,12 +64,14 @@ void main() {
 
     await _pumpPortfolio(tester);
 
-    expect(find.text('Your collection at a glance'), findsOneWidget);
+    // The overview hero is suppressed in the normal populated view; the metrics
+    // now lead directly under the title.
+    expect(find.text('Your collection at a glance'), findsNothing);
     expect(find.text('Collection value'), findsOneWidget);
     expect(find.text('\$18'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
-    expect(find.text('1 pending'), findsOneWidget);
+    expect(find.text('1 need value'), findsWidgets);
     expect(find.byKey(const ValueKey('portfolio-action-sort')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('portfolio-action-filter')),
@@ -76,9 +80,116 @@ void main() {
 
     await _revealPortfolio(
       tester,
+      find.byKey(const ValueKey('portfolio-intelligence-panel')),
+    );
+    expect(find.text('Portfolio intelligence'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-health-score')),
+      findsOneWidget,
+    );
+    expect(find.text('Pricing coverage'), findsOneWidget);
+    expect(find.text('2/3'), findsOneWidget);
+    expect(find.text('Avg confidence'), findsOneWidget);
+    expect(find.text('91%'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-locked-preview')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-attention-queue')),
+      findsNothing,
+    );
+
+    await _revealPortfolio(
+      tester,
       find.byKey(const ValueKey('portfolio-grid-item-card-1')),
     );
     expect(find.text('Hot Wheels 15 Mazda MX-5 Miata'), findsOneWidget);
+  });
+
+  testWidgets('paid plan unlocks full portfolio intelligence', (tester) async {
+    _seedPortfolio([
+      _item('paid-card', 'Pokemon Charizard', 1850),
+      _item(
+        'paid-pending',
+        'Hot Wheels Mystery',
+        0,
+        category: 'Toy Car',
+        valuationStatus: 'provider_not_configured',
+        confidence: 0.62,
+      ),
+    ]);
+
+    await _pumpPortfolio(tester, paidFeatures: true);
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-intelligence-panel')),
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-locked-preview')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-attention-queue')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-intelligence-top-value')),
+      findsOneWidget,
+    );
+    expect(find.text('Attention queue'), findsOneWidget);
+    expect(find.text('Top value items'), findsOneWidget);
+    expect(find.text('Needs trusted value'), findsOneWidget);
+    expect(find.text('Upgrade plan'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('portfolio-intelligence-action-trustedValue')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Needs trusted value view applied.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-paid-pending')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('portfolio-grid-item-paid-card')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('paid intelligence add-more recommendation opens scan flow', (
+    tester,
+  ) async {
+    var scanTapped = false;
+    _seedPortfolio([
+      _item('paid-card', 'Pokemon Charizard', 1850),
+      _item('paid-eagle', 'Silver Eagle 2015', 52, category: 'Coin'),
+    ]);
+
+    await _pumpPortfolio(
+      tester,
+      paidFeatures: true,
+      onScanPressed: () {
+        scanTapped = true;
+      },
+    );
+
+    await _revealPortfolio(
+      tester,
+      find.byKey(
+        const ValueKey('portfolio-recommendation-action-addMoreCollectibles'),
+      ),
+    );
+    await tester.tap(
+      find.byKey(
+        const ValueKey('portfolio-recommendation-action-addMoreCollectibles'),
+      ),
+    );
+    await tester.pump();
+
+    expect(scanTapped, isTrue);
   });
 
   testWidgets('free plan keeps advanced filters visibly locked', (
@@ -93,11 +204,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The real sort/filter sheet stays closed; the upgrade sheet is shown.
     expect(_portfolioSheet, findsNothing);
     expect(
-      find.text('Advanced filters are included with Pro and Premium.'),
+      find.byKey(const ValueKey('upgrade-sheet-activate')),
       findsOneWidget,
     );
+    expect(find.text('Filter your whole collection'), findsOneWidget);
   });
 
   testWidgets('unavailable valuation is distinct from genuine zero', (
@@ -132,7 +245,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-unavailable-card')),
-        matching: find.text('Pending'),
+        matching: find.text('No match'),
       ),
       findsWidgets,
     );
@@ -177,20 +290,73 @@ void main() {
     expect(find.byKey(const ValueKey('portfolio-retry')), findsOneWidget);
   });
 
-  testWidgets('partial state uses amber pending and green confirmed status', (
+  testWidgets(
+    'partial state uses amber needs value and green confirmed status',
+    (tester) async {
+      await _pumpPortfolio(
+        tester,
+        previewScenario: PortfolioPreviewScenario.partial,
+      );
+
+      await _revealPortfolio(tester, find.text('Needs value'));
+      final pendingText = tester.widget<Text>(
+        find
+            .descendant(
+              of: find.byKey(
+                const ValueKey('portfolio-grid-item-partial-comic'),
+              ),
+              matching: find.text('Needs value'),
+            )
+            .first,
+      );
+      expect(pendingText.style?.color, HomeTokens.warning);
+
+      final valuedText = tester.widget<Text>(find.text('Valued').first);
+      expect(valuedText.style?.color, HomeTokens.positive);
+    },
+  );
+
+  testWidgets('cloud upload state does not hide a displayable valuation', (
     tester,
   ) async {
-    await _pumpPortfolio(
+    _seedPortfolio([
+      _item(
+        'uploading-card',
+        'Uploading Charizard',
+        350,
+        syncStatus: 'pendingUpload',
+      ),
+      _item(
+        'needs-value-card',
+        'Needs Value Card',
+        0,
+        valuationStatus: 'no_market_match',
+      ),
+    ]);
+
+    await _pumpPortfolio(tester);
+
+    await _revealPortfolio(
       tester,
-      previewScenario: PortfolioPreviewScenario.partial,
+      find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+        matching: find.text('Valued'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
+        matching: find.text('\$350'),
+      ),
+      findsOneWidget,
     );
 
-    await _revealPortfolio(tester, find.text('Needs value'));
-    final pendingText = tester.widget<Text>(find.text('Needs value').first);
-    expect(pendingText.style?.color, HomeTokens.warning);
-
-    final valuedText = tester.widget<Text>(find.text('Valued').first);
-    expect(valuedText.style?.color, HomeTokens.positive);
+    await _revealPortfolio(tester, find.text('1 need value'));
+    expect(find.text('1 need value'), findsWidgets);
   });
 
   testWidgets('filtered empty keeps portfolio context and clears filters', (
@@ -204,14 +370,14 @@ void main() {
     await _revealPortfolio(tester, find.text('No matches found'));
     expect(find.text('No matches found'), findsWidgets);
     expect(find.text('Your portfolio is waiting'), findsNothing);
-    expect(find.text('Clear search'), findsWidgets);
+    // Quiet empty state: no "clear search" action — the user clears the field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-search')), findsNothing);
 
-    final previewClearSearch = find.byKey(
-      const ValueKey('portfolio-clear-search'),
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      '',
     );
-    await tester.ensureVisible(previewClearSearch);
-    await tester.pumpAndSettle();
-    await tester.tap(previewClearSearch);
     await tester.pumpAndSettle();
 
     await _revealPortfolio(
@@ -220,6 +386,49 @@ void main() {
     );
     expect(find.text('Base Set Charizard'), findsOneWidget);
   });
+
+  testWidgets(
+    'search field keeps focus across keystrokes (no per-char rebuild)',
+    (tester) async {
+      _seedPortfolio([
+        _item('search-card', 'Pokemon Charizard', 1850),
+        _item('search-coin', 'Silver Eagle', 52, category: 'Coin'),
+      ]);
+
+      await _pumpPortfolio(tester);
+
+      final fieldFinder = find.byKey(const ValueKey('portfolio-search-field'));
+
+      // Capture the field's State after the first character is in, then assert
+      // it survives subsequent keystrokes. The old query-embedded key rebuilt
+      // the field on every character (dropping focus); sibling sections changing
+      // as results filter (metrics/hero) also used to reshuffle + rebuild it.
+      await tester.enterText(fieldFinder, 'c');
+      await tester.pump();
+      final searchState = tester.state(fieldFinder);
+
+      // Another matching keystroke — field must not be rebuilt.
+      await tester.enterText(fieldFinder, 'ch');
+      await tester.pump();
+      expect(tester.state(fieldFinder), same(searchState));
+
+      // Type into no-match territory: the metrics/export sections collapse and
+      // the quiet empty state appears below. The anchored field must survive.
+      await tester.enterText(fieldFinder, 'chzzz');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-filtered-empty-state-surface')),
+        findsOneWidget,
+      );
+      expect(tester.state(fieldFinder), same(searchState));
+
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: fieldFinder, matching: find.byType(EditableText)),
+      );
+      expect(editable.focusNode.hasFocus, isTrue);
+    },
+  );
 
   testWidgets('entering a search query shows matching results', (tester) async {
     _seedPortfolio([
@@ -230,7 +439,7 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
@@ -246,6 +455,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-search-coin')),
       findsNothing,
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-search-clear'),
     );
     expect(
       find.byKey(const ValueKey('portfolio-search-clear')),
@@ -264,7 +477,7 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
@@ -300,23 +513,24 @@ void main() {
     await _pumpPortfolio(tester);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'zzzzz',
     );
     await tester.pumpAndSettle();
 
     await _revealPortfolio(tester, find.text('No matches found'));
     expect(find.text('No matches found'), findsWidgets);
-    expect(find.text('Clear search'), findsWidgets);
-    expect(
-      find.byKey(const ValueKey('portfolio-clear-search')),
-      findsOneWidget,
-    );
+    // Quiet empty state: search-only has no button; the user just edits/clears
+    // the field. Metrics + export collapse so the message sits under the field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-search')), findsNothing);
+    expect(find.byKey(const ValueKey('portfolio-clear-filters')), findsNothing);
+    expect(find.text('Collection value'), findsNothing);
 
-    final clearSearch = find.byKey(const ValueKey('portfolio-clear-search'));
-    await tester.ensureVisible(clearSearch);
-    await tester.pumpAndSettle();
-    await tester.tap(clearSearch);
+    await tester.enterText(
+      find.byKey(const ValueKey('portfolio-search-field')),
+      '',
+    );
     await tester.pumpAndSettle();
     await _revealPortfolio(
       tester,
@@ -330,7 +544,11 @@ void main() {
 
   testWidgets('opens combined filter and sort bottom sheet', (tester) async {
     _seedPortfolio([_item('sort-card', 'Pokemon Charizard', 1850)]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await _tapPortfolioToolbarButton(
       tester,
@@ -356,7 +574,11 @@ void main() {
       _item('low-card', 'Low Value Card', 12),
       _item('high-card', 'High Value Card', 240),
     ]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await _revealPortfolio(
       tester,
@@ -375,12 +597,21 @@ void main() {
       const ValueKey('portfolio-action-filter'),
     );
 
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(12, 12));
     await tester.pumpAndSettle();
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-card')),
+    );
     expect(
       _itemTop(tester, 'low-card'),
       lessThan(_itemTop(tester, 'high-card')),
@@ -390,16 +621,29 @@ void main() {
       tester,
       const ValueKey('portfolio-action-sort'),
     );
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
     await tester.pumpAndSettle();
 
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-high-card')),
+    );
+    await _revealPortfolio(
+      tester,
+      find.byKey(const ValueKey('portfolio-grid-item-low-card')),
+    );
     expect(
       _itemTop(tester, 'high-card'),
       lessThan(_itemTop(tester, 'low-card')),
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-sort'),
     );
     expect(find.text('High value'), findsOneWidget);
   });
@@ -417,7 +661,11 @@ void main() {
         valuationStatus: 'provider_not_configured',
       ),
     ]);
-    await _pumpPortfolio(tester, paidFeatures: true);
+    await _pumpPortfolio(
+      tester,
+      size: const Size(430, 1200),
+      paidFeatures: true,
+    );
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
@@ -435,6 +683,10 @@ void main() {
     expect(
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
       findsNothing,
+    );
+    await _revealToolbarControl(
+      tester,
+      const ValueKey('portfolio-action-filter'),
     );
     expect(find.text('Filter (1)'), findsOneWidget);
   });
@@ -493,14 +745,15 @@ void main() {
     await _pumpPortfolio(tester, paidFeatures: true);
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-category-filter-coins'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
@@ -512,8 +765,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('No matches found'), findsWidgets);
-    expect(find.text('Clear search'), findsWidgets);
-    expect(find.text('Reset filters'), findsOneWidget);
+    // Search + filters: no clear-search action, but filters keep a lightweight
+    // text button since they can't be dismissed by editing the search field.
+    expect(find.text('Clear search'), findsNothing);
+    expect(find.text('Clear filters'), findsOneWidget);
   });
 
   testWidgets('search clear preserves applied filter and sort state', (
@@ -528,26 +783,28 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('portfolio-action-filter')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-category-filter-coins')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-sort-option-valueHigh'),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('portfolio-sort-option-valueHigh')),
+    await _tapSheetControl(
+      tester,
+      const ValueKey('portfolio-category-filter-coins'),
     );
     await tester.pumpAndSettle();
     await _tapSheetControl(tester, const ValueKey('portfolio-filter-apply'));
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       'charizard',
     );
     await tester.pumpAndSettle();
     await _revealPortfolio(tester, find.text('No matches found'));
 
     await tester.enterText(
-      find.byKey(const ValueKey('portfolio-search-field-charizard')),
+      find.byKey(const ValueKey('portfolio-search-field')),
       '',
     );
     await tester.pumpAndSettle();
@@ -564,16 +821,16 @@ void main() {
       find.byKey(const ValueKey('portfolio-grid-item-valued-card')),
       findsNothing,
     );
+    expect(
+      _itemTop(tester, 'high-coin'),
+      lessThan(_itemTop(tester, 'low-coin')),
+    );
     await _revealToolbarControl(
       tester,
       const ValueKey('portfolio-action-filter'),
     );
     expect(find.text('Filter (1)'), findsOneWidget);
     expect(find.text('High value'), findsOneWidget);
-    expect(
-      _itemTop(tester, 'high-coin'),
-      lessThan(_itemTop(tester, 'low-coin')),
-    );
   });
 
   testWidgets('item rows open existing Detail route', (tester) async {
@@ -627,7 +884,7 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey('portfolio-search-field-')),
+        find.byKey(const ValueKey('portfolio-search-field')),
         findsOneWidget,
       );
       expect(
@@ -676,6 +933,15 @@ void main() {
   });
 }
 
+class _FakeFxRatesRepository implements FxRatesRepository {
+  const _FakeFxRatesRepository();
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot.empty;
+  }
+}
+
 Future<void> _pumpPortfolio(
   WidgetTester tester, {
   Size size = const Size(430, 844),
@@ -694,9 +960,12 @@ Future<void> _pumpPortfolio(
           activePlanLimitsProvider.overrideWithValue(
             PlanLimits.forPlan(
               plan: SubscriptionPlan.pro,
-              freeScanLimit: const UsageLimit(dailyFreeScanLimit: 25),
+              freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 25),
             ),
           ),
+        fxRatesRepositoryProvider.overrideWithValue(
+          const _FakeFxRatesRepository(),
+        ),
       ],
       child: MaterialApp(
         theme: AppTheme.dark,
@@ -727,6 +996,15 @@ Future<void> _revealPortfolio(WidgetTester tester, Finder finder) async {
       return;
     }
     await tester.drag(scroll.first, const Offset(0, -260));
+    await tester.pump();
+  }
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder.first);
+      await tester.pump();
+      return;
+    }
+    await tester.drag(scroll.first, const Offset(0, 260));
     await tester.pump();
   }
   expect(finder, findsOneWidget);
@@ -812,18 +1090,21 @@ Map<String, Object?> _item(
   String category = 'Trading Card',
   String imagePath = 'sample://card',
   String valuationStatus = 'market_estimated',
+  String syncStatus = 'synced',
+  double confidence = 0.91,
 }) {
   return {
     'id': id,
     'title': title,
     'category': category,
     'estimatedValue': value,
-    'confidence': 0.91,
+    'confidence': confidence,
     'condition': 'Near Mint',
     'recommendation': 'Keep protected.',
     'imagePath': imagePath,
     'galleryImages': <Object>[],
     'createdAt': '2026-07-01T00:00:00.000Z',
+    'syncStatus': syncStatus,
     'valuationStatus': valuationStatus,
     'valuationSource': valuationStatus,
     'marketSummary': {

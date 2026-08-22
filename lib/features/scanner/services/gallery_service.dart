@@ -16,7 +16,9 @@ class GalleryService {
 
   static const _allowedExtensions = {'jpg', 'jpeg', 'png'};
   static const _maxImageBytes = 10 * 1024 * 1024;
-  static const _maxPickerDimension = 1280.0;
+  // 1024px longest edge keeps text legible for recognition while cutting the
+  // upload/Gemini payload ~35% vs 1280 — less latency, CPU, and token cost.
+  static const _maxPickerDimension = 1024.0;
   static const _pickerImageQuality = 82;
 
   final ImagePicker _imagePicker;

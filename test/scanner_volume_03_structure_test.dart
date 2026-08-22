@@ -41,17 +41,20 @@ void main() {
           "title: 'Choose from gallery'",
           "title: 'Try a sample scan'",
         ]);
-        expect(source, contains('PackLoxHeader('));
-        expect(source, contains('PackLoxHero('));
-        expect(source, contains('PackLoxEntryTile('));
-        expect(source, contains("variant: PackLoxHeroVariant.scanner"));
-        expect(source, contains("variant: PackLoxEntryTileVariant.scanner"));
-        expect(source, contains("title: 'Ready when your item is.'"));
-        expect(source, contains("< 12 => 'Good morning'"));
-        expect(source, contains("< 18 => 'Good afternoon'"));
-        expect(source, contains("_ => 'Good evening'"));
-        expect(source, contains("? 'Collector'"));
-        expect(source, contains('Choose an option'));
+        // Camera is the accent-filled primary; both actions are buttons, not
+        // navigation rows, so they carry no disclosure chevron.
+        expect(source, contains('emphasis: true'));
+        expect(source, contains('showChevron: false'));
+        // Animated viewfinder anchors the hub; single trust line replaces the
+        // old repeated marketing copy.
+        expect(source, contains("ValueKey('scan-hub-reticle')"));
+        expect(source, contains("ValueKey('scan-hub-trust-note')"));
+        // The PackLox brand lockup now leads the hub for cross-tab header
+        // consistency (Home/Portfolio/Search/Settings all show it).
+        expect(source, contains('HomeBrandLockup'));
+        // Retired surfaces stay retired.
+        expect(source, isNot(contains('_ScannerHeroCard')));
+        expect(source, isNot(contains('Choose an option')));
         expect(source, isNot(contains('class ScanHubHero')));
         expect(source, isNot(contains('class ScanHubEntryTile')));
         expect(source, isNot(contains('scan-hub-real-collectible-montage')));

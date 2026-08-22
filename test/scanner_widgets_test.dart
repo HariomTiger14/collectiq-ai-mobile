@@ -417,7 +417,7 @@ void main() {
               onSelectRole: (_) {},
               onPreview: (_) {},
               onUseAsPrimary: (_) {},
-              onEnhance: (_, _) async {},
+              onEnhance: (slot, _) async => slot,
               onDelete: (_) {},
               onSample: () {},
               onReset: () {},
@@ -668,7 +668,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
-                onEnhance: (_, _) async {},
+                onEnhance: (slot, _) async => slot,
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -730,7 +730,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
-                onEnhance: (_, _) async {},
+                onEnhance: (slot, _) async => slot,
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -760,7 +760,7 @@ void main() {
   );
 
   testWidgets(
-    'CaptureWorkspace keeps role checklist collapsed and sample accessible',
+    'CaptureWorkspace shows the full role checklist inline and sample accessible',
     (WidgetTester tester) async {
       const service = ScanCapturePlanService();
       final emptyPlan = service.buildPlan(
@@ -788,7 +788,7 @@ void main() {
                 onSelectRole: (_) {},
                 onPreview: (_) {},
                 onUseAsPrimary: (_) {},
-                onEnhance: (_, _) async {},
+                onEnhance: (slot, _) async => slot,
                 onDelete: (_) {},
                 onSample: () {},
                 onReset: () {},
@@ -799,23 +799,19 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey('capture-guide-expansion')),
+        find.byKey(const ValueKey('workspace-role-checklist')),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('photo-checklist')), findsNothing);
       expect(
-        find.byKey(const ValueKey('capture-role-card-front')),
-        findsNothing,
+        find.byKey(const ValueKey('workspace-role-card-front')),
+        findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('scan-secondary-Use Sample Scan')),
         findsOneWidget,
       );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('capture-guide-expansion')),
-      );
-      await tester.tap(find.byKey(const ValueKey('capture-guide-expansion')));
-      await tester.pumpAndSettle();
+      // The goal hint is no longer gated behind a collapsed "Capture guide"
+      // section (consolidated with the always-visible checklist above).
       expect(find.textContaining('listing-ready evidence'), findsOneWidget);
     },
   );
@@ -1109,7 +1105,7 @@ class _PhotoReviewTestHost extends StatelessWidget {
         onSelectRole: (_) {},
         onPreview: onSelect,
         onUseAsPrimary: onUseAsPrimary,
-        onEnhance: (_, _) async {},
+        onEnhance: (slot, _) async => slot,
         onDelete: (path) {
           final slot = photos.firstWhere((photo) => photo.path == path);
           onDelete(slot);

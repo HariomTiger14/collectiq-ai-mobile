@@ -8,13 +8,13 @@ import 'package:collectiq_ai/features/scanner/domain/entities/scan_capture_role.
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_goal.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/scan_capture_plan_service.dart';
 import 'package:collectiq_ai/features/scanner/domain/services/smart_scan_guidance_service.dart';
-import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/presentation/scanner_visual_theme.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 enum CaptureRoleCardStatus { missing, captured, warning }
+
+enum _AddPhotoSource { camera, gallery }
 
 class CaptureWorkspace extends StatelessWidget {
   const CaptureWorkspace({
@@ -44,6 +44,9 @@ class CaptureWorkspace extends StatelessWidget {
     this.categoryLabel,
     this.hasManualCategory = false,
     this.detectedCategory,
+    this.onSelectCategory,
+    this.onRetakeSlot,
+    this.primaryImagePath,
   });
 
   final ScanGoal goal;
@@ -62,7 +65,7 @@ class CaptureWorkspace extends StatelessWidget {
   final void Function(String role) onSelectRole;
   final void Function(ScannerPhotoSlot slot) onPreview;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
-  final Future<void> Function(
+  final Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
@@ -75,6 +78,18 @@ class CaptureWorkspace extends StatelessWidget {
   final String? categoryLabel;
   final bool hasManualCategory;
   final String? detectedCategory;
+  final void Function(CollectibleCategory category)? onSelectCategory;
+  /// Replaces this exact captured photo with a freshly captured one
+  /// (instead of adding another photo to the same role), returning the
+  /// replacement so the open review carousel can show it immediately.
+  /// Falls back to [onCamera] (append, no immediate refresh) when not
+  /// provided.
+  final Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot)?
+  onRetakeSlot;
+  /// Path of the photo currently marked as the saved item's cover image —
+  /// lets the review carousel show which photo "Use as Primary" already
+  /// applies to.
+  final String? primaryImagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +108,7 @@ class CaptureWorkspace extends StatelessWidget {
       images: _capturedImagesForGuidance(captureImages),
       goal: goal,
       selectedCategoryLabel: categoryLabel,
+      planOptionalRoles: plan.optionalRoles,
     );
     final recommendedRole = smartGuidance.recommendedNextRole ?? nextRole;
     final analyzeReady = smartGuidance.canAnalyze;
@@ -158,6 +174,12 @@ class CaptureWorkspace extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
+          _CaptureCategorySelector(
+            category: category,
+            hasManualCategory: hasManualCategory,
+            onSelect: onSelectCategory,
+          ),
+          const SizedBox(height: AppSpacing.sm),
           _WorkspaceReadinessCard(
             imageCount: captureImages.length,
             guidance: smartGuidance,
@@ -174,10 +196,16 @@ class CaptureWorkspace extends StatelessWidget {
                 initialSlot: activeSlot,
                 photos: captureImages,
                 onSelect: onPreview,
-                onRetake: (slot) => onCamera(slot.role),
+                onRetake:
+                    onRetakeSlot ??
+                    (slot) async {
+                      await onCamera(slot.role);
+                      return null;
+                    },
                 onDelete: (slot) => onDelete(slot.path),
                 onUseAsPrimary: onUseAsPrimary,
                 onEnhance: onEnhance,
+                initialPrimaryPath: primaryImagePath,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -200,10 +228,16 @@ class CaptureWorkspace extends StatelessWidget {
                   initialSlot: slot,
                   photos: captureImages,
                   onSelect: onPreview,
-                  onRetake: (slot) => onCamera(slot.role),
+                  onRetake:
+                    onRetakeSlot ??
+                    (slot) async {
+                      await onCamera(slot.role);
+                      return null;
+                    },
                   onDelete: (slot) => onDelete(slot.path),
                   onUseAsPrimary: onUseAsPrimary,
                   onEnhance: onEnhance,
+                  initialPrimaryPath: primaryImagePath,
                 );
               } else {
                 onSelectRole(role);
@@ -257,28 +291,7 @@ class CaptureWorkspace extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: const ValueKey('scan-secondary-Gallery'),
-                  onPressed: isBusy ? null : () => onGallery(activeRole.id),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Gallery'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              if (analyzeReady && nextRole != null)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('scan-secondary-Add more photos'),
-                    onPressed: isBusy ? null : onPrimaryCapture,
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    label: const Text(
-                      'Add photo to selected group',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-              else if (slots.isNotEmpty || hasResult)
+              if (slots.isNotEmpty || hasResult)
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const ValueKey('scan-secondary-New Scan'),
@@ -311,45 +324,7 @@ class CaptureWorkspace extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xs),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: Material(
-              color: Colors.transparent,
-              child: ExpansionTile(
-                key: const ValueKey('capture-guide-expansion'),
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                initiallyExpanded: false,
-                title: Text(
-                  'Capture guide',
-                  style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                children: [
-                  _RoleChecklist(
-                    roles: roles,
-                    requiredRoles: plan.requiredRoles,
-                    slots: slots,
-                    roleCounts: roleCounts,
-                    isBusy: isBusy,
-                    onCapture: onCamera,
-                    onGallery: onGallery,
-                    onSelectRole: onSelectRole,
-                    onPreview: onPreview,
-                    onDelete: (role) {
-                      final slot = _latestSlotForRole(captureImages, role);
-                      if (slot != null) {
-                        onDelete(slot.path);
-                      }
-                    },
-                  ),
-                  _GoalHint(goal: goal),
-                ],
-              ),
-            ),
-          ),
+          _GoalHint(goal: goal),
         ],
       ),
     );
@@ -684,14 +659,15 @@ Future<void> _openPhotoReview(
   required ScannerPhotoSlot initialSlot,
   required List<ScannerPhotoSlot> photos,
   required void Function(ScannerPhotoSlot slot) onSelect,
-  required void Function(ScannerPhotoSlot slot) onRetake,
+  required Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot) onRetake,
   required void Function(ScannerPhotoSlot slot) onDelete,
   required void Function(ScannerPhotoSlot slot) onUseAsPrimary,
-  required Future<void> Function(
+  required Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
   onEnhance,
+  String? initialPrimaryPath,
 }) {
   if (photos.isEmpty) {
     return Future<void>.value();
@@ -711,6 +687,7 @@ Future<void> _openPhotoReview(
       onDelete: onDelete,
       onUseAsPrimary: onUseAsPrimary,
       onEnhance: onEnhance,
+      initialPrimaryPath: initialPrimaryPath,
     ),
   );
 }
@@ -724,19 +701,21 @@ class _PhotoReviewCarousel extends StatefulWidget {
     required this.onDelete,
     required this.onUseAsPrimary,
     required this.onEnhance,
+    this.initialPrimaryPath,
   });
 
   final int initialIndex;
   final List<ScannerPhotoSlot> photos;
   final void Function(ScannerPhotoSlot slot) onSelect;
-  final void Function(ScannerPhotoSlot slot) onRetake;
+  final Future<ScannerPhotoSlot?> Function(ScannerPhotoSlot slot) onRetake;
   final void Function(ScannerPhotoSlot slot) onDelete;
   final void Function(ScannerPhotoSlot slot) onUseAsPrimary;
-  final Future<void> Function(
+  final Future<ScannerPhotoSlot> Function(
     ScannerPhotoSlot slot,
     ImageEnhancementPreset preset,
   )
   onEnhance;
+  final String? initialPrimaryPath;
 
   @override
   State<_PhotoReviewCarousel> createState() => _PhotoReviewCarouselState();
@@ -746,6 +725,9 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
   late final PageController _pageController;
   late List<ScannerPhotoSlot> _photos;
   late int _index;
+  late String? _primaryPath;
+  bool _isEnhancing = false;
+  bool _isRetaking = false;
 
   @override
   void initState() {
@@ -753,6 +735,7 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
     _photos = widget.photos.toList(growable: true);
     _index = widget.initialIndex.clamp(0, _photos.length - 1).toInt();
     _pageController = PageController(initialPage: _index);
+    _primaryPath = widget.initialPrimaryPath;
   }
 
   @override
@@ -776,6 +759,64 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
     });
     widget.onSelect(_photos[_index]);
     _pageController.jumpToPage(_index);
+  }
+
+  Future<void> _toggleEnhance(ScannerPhotoSlot slot) async {
+    final nextPreset = slot.isEnhanced
+        ? ImageEnhancementPreset.original
+        : ImageEnhancementPreset.autoEnhance;
+    setState(() => _isEnhancing = true);
+    final enhancedSlot = await widget.onEnhance(slot, nextPreset);
+    if (!mounted) {
+      return;
+    }
+    await _precacheSlotImage(enhancedSlot);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _photos[_index] = enhancedSlot;
+      _isEnhancing = false;
+    });
+  }
+
+  /// Decodes [slot]'s image into the cache before it's swapped into view, so
+  /// the new (differently-pathed, uncached) file doesn't cause a visible
+  /// flash/flicker while it decodes on the following frame.
+  Future<void> _precacheSlotImage(ScannerPhotoSlot slot) async {
+    final path = slot.path;
+    if (path.startsWith('sample://') ||
+        path.startsWith('assets/') ||
+        path.startsWith('http://') ||
+        path.startsWith('https://')) {
+      return;
+    }
+    try {
+      await precacheImage(FileImage(File(path)), context);
+    } catch (_) {
+      // Best-effort; the image still renders (and shows its own error
+      // state) even if precaching fails.
+    }
+  }
+
+  Future<void> _retake(ScannerPhotoSlot slot) async {
+    setState(() => _isRetaking = true);
+    final replacement = await widget.onRetake(slot);
+    if (!mounted) {
+      return;
+    }
+    if (replacement == null) {
+      setState(() => _isRetaking = false);
+      return;
+    }
+    await _precacheSlotImage(replacement);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _photos[_index] = replacement;
+      _isRetaking = false;
+    });
   }
 
   @override
@@ -845,7 +886,12 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                         color: ScannerVisualTheme.surface.withValues(
                           alpha: 0.34,
                         ),
-                        child: _ReviewPhotoImage(path: _photos[index].path),
+                        child: InteractiveViewer(
+                          key: const ValueKey('photo-review-zoom'),
+                          minScale: 1,
+                          maxScale: 4,
+                          child: _ReviewPhotoImage(path: _photos[index].path),
+                        ),
                       ),
                     ),
                   );
@@ -866,33 +912,54 @@ class _PhotoReviewCarouselState extends State<_PhotoReviewCarousel> {
                 children: [
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-enhance'),
-                    onPressed: () async {
-                      final originalPath = active.originalPath ?? active.path;
-                      final result = await ImageEnhancementPreviewPage.show(
-                        context,
-                        image: XFile(originalPath),
-                        initialPreset: active.enhancementPreset,
-                        title: 'Edit enhancement',
-                        subtitle: 'Choose the clearest version for analysis.',
-                      );
-                      if (result != null) {
-                        await widget.onEnhance(active, result.preset);
-                      }
-                    },
-                    icon: const Icon(Icons.auto_fix_high_outlined),
-                    label: const Text('Enhance/Edit'),
+                    onPressed: _isEnhancing
+                        ? null
+                        : () => _toggleEnhance(active),
+                    icon: _isEnhancing
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            active.isEnhanced
+                                ? Icons.replay_outlined
+                                : Icons.auto_fix_high_outlined,
+                          ),
+                    label: Text(
+                      _isEnhancing
+                          ? 'Enhancing…'
+                          : active.isEnhanced
+                          ? 'Revert to original'
+                          : 'AI Enhance',
+                    ),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-retake'),
-                    onPressed: () => widget.onRetake(active),
-                    icon: const Icon(Icons.add_a_photo_outlined),
-                    label: const Text('Retake'),
+                    onPressed: _isRetaking ? null : () => _retake(active),
+                    icon: _isRetaking
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_a_photo_outlined),
+                    label: Text(_isRetaking ? 'Retaking…' : 'Retake'),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('photo-review-primary'),
-                    onPressed: () => widget.onUseAsPrimary(active),
-                    icon: const Icon(Icons.star_outline),
-                    label: const Text('Use as Primary'),
+                    onPressed: active.path == _primaryPath
+                        ? null
+                        : () {
+                            widget.onUseAsPrimary(active);
+                            setState(() => _primaryPath = active.path);
+                          },
+                    icon: Icon(
+                      active.path == _primaryPath
+                          ? Icons.star
+                          : Icons.star_outline,
+                    ),
+                    label: Text(
+                      active.path == _primaryPath ? 'Primary' : 'Use as Primary',
+                    ),
                   ),
                   FilledButton.tonalIcon(
                     key: const ValueKey('photo-review-delete'),
@@ -1137,6 +1204,133 @@ class _EmptyActivePreview extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CaptureCategorySelector extends StatelessWidget {
+  const _CaptureCategorySelector({
+    required this.category,
+    required this.hasManualCategory,
+    required this.onSelect,
+  });
+
+  final CollectibleCategory category;
+  final bool hasManualCategory;
+  final void Function(CollectibleCategory category)? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final canEdit = onSelect != null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('workspace-category-selector'),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: canEdit ? () => _openPicker(context) : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: ScannerVisualTheme.surfaceElevated,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: ScannerVisualTheme.border.withValues(alpha: 0.78),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.category_outlined,
+                size: 16,
+                color: ScannerVisualTheme.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                hasManualCategory
+                    ? category.title
+                    : '${category.title} (guessed)',
+                style: textTheme.labelMedium?.copyWith(
+                  color: ScannerVisualTheme.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (canEdit) ...[
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  Icons.expand_more,
+                  size: 16,
+                  color: ScannerVisualTheme.textSecondary,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ScannerVisualTheme.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.xs,
+                ),
+                child: Text(
+                  'What are you scanning?',
+                  style: Theme.of(sheetContext).textTheme.titleMedium
+                      ?.copyWith(
+                        color: ScannerVisualTheme.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+              for (final option in CollectibleCategory.values)
+                ListTile(
+                  key: ValueKey('workspace-category-option-${option.id}'),
+                  title: Text(
+                    option.title,
+                    style: TextStyle(
+                      color: ScannerVisualTheme.textPrimary,
+                      fontWeight: option == category
+                          ? FontWeight.w900
+                          : FontWeight.w500,
+                    ),
+                  ),
+                  trailing: option == category
+                      ? const Icon(
+                          Icons.check,
+                          color: ScannerVisualTheme.cyan,
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    onSelect?.call(option);
+                  },
+                ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1398,93 +1592,63 @@ class _WorkspaceRoleCard extends StatelessWidget {
                 onPressed: isBusy ? null : (captured ? onPreview : onCapture),
                 child: Text(captured ? 'View' : 'Add'),
               ),
-              IconButton(
-                tooltip: 'Choose ${_shortRoleLabel(role)} from gallery',
-                onPressed: isBusy ? null : onGallery,
-                style: _scannerWorkspaceIconButtonStyle(),
-                constraints: const BoxConstraints.tightFor(
-                  width: 34,
-                  height: 34,
+              if (captured)
+                PopupMenuButton<_AddPhotoSource>(
+                  key: ValueKey('workspace-role-add-more-${role.id}'),
+                  tooltip: 'Add another ${_shortRoleLabel(role)} photo',
+                  enabled: !isBusy,
+                  onSelected: (source) => switch (source) {
+                    _AddPhotoSource.camera => onCapture(),
+                    _AddPhotoSource.gallery => onGallery(),
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _AddPhotoSource.camera,
+                      child: Row(
+                        children: [
+                          Icon(Icons.photo_camera_outlined, size: 18),
+                          SizedBox(width: AppSpacing.xs),
+                          Text('Take another photo'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _AddPhotoSource.gallery,
+                      child: Row(
+                        children: [
+                          Icon(Icons.photo_library_outlined, size: 18),
+                          SizedBox(width: AppSpacing.xs),
+                          Text('Choose from gallery'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.add_a_photo_outlined,
+                      size: 18,
+                      color: ScannerVisualTheme.cyan,
+                    ),
+                  ),
+                )
+              else
+                IconButton(
+                  tooltip: 'Choose ${_shortRoleLabel(role)} from gallery',
+                  onPressed: isBusy ? null : onGallery,
+                  style: _scannerWorkspaceIconButtonStyle(),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 34,
+                    height: 34,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
                 ),
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.photo_library_outlined, size: 18),
-              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RoleChecklist extends StatelessWidget {
-  const _RoleChecklist({
-    required this.roles,
-    required this.requiredRoles,
-    required this.slots,
-    required this.roleCounts,
-    required this.isBusy,
-    required this.onCapture,
-    required this.onGallery,
-    required this.onSelectRole,
-    required this.onPreview,
-    required this.onDelete,
-  });
-
-  final List<ScanCaptureRole> roles;
-  final List<ScanCaptureRole> requiredRoles;
-  final Map<String, ScannerPhotoSlot> slots;
-  final Map<String, int> roleCounts;
-  final bool isBusy;
-  final Future<void> Function(String role) onCapture;
-  final Future<void> Function(String role) onGallery;
-  final void Function(String role) onSelectRole;
-  final void Function(ScannerPhotoSlot slot) onPreview;
-  final void Function(String role) onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: ExpansionTile(
-        key: const ValueKey('photo-checklist'),
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: EdgeInsets.zero,
-        initiallyExpanded: false,
-        title: Text(
-          'Photo checklist',
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        subtitle: Text(
-          '${roleCounts.values.fold<int>(0, (sum, count) => sum + count)} photos captured',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        children: [
-          for (final role in roles)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-              child: CaptureRoleCard(
-                role: role,
-                requiredRole: requiredRoles.contains(role),
-                slot: slots[role.id],
-                isBusy: isBusy,
-                compact: true,
-                onCapture: () => onCapture(role.id),
-                onGallery: () => onGallery(role.id),
-                onPreview: () {
-                  final slot = slots[role.id];
-                  if (slot != null) {
-                    onPreview(slot);
-                  } else {
-                    onSelectRole(role.id);
-                  }
-                },
-                onDelete: () => onDelete(role.id),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -2007,27 +2171,7 @@ String _statusLabel(CaptureRoleCardStatus status) {
   };
 }
 
-String _shortRoleLabel(ScanCaptureRole role) {
-  return switch (role) {
-    ScanCaptureRole.front => 'Front',
-    ScanCaptureRole.back => 'Back',
-    ScanCaptureRole.leftSide => 'Left',
-    ScanCaptureRole.rightSide => 'Right',
-    ScanCaptureRole.closeUp => 'Close-up',
-    ScanCaptureRole.edge => 'Edge',
-    ScanCaptureRole.side => 'Side',
-    ScanCaptureRole.top => 'Top',
-    ScanCaptureRole.bottom => 'Bottom',
-    ScanCaptureRole.baseUnderside => 'Base',
-    ScanCaptureRole.barcode => 'Barcode',
-    ScanCaptureRole.cornerCondition => 'Corner',
-    ScanCaptureRole.surfaceGlare => 'Glare',
-    ScanCaptureRole.dateMint => 'Date',
-    ScanCaptureRole.serialOrMark => 'Serial',
-    ScanCaptureRole.damageDetail => 'Damage',
-    ScanCaptureRole.angledReflective => 'Angle',
-  };
-}
+String _shortRoleLabel(ScanCaptureRole role) => role.shortLabel;
 
 String _optionalRoleDescription(ScanCaptureRole role) {
   return switch (role) {
@@ -2072,9 +2216,6 @@ List<ScanCaptureRole> _workspaceRoles(List<ScanCaptureRole> roles) {
       continue;
     }
     ordered.add(role);
-    if (ordered.length >= 5) {
-      break;
-    }
   }
   return ordered;
 }
@@ -2168,5 +2309,5 @@ String _selectedTitle(ScannerPhotoSlot slot) {
   if (slot.source == 'camera' && slot.role == ScanCaptureRole.front.id) {
     return 'Captured image';
   }
-  return '${slot.label} photo';
+  return '${_shortRoleLabel(ScanCaptureRole.fromId(slot.role))} photo';
 }

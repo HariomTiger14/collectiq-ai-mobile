@@ -1,22 +1,229 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
+import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
+import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_components.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
 
-enum _SearchScope { collection, catalog }
+/// A category/subcategory filter option: [key] is the value sent to the
+/// backend (matches PRICECHARTING_CATEGORY_GROUPS/
+/// PRICECHARTING_SUBCATEGORY_GROUPS/PRICECHARTING_PLATFORM_GROUPS in
+/// catalog_search_service.py), [label] is the display text.
+typedef CatalogFilterGroup = ({String key, String label});
+
+/// Top-level categories -- mirrors PRICECHARTING_CATEGORY_GROUPS plus the
+/// video-games key (PRICECHARTING_VIDEO_GAMES_CATEGORY_KEY). Keys must
+/// match exactly.
+const kCatalogCategoryGroups = <CatalogFilterGroup>[
+  (key: 'sports-cards', label: 'Sports Cards'),
+  (key: 'trading-card-games', label: 'Trading Card Games'),
+  (key: 'comics', label: 'Comics'),
+  (key: 'funko-pops', label: 'Funko Pops'),
+  (key: 'lego-sets', label: 'Lego Sets'),
+  (key: 'coins', label: 'Coins'),
+  (key: 'video-games', label: 'Video Games'),
+];
+
+/// Mirrors PRICECHARTING_PLATFORM_GROUPS -- keys must match exactly. Video
+/// Games has no coarse category taxonomy on the backend (category holds a
+/// real per-game genre), so it's filtered by platform instead, against the
+/// precomputed platform_group column. Used as the Subcategory options when
+/// Category is Video Games; picking none means any platform.
+const kCatalogPlatformGroups = <CatalogFilterGroup>[
+  (key: 'playstation', label: 'PlayStation'),
+  (key: 'xbox', label: 'Xbox'),
+  (key: 'nintendo', label: 'Nintendo'),
+  (key: 'sega', label: 'Sega'),
+  (key: 'atari', label: 'Atari'),
+  (key: 'pc', label: 'PC'),
+  (key: 'retro-other', label: 'Other retro'),
+];
+
+/// Subcategory options when Category is Sports Cards -- mirrors
+/// PRICECHARTING_SUBCATEGORY_GROUPS['sports-cards']. Picking none searches
+/// every sport combined, same as today.
+const kCatalogSportsCardsSubgroups = <CatalogFilterGroup>[
+  (key: 'baseball', label: 'Baseball'),
+  (key: 'basketball', label: 'Basketball'),
+  (key: 'football', label: 'Football'),
+  (key: 'hockey', label: 'Hockey'),
+  (key: 'soccer', label: 'Soccer'),
+];
+
+/// Subcategory options when Category is Trading Card Games -- mirrors
+/// PRICECHARTING_SUBCATEGORY_GROUPS['trading-card-games'].
+const kCatalogTradingCardGamesSubgroups = <CatalogFilterGroup>[
+  (key: 'magic', label: 'Magic'),
+  (key: 'pokemon', label: 'Pokémon'),
+  (key: 'yugioh', label: 'Yu-Gi-Oh!'),
+  (key: 'lorcana', label: 'Lorcana'),
+];
+
+/// Sneakers has no PriceCharting category_group -- it's an entirely
+/// separate catalog (kicksdb_catalog) picked by the `source` request param
+/// instead. This key exists only in the filter UI, so users pick it the
+/// same way as any other category; source/pricecharting-vs-kicksdb is
+/// backend plumbing they never need to see or choose directly. It never
+/// has subcategory options.
+const kSneakersCategoryKey = 'sneakers';
+
+/// The Subcategory options for a given top-level Category, or null if that
+/// category has nothing to drill into (Comics/Funko Pops/Lego Sets/Coins/
+/// Sneakers are each a single flat bucket).
+List<CatalogFilterGroup>? kCatalogSubgroupsFor(String? category) {
+  return switch (category) {
+    'sports-cards' => kCatalogSportsCardsSubgroups,
+    'trading-card-games' => kCatalogTradingCardGamesSubgroups,
+    'video-games' => kCatalogPlatformGroups,
+    _ => null,
+  };
+}
+
+const _unsetFilterField = Object();
+
+/// Immutable draft/applied state for the Discover filter sheet. Users pick
+/// a top-level category (which includes "Sneakers") and, for categories
+/// that have one, a subcategory drill-down -- the PriceCharting-vs-KicksDB
+/// `source` request param is derived from the category choice, never
+/// exposed as its own control.
+class _CatalogFilterSelection {
+  const _CatalogFilterSelection({
+    this.categoryGroup,
+    this.subcategory,
+    this.minPrice,
+    this.maxPrice,
+  });
+
+  const _CatalogFilterSelection.defaults()
+    : categoryGroup = null,
+      subcategory = null,
+      minPrice = null,
+      maxPrice = null;
+
+  final String? categoryGroup;
+  final String? subcategory;
+  final double? minPrice;
+  final double? maxPrice;
+
+  int get activeCount => [
+    categoryGroup,
+    subcategory,
+    minPrice,
+    maxPrice,
+  ].where((value) => value != null).length;
+
+  String get categoryLabel {
+    if (categoryGroup == kSneakersCategoryKey) {
+      return 'Sneakers';
+    }
+    if (categoryGroup == null) {
+      return 'All categories';
+    }
+    for (final group in kCatalogCategoryGroups) {
+      if (group.key == categoryGroup) {
+        return group.label;
+      }
+    }
+    return 'All categories';
+  }
+
+  /// The Subcategory options available for the current category, or null
+  /// if this category has none.
+  List<CatalogFilterGroup>? get subcategoryGroups =>
+      kCatalogSubgroupsFor(categoryGroup);
+
+  String get subcategoryLabel {
+    final groups = subcategoryGroups;
+    if (groups == null) {
+      return 'All';
+    }
+    for (final group in groups) {
+      if (group.key == subcategory) {
+        return group.label;
+      }
+    }
+    return categoryGroup == 'video-games' ? 'All platforms' : 'All';
+  }
+
+  /// The Filters button's summary text: just the category once applied, or
+  /// "Category · Subcategory" when a subcategory is also picked.
+  String get summaryLabel {
+    if (categoryGroup == null) {
+      return 'Filters';
+    }
+    if (subcategory != null) {
+      return '$categoryLabel · $subcategoryLabel';
+    }
+    return categoryLabel;
+  }
+
+  /// The category_group value to send to the search API -- null for
+  /// Sneakers, since it isn't a PriceCharting category_group at all.
+  String? get effectiveCategoryGroup =>
+      categoryGroup == kSneakersCategoryKey ? null : categoryGroup;
+
+  /// The subcategory value to send -- only meaningful alongside a category
+  /// that actually has subcategory options; dropped otherwise so a stale
+  /// value can never leak into an unrelated category's request.
+  String? get effectiveSubcategory =>
+      subcategoryGroups == null ? null : subcategory;
+
+  /// The `source` value to send: Sneakers pins to kicksdb; any real
+  /// PriceCharting category or Video Games platform pins to pricecharting
+  /// (so results from the other catalog don't quietly mix into a filtered
+  /// view); "All categories" leaves it unset so both sources merge.
+  String? get effectiveSource {
+    if (categoryGroup == kSneakersCategoryKey) {
+      return 'kicksdb';
+    }
+    if (categoryGroup != null) {
+      return 'pricecharting';
+    }
+    return null;
+  }
+
+  // Object? + a sentinel default lets a field be explicitly reset to null
+  // (e.g. clearing the category) while every other field stays unchanged --
+  // a plain `T? field` param can't distinguish "not passed" from "passed
+  // null" the way this needs to.
+  _CatalogFilterSelection copyWith({
+    Object? categoryGroup = _unsetFilterField,
+    Object? subcategory = _unsetFilterField,
+    Object? minPrice = _unsetFilterField,
+    Object? maxPrice = _unsetFilterField,
+  }) {
+    return _CatalogFilterSelection(
+      categoryGroup: identical(categoryGroup, _unsetFilterField)
+          ? this.categoryGroup
+          : categoryGroup as String?,
+      subcategory: identical(subcategory, _unsetFilterField)
+          ? this.subcategory
+          : subcategory as String?,
+      minPrice: identical(minPrice, _unsetFilterField)
+          ? this.minPrice
+          : minPrice as double?,
+      maxPrice: identical(maxPrice, _unsetFilterField)
+          ? this.maxPrice
+          : maxPrice as double?,
+    );
+  }
+}
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
@@ -32,26 +239,23 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _queryController;
-  _SearchScope _scope = _SearchScope.collection;
   var _catalogResults = const <CatalogSearchResult>[];
   var _isCatalogLoading = false;
   String? _catalogError;
   String _lastCatalogQuery = '';
   int _catalogRequestId = 0;
+  Timer? _catalogDebounceTimer;
+  var _filters = const _CatalogFilterSelection.defaults();
 
   @override
   void initState() {
     super.initState();
     _queryController = TextEditingController(text: _initialQuery);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(portfolioControllerProvider.notifier).ensureLoaded();
-      }
-    });
   }
 
   @override
   void dispose() {
+    _catalogDebounceTimer?.cancel();
     _queryController.dispose();
     super.dispose();
   }
@@ -68,37 +272,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = GlassBottomNavBar.scrollContentClearance(context);
-    final portfolioState = ref.watch(portfolioControllerProvider);
     final query = _queryController.text.trim();
-    final results = _searchItems(portfolioState.items, query);
-    final quickFilters = _quickFilters(portfolioState.items);
+    // Only categories with real catalog coverage belong here — a chip that
+    // searches to zero results reads as a broken/missing item, not an empty
+    // category. Sneakers has no catalog data yet, and this specific card
+    // isn't in the catalog, so both were removed (confirmed live against
+    // SIT: both returned zero results while every chip below returns real
+    // matches).
     final catalogQuickFilters = const [
-      'Charizard 4/102',
-      'Pokemon Cards',
-      'Nintendo 64',
-      'Magic Cards',
+      (label: 'Pokemon Cards', category: 'Cards'),
+      (label: 'Magic Cards', category: 'Cards'),
+      (label: 'Comics', category: 'Comics'),
+      (label: 'Coins', category: 'Coins'),
+      (label: 'Video Games', category: 'Video Games'),
     ];
     final hasQuery = query.isNotEmpty;
-    final hasResults = results.isNotEmpty;
-    final isCollection = _scope == _SearchScope.collection;
-    final isCatalog = _scope == _SearchScope.catalog;
-    final isEmpty = isCollection && hasQuery && !hasResults;
     final isCatalogReady = query.length >= 2;
     final isCatalogEmpty =
-        isCatalog &&
         isCatalogReady &&
         !_isCatalogLoading &&
         _catalogError == null &&
         _catalogResults.isEmpty &&
         _lastCatalogQuery == query;
-    final showInitialLoading =
-        isCollection &&
-        portfolioState.isLoading &&
-        portfolioState.items.isEmpty;
-    final showInitialError =
-        isCollection &&
-        portfolioState.errorMessage != null &&
-        portfolioState.items.isEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -115,7 +310,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             key: const ValueKey('search-scroll-view'),
             slivers: [
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 28, 16, bottomPadding),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding),
                 sliver: SliverToBoxAdapter(
                   child: Center(
                     child: ConstrainedBox(
@@ -123,101 +318,62 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const HomeBrandLockup(),
+                          const SizedBox(height: 20),
                           const _SearchHeader(),
                           const SizedBox(height: 22),
                           _SearchField(
                             controller: _queryController,
-                            hintText: isCatalog
-                                ? 'Search catalog prices'
-                                : 'Search saved items',
+                            hintText: 'Search catalog prices',
                             onChanged: _onQueryChanged,
-                            onClear: () {
-                              _queryController.clear();
-                              _onQueryChanged('');
-                            },
+                            // Clearing is a deliberate one-off action, not a
+                            // keystroke to debounce — route it the same way
+                            // as a quick-filter tap so results disappear
+                            // immediately instead of after the typing delay.
+                            onClear: () => _setQuery(''),
                           ),
-                          const SizedBox(height: 12),
-                          _SearchScopeControl(
-                            scope: _scope,
-                            onChanged: _setScope,
+                          const SizedBox(height: 10),
+                          _CatalogFilterButton(
+                            filters: _filters,
+                            onTap: () => _openFilterSheet(context),
                           ),
                           const SizedBox(height: 18),
-                          if (showInitialLoading)
-                            const _SearchLoadingState()
-                          else if (showInitialError)
-                            _SearchErrorState(
-                              message:
-                                  portfolioState.errorMessage ??
-                                  'Unable to load saved items.',
-                              onRetry: () => ref
-                                  .read(portfolioControllerProvider.notifier)
-                                  .loadItems(),
+                          _CatalogStatusCard(
+                            resultCount: _catalogResults.length,
+                            hasQuery: hasQuery,
+                            isConnected:
+                                _catalogError == null ||
+                                _catalogResults.isNotEmpty,
+                          ),
+                          const SizedBox(height: 18),
+                          if (!isCatalogReady) ...[
+                            const _SectionTitle('Search the catalog'),
+                            const SizedBox(height: 10),
+                            _QuickFilterChips(
+                              filters: catalogQuickFilters,
+                              onSelected: _setQuery,
+                            ),
+                          ] else if (_isCatalogLoading)
+                            const _CatalogLoadingState()
+                          else if (_catalogError != null)
+                            _CatalogErrorState(
+                              message: _catalogError!,
+                              onRetry: () => _runCatalogSearch(query),
                             )
-                          else if (isEmpty)
-                            const _SearchEmptyState()
-                          else if (isCatalog) ...[
-                            _CatalogStatusCard(
-                              resultCount: _catalogResults.length,
-                              hasQuery: hasQuery,
-                              isConnected:
-                                  _catalogError == null ||
-                                  _catalogResults.isNotEmpty,
-                            ),
-                            const SizedBox(height: 18),
-                            if (!isCatalogReady) ...[
-                              const _SectionTitle('Search the catalog'),
-                              const SizedBox(height: 10),
-                              _QuickFilterGrid(
-                                labels: catalogQuickFilters,
-                                onSelected: _setQuery,
+                          else if (isCatalogEmpty)
+                            const _CatalogEmptyState()
+                          else ...[
+                            const _SectionTitle('Catalog matches'),
+                            const SizedBox(height: 10),
+                            for (final result in _catalogResults.take(
+                              20,
+                            )) ...[
+                              _CatalogResultCard(
+                                result: result,
+                                onTap: () =>
+                                    _openCatalogResult(context, result),
                               ),
-                            ] else if (_isCatalogLoading)
-                              const _CatalogLoadingState()
-                            else if (_catalogError != null)
-                              _CatalogErrorState(
-                                message: _catalogError!,
-                                onRetry: () => _runCatalogSearch(query),
-                              )
-                            else if (isCatalogEmpty)
-                              const _CatalogEmptyState()
-                            else ...[
-                              const _SectionTitle('Catalog matches'),
                               const SizedBox(height: 10),
-                              for (final result in _catalogResults.take(
-                                20,
-                              )) ...[
-                                _CatalogResultCard(
-                                  result: result,
-                                  onTap: () =>
-                                      _openCatalogResult(context, result),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ],
-                          ] else ...[
-                            _SearchStatusCard(
-                              itemCount: portfolioState.items.length,
-                              resultCount: results.length,
-                              hasQuery: hasQuery,
-                            ),
-                            const SizedBox(height: 18),
-                            if (hasQuery && hasResults) ...[
-                              const _SectionTitle('Saved matches'),
-                              const SizedBox(height: 10),
-                              for (final item in results.take(12)) ...[
-                                _PortfolioResultCard(
-                                  item: item,
-                                  onTap: () => _openItem(context, item),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ] else ...[
-                              const _SectionTitle('Search your collection'),
-                              const SizedBox(height: 10),
-                              _QuickFilterGrid(
-                                labels: quickFilters,
-                                onSelected: _setQuery,
-                              ),
                             ],
                           ],
                         ],
@@ -233,83 +389,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  List<CollectibleItem> _searchItems(
-    List<CollectibleItem> items,
-    String query,
-  ) {
-    final normalized = query.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return const [];
-    }
-    return items
-        .where((item) {
-          return [
-            item.title,
-            item.category,
-            item.condition,
-            item.brand,
-            item.setName,
-            item.series,
-            item.cardNumber,
-            item.playerOrCharacter,
-            item.rarity,
-            item.edition,
-          ].whereType<String>().any((value) {
-            return value.toLowerCase().contains(normalized);
-          });
-        })
-        .toList(growable: false);
-  }
-
-  List<String> _quickFilters(List<CollectibleItem> items) {
-    if (items.isEmpty) {
-      return const ['Cards', 'Coins', 'Figures', 'Games'];
-    }
-
-    final counts = <String, int>{};
-    for (final item in items) {
-      final category = item.category.trim();
-      if (category.isEmpty) {
-        continue;
-      }
-      counts[category] = (counts[category] ?? 0) + 1;
-    }
-
-    final ranked = counts.entries.toList()
-      ..sort((a, b) {
-        final countCompare = b.value.compareTo(a.value);
-        if (countCompare != 0) {
-          return countCompare;
-        }
-        return a.key.compareTo(b.key);
-      });
-
-    return ranked.take(4).map((entry) => entry.key).toList(growable: false);
-  }
-
   void _setQuery(String query) {
     _queryController.text = query;
     _queryController.selection = TextSelection.collapsed(
       offset: _queryController.text.length,
     );
-    _onQueryChanged(query);
-  }
-
-  void _setScope(_SearchScope scope) {
-    if (_scope == scope) {
-      return;
-    }
-    setState(() => _scope = scope);
-    if (scope == _SearchScope.catalog) {
-      _runCatalogSearch(_queryController.text);
-    }
+    // A quick-filter tap is a deliberate, one-off action rather than a
+    // stream of keystrokes, so it should search immediately rather than
+    // wait out the typing debounce below.
+    _catalogDebounceTimer?.cancel();
+    setState(() {});
+    _runCatalogSearch(query);
   }
 
   void _onQueryChanged(String query) {
     setState(() {});
-    if (_scope == _SearchScope.catalog) {
-      _runCatalogSearch(query);
-    }
+    // Catalog search hits the backend (which itself queries Supabase), so
+    // debounce it — otherwise a query like "Charizard" fires a request per
+    // keystroke.
+    _catalogDebounceTimer?.cancel();
+    _catalogDebounceTimer = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) {
+        _runCatalogSearch(query);
+      }
+    });
   }
 
   Future<void> _runCatalogSearch(String query) async {
@@ -332,7 +435,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     try {
       final results = await ref
           .read(catalogSearchRepositoryProvider)
-          .searchCatalog(query: trimmed);
+          .searchCatalog(
+            query: trimmed,
+            categoryGroup: _filters.effectiveCategoryGroup,
+            subcategory: _filters.effectiveSubcategory,
+            minPrice: _filters.minPrice,
+            maxPrice: _filters.maxPrice,
+            source: _filters.effectiveSource,
+          );
       if (!mounted || requestId != _catalogRequestId) {
         return;
       }
@@ -347,27 +457,197 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() {
         _catalogResults = const [];
         _isCatalogLoading = false;
-        _catalogError =
-            'Catalog search is not connected yet. Collection search still works.';
+        _catalogError = 'Catalog search is not connected yet.';
       });
     }
   }
 
-  Future<void> _openItem(BuildContext context, CollectibleItem item) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => CollectibleDetailPage(
-          item: item,
-          onDelete: (itemId) async {
-            await ref
-                .read(portfolioControllerProvider.notifier)
-                .removeItem(itemId);
-            return true;
-          },
-        ),
-        settings: RouteSettings(name: '/search/portfolio/${item.id}'),
-      ),
+  Future<void> _openFilterSheet(BuildContext context) async {
+    var draft = _filters;
+    final minController = TextEditingController(
+      text: draft.minPrice == null ? '' : draft.minPrice!.toStringAsFixed(0),
     );
+    final maxController = TextEditingController(
+      text: draft.maxPrice == null ? '' : draft.maxPrice!.toStringAsFixed(0),
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: .58),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void update(_CatalogFilterSelection next) {
+              setSheetState(() => draft = next);
+            }
+
+            return _CatalogFilterSheet(
+              // Pinned outside the scrollable body so Apply is always
+              // reachable without scrolling -- users were selecting a
+              // filter, missing the Apply button below the fold, and
+              // dismissing the sheet without it ever taking effect.
+              footer: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('catalog-filter-reset'),
+                      onPressed: () {
+                        minController.clear();
+                        maxController.clear();
+                        update(const _CatalogFilterSelection.defaults());
+                      },
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('catalog-filter-apply'),
+                      onPressed: () {
+                        setState(() => _filters = draft);
+                        Navigator.of(context).pop();
+                        final query = _queryController.text.trim();
+                        if (query.length >= 2) {
+                          _runCatalogSearch(query);
+                        }
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
+              children: [
+                _CatalogFilterDropdown(
+                  dropdownKey: const ValueKey(
+                    'catalog-filter-category-dropdown',
+                  ),
+                  label: 'Category',
+                  valueLabel: draft.categoryLabel,
+                  isActive: draft.categoryGroup != null,
+                  itemBuilder: (context) => [
+                    CheckedPopupMenuItem<String>(
+                      key: const ValueKey(
+                        'catalog-filter-category-option-all',
+                      ),
+                      value: 'all',
+                      checked: draft.categoryGroup == null,
+                      child: const Text('All categories'),
+                    ),
+                    for (final group in kCatalogCategoryGroups)
+                      CheckedPopupMenuItem<String>(
+                        key: ValueKey(
+                          'catalog-filter-category-option-${group.key}',
+                        ),
+                        value: group.key,
+                        checked: draft.categoryGroup == group.key,
+                        child: Text(group.label),
+                      ),
+                    CheckedPopupMenuItem<String>(
+                      key: const ValueKey(
+                        'catalog-filter-category-option-$kSneakersCategoryKey',
+                      ),
+                      value: kSneakersCategoryKey,
+                      checked: draft.categoryGroup == kSneakersCategoryKey,
+                      child: const Text('Sneakers'),
+                    ),
+                  ],
+                  // Changing category always clears subcategory -- the
+                  // previous category's subcategory options (e.g. a chosen
+                  // sport under Sports Cards) have no meaning under a
+                  // different category and must never leak into its
+                  // request.
+                  onSelected: (value) => update(
+                    draft.copyWith(
+                      categoryGroup: value == 'all' ? null : value,
+                      subcategory: null,
+                    ),
+                  ),
+                ),
+                if (draft.subcategoryGroups case final subgroups?) ...[
+                  const SizedBox(height: 16),
+                  _CatalogFilterDropdown(
+                    dropdownKey: const ValueKey(
+                      'catalog-filter-subcategory-dropdown',
+                    ),
+                    label: draft.categoryGroup == 'video-games'
+                        ? 'Platform'
+                        : 'Subcategory',
+                    valueLabel: draft.subcategoryLabel,
+                    isActive: draft.subcategory != null,
+                    itemBuilder: (context) => [
+                      CheckedPopupMenuItem<String>(
+                        key: const ValueKey(
+                          'catalog-filter-subcategory-option-all',
+                        ),
+                        value: 'all',
+                        checked: draft.subcategory == null,
+                        child: Text(
+                          draft.categoryGroup == 'video-games'
+                              ? 'All platforms'
+                              : 'All',
+                        ),
+                      ),
+                      for (final group in subgroups)
+                        CheckedPopupMenuItem<String>(
+                          key: ValueKey(
+                            'catalog-filter-subcategory-option-${group.key}',
+                          ),
+                          value: group.key,
+                          checked: draft.subcategory == group.key,
+                          child: Text(group.label),
+                        ),
+                    ],
+                    onSelected: (value) => update(
+                      draft.copyWith(
+                        subcategory: value == 'all' ? null : value,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Text(
+                  'Price range',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: PackLoxTokens.textSecondary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _CatalogFilterPriceField(
+                        key: const ValueKey('catalog-filter-min-price'),
+                        controller: minController,
+                        hintText: 'Min \$',
+                        onChanged: (value) => update(
+                          draft.copyWith(minPrice: double.tryParse(value)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _CatalogFilterPriceField(
+                        key: const ValueKey('catalog-filter-max-price'),
+                        controller: maxController,
+                        hintText: 'Max \$',
+                        onChanged: (value) => update(
+                          draft.copyWith(maxPrice: double.tryParse(value)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    minController.dispose();
+    maxController.dispose();
   }
 
   Future<void> _openCatalogResult(
@@ -403,7 +683,7 @@ class _SearchHeader extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Search saved collectibles by name, category, brand, set, or identifier.',
+          'Search real market prices by name, category, brand, set, or identifier.',
           style: textTheme.titleMedium?.copyWith(
             color: PackLoxTokens.textSecondary,
             fontWeight: FontWeight.w700,
@@ -495,170 +775,6 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _SearchScopeControl extends StatelessWidget {
-  const _SearchScopeControl({required this.scope, required this.onChanged});
-
-  final _SearchScope scope;
-  final ValueChanged<_SearchScope> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('discover-search-scope-control'),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: PackLoxTokens.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ScopeButton(
-              label: 'Collection',
-              icon: Icons.inventory_2_outlined,
-              selected: scope == _SearchScope.collection,
-              onTap: () => onChanged(_SearchScope.collection),
-            ),
-          ),
-          Expanded(
-            child: _ScopeButton(
-              label: 'Catalog',
-              icon: Icons.manage_search_outlined,
-              selected: scope == _SearchScope.catalog,
-              onTap: () => onChanged(_SearchScope.catalog),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScopeButton extends StatelessWidget {
-  const _ScopeButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        key: ValueKey('discover-scope-${label.toLowerCase()}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? PackLoxTokens.blue : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected
-                    ? PackLoxTokens.textPrimary
-                    : PackLoxTokens.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: selected
-                        ? PackLoxTokens.textPrimary
-                        : PackLoxTokens.textSecondary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchStatusCard extends StatelessWidget {
-  const _SearchStatusCard({
-    required this.itemCount,
-    required this.resultCount,
-    required this.hasQuery,
-  });
-
-  final int itemCount;
-  final int resultCount;
-  final bool hasQuery;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: PackLoxTokens.blue.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              hasQuery
-                  ? Icons.manage_search_rounded
-                  : Icons.inventory_2_outlined,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasQuery
-                      ? '$resultCount saved ${resultCount == 1 ? 'match' : 'matches'}'
-                      : '$itemCount saved ${itemCount == 1 ? 'item' : 'items'} searchable',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hasQuery
-                      ? 'Results come from your PackLox portfolio.'
-                      : 'Scan or save items, then search them here.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: PackLoxTokens.textSecondary,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _CatalogStatusCard extends StatelessWidget {
   const _CatalogStatusCard({
@@ -720,84 +836,6 @@ class _CatalogStatusCard extends StatelessWidget {
   }
 }
 
-class _SearchEmptyState extends StatelessWidget {
-  const _SearchEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-empty-state'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: PackLoxTokens.surfaceRaised,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: PackLoxTokens.border),
-            ),
-            child: const Icon(
-              Icons.search_off_rounded,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No matches found',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try an item name, category, brand, set, card number, or character.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchLoadingState extends StatelessWidget {
-  const _SearchLoadingState();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-loading-state'),
-      child: Row(
-        children: [
-          const SizedBox.square(
-            dimension: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              color: PackLoxTokens.cyan,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Loading saved items...',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: PackLoxTokens.textPrimary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CatalogLoadingState extends StatelessWidget {
   const _CatalogLoadingState();
 
@@ -823,50 +861,6 @@ class _CatalogLoadingState extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchErrorState extends StatelessWidget {
-  const _SearchErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SurfaceCard(
-      key: const ValueKey('discover-error-state'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.error_outline, color: PackLoxTokens.amber),
-          const SizedBox(height: 12),
-          Text(
-            'Search is unavailable',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            key: const ValueKey('discover-retry'),
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retry'),
           ),
         ],
       ),
@@ -952,138 +946,363 @@ class _CatalogEmptyState extends StatelessWidget {
   }
 }
 
-class _QuickFilterGrid extends StatelessWidget {
-  const _QuickFilterGrid({required this.labels, required this.onSelected});
+// A fixed-column grid forces every label into the same width regardless of
+// how long it is — "Coins" and "Nike Air Force 1" don't belong in equally
+// sized boxes, and the longer ones were truncating illegibly. A Wrap of
+// pill chips sizes each one to its own content instead, so nothing clips
+// and short/long examples can sit naturally side by side.
+class _QuickFilterChips extends StatelessWidget {
+  const _QuickFilterChips({required this.filters, required this.onSelected});
 
-  final List<String> labels;
+  final List<({String label, String category})> filters;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 420 ? 4 : 2;
-        return GridView.builder(
-          key: const ValueKey('discover-quick-filter-grid'),
-          itemCount: labels.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: columns == 4 ? 1.1 : 2.2,
+    return Wrap(
+      key: const ValueKey('discover-quick-filter-grid'),
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (var index = 0; index < filters.length; index++)
+          _QuickFilterChip(
+            key: ValueKey('discover-quick-filter-$index'),
+            label: filters[index].label,
+            category: filters[index].category,
+            onTap: () => onSelected(filters[index].label),
           ),
-          itemBuilder: (context, index) {
-            final label = labels[index];
-            return GestureDetector(
-              key: ValueKey('discover-quick-filter-$index'),
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onSelected(label),
-              child: _SurfaceCard(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      _quickFilterIcon(label),
-                      color: _quickFilterColor(index),
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: PackLoxTokens.textPrimary,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      ],
     );
   }
 }
 
-class _PortfolioResultCard extends StatelessWidget {
-  const _PortfolioResultCard({required this.item, required this.onTap});
+class _QuickFilterChip extends StatelessWidget {
+  const _QuickFilterChip({
+    required this.label,
+    required this.category,
+    required this.onTap,
+    super.key,
+  });
 
-  final CollectibleItem item;
+  final String label;
+  final String category;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final value = _formatSearchValue(item);
-    return Semantics(
-      button: true,
-      label: 'Open ${item.title}',
-      child: GestureDetector(
-        key: ValueKey('discover-result-${item.id}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: _SurfaceCard(
-          child: Row(
-            children: [
-              _SearchThumbnail(
-                key: ValueKey('discover-portfolio-image-${item.id}'),
-                item: item,
+    // Same category → same icon/art/color everywhere in the app: resolve
+    // through the shared mapping (also used by Home's category tiles)
+    // instead of this screen's own icon logic. The category is passed in
+    // explicitly (not inferred from the label) since example product names
+    // like "Charizard 4/102" don't contain a recognizable category keyword.
+    final visual = categoryVisualFor(category);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: PackLoxTokens.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CategoryArtwork(visual: visual, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: PackLoxTokens.textPrimary,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: PackLoxTokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                        height: 1.12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${item.category} - ${item.condition}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: PackLoxTokens.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Row that opens the filter sheet -- shows a summary of active filters
+/// (category + a count badge for price/source) so the current state is
+/// visible without opening the sheet.
+class _CatalogFilterButton extends StatelessWidget {
+  const _CatalogFilterButton({required this.filters, required this.onTap});
+
+  final _CatalogFilterSelection filters;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = filters.activeCount > 0;
+    return GestureDetector(
+      key: const ValueKey('discover-filter-button'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: PackLoxTokens.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+            width: isActive ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: isActive
+                  ? PackLoxTokens.cyan
+                  : PackLoxTokens.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                filters.summaryLabel,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: isActive
+                      ? PackLoxTokens.textPrimary
+                      : PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: PackLoxTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
+            ),
+            if (filters.activeCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: PackLoxTokens.cyan.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${filters.activeCount}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: PackLoxTokens.cyan,
+                    fontWeight: FontWeight.w900,
                   ),
-                  const SizedBox(height: 2),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: PackLoxTokens.textSecondary,
-                    size: 20,
-                  ),
-                ],
+                ),
               ),
             ],
+            const SizedBox(width: 6),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: PackLoxTokens.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogFilterSheet extends StatelessWidget {
+  const _CatalogFilterSheet({required this.children, required this.footer});
+
+  final List<Widget> children;
+
+  /// Rendered below the scrollable body, outside its ListView, so Reset/
+  /// Apply stay reachable regardless of scroll position -- previously they
+  /// scrolled away with the rest of the content and users were dismissing
+  /// the sheet without ever reaching Apply, silently discarding their
+  /// selection.
+  final Widget footer;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .72,
+        minChildSize: .42,
+        maxChildSize: .92,
+        builder: (context, scrollController) {
+          return Container(
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surfaceRaised,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: PackLoxTokens.border),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: PackLoxTokens.border,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Filter catalog',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(
+                            color: PackLoxTokens.textPrimary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...children,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  footer,
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CatalogFilterDropdown extends StatelessWidget {
+  const _CatalogFilterDropdown({
+    required this.dropdownKey,
+    required this.label,
+    required this.valueLabel,
+    required this.isActive,
+    required this.itemBuilder,
+    required this.onSelected,
+  });
+
+  final Key dropdownKey;
+  final String label;
+  final String valueLabel;
+  final bool isActive;
+  final List<PopupMenuEntry<String>> Function(BuildContext) itemBuilder;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w900,
           ),
+        ),
+        const SizedBox(height: 8),
+        PopupMenuButton<String>(
+          key: dropdownKey,
+          itemBuilder: itemBuilder,
+          onSelected: onSelected,
+          constraints: const BoxConstraints(maxHeight: 420, minWidth: 260),
+          color: PackLoxTokens.surfaceRaised,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: PackLoxTokens.border),
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+                width: isActive ? 1.4 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    valueLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: isActive
+                          ? PackLoxTokens.textPrimary
+                          : PackLoxTokens.textSecondary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: PackLoxTokens.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CatalogFilterPriceField extends StatelessWidget {
+  const _CatalogFilterPriceField({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: PackLoxTokens.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PackLoxTokens.border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: PackLoxTokens.textPrimary,
+          fontWeight: FontWeight.w800,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          filled: false,
+          // The app's global InputDecorationTheme sets enabledBorder/
+          // focusedBorder independently of border, so those must be
+          // overridden too -- otherwise the theme's own outline box still
+          // renders inside this field's outer Container, showing as a
+          // nested double box.
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          hintText: hintText,
+          hintStyle: TextStyle(color: PackLoxTokens.textSecondary),
         ),
       ),
     );
@@ -1124,6 +1343,7 @@ class _CatalogResultCard extends StatelessWidget {
                   category: result.category,
                   title: result.title,
                   setName: result.setName,
+                  imageUrl: result.imageUrl,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1173,6 +1393,17 @@ class _CatalogResultCard extends StatelessWidget {
                                 _CatalogMetaPill(
                                   label:
                                       '${(result.confidence!.clamp(0, 1) * 100).round()}% match',
+                                ),
+                              if (_catalogExternalLink(result) case final link?)
+                                _CatalogListingLink(
+                                  key: ValueKey(
+                                    'discover-catalog-listing-link-${result.id}',
+                                  ),
+                                  label: link.isImage
+                                      ? 'View image'
+                                      : 'View listing',
+                                  onTap: () =>
+                                      _launchExternalLink(context, link.url),
                                 ),
                             ],
                           ),
@@ -1277,6 +1508,52 @@ class _CatalogMetaPill extends StatelessWidget {
   }
 }
 
+/// Small, unobtrusive "View listing"/"View image" affordance shown on
+/// catalog cards so users can see a real photo of the item -- either its
+/// original source page or, when available, a direct link straight to a
+/// publisher-sourced product image -- without the app hosting/rendering
+/// the image itself.
+class _CatalogListingLink extends StatelessWidget {
+  const _CatalogListingLink({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: PackLoxTokens.cyan,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.north_east_rounded,
+                size: 12,
+                color: PackLoxTokens.cyan,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CatalogResultDetailPage extends ConsumerStatefulWidget {
   const _CatalogResultDetailPage({
     required this.result,
@@ -1348,6 +1625,7 @@ class _CatalogResultDetailPageState
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),
       _CatalogDetailRowData('Source', result.source),
+      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
       _CatalogDetailRowData('Confidence', confidence),
       if (result.lastUpdated != null)
         _CatalogDetailRowData('Updated', _formatShortDate(result.lastUpdated!)),
@@ -1382,26 +1660,51 @@ class _CatalogResultDetailPageState
                             onBack: () => Navigator.of(context).maybePop(),
                           ),
                           const SizedBox(height: 18),
-                          Center(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Container(
-                                width: 180,
-                                height: 180,
-                                decoration: BoxDecoration(
-                                  color: PackLoxTokens.surfaceRaised,
-                                  borderRadius: BorderRadius.circular(28),
-                                  border: Border.all(
-                                    color: PackLoxTokens.border,
+                          Builder(
+                            builder: (context) {
+                              final hasRealPhoto =
+                                  (result.imageUrl ?? '').trim().isNotEmpty;
+                              // A real photo (RAWG video-game covers/
+                              // screenshots especially) is almost always
+                              // widescreen -- give it a frame shaped to
+                              // match, filling edge to edge, rather than
+                              // squeezing it into the square the bucketed
+                              // placeholder illustrations use. The square
+                              // stays for the no-photo fallback case, since
+                              // those illustrations are designed square.
+                              final frame = ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: PackLoxTokens.surfaceRaised,
+                                    borderRadius: BorderRadius.circular(28),
+                                    border: Border.all(
+                                      color: PackLoxTokens.border,
+                                    ),
+                                  ),
+                                  child: _CatalogPlaceholderArt(
+                                    category: result.category,
+                                    title: result.title,
+                                    setName: result.setName,
+                                    imageUrl: result.imageUrl,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
-                                child: _CatalogPlaceholderArt(
-                                  category: result.category,
-                                  title: result.title,
-                                  setName: result.setName,
-                                ),
-                              ),
-                            ),
+                              );
+                              if (!hasRealPhoto) {
+                                return Center(
+                                  child: SizedBox(
+                                    width: 180,
+                                    height: 180,
+                                    child: frame,
+                                  ),
+                                );
+                              }
+                              return AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: frame,
+                              );
+                            },
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -1422,12 +1725,62 @@ class _CatalogResultDetailPageState
                               _SearchPill(label: result.source),
                             ],
                           ),
+                          if (_catalogExternalLink(result) case final link?) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                key: const ValueKey(
+                                  'catalog-detail-view-listing',
+                                ),
+                                onPressed: () =>
+                                    _launchExternalLink(context, link.url),
+                                icon: const Icon(
+                                  Icons.north_east_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  link.url == (result.imageUrl ?? '').trim()
+                                      ? 'View full image'
+                                      : link.isImage
+                                      ? 'View image'
+                                      : 'View original listing',
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: PackLoxTokens.cyan,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  textStyle: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 18),
                           _CatalogValuePanel(result: result, value: value),
                           const SizedBox(height: 14),
                           _CatalogTrustPanel(result: result),
+                          if (result.marketplaceListings.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            _CatalogMarketplaceListingsPanel(
+                              itemTitle: result.title,
+                              result: result,
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          _CatalogHistoryChartPanel(
+                            history: result.history,
+                            isLoading: _isLoadingDetail,
+                            errorMessage: _detailError,
+                            currency: result.currency,
+                          ),
                           const SizedBox(height: 14),
                           _CatalogHistoryPanel(
+                            itemTitle: result.title,
                             history: result.history,
                             isLoading: _isLoadingDetail,
                             errorMessage: _detailError,
@@ -1522,15 +1875,22 @@ class _CatalogResultDetailPageState
     setState(() => _isSaving = true);
     final item = _catalogResultToPortfolioItem(_result);
     try {
-      await ref.read(portfolioControllerProvider.notifier).saveItem(item);
+      final saved = await ref
+          .read(portfolioControllerProvider.notifier)
+          .saveItem(item);
+      if (!mounted) {
+        return;
+      }
+      if (!saved) {
+        // Blocked by the free cap; the app shell shows the upgrade sheet.
+        setState(() => _isSaving = false);
+        return;
+      }
       final savedItem = ref
           .read(portfolioControllerProvider)
           .items
           .where((candidate) => candidate.id == item.id)
           .firstOrNull;
-      if (!mounted) {
-        return;
-      }
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => CollectibleDetailPage(
@@ -1558,9 +1918,19 @@ class _CatalogResultDetailPageState
 
   Future<void> _loadCatalogDetail() async {
     try {
+      // preferredCurrency drives both price display and which eBay
+      // marketplace's listings the backend matches -- see
+      // CatalogSearchRepository.getCatalogDetail's own doc comment.
+      final profileState = ref.read(profileControllerProvider);
+      final preferredCurrency = profileState.hasValue
+          ? profileState.requireValue.preferredCurrency
+          : null;
       final detail = await ref
           .read(catalogSearchRepositoryProvider)
-          .getCatalogDetail(result: widget.result);
+          .getCatalogDetail(
+            result: widget.result,
+            currency: preferredCurrency,
+          );
       if (!mounted) {
         return;
       }
@@ -1640,67 +2010,6 @@ class _CatalogValuePanel extends StatelessWidget {
               height: 1,
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _CatalogEstimateChip(
-                label: 'Low',
-                value: _formatOptionalCatalogValue(
-                  result.lowEstimate,
-                  result.currency,
-                ),
-              ),
-              _CatalogEstimateChip(
-                label: 'High',
-                value: _formatOptionalCatalogValue(
-                  result.highEstimate,
-                  result.currency,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CatalogEstimateChip extends StatelessWidget {
-  const _CatalogEstimateChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: PackLoxTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PackLoxTokens.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: PackLoxTokens.textSecondary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: PackLoxTokens.textPrimary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
         ],
       ),
     );
@@ -1722,9 +2031,10 @@ class _CatalogTrustPanel extends StatelessWidget {
     final rows = [
       _CatalogDetailRowData(
         'Status',
-        hasValue ? 'Provider-backed catalog value' : unavailableCopy.title,
+        hasValue ? 'Trusted provider value' : unavailableCopy.title,
       ),
       _CatalogDetailRowData('Source', result.source),
+      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
       if (confidence != null)
         _CatalogDetailRowData(
           'Confidence',
@@ -1733,7 +2043,7 @@ class _CatalogTrustPanel extends StatelessWidget {
       if (_clean(result.setName) != null || _clean(result.identifier) != null)
         _CatalogDetailRowData('Match basis', _catalogMatchBasis(result)),
       _CatalogDetailRowData(
-        'Value range',
+        'Loose / Graded',
         '${_formatOptionalCatalogValue(result.lowEstimate, result.currency)} - ${_formatOptionalCatalogValue(result.highEstimate, result.currency)}',
       ),
       if (result.lastUpdated != null)
@@ -1744,6 +2054,8 @@ class _CatalogTrustPanel extends StatelessWidget {
       if (_clean(result.attribution) != null)
         _CatalogDetailRowData('Attribution', result.attribution!.trim()),
       if (!hasValue)
+        _CatalogDetailRowData('Reason', unavailableCopy.shortLabel),
+      if (!hasValue)
         _CatalogDetailRowData('Next step', unavailableCopy.actionLabel),
     ];
 
@@ -1751,7 +2063,7 @@ class _CatalogTrustPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle('Pricing confidence'),
+          const _SectionTitle('Pricing evidence'),
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1781,7 +2093,7 @@ class _CatalogTrustPanel extends StatelessWidget {
               Expanded(
                 child: Text(
                   hasValue
-                      ? 'This catalog value comes from saved provider data. PackLox saves it as a dated portfolio snapshot when you add the item.'
+                      ? 'This value comes from provider-backed catalog evidence. PackLox saves it as a dated portfolio snapshot when you add the item.'
                       : _clean(result.displayMessage) ??
                             unavailableCopy.message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1805,19 +2117,717 @@ class _CatalogTrustPanel extends StatelessWidget {
   }
 }
 
+/// Real, currently-available eBay listings for this catalog item, when
+/// any exist -- link-out only (opens the real eBay listing in-browser),
+/// never a purchase flow inside PackLox itself. Hides entirely when empty
+/// rather than showing an empty/error state: most items won't have a live
+/// listing at any given moment (eBay's marketplace is large but not
+/// exhaustive), and that's a normal, expected outcome, not a failure.
+const int _kInlineMarketplaceListingsLimit = 3;
+
+class _CatalogMarketplaceListingsPanel extends StatelessWidget {
+  const _CatalogMarketplaceListingsPanel({required this.itemTitle, required this.result});
+
+  final String itemTitle;
+  final CatalogSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final listings = result.marketplaceListings;
+    if (listings.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final visible = listings.take(_kInlineMarketplaceListingsLimit).toList();
+    final hasMore = listings.length > visible.length;
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Where to buy',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final listing in visible) ...[
+            _CatalogMarketplaceListingRow(listing: listing),
+            if (listing != visible.last)
+              const Divider(color: PackLoxTokens.border, height: 18),
+          ],
+          if (hasMore) ...[
+            const Divider(color: PackLoxTokens.border, height: 18),
+            InkWell(
+              key: const ValueKey('catalog-view-full-marketplace-listings'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => _CatalogFullMarketplaceListingsPage(
+                    itemTitle: itemTitle,
+                    listings: listings,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'View all listings (${listings.length})',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: PackLoxTokens.cyan,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: PackLoxTokens.cyan,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Full list of marketplace listings for a catalog item -- reuses whatever
+/// the detail screen already fetched (up to 8 per source, see
+/// CatalogSearchService._fetch_marketplace_listings) with no second
+/// network call.
+class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
+  const _CatalogFullMarketplaceListingsPage({
+    required this.itemTitle,
+    required this.listings,
+  });
+
+  final String itemTitle;
+  final List<MarketplaceListing> listings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PackLoxTokens.background,
+      appBar: AppBar(
+        backgroundColor: PackLoxTokens.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: PackLoxTokens.textPrimary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Where to buy',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          children: [
+            Text(
+              itemTitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final listing in listings) ...[
+                    _CatalogMarketplaceListingRow(
+                      listing: listing,
+                      truncateTitle: false,
+                    ),
+                    if (listing != listings.last)
+                      const Divider(color: PackLoxTokens.border, height: 18),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogMarketplaceListingRow extends StatelessWidget {
+  const _CatalogMarketplaceListingRow({
+    required this.listing,
+    this.truncateTitle = true,
+  });
+
+  final MarketplaceListing listing;
+
+  /// Compact contexts (the inline "Where to buy" preview) clip long
+  /// titles to 2 lines since row height there needs to stay predictable
+  /// -- the full listings page has nothing else competing for space, so
+  /// it shows the whole title instead.
+  final bool truncateTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _launchExternalLink(context, listing.url),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  listing.title,
+                  maxLines: truncateTitle ? 2 : null,
+                  overflow: truncateTitle ? TextOverflow.ellipsis : null,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: PackLoxTokens.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _SearchPill(label: listing.source),
+                    if (listing.condition.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          listing.condition,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: PackLoxTokens.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatOptionalCatalogValue(listing.price, listing.currency),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Icon(
+                Icons.north_east_rounded,
+                size: 14,
+                color: PackLoxTokens.cyan,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A dated point for the [_CatalogHistoryChart].
+class _CatalogChartPoint {
+  const _CatalogChartPoint({required this.date, required this.value});
+
+  final DateTime date;
+  final double value;
+}
+
+/// Sorts [history] chronologically (oldest first) and drops points with no
+/// usable market value, since the backend documents [history] as
+/// "newest first when supplied" -- never assume that ordering holds.
+List<_CatalogChartPoint> _catalogChartPoints(
+  List<CatalogPriceHistoryPoint> history,
+) {
+  final points =
+      [
+          for (final point in history)
+            if (point.marketValue != null && point.marketValue! > 0)
+              _CatalogChartPoint(date: point.validFrom, value: point.marketValue!),
+        ]
+        ..sort((a, b) => a.date.compareTo(b.date));
+  return points;
+}
+
+/// Card wrapping [_CatalogHistoryChart] with the surrounding loading/error/
+/// empty states, matching the visual language of the portfolio detail
+/// screen's value-history chart (see `_ValueHistoryChart` in
+/// `collectible_detail_page.dart`) but sourced from catalog-level
+/// [CatalogPriceHistoryPoint] data instead of portfolio snapshots.
+class _CatalogHistoryChartPanel extends StatelessWidget {
+  const _CatalogHistoryChartPanel({
+    required this.history,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.currency,
+  });
+
+  final List<CatalogPriceHistoryPoint> history;
+  final bool isLoading;
+  final String? errorMessage;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = _catalogChartPoints(history);
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _SectionTitle('Value trend')),
+              if (isLoading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (points.isEmpty)
+            Container(
+              height: 120,
+              width: double.infinity,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: PackLoxTokens.background.withValues(alpha: 0.48),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: PackLoxTokens.border.withValues(alpha: 0.62),
+                ),
+              ),
+              child: Text(
+                isLoading
+                    ? 'Loading observed catalog history...'
+                    : errorMessage ??
+                          'History starts after daily catalog refreshes.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: PackLoxTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: _CatalogHistoryChart(points: points, currency: currency),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Real axis-labeled trend chart for a catalog item's observed valuation
+/// history -- dates along the bottom, price along the left. Styled to match
+/// `_ValueHistoryChart` in `collectible_detail_page.dart` (same gridlines,
+/// gradient fill, tooltip shape), using [PackLoxTokens] since this screen
+/// uses that token set rather than `HomeTokens`.
+class _CatalogHistoryChart extends StatelessWidget {
+  const _CatalogHistoryChart({required this.points, required this.currency});
+
+  final List<_CatalogChartPoint> points;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final axisLabelStyle = textTheme.labelSmall?.copyWith(
+      color: PackLoxTokens.textSecondary,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+    );
+    const color = PackLoxTokens.cyan;
+
+    if (points.length == 1) {
+      // A single observed point can't draw a meaningful line -- render it as
+      // a flat single-dot chart instead of feeding fl_chart a zero-width
+      // x-axis range, which would otherwise force awkward interval math.
+      final value = points.first.value;
+      final (minY, maxY, yInterval) = _niceCatalogAxisBounds(
+        value - (value.abs() * 0.1) - 1,
+        value + (value.abs() * 0.1) + 1,
+      );
+      return LineChart(
+        LineChartData(
+          minX: 0,
+          maxX: 1,
+          minY: minY,
+          maxY: maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: yInterval,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: PackLoxTokens.border.withValues(alpha: 0.4),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 46,
+                interval: yInterval,
+                getTitlesWidget: (value, meta) => Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    _compactCatalogChartMoney(value),
+                    style: axisLabelStyle,
+                  ),
+                ),
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 26,
+                interval: 1,
+                getTitlesWidget: (rawValue, meta) {
+                  if (rawValue.round() != 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _axisCatalogChartDate(points.first.date),
+                      style: axisLabelStyle,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                return LineTooltipItem(
+                  '${_formatOptionalCatalogValue(value, currency)}\n'
+                  '${_formatShortDate(points.first.date)}',
+                  textTheme.labelSmall!.copyWith(
+                    color: PackLoxTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: [FlSpot(0, value), FlSpot(1, value)],
+              isCurved: false,
+              color: color,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                checkToShowDot: (spot, _) => spot.x == 0,
+              ),
+              belowBarData: BarAreaData(show: false),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final values = points.map((point) => point.value).toList();
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final rawRange = maxValue - minValue;
+    final padding = rawRange > 0 ? rawRange * 0.15 : (maxValue.abs() * 0.1) + 1;
+    final (minY, maxY, yInterval) = _niceCatalogAxisBounds(
+      (minValue - padding).clamp(0, double.infinity).toDouble(),
+      maxValue + padding,
+    );
+    final lastIndex = points.length - 1;
+    final labelIndices = _pickCatalogChartLabelIndices(points);
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: lastIndex.toDouble(),
+        minY: minY,
+        maxY: maxY,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: yInterval,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: PackLoxTokens.border.withValues(alpha: 0.4),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              interval: yInterval,
+              getTitlesWidget: (value, meta) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  _compactCatalogChartMoney(value),
+                  style: axisLabelStyle,
+                ),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.round();
+                if (!labelIndices.contains(index)) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _axisCatalogChartDate(points[index].date),
+                    style: axisLabelStyle,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+              final point = points[spot.x.round().clamp(0, lastIndex)];
+              return LineTooltipItem(
+                '${_formatOptionalCatalogValue(point.value, currency)}\n'
+                '${_formatShortDate(point.date)}',
+                textTheme.labelSmall!.copyWith(
+                  color: PackLoxTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var index = 0; index <= lastIndex; index += 1)
+                FlSpot(index.toDouble(), points[index].value),
+            ],
+            isCurved: true,
+            curveSmoothness: 0.22,
+            color: color,
+            barWidth: 2.5,
+            dotData: FlDotData(show: points.length <= 6),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  color.withValues(alpha: 0.28),
+                  color.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact axis-tick money label (e.g. "$1.2k"), unlike
+/// [_formatOptionalCatalogValue] which renders "Not supplied" for
+/// zero/negative inputs -- axis gridlines can legitimately land on zero.
+String _compactCatalogChartMoney(double value) {
+  if (value >= 1000) {
+    final thousands = value / 1000;
+    final formatted = thousands.toStringAsFixed(thousands < 10 ? 1 : 0);
+    return '\$${formatted}k';
+  }
+  // Exact, not rounded to the nearest dollar: this chart's gridlines often
+  // land on sub-dollar steps for low-value catalog items (e.g. $3.50,
+  // $4.50), and rounding those to whole dollars produced visibly
+  // duplicated adjacent labels ("$4", "$4"). Only drop the decimals when
+  // the gridline value genuinely is a whole number.
+  final isWhole = value == value.roundToDouble();
+  return '\$${value.toStringAsFixed(isWhole ? 0 : 2)}';
+}
+
+/// Short axis-only date label ("15 Aug", no year) -- distinct from
+/// [_formatShortDate] (used in tooltips/detail rows), which includes the
+/// year and is too wide for the chart's bottom axis, causing the last
+/// label to overflow past the chart's right edge.
+String _axisCatalogChartDate(DateTime date) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]}';
+}
+
+/// Rounds a raw (min, max) range out to "nice" gridline values (multiples of
+/// 1/2/5 * 10^n) with an evenly-spaced interval, mirroring the
+/// `_niceAxisBounds` helper used by the portfolio detail chart so both
+/// charts avoid fl_chart's default from-zero tick generation crowding
+/// labels near the bottom of the axis.
+(double, double, double) _niceCatalogAxisBounds(double rawMin, double rawMax) {
+  final range = (rawMax - rawMin) <= 0 ? rawMax.abs() + 1 : rawMax - rawMin;
+  final roughStep = range / 4;
+  final magnitude = math
+      .pow(10, (math.log(roughStep) / math.ln10).floor())
+      .toDouble();
+  final residual = roughStep / magnitude;
+  final niceResidual = residual <= 1
+      ? 1.0
+      : residual <= 2
+      ? 2.0
+      : residual <= 5
+      ? 5.0
+      : 10.0;
+  final step = niceResidual * magnitude;
+  final minY = (rawMin / step).floor() * step;
+  final maxY = (rawMax / step).ceil() * step;
+  return (math.max(0, minY), maxY == minY ? minY + step : maxY, step);
+}
+
+/// Picks which point indices get an x-axis date label, evenly spaced but
+/// collapsing consecutive candidates that would render the same short date.
+Set<int> _pickCatalogChartLabelIndices(List<_CatalogChartPoint> points) {
+  final lastIndex = points.length - 1;
+  if (lastIndex <= 0) {
+    return {0};
+  }
+  const targetLabelCount = 4;
+  final rawCandidates = <int>{
+    for (var i = 0; i < targetLabelCount; i += 1)
+      (lastIndex * i / (targetLabelCount - 1)).round(),
+  }.toList()..sort();
+
+  final chosen = <int>[];
+  for (final index in rawCandidates) {
+    final label = _axisCatalogChartDate(points[index].date);
+    if (chosen.isNotEmpty &&
+        _axisCatalogChartDate(points[chosen.last].date) == label) {
+      chosen[chosen.length - 1] = index;
+    } else {
+      chosen.add(index);
+    }
+  }
+  return chosen.toSet();
+}
+
+/// How many entries show inline on the detail screen before the list
+/// hands off to the dedicated full-history page -- the trend chart above
+/// this panel already uses the complete fetched history (up to 90, see
+/// CatalogSearchRepository.getCatalogDetail's default), so this is purely
+/// a display cap, not a data-fetching one.
+const int _kInlinePriceHistoryLimit = 5;
+
+/// Merges consecutive history entries that share the same price into one
+/// row spanning the full date range, instead of a run of identical-
+/// looking rows -- history is a daily SCD2 snapshot, so a price holding
+/// steady for a week produces one row per day even though nothing
+/// changed. Assumes [history] is sorted newest-first (validFrom
+/// descending), matching what the backend already returns; each merged
+/// row keeps the newest entry's isCurrent/validTo/estimates and only
+/// widens validFrom back to the oldest entry in that steady run.
+List<CatalogPriceHistoryPoint> _mergeConsecutiveSamePriceHistory(
+  List<CatalogPriceHistoryPoint> history,
+) {
+  if (history.isEmpty) {
+    return history;
+  }
+  final merged = <CatalogPriceHistoryPoint>[];
+  for (final point in history) {
+    final last = merged.isEmpty ? null : merged.last;
+    final samePrice =
+        last != null &&
+        last.marketValue == point.marketValue &&
+        last.currency == point.currency;
+    if (last != null && samePrice) {
+      merged[merged.length - 1] = CatalogPriceHistoryPoint(
+        validFrom: point.validFrom,
+        validTo: last.validTo,
+        isCurrent: last.isCurrent,
+        currency: last.currency,
+        marketValue: last.marketValue,
+        lowEstimate: last.lowEstimate,
+        highEstimate: last.highEstimate,
+        sourceFile: last.sourceFile,
+        sourceDownloadedAt: last.sourceDownloadedAt,
+      );
+    } else {
+      merged.add(point);
+    }
+  }
+  return merged;
+}
+
 class _CatalogHistoryPanel extends StatelessWidget {
   const _CatalogHistoryPanel({
+    required this.itemTitle,
     required this.history,
     required this.isLoading,
     required this.errorMessage,
   });
 
+  final String itemTitle;
   final List<CatalogPriceHistoryPoint> history;
   final bool isLoading;
   final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
+    final mergedHistory = _mergeConsecutiveSamePriceHistory(history);
+    final visible = mergedHistory.take(_kInlinePriceHistoryLimit).toList();
+    final hasMore = mergedHistory.length > visible.length;
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1834,11 +2844,46 @@ class _CatalogHistoryPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (history.isNotEmpty) ...[
-            for (final point in history.take(4)) ...[
+          if (visible.isNotEmpty) ...[
+            for (final point in visible) ...[
               _CatalogHistoryRow(point: point),
-              if (point != history.take(4).last)
+              if (point != visible.last)
                 const Divider(color: PackLoxTokens.border, height: 18),
+            ],
+            if (hasMore) ...[
+              const Divider(color: PackLoxTokens.border, height: 18),
+              InkWell(
+                key: const ValueKey('catalog-view-full-price-history'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _CatalogFullPriceHistoryPage(
+                      itemTitle: itemTitle,
+                      history: history,
+                    ),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'View full price history (${mergedHistory.length})',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: PackLoxTokens.cyan,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: PackLoxTokens.cyan,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ] else
             Text(
@@ -1853,6 +2898,70 @@ class _CatalogHistoryPanel extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full, scrollable price-change history for a catalog item -- reuses
+/// whatever the detail screen already fetched (up to 90 entries, see
+/// CatalogSearchRepository.getCatalogDetail) with no second network call.
+class _CatalogFullPriceHistoryPage extends StatelessWidget {
+  const _CatalogFullPriceHistoryPage({
+    required this.itemTitle,
+    required this.history,
+  });
+
+  final String itemTitle;
+  final List<CatalogPriceHistoryPoint> history;
+
+  @override
+  Widget build(BuildContext context) {
+    final mergedHistory = _mergeConsecutiveSamePriceHistory(history);
+    return Scaffold(
+      backgroundColor: PackLoxTokens.background,
+      appBar: AppBar(
+        backgroundColor: PackLoxTokens.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: PackLoxTokens.textPrimary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Price history',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: PackLoxTokens.textPrimary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          children: [
+            Text(
+              itemTitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final point in mergedHistory) ...[
+                    _CatalogHistoryRow(point: point),
+                    if (point != mergedHistory.last)
+                      const Divider(color: PackLoxTokens.border, height: 18),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1959,96 +3068,22 @@ class _CatalogDetailRow extends StatelessWidget {
   }
 }
 
-class _SearchThumbnail extends StatelessWidget {
-  const _SearchThumbnail({required this.item, super.key});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final imagePath = _searchImagePath(item);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: PackLoxTokens.surfaceRaised,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: PackLoxTokens.border),
-        ),
-        child: imagePath == null
-            ? _CatalogPlaceholderArt(
-                category: item.category,
-                title: item.title,
-                setName: item.setName,
-                compact: true,
-              )
-            : _SearchImage(path: imagePath),
-      ),
-    );
-  }
-}
-
-class _SearchImage extends StatelessWidget {
-  const _SearchImage({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    final normalizedPath = path.trim();
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return Image.network(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _MissingSearchImage(),
-      );
-    }
-    if (normalizedPath.startsWith('assets/')) {
-      return Image.asset(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _MissingSearchImage(),
-      );
-    }
-    return buildLocalPortfolioImage(
-      imagePath: normalizedPath,
-      fit: BoxFit.cover,
-      placeholderBuilder: () => const _MissingSearchImage(),
-    );
-  }
-}
-
-class _MissingSearchImage extends StatelessWidget {
-  const _MissingSearchImage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(
-        Icons.inventory_2_outlined,
-        color: PackLoxTokens.cyan,
-        size: 24,
-      ),
-    );
-  }
-}
-
 class _CatalogPlaceholderThumbnail extends StatelessWidget {
   const _CatalogPlaceholderThumbnail({
     required this.category,
     required this.title,
     required this.setName,
+    this.imageUrl,
     super.key,
   });
 
   final String category;
   final String title;
   final String? setName;
+
+  /// Real catalog product photo (KicksDB today). Falls back to the
+  /// bucketed illustration below on null/empty or a failed load.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -2066,6 +3101,7 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
           category: category,
           title: title,
           setName: setName,
+          imageUrl: imageUrl,
         ),
       ),
     );
@@ -2077,38 +3113,56 @@ class _CatalogPlaceholderArt extends StatelessWidget {
     required this.category,
     required this.title,
     required this.setName,
-    this.compact = false,
+    this.imageUrl,
+    this.fit = BoxFit.cover,
   });
 
   final String category;
   final String title;
   final String? setName;
-  final bool compact;
+  final String? imageUrl;
+
+  /// BoxFit.cover (the default) fills the frame and crops -- right for the
+  /// small, fixed-aspect thumbnails this is normally used in. The catalog
+  /// detail hero passes BoxFit.contain instead so the full real photo is
+  /// visible uncropped, since that image is the whole point of the screen,
+  /// not a grid tile.
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
     final style = _placeholderStyle(category, title, setName);
+    final photoUrl = imageUrl;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return Image.network(
+        photoUrl,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => _catalogArtFallback(style),
+      );
+    }
+    return _catalogArtFallback(style);
+  }
+
+  Widget _catalogArtFallback(_PlaceholderStyle style) {
     if (style.assetPath != null) {
       return Image.asset(
         style.assetPath!,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        errorBuilder: (_, _, _) =>
-            _FallbackCatalogPlaceholderArt(style: style, compact: compact),
+        errorBuilder: (_, _, _) => _FallbackCatalogPlaceholderArt(
+          style: style,
+        ),
       );
     }
-    return _FallbackCatalogPlaceholderArt(style: style, compact: compact);
+    return _FallbackCatalogPlaceholderArt(style: style);
   }
 }
 
 class _FallbackCatalogPlaceholderArt extends StatelessWidget {
-  const _FallbackCatalogPlaceholderArt({
-    required this.style,
-    required this.compact,
-  });
+  const _FallbackCatalogPlaceholderArt({required this.style});
 
   final _PlaceholderStyle style;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2134,8 +3188,8 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         Align(
           alignment: Alignment.topRight,
           child: Container(
-            width: compact ? 28 : 34,
-            height: compact ? 28 : 34,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: style.accent.withValues(alpha: 0.18),
               shape: BoxShape.circle,
@@ -2145,8 +3199,8 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         Align(
           alignment: Alignment.bottomLeft,
           child: Container(
-            width: compact ? 20 : 26,
-            height: compact ? 20 : 26,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               color: PackLoxTokens.textPrimary.withValues(alpha: 0.04),
               shape: BoxShape.circle,
@@ -2155,42 +3209,40 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
         ),
         Center(
           child: SizedBox(
-            width: compact ? 34 : 38,
-            height: compact ? 34 : 38,
+            width: 38,
+            height: 38,
             child: CustomPaint(
               painter: _PlaceholderMarkPainter(
                 mark: style.mark,
                 accent: style.accent,
-                compact: compact,
               ),
             ),
           ),
         ),
-        if (!compact)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: PackLoxTokens.surface.withValues(alpha: 0.62),
-                border: Border(
-                  top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
-                ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            decoration: BoxDecoration(
+              color: PackLoxTokens.surface.withValues(alpha: 0.62),
+              border: Border(
+                top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
               ),
-              child: Text(
-                style.label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: PackLoxTokens.textSecondary,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
+            ),
+            child: Text(
+              style.label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: PackLoxTokens.textSecondary,
+                fontWeight: FontWeight.w900,
+                height: 1,
               ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -2224,22 +3276,17 @@ class _SearchPill extends StatelessWidget {
 enum _PlaceholderMark { card, game, toy, coin, comic, watch, shoe, collectible }
 
 class _PlaceholderMarkPainter extends CustomPainter {
-  const _PlaceholderMarkPainter({
-    required this.mark,
-    required this.accent,
-    required this.compact,
-  });
+  const _PlaceholderMarkPainter({required this.mark, required this.accent});
 
   final _PlaceholderMark mark;
   final Color accent;
-  final bool compact;
 
   @override
   void paint(Canvas canvas, Size size) {
     final stroke = Paint()
       ..color = accent
       ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 1.8 : 2.1
+      ..strokeWidth = 2.1
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final fill = Paint()
@@ -2248,7 +3295,7 @@ class _PlaceholderMarkPainter extends CustomPainter {
     final glow = Paint()
       ..color = accent.withValues(alpha: 0.18)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 5 : 6
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
@@ -2563,34 +3610,8 @@ class _PlaceholderMarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PlaceholderMarkPainter oldDelegate) {
-    return oldDelegate.mark != mark ||
-        oldDelegate.accent != accent ||
-        oldDelegate.compact != compact;
+    return oldDelegate.mark != mark || oldDelegate.accent != accent;
   }
-}
-
-String? _searchImagePath(CollectibleItem item) {
-  final cloudImageUrl = item.cloudImageUrl?.trim();
-  if (cloudImageUrl != null && cloudImageUrl.isNotEmpty) {
-    return cloudImageUrl;
-  }
-  for (final image in item.galleryImages) {
-    final cloudUrl = image.cloudImageUrl?.trim();
-    if (cloudUrl != null && cloudUrl.isNotEmpty) {
-      return cloudUrl;
-    }
-  }
-  final primaryPath = item.imagePath.trim();
-  if (primaryPath.isNotEmpty && !primaryPath.startsWith('sample://')) {
-    return primaryPath;
-  }
-  for (final image in item.galleryImages) {
-    final path = image.path.trim();
-    if (path.isNotEmpty && !path.startsWith('sample://')) {
-      return path;
-    }
-  }
-  return null;
 }
 
 CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
@@ -2601,6 +3622,7 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
   final confidence = (result.confidence?.clamp(0, 1) ?? 0.72).toDouble();
   final attribution = result.attribution ?? 'Pricing data by ${result.source}';
   final imagePath =
+      result.imageUrl ??
       _placeholderStyle(
         result.category,
         result.title,
@@ -2710,6 +3732,18 @@ _PlaceholderStyle _placeholderStyle(
           'assets/packlox/icons/categories/3d/packlox_category_placeholder_watch_v1.png',
     );
   }
+  if (text.contains('funko') ||
+      text.contains('vinyl figure') ||
+      text.contains('vinyl collectible')) {
+    return const _PlaceholderStyle(
+      label: 'FUNKO',
+      mark: _PlaceholderMark.toy,
+      accent: PackLoxTokens.blue,
+      background: Color(0xFF111827),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_toy_v1.png',
+    );
+  }
   if (text.contains('shoe') || text.contains('sneaker')) {
     return const _PlaceholderStyle(
       label: 'SHOE',
@@ -2732,6 +3766,18 @@ _PlaceholderStyle _placeholderStyle(
       background: Color(0xFF101C22),
       assetPath:
           'assets/packlox/icons/categories/3d/packlox_category_placeholder_game_v1.png',
+    );
+  }
+  if (text.contains('lego') ||
+      text.contains('building set') ||
+      text.contains('brick set')) {
+    return const _PlaceholderStyle(
+      label: 'LEGO',
+      mark: _PlaceholderMark.collectible,
+      accent: PackLoxTokens.cyan,
+      background: Color(0xFF101A20),
+      assetPath:
+          'assets/packlox/icons/categories/3d/packlox_category_placeholder_item_v1.png',
     );
   }
   if (text.contains('toy') ||
@@ -2782,51 +3828,55 @@ class _PlaceholderStyle {
   final String? assetPath;
 }
 
-IconData _quickFilterIcon(String label) {
-  final normalized = label.toLowerCase();
-  if (normalized.contains('card')) {
-    return Icons.style_outlined;
+/// Opens a catalog item's source product page -- or, when available, a
+/// direct link to a publisher-sourced product image -- in an in-app
+/// browser tab (SFSafariViewController on iOS, Chrome Custom Tabs on
+/// Android), failing silently with a brief snackbar if the link cannot be
+/// opened.
+Future<void> _launchExternalLink(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    return;
   }
-  if (normalized.contains('coin')) {
-    return Icons.album_outlined;
+  final messenger = ScaffoldMessenger.of(context);
+  var launched = false;
+  try {
+    launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+  } catch (_) {
+    launched = false;
   }
-  if (normalized.contains('game')) {
-    return Icons.sports_esports_outlined;
+  if (!launched) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Unable to open link')),
+    );
   }
-  if (normalized.contains('figure') || normalized.contains('toy')) {
-    return Icons.smart_toy_outlined;
-  }
-  return Icons.grid_view_outlined;
 }
 
-Color _quickFilterColor(int index) {
-  return switch (index % 4) {
-    0 => PackLoxTokens.cyan,
-    1 => PackLoxTokens.amber,
-    2 => const Color(0xFF9B7CFF),
-    _ => PackLoxTokens.success,
-  };
-}
-
-String _formatSearchValue(CollectibleItem item) {
-  if (item.estimatedValue <= 0) {
-    return 'Pending';
+/// Picks the outbound link target for a catalog result: a direct
+/// publisher-sourced image link when available (preferred, since
+/// PriceCharting's own product page frequently has no image at all for
+/// TCG categories -- the entire reason a separate image-enrichment
+/// pipeline exists), otherwise a fallback to the source's product page.
+/// Returns null when neither is available.
+({String url, bool isImage})? _catalogExternalLink(CatalogSearchResult result) {
+  // result.imageUrl is only ever set by the detail() endpoint (a real,
+  // confirmed match, already rendered inline above -- but cropped to fit
+  // the thumbnail frame). Prefer it here so there's always a way to open
+  // the same photo full-size externally, not just when no inline image
+  // exists.
+  final inlineImageUrl = (result.imageUrl ?? '').trim();
+  if (inlineImageUrl.isNotEmpty) {
+    return (url: inlineImageUrl, isImage: true);
   }
-  final currency = item.pricing?.currency.trim().toUpperCase() ?? 'AUD';
-  final amount = _formatCatalogAmount(item.estimatedValue);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-  if (currency == 'AUD' || currency.isEmpty) {
-    return '\$$withCommas AUD';
+  final externalImageUrl = (result.externalImageUrl ?? '').trim();
+  if (externalImageUrl.isNotEmpty) {
+    return (url: externalImageUrl, isImage: true);
   }
-  if (currency == 'USD') {
-    return 'USD \$$withCommas';
+  final productUrl = (result.productUrl ?? '').trim();
+  if (productUrl.isNotEmpty) {
+    return (url: productUrl, isImage: false);
   }
-  return '$currency $withCommas';
+  return null;
 }
 
 String _formatCatalogValue(CatalogSearchResult result) {

@@ -8,58 +8,81 @@ void main() {
     test('free plan keeps core collecting useful but bounded', () {
       final limits = PlanLimits.forPlan(
         plan: SubscriptionPlan.free,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 10),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
-      expect(limits.scanLimit.dailyFreeScanLimit, 10);
-      expect(limits.maxPortfolioItems, 250);
-      expect(limits.maxPhotosPerItem, 2);
-      expect(limits.maxActivePriceAlerts, 3);
+      expect(limits.scanLimit.monthlyFreeScanLimit, 20);
+      expect(limits.maxPortfolioItems, kFreeMaxCollectibles);
+      expect(limits.maxPhotosPerItem, kFreeMaxPhotosPerItem);
+      expect(limits.maxActivePriceAlerts, kFreeMaxActiveAlerts);
       expect(limits.canUseFullValueHistory, isFalse);
       expect(limits.canExportPortfolio, isFalse);
       expect(limits.canUseAdvancedFilters, isFalse);
+      expect(limits.canUsePortfolioIntelligence, isFalse);
     });
 
-    test('pro unlocks collector tools without bulk refresh', () {
+    test('pro is the single paid tier: everything unlocked', () {
       final limits = PlanLimits.forPlan(
         plan: SubscriptionPlan.pro,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 10),
-      );
-
-      expect(limits.maxPortfolioItems, 1000);
-      expect(limits.maxPhotosPerItem, 6);
-      expect(limits.maxActivePriceAlerts, 25);
-      expect(limits.canUseFullValueHistory, isTrue);
-      expect(limits.canExportPortfolio, isTrue);
-      expect(limits.canUseAdvancedFilters, isTrue);
-      expect(limits.canBulkRefreshValues, isFalse);
-    });
-
-    test('premium unlocks heavy collector tools', () {
-      final limits = PlanLimits.forPlan(
-        plan: SubscriptionPlan.premium,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 10),
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
       expect(limits.scanLimit.isUnlimited, isTrue);
-      expect(limits.maxPortfolioItems, 10000);
-      expect(limits.maxPhotosPerItem, 12);
-      expect(limits.maxActivePriceAlerts, 100);
-      expect(limits.canBulkRefreshValues, isTrue);
+      expect(limits.maxPortfolioItems, kUnlimitedTierCap);
+      expect(limits.maxPhotosPerItem, kProMaxPhotosPerItem);
+      expect(limits.maxActivePriceAlerts, kUnlimitedTierCap);
+      expect(limits.monthlyPriceRefreshes, kUnlimitedTierCap);
+      expect(limits.canUseFullValueHistory, isTrue);
+      expect(limits.canExportPortfolio, isTrue);
+      expect(limits.canUseAdvancedFilters, isTrue);
       expect(limits.canUsePortfolioIntelligence, isTrue);
+      expect(limits.canBulkRefreshValues, isTrue);
     });
 
-    test('portfolio and alert helper checks enforce caps', () {
-      final limits = PlanLimits.forPlan(
-        plan: SubscriptionPlan.free,
-        freeScanLimit: const UsageLimit(dailyFreeScanLimit: 10),
+    test('premium maps to the same limits as pro (data safety)', () {
+      final premium = PlanLimits.forPlan(
+        plan: SubscriptionPlan.premium,
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
+      );
+      final pro = PlanLimits.forPlan(
+        plan: SubscriptionPlan.pro,
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
       );
 
-      expect(limits.canAddPortfolioItem(249), isTrue);
-      expect(limits.canAddPortfolioItem(250), isFalse);
-      expect(limits.canAddPortfolioItem(250, replacingExisting: true), isTrue);
-      expect(limits.canCreatePriceAlert(2), isTrue);
-      expect(limits.canCreatePriceAlert(3), isFalse);
+      expect(premium.scanLimit.isUnlimited, isTrue);
+      expect(premium.maxPortfolioItems, pro.maxPortfolioItems);
+      expect(premium.maxPhotosPerItem, pro.maxPhotosPerItem);
+      expect(premium.maxActivePriceAlerts, pro.maxActivePriceAlerts);
+      expect(premium.canUsePortfolioIntelligence, isTrue);
+    });
+
+    test('high pro caps read as "Unlimited" in labels', () {
+      final pro = PlanLimits.forPlan(
+        plan: SubscriptionPlan.pro,
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
+      );
+
+      expect(pro.portfolioItemsLabel, 'Unlimited');
+      expect(pro.priceAlertsLabel, 'Unlimited');
+    });
+
+    test('portfolio and alert helper checks enforce the free caps', () {
+      final limits = PlanLimits.forPlan(
+        plan: SubscriptionPlan.free,
+        freeScanLimit: const UsageLimit(monthlyFreeScanLimit: 20),
+      );
+
+      expect(limits.canAddPortfolioItem(kFreeMaxCollectibles - 1), isTrue);
+      expect(limits.canAddPortfolioItem(kFreeMaxCollectibles), isFalse);
+      expect(
+        limits.canAddPortfolioItem(
+          kFreeMaxCollectibles,
+          replacingExisting: true,
+        ),
+        isTrue,
+      );
+      expect(limits.canCreatePriceAlert(kFreeMaxActiveAlerts - 1), isTrue);
+      expect(limits.canCreatePriceAlert(kFreeMaxActiveAlerts), isFalse);
     });
   });
 }

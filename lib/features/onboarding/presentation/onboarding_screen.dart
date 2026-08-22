@@ -149,7 +149,7 @@ class _ScanStage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PackLoxHero(
-            variant: PackLoxHeroVariant.standard,
+            variant: PackLoxHeroVariant.scanner,
             eyebrow: 'PackLox',
             title: 'Scan any collectible',
             subtitle:
@@ -161,6 +161,7 @@ class _ScanStage extends StatelessWidget {
           SizedBox(height: AppSpacing.xl),
           _OnboardingSignalCard(
             icon: Icons.photo_camera_outlined,
+            iconColor: _iconCyan,
             title: 'Camera and gallery ready',
             body:
                 'Take a new photo or choose one from your phone when the item is already pictured.',
@@ -168,6 +169,7 @@ class _ScanStage extends StatelessWidget {
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
             icon: Icons.filter_center_focus_outlined,
+            iconColor: _iconPurple,
             title: 'Multiple angles help',
             body:
                 'Add front, back, label, serial, or condition photos when a collectible needs more context.',
@@ -184,28 +186,39 @@ class _ReviewStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'Review',
-      title: 'Check the AI result before saving',
-      subtitle:
-          'PackLox shows what it detected, how confident it is, and what details are available from analysis.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          PackLoxHero(
+            variant: PackLoxHeroVariant.analysis,
+            eyebrow: 'Review',
+            title: 'Check the AI result before saving',
+            subtitle:
+                'PackLox shows what it detected, how confident it is, and what details are available from analysis.',
+            icon: Icons.fact_check_outlined,
+            semanticLabel:
+                'Review the AI result and decide what to keep before saving.',
+          ),
+          SizedBox(height: AppSpacing.xl),
           _OnboardingStepCard(
             icon: Icons.badge_outlined,
+            iconColor: _iconCyan,
             title: 'Identity',
             body:
                 'Review title, category, brand, year, set, edition, and match confidence.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
-            icon: Icons.fact_check_outlined,
+            icon: Icons.rate_review_outlined,
+            iconColor: _iconPurple,
             title: 'Condition and notes',
             body:
-                'Use condition, grading cues, identifiers, and AI reasoning to decide what to keep.',
+                'Use condition, identifiers, and AI reasoning to decide what to keep.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
             icon: Icons.payments_outlined,
+            iconColor: _iconGold,
             title: 'Market value when available',
             body:
                 'Estimated value appears only when PackLox has enough reliable market evidence.',
@@ -222,14 +235,23 @@ class _PortfolioStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'Portfolio',
-      title: 'Build a collection you can manage',
-      subtitle:
-          'Saved items become portfolio records with photos, valuation context, ownership details, and notes.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _OnboardingStepCard(
+          PackLoxHero(
+            variant: PackLoxHeroVariant.portfolio,
+            eyebrow: 'Portfolio',
+            title: 'Build a collection you can manage',
+            subtitle:
+                'Saved items become portfolio records with photos, valuation context, ownership details, and notes.',
             icon: Icons.inventory_2_outlined,
+            semanticLabel:
+                'Saved collectibles become portfolio records you can track over time.',
+          ),
+          SizedBox(height: AppSpacing.xl),
+          _OnboardingStepCard(
+            icon: Icons.bookmark_added_outlined,
+            iconColor: _iconGreen,
             title: 'Save the final result',
             body:
                 'Keep the item after review, then open it later with all captured details.',
@@ -237,13 +259,15 @@ class _PortfolioStage extends StatelessWidget {
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
             icon: Icons.query_stats_outlined,
+            iconColor: _iconGold,
             title: 'Track value and status',
             body:
-                'Use portfolio detail, wishlist status, alerts, and goals as your collection grows.',
+                'Use portfolio detail, wishlist status, and alerts as your collection grows.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingStepCard(
             icon: Icons.dashboard_customize_outlined,
+            iconColor: _iconCyan,
             title: 'See the bigger picture',
             body:
                 'The dashboard gives a quick view of collection activity and next actions.',
@@ -260,21 +284,31 @@ class _ControlStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _OnboardingStageFrame(
-      eyebrow: 'Your account',
-      title: 'Every item belongs to your PackLox account.',
-      subtitle:
-          'Scan, pricing evidence, photos, alerts, and valuation history stay connected to your signed-in collection.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          PackLoxHero(
+            variant: PackLoxHeroVariant.standard,
+            eyebrow: 'Your account',
+            title: 'Every item belongs to your PackLox account',
+            subtitle:
+                'Scan, pricing evidence, photos, alerts, and valuation history stay connected to your signed-in collection.',
+            icon: Icons.account_circle_outlined,
+            semanticLabel:
+                'Your PackLox account keeps your collection connected across devices.',
+          ),
+          SizedBox(height: AppSpacing.xl),
           _OnboardingSignalCard(
             icon: Icons.cloud_done_outlined,
+            iconColor: _iconCyan,
             title: 'Cloud-backed portfolio',
             body:
-                'Your saved collectibles are tied to your account so they can come back after reinstall or device changes.',
+                'Your saved collectibles are tied to your account, so your collection travels with you — not just this device.',
           ),
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
             icon: Icons.verified_user_outlined,
+            iconColor: _iconPurple,
             title: 'Evidence stays attached',
             body:
                 'Photos, notes, identifiers, and pricing snapshots remain part of the same portfolio record.',
@@ -282,6 +316,7 @@ class _ControlStage extends StatelessWidget {
           SizedBox(height: AppSpacing.md),
           _OnboardingSignalCard(
             icon: Icons.lock_outline_rounded,
+            iconColor: _iconGreen,
             title: 'Private account space',
             body:
                 'Your collection is yours. PackLox keeps account access required before portfolio actions begin.',
@@ -293,22 +328,12 @@ class _ControlStage extends StatelessWidget {
 }
 
 class _OnboardingStageFrame extends StatelessWidget {
-  const _OnboardingStageFrame({
-    required this.child,
-    this.eyebrow,
-    this.title,
-    this.subtitle,
-  });
+  const _OnboardingStageFrame({required this.child});
 
-  final String? eyebrow;
-  final String? title;
-  final String? subtitle;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -319,44 +344,7 @@ class _OnboardingStageFrame extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (eyebrow != null) ...[
-                Text(
-                  eyebrow!.toUpperCase(),
-                  style: textTheme.labelSmall?.copyWith(
-                    color: PackLoxTokens.cyan,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.6,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-              if (title != null) ...[
-                Text(
-                  title!,
-                  style: textTheme.headlineMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    height: 1.08,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-              if (subtitle != null) ...[
-                Text(
-                  subtitle!,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: PackLoxTokens.textSecondary,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-              ],
-              child,
-            ],
-          ),
+          child: child,
         ),
       ),
     );
@@ -508,14 +496,25 @@ class _ProgressDot extends StatelessWidget {
   }
 }
 
+// Mirrors category_visual.dart's 4-color palette (which itself mirrors
+// HomeTokens.categoryCards/Coins/Figures/More) so onboarding's icon badges
+// read as the same "PackLox" coloring convention as Home's category tiles,
+// instead of the flat single-cyan badges every card used before.
+const _iconCyan = Color(0xFF22D3EE);
+const _iconGold = Color(0xFFF4B740);
+const _iconPurple = Color(0xFF9B7CFF);
+const _iconGreen = Color(0xFF00D88A);
+
 class _OnboardingStepCard extends StatelessWidget {
   const _OnboardingStepCard({
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.body,
   });
 
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String body;
 
@@ -523,6 +522,7 @@ class _OnboardingStepCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _OnboardingCard(
       icon: icon,
+      iconColor: iconColor,
       title: title,
       body: body,
       borderColor: PackLoxTokens.blue.withValues(alpha: .52),
@@ -533,11 +533,13 @@ class _OnboardingStepCard extends StatelessWidget {
 class _OnboardingSignalCard extends StatelessWidget {
   const _OnboardingSignalCard({
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.body,
   });
 
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String body;
 
@@ -545,6 +547,7 @@ class _OnboardingSignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _OnboardingCard(
       icon: icon,
+      iconColor: iconColor,
       title: title,
       body: body,
       borderColor: PackLoxTokens.border,
@@ -555,12 +558,14 @@ class _OnboardingSignalCard extends StatelessWidget {
 class _OnboardingCard extends StatelessWidget {
   const _OnboardingCard({
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.body,
     required this.borderColor,
   });
 
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String body;
   final Color borderColor;
@@ -592,12 +597,18 @@ class _OnboardingCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: PackLoxTokens.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: PackLoxTokens.border),
+                shape: BoxShape.circle,
+                color: iconColor.withValues(alpha: .14),
+                boxShadow: [
+                  BoxShadow(
+                    color: iconColor.withValues(alpha: .18),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
               child: ExcludeSemantics(
-                child: Icon(icon, color: PackLoxTokens.cyan),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
             ),
             const SizedBox(width: AppSpacing.md),

@@ -8,7 +8,7 @@ class SitDummyBillingConfig {
   /// Creates SIT dummy billing config.
   const SitDummyBillingConfig({
     required this.enabled,
-    this.restorePlan = SubscriptionPlan.premium,
+    this.restorePlan = SubscriptionPlan.pro,
   });
 
   /// Whether dummy billing should be enabled for this build.
@@ -26,7 +26,7 @@ class SitDummyBillingConfig {
     );
     const restorePlanName = String.fromEnvironment(
       'SIT_DUMMY_BILLING_RESTORE_PLAN',
-      defaultValue: 'premium',
+      defaultValue: 'pro',
     );
 
     return SitDummyBillingConfig(
@@ -49,16 +49,10 @@ class SitDummyBillingRepository implements BillingRepository {
       id: 'sit_pro_monthly',
       plan: SubscriptionPlan.pro,
       title: 'PackLox Pro',
-      description: 'Higher scan limits, cloud portfolio tools, and alerts.',
+      description:
+          'Unlimited scans and collection, price history, portfolio '
+          'intelligence, exports, and advanced filters.',
       price: 'AUD 9.99 / month',
-      currencyCode: 'AUD',
-    ),
-    BillingProduct(
-      id: 'sit_premium_monthly',
-      plan: SubscriptionPlan.premium,
-      title: 'PackLox Premium',
-      description: 'Unlimited scans and advanced collector testing access.',
-      price: 'AUD 19.99 / month',
       currencyCode: 'AUD',
     ),
   ];

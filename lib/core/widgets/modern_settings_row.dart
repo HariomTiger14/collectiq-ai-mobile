@@ -12,6 +12,7 @@ class ModernSettingsRow extends StatefulWidget {
     required this.subtitle,
     this.trailing,
     this.trailingText,
+    this.trailingWarning = false,
     this.onTap,
   });
 
@@ -29,6 +30,11 @@ class ModernSettingsRow extends StatefulWidget {
 
   /// Optional trailing text.
   final String? trailingText;
+
+  /// When true, [trailingText] renders as a warning pill instead of plain
+  /// text -- for a status that genuinely needs the user's attention (e.g.
+  /// a missing permission), so it doesn't blend in with routine nav values.
+  final bool trailingWarning;
 
   /// Tap callback.
   final VoidCallback? onTap;
@@ -192,13 +198,23 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
                       ),
                     ),
                     if (trailing != null) ...[
-                      SizedBox(width: dense ? AppSpacing.sm : AppSpacing.md),
+                      SizedBox(width: dense ? AppSpacing.xs : AppSpacing.sm),
                       SizedBox(
-                        width: dense ? 78 : 104,
+                        width: dense ? 68 : 88,
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: trailing,
                         ),
+                      ),
+                    ],
+                    // A chevron appears only when the row navigates, so trailing
+                    // text can be read as status (not a fake "tap me" affordance).
+                    if (widget.onTap != null) ...[
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: HomeTokens.textMuted,
+                        size: dense ? 18 : 20,
                       ),
                     ],
                   ],
@@ -218,13 +234,43 @@ class _ModernSettingsRowState extends State<ModernSettingsRow>
     }
     final textTheme = Theme.of(context).textTheme;
 
+    if (widget.trailingWarning) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: HomeTokens.warning.withValues(alpha: 0.16),
+          // A fixed pill radius (999) stretches into an odd oval once this
+          // wraps to 2 lines, so use a small rounded-rect radius instead.
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: HomeTokens.warning.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: textTheme.labelMedium?.copyWith(
+            color: HomeTokens.warning,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+          ),
+        ),
+      );
+    }
+
+    // Accent only when the row is actionable; muted when it's a status value so
+    // blue never implies tappable on an inert row.
+    final isActionable = widget.onTap != null;
     return Text(
       text,
-      maxLines: 1,
+      maxLines: 2,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
       style: textTheme.labelMedium?.copyWith(
-        color: HomeTokens.accent,
+        color: isActionable ? HomeTokens.accent : HomeTokens.textSecondary,
         fontSize: 12.5,
         fontWeight: FontWeight.w800,
       ),

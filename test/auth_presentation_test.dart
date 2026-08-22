@@ -185,8 +185,8 @@ void main() {
       findsNothing,
     );
 
-    expect(find.text('Account'), findsOneWidget);
-    await tester.tap(find.text('Account').first);
+    expect(find.byKey(const ValueKey('settings-account-row')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('settings-account-row')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 240));
 
@@ -2070,11 +2070,17 @@ void main() {
       find.byKey(const ValueKey('settings-auth-sign-in-button')),
       findsNothing,
     );
+    await tester.revealText('Sign Out');
     expect(find.text('Sign Out'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Sign Out'));
-    await tester.pump();
     await tester.tap(find.text('Sign Out'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+
+    expect(find.text('Sign Out?'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-danger-confirm-button')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 240));
 
@@ -2183,6 +2189,24 @@ extension on WidgetTester {
     );
     await pump();
     return container;
+  }
+
+  /// Scrolls a lazily-built sliver list (e.g. Settings' CustomScrollView)
+  /// until [text] is actually built into the tree -- off-screen sliver
+  /// content isn't present for `find.text`/`ensureVisible` until scrolled
+  /// near the viewport at least once.
+  Future<void> revealText(String text) async {
+    final scrollable = find.byType(Scrollable).first;
+    for (var attempt = 0; attempt < 24; attempt += 1) {
+      if (find.text(text).evaluate().isNotEmpty) {
+        await ensureVisible(find.text(text).first);
+        await pump();
+        return;
+      }
+      await drag(scrollable, const Offset(0, -320));
+      await pump();
+    }
+    fail('Could not reveal "$text".');
   }
 
   Future<void> pumpAuthRoute({

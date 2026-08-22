@@ -1,11 +1,11 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_header.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_wordmark.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeTokens {
   const HomeTokens._();
@@ -26,6 +26,7 @@ class HomeTokens {
   static const textMuted = Color(0xFF6F8295);
   static const positive = Color(0xFF00D88A);
   static const warning = Color(0xFFF4B740);
+  static const negative = Color(0xFFFF5C5C);
 
   static const pageGutter = 16.0;
   static const cardPadding = 14.0;
@@ -40,11 +41,17 @@ class HomeTokens {
 class HomeBrandLockup extends StatelessWidget {
   const HomeBrandLockup({
     this.showAlert = false,
+    this.alertCount = 0,
     this.onAlertPressed,
     super.key,
   });
 
   final bool showAlert;
+
+  /// Number of items/alerts needing attention. When > 0 a small count badge
+  /// is shown on the alert button so it reads at a glance instead of a bare
+  /// indicator.
+  final int alertCount;
   final VoidCallback? onAlertPressed;
 
   @override
@@ -72,20 +79,57 @@ class HomeBrandLockup extends StatelessWidget {
           ),
         ),
         if (showAlert)
-          IconButton(
-            key: const ValueKey('home-alert-button'),
-            tooltip: 'Collection alert',
-            onPressed: onAlertPressed,
-            icon: const Icon(Icons.priority_high_rounded),
-            color: HomeTokens.warning,
-            style: IconButton.styleFrom(
-              backgroundColor: HomeTokens.surfaceRaised,
-              side: const BorderSide(color: HomeTokens.border),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                key: const ValueKey('home-alert-button'),
+                tooltip: alertCount > 0
+                    ? '$alertCount ${alertCount == 1 ? 'item needs' : 'items need'} attention'
+                    : 'Collection alert',
+                onPressed: onAlertPressed,
+                icon: const Icon(Icons.notifications_none_rounded),
+                color: HomeTokens.textPrimary,
+                style: IconButton.styleFrom(
+                  backgroundColor: HomeTokens.surfaceRaised,
+                  side: const BorderSide(color: HomeTokens.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  fixedSize: const Size.square(54),
+                ),
               ),
-              fixedSize: const Size.square(54),
-            ),
+              if (alertCount > 0)
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    key: const ValueKey('home-alert-badge'),
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 22,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: HomeTokens.warning,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: HomeTokens.background,
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      alertCount > 99 ? '99+' : '$alertCount',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: HomeTokens.background,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
       ],
     );
@@ -111,7 +155,7 @@ class HomeTitleBlock extends StatelessWidget {
             height: 1.05,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 10),
         Text(
           subtitle,
           key: const ValueKey('home-state-subtitle'),
@@ -301,6 +345,8 @@ class HomeActionRow extends StatelessWidget {
     required this.subtitle,
     this.iconColor = const Color(0xFF8BC7FF),
     this.informational = false,
+    this.emphasis = false,
+    this.showChevron = true,
     this.onTap,
     super.key,
   });
@@ -311,6 +357,14 @@ class HomeActionRow extends StatelessWidget {
   final String subtitle;
   final Color iconColor;
   final bool informational;
+
+  /// Accent-filled primary treatment for the main call to action on a screen
+  /// (e.g. the scanner's "Take a photo"). Only applies while [onTap] is set.
+  final bool emphasis;
+
+  /// Trailing disclosure chevron. Hidden for button-style actions that open a
+  /// flow (camera/gallery) rather than navigate into a list/detail.
+  final bool showChevron;
   final VoidCallback? onTap;
 
   @override
@@ -333,6 +387,34 @@ class HomeActionRow extends StatelessWidget {
         ? HomeTokens.border.withValues(alpha: .82)
         : HomeTokens.border.withValues(alpha: .58);
 
+    // Accent-filled primary variant. Falls back to the standard surface styling
+    // when the row is disabled so the emphasis never sits on a dead control.
+    final useEmphasis = emphasis && enabled;
+    final surfaceColor = useEmphasis
+        ? HomeTokens.accent
+        : enabled
+        ? HomeTokens.surfaceRaised
+        : informational
+        ? HomeTokens.surfaceRaised.withValues(alpha: .88)
+        : HomeTokens.surfaceRaised.withValues(alpha: .64);
+    final resolvedBorderColor = useEmphasis
+        ? HomeTokens.accentStrong
+        : borderColor;
+    final iconBackgroundColor = useEmphasis
+        ? Colors.white.withValues(alpha: .22)
+        : effectiveIconColor.withValues(
+            alpha: enabled
+                ? .18
+                : informational
+                ? .14
+                : .10,
+          );
+    final resolvedIconColor = useEmphasis ? Colors.white : effectiveIconColor;
+    final resolvedTitleColor = useEmphasis ? Colors.white : titleColor;
+    final resolvedSubtitleColor = useEmphasis
+        ? Colors.white.withValues(alpha: .84)
+        : subtitleColor;
+
     return MotionTapScale(
       onTap: onTap,
       child: Semantics(
@@ -346,13 +428,9 @@ class HomeActionRow extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 84),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: enabled
-                ? HomeTokens.surfaceRaised
-                : informational
-                ? HomeTokens.surfaceRaised.withValues(alpha: .88)
-                : HomeTokens.surfaceRaised.withValues(alpha: .64),
+            color: surfaceColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
+            border: Border.all(color: resolvedBorderColor),
           ),
           child: Row(
             children: [
@@ -360,16 +438,10 @@ class HomeActionRow extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: effectiveIconColor.withValues(
-                    alpha: enabled
-                        ? .18
-                        : informational
-                        ? .14
-                        : .10,
-                  ),
+                  color: iconBackgroundColor,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: effectiveIconColor, size: 24),
+                child: Icon(icon, color: resolvedIconColor, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -382,7 +454,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: titleColor,
+                        color: resolvedTitleColor,
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
@@ -393,7 +465,7 @@ class HomeActionRow extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: subtitleColor,
+                        color: resolvedSubtitleColor,
                         fontWeight: FontWeight.w600,
                         height: 1.22,
                       ),
@@ -401,17 +473,15 @@ class HomeActionRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                key: ValueKey('home-action-$keySeed-chevron'),
-                color: enabled
-                    ? const Color(0xFF8BC7FF)
-                    : informational
-                    ? HomeTokens.textSecondary
-                    : HomeTokens.textMuted,
-                size: 26,
-              ),
+              if (enabled && showChevron) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  key: ValueKey('home-action-$keySeed-chevron'),
+                  color: const Color(0xFF8BC7FF),
+                  size: 26,
+                ),
+              ],
             ],
           ),
         ),
@@ -668,15 +738,22 @@ class HomeStateContainer extends StatelessWidget {
   const HomeStateContainer({
     required this.sections,
     this.controller,
+    this.storageKey = 'home-scroll-position',
     this.topPadding = AppSpacing.xs,
     this.bottomClearance = HomeTokens.bottomContentClearance,
+    this.onRefresh,
     super.key,
   });
 
   final List<Widget> sections;
   final ScrollController? controller;
+  final String storageKey;
   final double topPadding;
   final double bottomClearance;
+
+  /// Pull-to-refresh handler. When set, wraps the scroll view in a
+  /// [RefreshIndicator] so Home can re-sync the portfolio on demand.
+  final Future<void> Function()? onRefresh;
 
   static double gutterForWidth(double width) {
     if (width < 360) {
@@ -696,8 +773,8 @@ class HomeStateContainer extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final gutter = gutterForWidth(constraints.maxWidth);
-        return CustomScrollView(
-          key: const PageStorageKey<String>('home-scroll-position'),
+        final scrollView = CustomScrollView(
+          key: PageStorageKey<String>(storageKey),
           controller: controller,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
@@ -706,14 +783,34 @@ class HomeStateContainer extends StatelessWidget {
             SliverPadding(
               padding: EdgeInsets.only(top: topPadding),
               sliver: SliverList(
-                delegate: SliverChildListDelegate.fixed([
+                // Regular (not .fixed) delegate so children are reconciled by
+                // key, not just index. Combined with forwarding each section's
+                // key onto the wrapper Flutter diffs, a keyed section keeps its
+                // element (and any focus) when sibling sections are inserted or
+                // removed — e.g. the Portfolio search hero appearing on a
+                // no-match query, which otherwise rebuilt the search field and
+                // dropped focus after a single character.
+                delegate: SliverChildListDelegate([
                   for (final section in sections)
-                    _HomeConstrainedSection(gutter: gutter, child: section),
+                    _HomeConstrainedSection(
+                      key: section.key,
+                      gutter: gutter,
+                      child: section,
+                    ),
                   SizedBox(height: bottomClearance),
                 ]),
               ),
             ),
           ],
+        );
+        if (onRefresh == null) {
+          return scrollView;
+        }
+        return RefreshIndicator(
+          onRefresh: onRefresh!,
+          color: HomeTokens.accent,
+          backgroundColor: HomeTokens.surfaceRaised,
+          child: scrollView,
         );
       },
     );
@@ -742,7 +839,11 @@ class HomeSection extends StatelessWidget {
 }
 
 class _HomeConstrainedSection extends StatelessWidget {
-  const _HomeConstrainedSection({required this.gutter, required this.child});
+  const _HomeConstrainedSection({
+    required this.gutter,
+    required this.child,
+    super.key,
+  });
 
   final double gutter;
   final Widget child;
@@ -1219,6 +1320,7 @@ class HomeValueMetricCard extends StatelessWidget {
     required this.value,
     this.isUnavailable = false,
     this.changeLabel,
+    this.changeColor = HomeTokens.positive,
     this.trendValues = const [],
     super.key,
   });
@@ -1227,6 +1329,7 @@ class HomeValueMetricCard extends StatelessWidget {
   final String value;
   final bool isUnavailable;
   final String? changeLabel;
+  final Color changeColor;
   final List<double> trendValues;
 
   @override
@@ -1262,7 +1365,7 @@ class HomeValueMetricCard extends StatelessWidget {
             Text(
               changeLabel!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: HomeTokens.positive,
+                color: changeColor,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1327,6 +1430,101 @@ class _HomeSparklinePainter extends CustomPainter {
   }
 }
 
+class HomeSparkline extends StatelessWidget {
+  const HomeSparkline({
+    required this.values,
+    this.color = HomeTokens.accent,
+    this.height = 52,
+    super.key,
+  });
+
+  final List<double> values;
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (values.length < 2) {
+      return SizedBox(height: height);
+    }
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _HomeAreaSparklinePainter(values: values, color: color),
+      ),
+    );
+  }
+}
+
+class _HomeAreaSparklinePainter extends CustomPainter {
+  const _HomeAreaSparklinePainter({required this.values, required this.color});
+
+  final List<double> values;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) {
+      return;
+    }
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final span = maxValue - minValue;
+    const topInset = 6.0;
+    const bottomInset = 4.0;
+    final usableHeight = size.height - topInset - bottomInset;
+    final points = <Offset>[];
+    for (var i = 0; i < values.length; i++) {
+      final x = size.width * i / (values.length - 1);
+      final normalized = span == 0 ? 0.5 : (values[i] - minValue) / span;
+      final y = topInset + usableHeight * (1 - normalized);
+      points.add(Offset(x, y));
+    }
+
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      linePath.lineTo(point.dx, point.dy);
+    }
+
+    final fillPath = Path.from(linePath)
+      ..lineTo(points.last.dx, size.height)
+      ..lineTo(points.first.dx, size.height)
+      ..close();
+    canvas.drawPath(
+      fillPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0)],
+        ).createShader(Offset.zero & size),
+    );
+
+    canvas.drawPath(
+      linePath,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 2.5,
+    );
+
+    canvas.drawCircle(points.last, 3.5, Paint()..color = color);
+    canvas.drawCircle(
+      points.last,
+      6,
+      Paint()..color = color.withValues(alpha: 0.22),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HomeAreaSparklinePainter oldDelegate) {
+    return oldDelegate.values != values || oldDelegate.color != color;
+  }
+}
+
 enum HomeCategoryKind { cards, coins, figures, more }
 
 class HomeCategoryTile extends StatelessWidget {
@@ -1341,34 +1539,37 @@ class HomeCategoryTile extends StatelessWidget {
   });
 
   factory HomeCategoryTile.cards({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Cards');
     return HomeCategoryTile(
       label: 'Cards',
-      icon: Icons.style_outlined,
-      assetPath: PackLoxAssets.categoryCards,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'trading cards',
-      iconColor: HomeTokens.categoryCards,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
 
   factory HomeCategoryTile.coins({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Coins');
     return HomeCategoryTile(
       label: 'Coins',
-      icon: Icons.album_outlined,
-      assetPath: PackLoxAssets.categoryCoins,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'collectible coins and medallions',
-      iconColor: HomeTokens.categoryCoins,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
 
   factory HomeCategoryTile.figures({VoidCallback? onTap}) {
+    final visual = categoryVisualFor('Figures');
     return HomeCategoryTile(
       label: 'Figures',
-      icon: Icons.smart_toy_outlined,
-      assetPath: PackLoxAssets.categoryFigures,
+      icon: visual.icon,
+      assetPath: visual.assetPath!,
       semanticMeaning: 'figurines and action figures',
-      iconColor: HomeTokens.categoryFigures,
+      iconColor: visual.color,
       onTap: onTap,
     );
   }
@@ -1377,7 +1578,7 @@ class HomeCategoryTile extends StatelessWidget {
     return HomeCategoryTile(
       label: 'More',
       icon: Icons.grid_view_outlined,
-      assetPath: PackLoxAssets.categoryMore,
+      assetPath: PackLoxAssets.categoryColorLego,
       semanticMeaning: 'more categories grid',
       iconColor: HomeTokens.categoryMore,
       onTap: onTap,
@@ -1402,7 +1603,10 @@ class HomeCategoryTile extends StatelessWidget {
         onTap: onTap,
         child: Container(
           key: ValueKey('home-popular-category-${label.toLowerCase()}'),
-          constraints: const BoxConstraints(minHeight: 74, minWidth: 48),
+          // Taller floor reserves room for two-line labels (e.g. "Video Games",
+          // "One Piece") so long names wrap instead of truncating, while short
+          // ones still sit on a uniform tile height.
+          constraints: const BoxConstraints(minHeight: 92, minWidth: 48),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -1413,23 +1617,26 @@ class HomeCategoryTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset(
+              CategoryArtwork(
                 key: ValueKey(
                   'home-popular-category-${label.toLowerCase()}-icon',
                 ),
-                assetPath,
-                width: 30,
-                height: 30,
-                colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                visual: CategoryVisual(
+                  icon: icon,
+                  color: iconColor,
+                  assetPath: assetPath,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 label,
-                maxLines: 1,
+                maxLines: 2,
+                textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: HomeTokens.textPrimary,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
                 ),
               ),
             ],

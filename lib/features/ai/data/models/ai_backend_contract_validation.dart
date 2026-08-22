@@ -68,17 +68,25 @@ class AiBackendContractValidator {
   }
 
   /// Validates a parsed response after safe defaults have been applied.
+  ///
+  /// This only guards against a genuinely malformed/empty response — it must
+  /// NOT reject a well-formed "I couldn't identify this" result. The backend
+  /// legitimately returns itemName "Unknown collectible" / category
+  /// "Collectible" (with low/zero confidence) when a real photo isn't a
+  /// recognizable collectible; that's a valid low-confidence outcome for the
+  /// result screen to show (see the "Needs Review" banner), not a contract
+  /// violation. Raw field presence is already enforced by
+  /// [validateResponsePayload] before parsing, so re-checking the resolved
+  /// string here only ever caught legitimate unknown-item responses.
   AiBackendContractValidationResult validateResponse(
     AiBackendAnalysisResponse response,
   ) {
     final issues = <String>[];
-    if (response.itemName.trim().isEmpty ||
-        response.itemName == 'Unknown collectible') {
-      issues.add('itemName is missing or defaulted.');
+    if (response.itemName.trim().isEmpty) {
+      issues.add('itemName is missing.');
     }
-    if (response.category.trim().isEmpty ||
-        response.category == 'Collectible') {
-      issues.add('category is missing or defaulted.');
+    if (response.category.trim().isEmpty) {
+      issues.add('category is missing.');
     }
     final allowsUnavailableValue = switch (response.valuationStatus) {
       ValuationStatus.providerNotConfigured ||
@@ -90,7 +98,9 @@ class AiBackendContractValidator {
     if (response.estimatedValue <= 0 && !allowsUnavailableValue) {
       issues.add('estimatedValue must be greater than zero.');
     }
-    if (response.confidence <= 0 || response.confidence > 1) {
+    // 0 is a legitimate "no confidence at all" signal for an unidentified
+    // item, not a malformed response — only reject out-of-range values.
+    if (response.confidence < 0 || response.confidence > 1) {
       issues.add('confidence must be between 0 and 1.');
     }
     if (response.condition.trim().isEmpty) {

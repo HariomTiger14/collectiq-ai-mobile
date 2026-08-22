@@ -1,6 +1,10 @@
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/api_client.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart';
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -8,6 +12,7 @@ import 'package:collectiq_ai/features/image_sync/domain/entities/image_upload_ta
 import 'package:collectiq_ai/features/image_sync/domain/entities/sync_queue_snapshot.dart';
 import 'package:collectiq_ai/features/image_sync/domain/repositories/sync_queue_repository.dart';
 import 'package:collectiq_ai/features/image_sync/presentation/controllers/image_sync_controller.dart';
+import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -41,13 +46,24 @@ void main() {
       await _pumpDetail(tester, _authorityItem());
 
       expect(
+        find.byKey(const ValueKey('collectible-detail-intelligence-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('Evidence looks healthy'), findsOneWidget);
+      expect(
         find.byKey(const ValueKey('collectible-detail-authority-header')),
         findsOneWidget,
       );
-      expect(find.text('Portfolio Detail'), findsOneWidget);
-      expect(find.text('Saved collectible'), findsOneWidget);
+      // The item leads directly now — no generic "Portfolio Detail" title block
+      // and no repeated "Saved collectible" eyebrow. The name shows once, in the
+      // overview below.
+      expect(find.text('Portfolio Detail'), findsNothing);
       expect(
         find.byKey(const ValueKey('collectible-detail-authority-overview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-title')),
         findsOneWidget,
       );
       expect(
@@ -75,29 +91,33 @@ void main() {
       expect(find.text('Gain/Loss'), findsOneWidget);
       expect(find.text('USD \$200'), findsWidgets);
       expect(find.text('USD \$245'), findsWidgets);
-      expect(find.text('+USD \$45'), findsOneWidget);
+      // Converted to the display currency (AUD, the default with no profile
+      // override) at parity, not left in the item's own USD -- this is the
+      // exact bug being fixed: a value/movement label must respect the
+      // user's chosen display currency, not just the item's stored one.
+      expect(find.text('+\$45 AUD'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
-      await _revealText(tester, 'Pricing Trust');
-      expect(find.text('Pricing Trust'), findsOneWidget);
+      await _revealText(tester, 'Pricing evidence');
+      expect(find.text('Pricing evidence'), findsOneWidget);
       expect(find.text('Trusted market valuation'), findsWidgets);
       expect(find.text('Verified'), findsOneWidget);
       expect(find.text('Provider'), findsWidgets);
       expect(find.text('Saved provider'), findsWidgets);
+      expect(find.text('Currency'), findsWidgets);
       expect(find.text('Value range'), findsWidgets);
-      expect(find.text('USD \$220 - USD \$270'), findsWidgets);
+      expect(find.text('USD \$220 - \$270'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },
   );
 
   testWidgets(
-    'inline gallery preserves saved image order and active preview switching',
+    'overview gallery preserves saved image order and active preview switching',
     (tester) async {
       await _pumpDetail(tester, _authorityItem());
 
-      await _revealText(tester, 'Image Gallery');
-
-      expect(find.text('Image Gallery'), findsOneWidget);
+      // Image browsing lives in the overview hero + filmstrip at the top of the
+      // screen; there is a single filmstrip (no duplicate in a gallery section).
       expect(
         find.byKey(const ValueKey('collectible-detail-gallery-filmstrip')),
         findsOneWidget,
@@ -111,9 +131,7 @@ void main() {
       await tester.tap(detailTile);
       await tester.pumpAndSettle();
 
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, 900));
-      await tester.pumpAndSettle();
-
+      // Selecting a thumbnail swaps the overview hero to that image.
       expect(
         find.byKey(const ValueKey('collectible-detail-hero-sample://detail')),
         findsOneWidget,
@@ -122,8 +140,9 @@ void main() {
   );
 
   testWidgets(
-    'inline market section separates unavailable valuation from saved zero value',
+    'value card separates unavailable valuation from saved zero market value',
     (tester) async {
+      // Unavailable: no trusted value → "No valuation saved" on the top card.
       await _pumpDetail(
         tester,
         _authorityItem(
@@ -131,11 +150,10 @@ void main() {
           valuationStatus: ValuationStatus.unavailable,
         ),
       );
-
-      await _revealText(tester, 'Market & Value');
-      expect(find.text('Value unavailable'), findsWidgets);
       expect(find.text('No valuation saved'), findsWidgets);
+      expect(find.text('Estimated from saved market data'), findsNothing);
 
+      // Saved zero market value: a trusted status with distinct copy.
       await _pumpDetail(
         tester,
         _authorityItem(
@@ -143,10 +161,8 @@ void main() {
           valuationStatus: ValuationStatus.marketEstimated,
         ),
       );
-
-      await _revealText(tester, 'Market & Value');
-      expect(find.textContaining('USD \$0'), findsWidgets);
       expect(find.text('Estimated from saved market data'), findsWidgets);
+      expect(find.text('No valuation saved'), findsNothing);
     },
   );
 
@@ -174,19 +190,21 @@ void main() {
         );
 
     await _pumpDetail(tester, item);
-    await _revealText(tester, 'Pricing Trust');
+    await _revealText(tester, 'Pricing evidence');
 
-    expect(find.text('Pricing Trust'), findsOneWidget);
+    expect(find.text('Pricing evidence'), findsOneWidget);
     expect(find.text('Unavailable'), findsOneWidget);
     expect(find.text('No trusted match yet'), findsWidgets);
     expect(
       find.text(
-        'PackLox could not match this identity to trusted catalog or sold-comps evidence. Correct details and reprice.',
+        'PackLox could not match this item to a trusted pricing source. Add the exact name, set, number, SKU, or condition and recheck value.',
       ),
       findsWidgets,
     );
-    expect(find.text('Match basis'), findsOneWidget);
-    expect(find.text('Catalog match'), findsOneWidget);
+    expect(find.text('Pricing confidence'), findsWidgets);
+    expect(find.text('Not available'), findsWidgets);
+    expect(find.text('Match basis'), findsNothing);
+    expect(find.text('Reason'), findsWidgets);
   });
 
   testWidgets('favorite action persists wishlist status', (tester) async {
@@ -395,6 +413,113 @@ void main() {
     );
   });
 
+  testWidgets('refresh value uses backend reprice contract', (tester) async {
+    final item = _authorityItem();
+    final repository = _MemoryPortfolioRepository([item]);
+    final apiClient = _SuccessfulRepriceApiClient();
+    final valuationSnapshots = _RecordingValuationSnapshotRepository();
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: apiClient,
+      valuationSnapshotRepository: valuationSnapshots,
+    );
+
+    await _revealText(tester, 'Actions Menu');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-refresh-value-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(apiClient.lastPath, ApiConstants.pricingRepricePath);
+    final payload = apiClient.lastPayload;
+    expect(payload['itemId'], item.id);
+    expect(payload['previousValue'], item.pricing?.estimatedMarketValue);
+    expect(payload['previousCurrency'], item.pricing?.currency);
+    expect(payload['correctionSource'], 'portfolio_manual_correction');
+    final identity = payload['identity'] as Map<String, dynamic>;
+    expect(identity['title'], item.title);
+    expect(identity['category'], item.category);
+    expect(identity['setName'], item.setName);
+    expect(identity['cardNumber'], item.cardNumber);
+
+    final updated = repository.items.single;
+    expect(updated.estimatedValue, 310);
+    expect(updated.valuationStatus, ValuationStatus.marketEstimated);
+    expect(updated.valuationSource, 'PriceCharting');
+    expect(updated.pricing?.pricingSource, 'PriceCharting');
+    expect(updated.valueAtScan, item.valueAtScan);
+    expect(updated.lastValueRefreshedAt, isNotNull);
+    expect(valuationSnapshots.recordedItems, hasLength(1));
+    expect(valuationSnapshots.recordedItems.single.id, item.id);
+    expect(valuationSnapshots.snapshots, hasLength(1));
+    expect(valuationSnapshots.snapshots.single.valueAud, 310);
+    expect(
+      valuationSnapshots.snapshots.single.pricingProvider,
+      'PriceCharting',
+    );
+    expect(find.text('Portfolio value refreshed'), findsOneWidget);
+  });
+
+  testWidgets('refresh value skips duplicate history when value is unchanged', (
+    tester,
+  ) async {
+    final item = _authorityItem(estimatedValue: 310).copyWith(
+      pricing: const PricingInfo(
+        estimatedMarketValue: 310,
+        lowEstimate: 290,
+        highEstimate: 340,
+        currency: 'USD',
+        pricingSource: 'PriceCharting',
+        pricingConfidence: 0.88,
+        lastUpdated: null,
+        valuationStatus: ValuationStatus.marketEstimated,
+        valuationSource: 'PriceCharting',
+      ),
+      valuationStatus: ValuationStatus.marketEstimated,
+      valuationSource: 'PriceCharting',
+      lastValueRefreshedAt: DateTime(2026, 7, 26),
+    );
+    final repository = _MemoryPortfolioRepository([item]);
+    final apiClient = _SuccessfulRepriceApiClient(value: 310);
+    final valuationSnapshots = _RecordingValuationSnapshotRepository();
+    valuationSnapshots.snapshots.add(
+      PortfolioValuationSnapshot(
+        id: 'detail-authority-item-seeded',
+        portfolioItemId: 'detail-authority-item',
+        valueAud: 310,
+        lowEstimateAud: 290,
+        highEstimateAud: 340,
+        displayString: 'USD \$310.00',
+        valuationStatus: ValuationStatus.marketEstimated,
+        pricingProvider: 'PriceCharting',
+        confidenceScore: 0.88,
+        pricedAt: DateTime(2026, 7, 26),
+      ),
+    );
+
+    await _pumpDetail(
+      tester,
+      item,
+      portfolioRepository: repository,
+      apiClient: apiClient,
+      valuationSnapshotRepository: valuationSnapshots,
+    );
+
+    await _revealText(tester, 'Actions Menu');
+    await tester.tap(
+      find.byKey(const ValueKey('collectible-detail-refresh-value-action')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.items.single.lastValueRefreshedAt, isNotNull);
+    expect(valuationSnapshots.recordedItems, isEmpty);
+    expect(valuationSnapshots.snapshots, hasLength(1));
+    expect(find.text('Portfolio value refreshed'), findsOneWidget);
+  });
+
   testWidgets('correct and reprice uses backend reprice contract', (
     tester,
   ) async {
@@ -472,7 +597,10 @@ void main() {
     expect(find.text('Snapshot value'), findsOneWidget);
     expect(find.text('USD \$161'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
-    expect(find.text('Trend begins after next refresh.'), findsOneWidget);
+    expect(
+      find.text('Refresh value to save the first trusted history point.'),
+      findsOneWidget,
+    );
     expect(find.text('+Value unavailable'), findsNothing);
     expect(find.text('Source'), findsWidgets);
     expect(find.text('PriceCharting'), findsWidgets);
@@ -501,7 +629,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Portfolio Detail'), findsOneWidget);
+      expect(find.text('Portfolio Detail'), findsNothing);
       expect(
         find.byKey(const ValueKey('collectible-detail-authority-overview')),
         findsOneWidget,
@@ -527,8 +655,8 @@ void main() {
       expect(find.text('Brand'), findsOneWidget);
       expect(find.text('PackLox Motors'), findsOneWidget);
 
-      await _revealText(tester, 'AI Insights');
-      expect(find.text('AI Insights'), findsOneWidget);
+      await _revealText(tester, 'Item insights');
+      expect(find.text('Item insights'), findsOneWidget);
       expect(
         find.textContaining('Stored scan reasoning only.'),
         findsOneWidget,
@@ -536,7 +664,7 @@ void main() {
 
       await _revealText(tester, 'Stored owner note.');
       expect(
-        find.byKey(const ValueKey('collectible-detail-notes-field')),
+        find.byKey(const ValueKey('collectible-detail-notes-edit-button')),
         findsOneWidget,
       );
       expect(find.text('Stored owner note.'), findsOneWidget);
@@ -649,7 +777,11 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('edit-collectible-low-value-field')),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('edit-collectible-high-value-field')),
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('edit-collectible-save-button')),
@@ -724,12 +856,8 @@ void main() {
       'Trading Card',
     );
     await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-low-value-field')),
-      '260',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('edit-collectible-high-value-field')),
-      '300',
+      find.byKey(const ValueKey('edit-collectible-set-field')),
+      'Edited Set',
     );
     await tester.tap(
       find.byKey(const ValueKey('edit-collectible-save-button')),
@@ -738,6 +866,61 @@ void main() {
 
     expect(find.byKey(const ValueKey('edit-collectible-sheet')), findsNothing);
     expect(find.text('Collectible updated'), findsOneWidget);
+  });
+
+  testWidgets('detail intelligence review opens correction sheet', (
+    tester,
+  ) async {
+    final item =
+        _authorityItem(
+          estimatedValue: 0,
+          valuationStatus: ValuationStatus.noMarketMatch,
+          imagePath: '',
+          galleryImages: const [],
+        ).copyWith(
+          category: 'Pokemon Card',
+          setName: '',
+          cardNumber: '',
+          rarity: '',
+          pricing: const PricingInfo(
+            estimatedMarketValue: 0,
+            lowEstimate: 0,
+            highEstimate: 0,
+            currency: 'USD',
+            pricingSource: 'PriceCharting',
+            pricingConfidence: 0.42,
+            lastUpdated: null,
+            valuationStatus: ValuationStatus.noMarketMatch,
+            valuationSource: 'pricecharting',
+            reasonCode: 'NO_MARKET_MATCH',
+            valuationStrategy: 'catalog_lookup',
+          ),
+        );
+
+    await _pumpDetail(tester, item);
+
+    expect(
+      find.byKey(const ValueKey('collectible-detail-intelligence-panel')),
+      findsOneWidget,
+    );
+    expect(find.text('Trusted value needs review'), findsOneWidget);
+    expect(find.textContaining('Review the identity fields'), findsOneWidget);
+    await tester.tap(
+      find.byKey(
+        const ValueKey('collectible-detail-intelligence-review-details-action'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('edit-collectible-sheet')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('edit-collectible-card-number-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Save & reprice'), findsOneWidget);
   });
 }
 
@@ -751,6 +934,7 @@ Future<void> _pumpDetail(
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
   PlanLimits? planLimits,
+  SharedPreferencesValuationSnapshotRepository? valuationSnapshotRepository,
 }) async {
   tester.view.physicalSize = const Size(900, 1200);
   tester.view.devicePixelRatio = 1;
@@ -779,6 +963,23 @@ Future<void> _pumpDetail(
         if (apiClient != null) apiClientProvider.overrideWithValue(apiClient),
         if (planLimits != null)
           activePlanLimitsProvider.overrideWithValue(planLimits),
+        if (valuationSnapshotRepository != null)
+          valuationSnapshotRepositoryProvider.overrideWithValue(
+            valuationSnapshotRepository,
+          ),
+        // Fixed, no-network rates so currency-display tests are
+        // deterministic. Parity (1.0 for every tracked currency) keeps
+        // every pre-existing dollar-amount assertion in this file valid --
+        // converting at parity only changes which currency label is shown,
+        // never the number.
+        fxRatesRepositoryProvider.overrideWithValue(
+          const _FixedRateFxRatesRepository({
+            'USD': 1.0,
+            'AUD': 1.0,
+            'CAD': 1.0,
+            'GBP': 1.0,
+          }),
+        ),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -789,6 +990,51 @@ Future<void> _pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _FixedRateFxRatesRepository implements FxRatesRepository {
+  const _FixedRateFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
+}
+
+class _RecordingValuationSnapshotRepository
+    extends SharedPreferencesValuationSnapshotRepository {
+  final List<CollectibleItem> recordedItems = [];
+  final List<PortfolioValuationSnapshot> snapshots = [];
+
+  @override
+  Future<List<PortfolioValuationSnapshot>> getSnapshots(String itemId) async {
+    return snapshots
+        .where((snapshot) => snapshot.portfolioItemId == itemId)
+        .toList();
+  }
+
+  @override
+  Future<void> recordSnapshot(CollectibleItem item) async {
+    recordedItems.add(item);
+    final pricing = item.pricing;
+    final value = pricing?.estimatedMarketValue;
+    snapshots.add(
+      PortfolioValuationSnapshot(
+        id: '${item.id}-${snapshots.length + 1}',
+        portfolioItemId: item.id,
+        valueAud: value,
+        lowEstimateAud: pricing?.lowEstimate,
+        highEstimateAud: pricing?.highEstimate,
+        displayString: pricing?.displayString,
+        valuationStatus: item.valuationStatus,
+        pricingProvider: pricing?.pricingSource,
+        confidenceScore: pricing?.pricingConfidence,
+        pricedAt: item.lastValueRefreshedAt ?? DateTime(2026, 7, 27),
+      ),
+    );
+  }
 }
 
 const _premiumPlanLimits = PlanLimits(
@@ -941,25 +1187,22 @@ class _UnavailablePricingApiClient extends ApiClient {
       requestOptions: dio.RequestOptions(path: path),
       data: {
         'success': true,
-        'data': {
-          'estimatedValue': 0,
+        'pricing': {
+          'status': 'unavailable',
+          'reasonCode': 'NO_MARKET_MATCH',
+          'displayMessage': 'No trusted market match found for this identity.',
           'estimatedMarketValue': 0,
+          'lowEstimate': 0,
+          'highEstimate': 0,
           'currency': 'USD',
-          'valuationStatus': 'no_market_match',
-          'valuationSource': 'catalog_lookup',
-          'valuationConfidence': 0,
-          'pricing': {
-            'estimatedMarketValue': 0,
-            'lowEstimate': 0,
-            'highEstimate': 0,
-            'currency': 'USD',
-            'pricingSource': 'PriceCharting',
-            'pricingConfidence': 0,
-            'valuationStatus': 'no_market_match',
-            'valuationSource': 'catalog_lookup',
-            'reasonCode': 'NO_MARKET_MATCH',
-            'valuationStrategy': 'catalog_lookup',
+          'confidenceScore': 0,
+          'valuationStrategy': 'catalog_lookup',
+          'pricingSource': {
+            'name': 'PriceCharting',
+            'attributionText': 'Pricing data powered by PriceCharting',
+            'lastChecked': '2026-07-27T00:00:00Z',
           },
+          'matchMetadata': {'reason': 'No trusted match found.'},
         },
       },
     );
@@ -967,13 +1210,14 @@ class _UnavailablePricingApiClient extends ApiClient {
 }
 
 class _SuccessfulRepriceApiClient extends ApiClient {
-  _SuccessfulRepriceApiClient()
+  _SuccessfulRepriceApiClient({this.value = 310})
     : super(
         config: const EnvironmentConfig(
           environment: AppEnvironment.development,
         ),
       );
 
+  final double value;
   String? lastPath;
   Map<String, dynamic> lastPayload = const {};
 
@@ -991,11 +1235,11 @@ class _SuccessfulRepriceApiClient extends ApiClient {
         'success': true,
         'pricing': {
           'status': 'available',
-          'estimatedMarketValue': 310,
-          'lowEstimate': 290,
-          'highEstimate': 340,
+          'estimatedMarketValue': value,
+          'lowEstimate': value - 20,
+          'highEstimate': value + 30,
           'currency': 'USD',
-          'displayString': 'USD \$310.00',
+          'displayString': 'USD \$${value.toStringAsFixed(2)}',
           'confidenceScore': 0.88,
           'pricingConfidence': 88,
           'valuationStrategy': 'catalog_lookup',
@@ -1004,7 +1248,7 @@ class _SuccessfulRepriceApiClient extends ApiClient {
             'attributionText': 'Pricing data powered by PriceCharting',
             'lastChecked': '2026-07-27T00:00:00Z',
           },
-          'originalMarketPayload': {'price': 310, 'currency': 'USD'},
+          'originalMarketPayload': {'price': value, 'currency': 'USD'},
           'matchMetadata': {
             'reason': 'Matched by corrected title, set, and card number.',
           },

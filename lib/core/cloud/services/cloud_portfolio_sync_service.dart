@@ -13,6 +13,7 @@ class PortfolioValuationSnapshot {
     this.displayString,
     this.pricingProvider,
     this.confidenceScore,
+    this.currency = 'AUD',
   });
 
   final String id;
@@ -25,6 +26,14 @@ class PortfolioValuationSnapshot {
   final String? pricingProvider;
   final double? confidenceScore;
   final DateTime pricedAt;
+
+  /// The currency `valueAud`/`lowEstimateAud`/`highEstimateAud` are actually
+  /// denominated in -- those columns are historically misnamed (they hold
+  /// whatever display currency was active when the row was written, not
+  /// necessarily AUD). Defaults to AUD for rows written before this column
+  /// existed, matching the backfill migration
+  /// (202608220001_valuation_snapshot_currency.sql).
+  final String currency;
 
   factory PortfolioValuationSnapshot.fromJson(Map<String, dynamic> json) {
     return PortfolioValuationSnapshot(
@@ -39,6 +48,7 @@ class PortfolioValuationSnapshot {
       confidenceScore: _double(json['confidence_score']),
       pricedAt:
           _date(json['priced_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      currency: _string(json['currency'])?.toUpperCase() ?? 'AUD',
     );
   }
 }
@@ -97,6 +107,11 @@ abstract interface class CloudPortfolioSyncService {
   Future<List<PortfolioValuationSnapshot>> fetchValuationSnapshots(
     String itemId,
   );
+
+  /// All valuation snapshots across every item the user owns — used to draw
+  /// the portfolio-total value history chart (Home screen), as opposed to
+  /// [fetchValuationSnapshots] which is scoped to one item's own chart.
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots();
 
   Future<List<CollectibleItem>> fetchItems();
 

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Video games</title>
+  <defs>
+    <linearGradient id="cart" x1="18" y1="10" x2="45" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#334155"/><stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="label" x1="23" y1="16" x2="42" y2="35" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/><stop offset=".5" stop-color="#00D88A"/><stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="19" ry="5" fill="#020617" opacity=".45"/>
+  <path d="M18 10h28v35l-5 7H23l-5-7V10Z" fill="url(#cart)"/>
+  <path d="M23 16h18v20H23V16Z" fill="url(#label)"/>
+  <path d="M23 43h18M27 48h10" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="32" cy="26" r="5" fill="#0F172A"/><circle cx="32" cy="26" r="2.5" fill="#BAE6FD"/>
+</svg>

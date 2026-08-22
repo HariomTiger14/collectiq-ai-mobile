@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
@@ -22,12 +26,14 @@ import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_servic
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_exception.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -176,96 +182,103 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
             child: ColoredBox(
               key: const ValueKey('collectible-detail-packlox-surface'),
               color: HomeTokens.background,
-              child: HomeStateContainer(
-                key: const ValueKey('collectible-detail-scroll-view'),
+              child: Scrollbar(
                 controller: _scrollController,
-                sections: [
-                  const HomeSection(child: HomeBrandLockup()),
-                  HomeSection(
-                    child: _DetailTitleBlock(
-                      item: currentItem,
-                      valuationStateLabel: _detailValueStatusLabel(currentItem),
-                    ),
-                  ),
-                  HomeSection(
-                    child: _DetailAuthorityHeader(
-                      item: currentItem,
-                      isFavorited: isFavorited,
-                      onBack: () => Navigator.of(context).maybePop(),
-                      onEdit: () => _showEditCollectibleDialog(
-                        context: context,
-                        ref: ref,
+                thumbVisibility: true,
+                child: HomeStateContainer(
+                  key: const ValueKey('collectible-detail-scroll-view'),
+                  storageKey: 'collectible-detail-scroll-position',
+                  controller: _scrollController,
+                  sections: [
+                    // Lead straight with the item: the action bar + hero + name +
+                    // value. The old repeated brand lockup and generic "Portfolio
+                    // Detail" title block duplicated what the item block already
+                    // shows, so they were removed.
+                    HomeSection(
+                      child: _DetailAuthorityHeader(
                         item: currentItem,
+                        isFavorited: isFavorited,
+                        onBack: () => Navigator.of(context).maybePop(),
+                        onEdit: () => _showEditCollectibleDialog(
+                          context: context,
+                          ref: ref,
+                          item: currentItem,
+                        ),
+                        onShare: () => _shareItem(context, currentItem),
+                        onFavorite: () => _toggleWishlistFavorite(
+                          currentItem,
+                          wishlistStatus,
+                        ),
                       ),
-                      onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () =>
-                          _toggleWishlistFavorite(currentItem, wishlistStatus),
                     ),
-                  ),
-                  HomeSection(
-                    child: _DetailAuthorityOverview(
-                      item: currentItem,
-                      selectedImage: selectedImage,
-                      isFavorited: isFavorited,
-                      onImageSelected: (image) {
-                        setState(() => _selectedGalleryPath = image.path);
-                      },
-                      onImageTap: selectedImage == null
-                          ? null
-                          : () => _showImageViewer(
-                              context,
-                              item: currentItem,
-                              initialImage: selectedImage,
-                              onUseAsPrimary: _setPrimaryImage,
-                              onDelete: _deleteGalleryImage,
-                              onEdit: _editGalleryImage,
-                            ),
-                    ),
-                  ),
-                  if (currentItem.confidence < 0.70)
-                    const HomeSection(child: _LowConfidenceBanner()),
-                  HomeSection(
-                    bottomPadding: AppSpacing.xl,
-                    child: _DetailInlineContent(
-                      item: currentItem,
-                      galleryImages: galleryImages,
-                      isFavorited: isFavorited,
-                      onImageSelected: (image) {
-                        setState(() => _selectedGalleryPath = image.path);
-                      },
-                      selectedImage: selectedImage,
-                      onImageTap: selectedImage == null
-                          ? null
-                          : () => _showImageViewer(
-                              context,
-                              item: currentItem,
-                              initialImage: selectedImage,
-                              onUseAsPrimary: _setPrimaryImage,
-                              onDelete: _deleteGalleryImage,
-                              onEdit: _editGalleryImage,
-                            ),
-                      onAddPhoto: () =>
-                          _addPortfolioPhotoFromGallery(currentItem),
-                      isRefreshingValue: _isRefreshingValue,
-                      onRefreshValue: () => _refreshPortfolioValue(currentItem),
-                      onEdit: () => _showEditCollectibleDialog(
-                        context: context,
-                        ref: ref,
+                    HomeSection(
+                      child: _DetailAuthorityOverview(
                         item: currentItem,
+                        selectedImage: selectedImage,
+                        isFavorited: isFavorited,
+                        onImageSelected: (image) {
+                          setState(() => _selectedGalleryPath = image.path);
+                        },
+                        onImageTap: selectedImage == null
+                            ? null
+                            : () => _showImageViewer(
+                                context,
+                                item: currentItem,
+                                initialImage: selectedImage,
+                                onUseAsPrimary: _setPrimaryImage,
+                                onDelete: _deleteGalleryImage,
+                                onEdit: _editGalleryImage,
+                              ),
                       ),
-                      onShare: () => _shareItem(context, currentItem),
-                      onFavorite: () =>
-                          _toggleWishlistFavorite(currentItem, wishlistStatus),
-                      onDelete: widget.onDelete == null
-                          ? null
-                          : () => _confirmDetailDelete(
-                              context,
-                              currentItem,
-                              widget.onDelete!,
-                            ),
                     ),
-                  ),
-                ],
+                    if (currentItem.confidence < 0.70)
+                      const HomeSection(child: _LowConfidenceBanner()),
+                    HomeSection(
+                      bottomPadding: AppSpacing.xl,
+                      child: _DetailInlineContent(
+                        item: currentItem,
+                        galleryImages: galleryImages,
+                        isFavorited: isFavorited,
+                        onImageSelected: (image) {
+                          setState(() => _selectedGalleryPath = image.path);
+                        },
+                        selectedImage: selectedImage,
+                        onImageTap: selectedImage == null
+                            ? null
+                            : () => _showImageViewer(
+                                context,
+                                item: currentItem,
+                                initialImage: selectedImage,
+                                onUseAsPrimary: _setPrimaryImage,
+                                onDelete: _deleteGalleryImage,
+                                onEdit: _editGalleryImage,
+                              ),
+                        onAddPhoto: () =>
+                            _addPortfolioPhotoFromGallery(currentItem),
+                        isRefreshingValue: _isRefreshingValue,
+                        onRefreshValue: () =>
+                            _refreshPortfolioValue(currentItem),
+                        onEdit: () => _showEditCollectibleDialog(
+                          context: context,
+                          ref: ref,
+                          item: currentItem,
+                        ),
+                        onShare: () => _shareItem(context, currentItem),
+                        onFavorite: () => _toggleWishlistFavorite(
+                          currentItem,
+                          wishlistStatus,
+                        ),
+                        onDelete: widget.onDelete == null
+                            ? null
+                            : () => _confirmDetailDelete(
+                                context,
+                                currentItem,
+                                widget.onDelete!,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -439,10 +452,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       final planLimits = ref.read(activePlanLimitsProvider);
       final currentPhotoCount = item.effectiveGalleryImages.length;
       if (!planLimits.canAddPhoto(currentPhotoCount)) {
-        _showDetailSnackBar(
-          context,
-          'Your ${planLimits.plan.displayName} plan supports ${planLimits.photosPerItemLabel}. Upgrade to add more photos.',
-        );
+        await showUpgradeSheet(context, reason: PaywallReason.morePhotos);
         return;
       }
 
@@ -494,9 +504,9 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
       await ref
           .read(subscriptionControllerProvider.notifier)
           .ensureCanRefreshValue();
-    } on SubscriptionException catch (error) {
+    } on SubscriptionException {
       if (mounted) {
-        _showDetailSnackBar(context, error.message);
+        await showUpgradeSheet(context, reason: PaywallReason.moreRefreshes);
       }
       return;
     }
@@ -506,11 +516,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
 
     setState(() => _isRefreshingValue = true);
     ValuationStatus? refreshedStatus;
+    String? refreshedReasonCode;
     try {
       final quote = await ref
           .read(scanPricingQuoteServiceProvider)
-          .quoteItem(item);
+          .repriceItem(item);
       refreshedStatus = quote.valuationStatus;
+      refreshedReasonCode = quote.pricing.reasonCode;
       final refreshedAt = DateTime.now();
       final hasRefreshedValue =
           quote.valuationStatus == ValuationStatus.marketEstimated &&
@@ -556,7 +568,10 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     }
 
     if (mounted) {
-      _showDetailSnackBar(context, _valueRefreshMessage(refreshedStatus));
+      _showDetailSnackBar(
+        context,
+        _valueRefreshMessage(refreshedStatus, reasonCode: refreshedReasonCode),
+      );
     }
   }
 }
@@ -911,48 +926,6 @@ void _showImageViewer(
   );
 }
 
-class _DetailTitleBlock extends StatelessWidget {
-  const _DetailTitleBlock({
-    required this.item,
-    required this.valuationStateLabel,
-  });
-
-  final CollectibleItem item;
-  final String valuationStateLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Portfolio Detail',
-          key: const ValueKey('collectible-detail-packlox-title'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            color: HomeTokens.textPrimary,
-            fontWeight: FontWeight.w900,
-            height: 1.05,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${_fallback(item.category)} / $valuationStateLabel',
-          key: const ValueKey('collectible-detail-packlox-subtitle'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: HomeTokens.textSecondary,
-            fontWeight: FontWeight.w600,
-            height: 1.35,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _DetailAuthorityHeader extends StatelessWidget {
   const _DetailAuthorityHeader({
     required this.item,
@@ -972,7 +945,6 @@ class _DetailAuthorityHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Semantics(
       container: true,
       label: 'Collectible Details. ${item.title}.',
@@ -984,66 +956,37 @@ class _DetailAuthorityHeader extends StatelessWidget {
           borderRadius: BorderRadius.circular(HomeTokens.cardRadius),
           border: Border.all(color: HomeTokens.border),
         ),
-        child: Column(
+        // Action bar only. The item name lives once, large, in the overview
+        // block directly below — no need to repeat it (and an eyebrow) here.
+        child: Row(
           children: [
-            Row(
-              children: [
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-back'),
-                  tooltip: 'Back',
-                  icon: Icons.arrow_back,
-                  onPressed: onBack,
-                ),
-                const Spacer(),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-favorite-action'),
-                  tooltip: isFavorited ? 'Favorited' : 'Favorite',
-                  icon: isFavorited ? Icons.favorite : Icons.favorite_border,
-                  selected: isFavorited,
-                  onPressed: onFavorite,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-share-action'),
-                  tooltip: 'Share',
-                  icon: Icons.ios_share_outlined,
-                  onPressed: onShare,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                _DetailIconButton(
-                  key: const ValueKey('collectible-detail-edit-button'),
-                  tooltip: 'Edit collectible',
-                  icon: Icons.edit_outlined,
-                  onPressed: onEdit,
-                ),
-              ],
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-back'),
+              tooltip: 'Back',
+              icon: Icons.arrow_back,
+              onPressed: onBack,
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Saved collectible',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: HomeTokens.textSecondary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: HomeTokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
+            const Spacer(),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-favorite-action'),
+              tooltip: isFavorited ? 'Favorited' : 'Favorite',
+              icon: isFavorited ? Icons.favorite : Icons.favorite_border,
+              selected: isFavorited,
+              onPressed: onFavorite,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-share-action'),
+              tooltip: 'Share',
+              icon: Icons.ios_share_outlined,
+              onPressed: onShare,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            _DetailIconButton(
+              key: const ValueKey('collectible-detail-edit-button'),
+              tooltip: 'Edit collectible',
+              icon: Icons.edit_outlined,
+              onPressed: onEdit,
             ),
           ],
         ),
@@ -1160,7 +1103,10 @@ class _DetailAuthorityOverview extends StatelessWidget {
               );
             },
           ),
-          if (images.isNotEmpty) ...[
+          // Only show the filmstrip when there is more than one image — with a
+          // single image the hero already shows it and there is nothing to
+          // switch between.
+          if (images.length > 1) ...[
             const SizedBox(height: AppSpacing.sm),
             _DetailGalleryFilmstrip(
               item: item,
@@ -1211,7 +1157,9 @@ class _DetailOverviewImagePreview extends StatelessWidget {
                   item: item,
                   image: selectedImage,
                 ),
-                if (images.isNotEmpty)
+                // The "n/N" position pill is only meaningful with multiple
+                // images; a lone "1/1" is noise on a single-image hero.
+                if (images.length > 1)
                   Positioned(
                     left: AppSpacing.xs,
                     top: AppSpacing.xs,
@@ -1330,7 +1278,15 @@ class _DetailInlineContent extends StatelessWidget {
     return Column(
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
-        _DetailOverviewSection(item: item),
+        // "At a glance" was removed: Category shows as a chip in the overview,
+        // Rarity lives in Details & Info, Confidence in the overview mini-stat +
+        // Item insights, so it only duplicated content shown elsewhere.
+        _DetailIntelligenceActionPanel(
+          item: item,
+          isRefreshingValue: isRefreshingValue,
+          onEdit: onEdit,
+          onRefreshValue: onRefreshValue,
+        ),
         if (_usesCatalogPlaceholderImage(item)) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
@@ -1431,13 +1387,16 @@ class _DetailAuthorityBadge extends StatelessWidget {
   }
 }
 
-class _DetailAuthorityValueBlock extends StatelessWidget {
+class _DetailAuthorityValueBlock extends ConsumerWidget {
   const _DetailAuthorityValueBlock({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
     final textTheme = Theme.of(context).textTheme;
     final isPending = _isValuationPending(item);
     final accentColor = isPending
@@ -1464,7 +1423,12 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _detailValueLabel(context, item),
+            _detailValueLabel(
+              context,
+              item,
+              displayCurrency: displayCurrency,
+              currentRates: currentRates,
+            ),
             key: const ValueKey('collectible-detail-value-card-value'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1483,6 +1447,19 @@ class _DetailAuthorityValueBlock extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (item.purchasePrice != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _purchaseSummaryLabel(item),
+              key: const ValueKey('collectible-detail-purchase-summary'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: _purchaseGainColor(item),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1643,37 +1620,6 @@ class _DetailMiniStat extends StatelessWidget {
   }
 }
 
-class _DetailOverviewSection extends StatelessWidget {
-  const _DetailOverviewSection({required this.item});
-
-  final CollectibleItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailAuthorityPanel(
-      key: const ValueKey('collectible-detail-overview-section'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _DetailSectionTitle(title: 'At a glance', icon: Icons.info_outline),
-          const SizedBox(height: AppSpacing.sm),
-          _DetailAuthorityRows(
-            rows: [
-              _DetailInfoRowData('Category', _fallback(item.category)),
-              _DetailInfoRowData('Rarity', _rarityLabel(item)),
-              _DetailInfoRowData(
-                'Confidence',
-                '${_confidenceBand(item.confidence)} (${_confidencePercent(item.confidence)})',
-              ),
-              _DetailInfoRowData('Recommendation', item.recommendation),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DetailGallerySection extends StatelessWidget {
   const _DetailGallerySection({
     required this.item,
@@ -1708,24 +1654,11 @@ class _DetailGallerySection extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           if (galleryImages.isEmpty)
             const _DetailEmptyCopy('No saved image is available for this item.')
-          else ...[
-            AspectRatio(
-              aspectRatio: 1.35,
-              child: InkWell(
-                onTap: onImageTap,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  child: _DetailImageSurface(item: item, image: selectedImage),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _DetailGalleryFilmstrip(
-              item: item,
-              selectedPath: selectedImage?.path,
-              onSelected: onImageSelected,
-            ),
-            const SizedBox(height: AppSpacing.sm),
+          else
+            // Image viewing and browsing already live in the overview hero +
+            // filmstrip above (they share the selected image), so this section
+            // no longer re-renders a large preview or a second filmstrip — it
+            // only adds new photos.
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -1743,7 +1676,6 @@ class _DetailGallerySection extends StatelessWidget {
                 ),
               ),
             ),
-          ],
         ],
       ),
     );
@@ -1816,6 +1748,154 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
   }
 }
 
+class _DetailIntelligenceActionPanel extends StatelessWidget {
+  const _DetailIntelligenceActionPanel({
+    required this.item,
+    required this.isRefreshingValue,
+    required this.onEdit,
+    required this.onRefreshValue,
+  });
+
+  final CollectibleItem item;
+  final bool isRefreshingValue;
+  final VoidCallback onEdit;
+  final VoidCallback onRefreshValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final missingLabels = _missingDetailLabels(item);
+    final status = _effectiveValuationStatus(item);
+    final hasTrustedValue = status == ValuationStatus.marketEstimated;
+    final hasLowConfidence = item.confidence < 0.75;
+    final hasStalePricing = _hasStaleDetailPricing(item);
+    final needsPricingReview = !hasTrustedValue;
+    final accent = needsPricingReview
+        ? HomeTokens.warning
+        : hasLowConfidence || missingLabels.isNotEmpty || hasStalePricing
+        ? HomeTokens.accent
+        : HomeTokens.positive;
+    final title = needsPricingReview
+        ? 'Trusted value needs review'
+        : hasLowConfidence
+        ? 'Identity confidence needs review'
+        : missingLabels.isNotEmpty
+        ? 'Metadata gaps found'
+        : hasStalePricing
+        ? 'Value refresh recommended'
+        : 'Evidence looks healthy';
+    final message = needsPricingReview
+        ? '${_pricingTrustMessage(item)} Review the identity fields, then save and reprice.'
+        : hasLowConfidence
+        ? 'PackLox is less confident about this identification. Check the title, category, condition, and identifiers before relying on the value.'
+        : missingLabels.isNotEmpty
+        ? 'Missing: ${missingLabels.join(', ')}. Complete these fields to improve future repricing and portfolio intelligence.'
+        : hasStalePricing
+        ? 'This valuation has not been refreshed recently. Refreshing saves a new dated snapshot when a trusted provider match exists.'
+        : 'This item has provider-backed pricing evidence and enough saved identity detail for current portfolio intelligence.';
+
+    return _DetailAuthorityPanel(
+      key: const ValueKey('collectible-detail-intelligence-panel'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailSectionTitle(
+            title: 'Portfolio intelligence',
+            icon: Icons.auto_awesome_outlined,
+            trailing: hasTrustedValue ? 'Trusted' : 'Review',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: accent.withValues(alpha: 0.32)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(_intelligenceIconFor(item), color: accent, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: HomeTokens.textPrimary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.28,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey(
+                    'collectible-detail-intelligence-review-details-action',
+                  ),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Review details'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: HomeTokens.textPrimary,
+                    side: const BorderSide(color: HomeTokens.border),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton.icon(
+                  key: const ValueKey(
+                    'collectible-detail-intelligence-refresh-value-action',
+                  ),
+                  onPressed: isRefreshingValue ? null : onRefreshValue,
+                  icon: Icon(
+                    isRefreshingValue
+                        ? Icons.hourglass_top_rounded
+                        : Icons.refresh_rounded,
+                    size: 18,
+                  ),
+                  label: Text(isRefreshingValue ? 'Refreshing' : 'Refresh'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: HomeTokens.accentStrong,
+                    foregroundColor: HomeTokens.textPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DetailInfoSection extends StatelessWidget {
   const _DetailInfoSection({required this.item});
 
@@ -1837,14 +1917,9 @@ class _DetailInfoSection extends StatelessWidget {
             )
           else
             _DetailAuthorityRows(rows: rows),
-          const SizedBox(height: AppSpacing.md),
-          _DetailSectionTitle(
-            title: 'Condition',
-            icon: Icons.fact_check_outlined,
-            compact: true,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _DetailConfidenceMeter(confidence: item.confidence),
+          // The "Identification confidence" meter was removed here — confidence
+          // is already shown in the overview mini-stat and, with an explanation,
+          // in the "Item insights" section below.
         ],
       ),
     );
@@ -1867,8 +1942,9 @@ class _DetailMarketSection extends StatelessWidget {
         children: [
           _DetailSectionTitle(title: 'Market & Value', icon: Icons.paid),
           const SizedBox(height: AppSpacing.sm),
-          _DetailAuthorityValueBlock(item: item),
-          const SizedBox(height: AppSpacing.md),
+          // The big "Estimated value" block was removed here — it duplicated the
+          // top value card. This section keeps the value history, pricing
+          // evidence, and the detailed market rows (current, at-scan, range…).
           _DetailValueHistoryPanel(item: item),
           const SizedBox(height: AppSpacing.md),
           _PricingTrustPanel(item: item),
@@ -1882,11 +1958,11 @@ class _DetailMarketSection extends StatelessWidget {
               'No market pricing evidence has been saved for this collectible.',
             )
           else
-            _DetailAuthorityRows(rows: rows, alignValuesRight: true),
+            _DetailAuthorityRows(rows: rows),
           const SizedBox(height: AppSpacing.md),
           _DetailEmptyCopy(
             item.marketSummary == null
-                ? 'No saved price-history series is available yet.'
+                ? 'History starts after the first trusted valuation snapshot.'
                 : 'Saved market evidence is shown without fabricating price history.',
           ),
         ],
@@ -1919,7 +1995,7 @@ class _PricingTrustPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _DetailSectionTitle(
-            title: 'Pricing Trust',
+            title: 'Pricing evidence',
             icon: Icons.verified_user_outlined,
             compact: true,
             trailing: _pricingTrustTrailing(status),
@@ -2117,7 +2193,7 @@ class _SnapshotEvidenceRows extends StatelessWidget {
       if (pricing.reasonCode?.trim().isNotEmpty ?? false)
         _DetailInfoRowData('Reason', _humanizeToken(pricing.reasonCode!)),
     ];
-    return _DetailAuthorityRows(rows: rows, alignValuesRight: true);
+    return _DetailAuthorityRows(rows: rows);
   }
 }
 
@@ -2136,10 +2212,27 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       data: (value) => value,
       orElse: () => const <PortfolioValuationSnapshot>[],
     );
-    final chartValues = _valueHistoryChartValues(item, snapshots);
-    final currency = item.pricing?.currency ?? 'AUD';
-    final scanValue = _valueAtScanFor(item);
-    final currentValue = _currentValueFor(item);
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final fxRates = ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    final chartPoints = _valueHistoryPoints(
+      item,
+      snapshots,
+      displayCurrency: displayCurrency,
+      rates: fxRates,
+    );
+    final itemCurrency = item.pricing?.currency ?? 'AUD';
+    final scanValue = convertCurrent(
+      _valueAtScanFor(item),
+      from: itemCurrency,
+      to: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
+    final currentValue = convertCurrent(
+      _currentValueFor(item),
+      from: itemCurrency,
+      to: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
     final delta = currentValue - scanValue;
     final hasMovement = scanValue > 0 && currentValue > 0 && delta.abs() > 0.01;
     final isPositive = delta >= 0;
@@ -2149,16 +2242,22 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         ? HomeTokens.positive
         : Theme.of(context).colorScheme.error;
     final movementLabel = hasMovement
-        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), currency)}'
+        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), displayCurrency)}'
         : null;
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
         : null;
-    final footerLabel = snapshotsAsync.isLoading
-        ? 'Loading value history'
-        : snapshots.isNotEmpty
-        ? _snapshotHistoryLabel(snapshots)
-        : _lastRefreshedLabel(item);
+    final historyHint = _valueHistoryHint(
+      isLoading: snapshotsAsync.isLoading,
+      snapshots: snapshots,
+      hasMovement: hasMovement,
+      hasTrustedValue: scanValue > 0 || currentValue > 0,
+    );
+    final footerLabel = _valueHistoryFooterLabel(
+      isLoading: snapshotsAsync.isLoading,
+      snapshots: snapshots,
+      item: item,
+    );
 
     return Container(
       key: const ValueKey('collectible-detail-value-history-panel'),
@@ -2183,30 +2282,31 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'At scan',
-                  value: _formatMoney(scanValue, currency),
+                  value: _formatMoney(scanValue, displayCurrency),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'Current',
-                  value: _formatMoney(currentValue, currency),
+                  value: _formatMoney(currentValue, displayCurrency),
                 ),
               ),
-              if (hasMovement) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _DetailValueHistoryMetric(
-                    label: 'Gain/Loss',
-                    value: movementLabel!,
-                    valueColor: movementColor,
-                    subtitle: movementPercent,
-                  ),
-                ),
-              ],
             ],
           ),
-          if (!hasMovement) ...[
+          // Gain/Loss gets its own full-width row instead of squeezing into
+          // a third column -- its value (sign + amount + currency code) is
+          // longer than the other two metrics and was clipping there.
+          if (hasMovement) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _DetailValueHistoryMetric(
+              label: 'Gain/Loss',
+              value: movementLabel!,
+              valueColor: movementColor,
+              subtitle: movementPercent,
+            ),
+          ],
+          if (historyHint.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
@@ -2218,7 +2318,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Trend begins after next refresh.',
+                    historyHint,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -2232,45 +2332,59 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
           ],
           const SizedBox(height: AppSpacing.sm),
           if (!planLimits.canUseFullValueHistory)
-            _DetailPlanLockedPanel(
-              icon: Icons.lock_outline_rounded,
-              title: 'Full history is a Pro tool',
-              message:
-                  'Free shows value at scan and current value. Upgrade for trend charts and deeper valuation history.',
-            )
-          else
-            Container(
-              height: 54,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: HomeTokens.background.withValues(alpha: 0.48),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(
-                  color: HomeTokens.border.withValues(alpha: 0.62),
-                ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () =>
+                  showUpgradeSheet(context, reason: PaywallReason.priceHistory),
+              child: _DetailPlanLockedPanel(
+                icon: Icons.lock_outline_rounded,
+                title: 'Full history is a Pro tool',
+                message:
+                    'Free plan shows value at scan and current value. Tap to unlock trend charts and deeper valuation history with Pro.',
               ),
-              child: CustomPaint(
-                painter: _ValueHistorySparklinePainter(
-                  color: movementColor,
-                  values: chartValues,
-                ),
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: Text(
-                      footerLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: HomeTokens.textSecondary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
+            )
+          else ...[
+            Text(
+              footerLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: HomeTokens.textSecondary,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            if (chartPoints.length < 2)
+              Container(
+                height: 120,
+                width: double.infinity,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: HomeTokens.background.withValues(alpha: 0.48),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: HomeTokens.border.withValues(alpha: 0.62),
+                  ),
+                ),
+                child: Text(
+                  'Not enough saved history yet for a trend chart.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: HomeTokens.textSecondary,
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: _ValueHistoryChart(
+                  points: chartPoints,
+                  color: movementColor,
+                  currency: displayCurrency,
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -2383,55 +2497,222 @@ class _DetailValueHistoryMetric extends StatelessWidget {
   }
 }
 
-class _ValueHistorySparklinePainter extends CustomPainter {
-  const _ValueHistorySparklinePainter({
+/// A dated value-history point for the [_ValueHistoryChart].
+class _ValueHistoryPoint {
+  const _ValueHistoryPoint({required this.date, required this.value});
+
+  final DateTime date;
+  final double value;
+}
+
+/// Real axis-labeled trend chart for a single item's value history --
+/// dates along the bottom, price along the left, matching the kind of
+/// chart other portfolio/finance apps show rather than an unlabeled
+/// sparkline.
+class _ValueHistoryChart extends StatelessWidget {
+  const _ValueHistoryChart({
+    required this.points,
     required this.color,
-    required this.values,
+    required this.currency,
   });
 
+  final List<_ValueHistoryPoint> points;
   final Color color;
-  final List<double> values;
+  final String currency;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final cleanedValues = values.where((value) => value >= 0).toList();
-    if (cleanedValues.isEmpty) {
-      return;
-    }
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.9)
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final path = Path();
-    final left = AppSpacing.sm;
-    final right = size.width - AppSpacing.sm;
-    final top = size.height * 0.22;
-    final bottom = size.height * 0.76;
-    final minValue = cleanedValues.reduce((a, b) => a < b ? a : b);
-    final maxValue = cleanedValues.reduce((a, b) => a > b ? a : b);
-    final range = maxValue - minValue;
-    Offset pointFor(int index, double value) {
-      final x = cleanedValues.length == 1
-          ? size.width / 2
-          : left + ((right - left) * index / (cleanedValues.length - 1));
-      final normalized = range <= 0 ? 0.5 : (value - minValue) / range;
-      return Offset(x, bottom - ((bottom - top) * normalized));
-    }
+  Widget build(BuildContext context) {
+    final values = points.map((point) => point.value).toList();
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final rawRange = maxValue - minValue;
+    // A little vertical headroom so the line never touches the chart edges;
+    // when every point is flat, fall back to a fixed band around the value.
+    final padding = rawRange > 0 ? rawRange * 0.15 : (maxValue.abs() * 0.1) + 1;
+    final (minY, maxY, yInterval) = _niceAxisBounds(
+      (minValue - padding).clamp(0, double.infinity).toDouble(),
+      maxValue + padding,
+    );
+    final lastIndex = points.length - 1;
+    final labelIndices = _pickChartLabelIndices(points);
+    final textTheme = Theme.of(context).textTheme;
+    final axisLabelStyle = textTheme.labelSmall?.copyWith(
+      color: HomeTokens.textSecondary,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+    );
 
-    final firstPoint = pointFor(0, cleanedValues.first);
-    path.moveTo(firstPoint.dx, firstPoint.dy);
-    for (var index = 1; index < cleanedValues.length; index += 1) {
-      final point = pointFor(index, cleanedValues[index]);
-      path.lineTo(point.dx, point.dy);
-    }
-    canvas.drawPath(path, paint);
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: lastIndex.toDouble(),
+        minY: minY,
+        maxY: maxY,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: yInterval,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: HomeTokens.border.withValues(alpha: 0.4),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              interval: yInterval,
+              getTitlesWidget: (value, meta) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(_compactChartMoney(value), style: axisLabelStyle),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.round();
+                if (!labelIndices.contains(index)) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _shortChartDate(points[index].date),
+                    style: axisLabelStyle,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+              final point = points[spot.x.round().clamp(0, lastIndex)];
+              return LineTooltipItem(
+                '${_formatMoney(point.value, currency)}\n'
+                '${_formatPricingDate(point.date)}',
+                textTheme.labelSmall!.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var index = 0; index <= lastIndex; index += 1)
+                FlSpot(index.toDouble(), points[index].value),
+            ],
+            isCurved: true,
+            curveSmoothness: 0.22,
+            color: color,
+            barWidth: 2.5,
+            dotData: FlDotData(show: points.length <= 6),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  color.withValues(alpha: 0.28),
+                  color.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  @override
-  bool shouldRepaint(covariant _ValueHistorySparklinePainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.values != values;
+/// Picks which point indices get an x-axis date label. Evenly-spaced
+/// candidates can still land on the same calendar day (e.g. an at-scan
+/// point and a same-day backfilled snapshot) -- when two chosen candidates
+/// would render identical text, the earlier one is dropped in favor of the
+/// later one, so the axis never shows the same date twice in a row and the
+/// most-recent point (today) is always kept.
+/// Rounds a raw (min, max) range out to "nice" gridline values (multiples of
+/// 1/2/5 * 10^n) with an evenly-spaced interval, instead of showing whatever
+/// arbitrary numbers the raw data produces. Without this, fl_chart's own
+/// tick generation (which steps from zero, not from [rawMin]) can add an
+/// extra tick very close to rawMin, crowding two labels together near the
+/// bottom of the axis.
+(double, double, double) _niceAxisBounds(double rawMin, double rawMax) {
+  final range = (rawMax - rawMin) <= 0 ? rawMax.abs() + 1 : rawMax - rawMin;
+  final roughStep = range / 4;
+  final magnitude = math
+      .pow(10, (math.log(roughStep) / math.ln10).floor())
+      .toDouble();
+  final residual = roughStep / magnitude;
+  final niceResidual = residual <= 1
+      ? 1.0
+      : residual <= 2
+      ? 2.0
+      : residual <= 5
+      ? 5.0
+      : 10.0;
+  final step = niceResidual * magnitude;
+  final minY = (rawMin / step).floor() * step;
+  final maxY = (rawMax / step).ceil() * step;
+  return (math.max(0, minY), maxY == minY ? minY + step : maxY, step);
+}
+
+Set<int> _pickChartLabelIndices(List<_ValueHistoryPoint> points) {
+  final lastIndex = points.length - 1;
+  if (lastIndex <= 0) {
+    return {0};
   }
+  const targetLabelCount = 4;
+  final rawCandidates = <int>{
+    for (var i = 0; i < targetLabelCount; i += 1)
+      (lastIndex * i / (targetLabelCount - 1)).round(),
+  }.toList()..sort();
+
+  final chosen = <int>[];
+  for (final index in rawCandidates) {
+    final label = _shortChartDate(points[index].date);
+    if (chosen.isNotEmpty &&
+        _shortChartDate(points[chosen.last].date) == label) {
+      chosen[chosen.length - 1] = index;
+    } else {
+      chosen.add(index);
+    }
+  }
+  return chosen.toSet();
+}
+
+const _chartMonthAbbreviations = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _shortChartDate(DateTime date) {
+  return '${date.day} ${_chartMonthAbbreviations[date.month - 1]}';
+}
+
+String _compactChartMoney(double value) {
+  if (value >= 1000) {
+    final thousands = value / 1000;
+    final formatted = thousands.toStringAsFixed(thousands < 10 ? 1 : 0);
+    return '\$${formatted}k';
+  }
+  return '\$${value.toStringAsFixed(0)}';
 }
 
 class _DetailInsightsSection extends StatelessWidget {
@@ -2448,7 +2729,7 @@ class _DetailInsightsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _DetailSectionTitle(
-            title: 'AI Insights',
+            title: 'Item insights',
             icon: Icons.psychology_alt_outlined,
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -2611,20 +2892,10 @@ class _DetailActionsMenuSection extends StatelessWidget {
             description: 'Get the latest available pricing snapshot',
             onTap: onRefreshValue,
           ),
-          _DetailActionMenuRow(
-            key: const ValueKey('collectible-detail-action-favorite-row'),
-            icon: isFavorited ? Icons.favorite : Icons.favorite_border,
-            label: isFavorited ? 'Favorited' : 'Add to Wishlist',
-            description: 'Save for quick access',
-            onTap: onFavorite,
-          ),
-          _DetailActionMenuRow(
-            key: const ValueKey('collectible-detail-action-share-row'),
-            icon: Icons.ios_share_outlined,
-            label: 'Share item',
-            description: 'Uses real saved item data',
-            onTap: onShare,
-          ),
+          // "Add to Wishlist" and "Share item" were removed here — both are one
+          // tap away in the header action bar (♡ / share), and wishlist state
+          // also has its own "Wishlist Status" section. This menu keeps the
+          // actions that aren't in the header: reprice, refresh, delete.
           if (onDelete != null)
             _DetailActionMenuRow(
               key: const ValueKey('collectible-detail-delete-action'),
@@ -2772,13 +3043,9 @@ class _DetailInfoRowData {
 }
 
 class _DetailAuthorityRows extends StatelessWidget {
-  const _DetailAuthorityRows({
-    required this.rows,
-    this.alignValuesRight = false,
-  });
+  const _DetailAuthorityRows({required this.rows});
 
   final List<_DetailInfoRowData> rows;
-  final bool alignValuesRight;
 
   @override
   Widget build(BuildContext context) {
@@ -2803,7 +3070,6 @@ class _DetailAuthorityRows extends StatelessWidget {
                 flex: 7,
                 child: Text(
                   row.value,
-                  textAlign: alignValuesRight ? TextAlign.right : null,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: PackLoxTokens.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -2842,31 +3108,52 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
 List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
   final pricing = item.pricing;
   final market = item.marketSummary;
+  final trustedPricing = _hasTrustedPricingEvidence(item);
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
         'Current value',
-        _displayValue(pricing, fallbackValue: item.estimatedValue),
+        trustedPricing
+            ? _displayValue(pricing, fallbackValue: item.estimatedValue)
+            : 'Value unavailable',
       ),
       _DetailInfoRowData(
         'Value at scan',
-        _formatMoney(item.valueAtScan ?? item.estimatedValue, pricing.currency),
+        trustedPricing
+            ? _formatMoney(
+                item.valueAtScan ?? item.estimatedValue,
+                pricing.currency,
+              )
+            : 'Value unavailable',
       ),
+      _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
         _DetailInfoRowData(
           'Last refreshed',
           _formatPricingDate(item.lastValueRefreshedAt),
         ),
       if (_sourceMarketValue(pricing) != null)
-        _DetailInfoRowData('Source market value', _sourceMarketValue(pricing)!),
+        _DetailInfoRowData(
+          'Source currency value',
+          _sourceMarketValue(pricing)!,
+        ),
       _DetailInfoRowData(
         'Value range',
-        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+        trustedPricing
+            ? _formatMoneyRange(
+                pricing.lowEstimate,
+                pricing.highEstimate,
+                pricing.currency,
+              )
+            : 'Value unavailable',
       ),
-      _DetailInfoRowData('Source', pricing.pricingSource),
+      _DetailInfoRowData('Source', _pricingProviderLabel(item)),
       _DetailInfoRowData(
-        'Confidence',
-        '${(pricing.pricingConfidence * 100).toStringAsFixed(0)}%',
+        'Pricing confidence',
+        _pricingConfidenceLabel(
+          status: _effectiveValuationStatus(item),
+          confidence: pricing.pricingConfidence,
+        ),
       ),
       _DetailInfoRowData('Updated', _formatPricingDate(pricing.lastUpdated)),
     ],
@@ -2885,14 +3172,15 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
   final confidence = pricing?.pricingConfidence ?? market?.confidence;
   final rows = <_DetailInfoRowData>[
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
-    if (pricing?.pricingSource.trim().isNotEmpty == true)
-      _DetailInfoRowData('Provider', pricing!.pricingSource),
-    if (confidence != null)
-      _DetailInfoRowData(
-        'Confidence',
-        '${_pricingConfidenceBand(confidence)} (${_confidencePercent(confidence)})',
-      ),
-    if (pricing?.valuationStrategy?.trim().isNotEmpty == true)
+    _DetailInfoRowData('Provider', _pricingProviderLabel(item)),
+    if (pricing?.currency.trim().isNotEmpty == true)
+      _DetailInfoRowData('Currency', pricing!.currency.toUpperCase()),
+    _DetailInfoRowData(
+      'Pricing confidence',
+      _pricingConfidenceLabel(status: status, confidence: confidence),
+    ),
+    if (_hasTrustedPricingEvidence(item) &&
+        pricing?.valuationStrategy?.trim().isNotEmpty == true)
       _DetailInfoRowData(
         'Match basis',
         _pricingStrategyLabel(pricing!.valuationStrategy!),
@@ -2901,7 +3189,11 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
         (pricing.lowEstimate > 0 || pricing.highEstimate > 0))
       _DetailInfoRowData(
         'Value range',
-        '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+        _formatMoneyRange(
+          pricing.lowEstimate,
+          pricing.highEstimate,
+          pricing.currency,
+        ),
       ),
     _DetailInfoRowData(
       'Portfolio record',
@@ -2913,7 +3205,7 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
       _DetailInfoRowData('Reason', _pricingUnavailableReason(item)!),
     if (_sourceMarketValue(pricing ?? _emptyPricingFor(item)) != null)
       _DetailInfoRowData(
-        'Original value',
+        'Source currency value',
         _sourceMarketValue(pricing ?? _emptyPricingFor(item))!,
       ),
     if (pricing?.lastUpdated != null)
@@ -2943,7 +3235,7 @@ String _pricingTrustTitle(ValuationStatus status) {
     ValuationStatus.providerNotConfigured => 'Provider not connected',
     ValuationStatus.noMarketMatch => 'No trusted match yet',
     ValuationStatus.lookupFailed => 'Lookup did not complete',
-    ValuationStatus.unavailable => 'Trusted value unavailable',
+    ValuationStatus.unavailable => 'No trusted valuation yet',
   };
 }
 
@@ -2961,10 +3253,10 @@ String _pricingTrustTrailing(ValuationStatus status) {
 String _pricingTrustMessage(CollectibleItem item) {
   final pricing = item.pricing;
   final explanation = _clean(pricing?.pricingExplanation);
-  if (explanation != null) {
+  final status = _effectiveValuationStatus(item);
+  if (_hasTrustedPricingEvidence(item) && explanation != null) {
     return explanation;
   }
-  final status = _effectiveValuationStatus(item);
   final unavailableCopy = pricingUnavailableCopy(
     reasonCode: pricing?.reasonCode,
     status: status,
@@ -2976,9 +3268,10 @@ String _pricingTrustMessage(CollectibleItem item) {
       'This item has an AI estimate only. Reprice it before relying on portfolio value.',
     ValuationStatus.providerNotConfigured => unavailableCopy.message,
     ValuationStatus.noMarketMatch =>
-      '${unavailableCopy.message} ${unavailableCopy.actionLabel}.',
+      'PackLox could not match this item to a trusted pricing source. Add the exact name, set, number, SKU, or condition and recheck value.',
     ValuationStatus.lookupFailed => unavailableCopy.message,
-    ValuationStatus.unavailable => unavailableCopy.message,
+    ValuationStatus.unavailable =>
+      'PackLox could not match this item to a trusted pricing source yet. Review the item details and recheck value when ready.',
   };
 }
 
@@ -3005,6 +3298,44 @@ String _pricingConfidenceBand(double confidence) {
     return 'Low';
   }
   return 'Not scored';
+}
+
+String _pricingConfidenceLabel({
+  required ValuationStatus status,
+  required double? confidence,
+}) {
+  if (status != ValuationStatus.marketEstimated &&
+      status != ValuationStatus.aiEstimated) {
+    return 'Not available';
+  }
+  final value = confidence;
+  if (value == null || value <= 0) {
+    return 'Not available';
+  }
+  return '${_pricingConfidenceBand(value)} (${_confidencePercent(value)})';
+}
+
+String _pricingProviderLabel(CollectibleItem item) {
+  final status = _effectiveValuationStatus(item);
+  final pricingSource = _clean(item.pricing?.pricingSource);
+  return switch (status) {
+    ValuationStatus.marketEstimated ||
+    ValuationStatus.aiEstimated => pricingSource ?? 'Trusted provider',
+    ValuationStatus.providerNotConfigured => 'Provider not connected',
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => 'Not matched',
+  };
+}
+
+bool _hasTrustedPricingEvidence(CollectibleItem item) {
+  return switch (_effectiveValuationStatus(item)) {
+    ValuationStatus.marketEstimated || ValuationStatus.aiEstimated => true,
+    ValuationStatus.providerNotConfigured ||
+    ValuationStatus.noMarketMatch ||
+    ValuationStatus.lookupFailed ||
+    ValuationStatus.unavailable => false,
+  };
 }
 
 String _pricingStrategyLabel(String strategy) {
@@ -3138,35 +3469,88 @@ double _currentValueFor(CollectibleItem item) {
   return item.estimatedValue;
 }
 
-List<double> _valueHistoryChartValues(
+/// Dated points for [_ValueHistoryChart]: the at-scan value, every saved
+/// snapshot (real or catalog-history-backfilled -- pre-ownership market
+/// context is legitimate to show here, unlike on the portfolio-wide
+/// aggregate), and the current value, sorted chronologically.
+List<_ValueHistoryPoint> _valueHistoryPoints(
   CollectibleItem item,
-  List<PortfolioValuationSnapshot> snapshots,
-) {
-  final values = <double>[];
+  List<PortfolioValuationSnapshot> snapshots, {
+  String displayCurrency = 'AUD',
+  FxRateSnapshot rates = FxRateSnapshot.empty,
+}) {
+  final itemCurrency = item.pricing?.currency ?? 'AUD';
+  final points = <_ValueHistoryPoint>[];
   final scanValue = _valueAtScanFor(item);
   if (scanValue > 0) {
-    values.add(scanValue);
+    points.add(
+      _ValueHistoryPoint(
+        date: item.createdAt,
+        value: convertHistorical(
+          scanValue,
+          from: itemCurrency,
+          to: displayCurrency,
+          date: item.createdAt,
+          rates: rates,
+        ),
+      ),
+    );
   }
-  final sortedSnapshots = [...snapshots]
-    ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
-  for (final snapshot in sortedSnapshots) {
+  for (final snapshot in snapshots) {
     final value = snapshot.valueAud;
     if (value != null && value > 0) {
-      values.add(value);
+      points.add(
+        _ValueHistoryPoint(
+          date: snapshot.pricedAt,
+          value: convertHistorical(
+            value,
+            from: snapshot.currency,
+            to: displayCurrency,
+            date: snapshot.pricedAt,
+            rates: rates,
+          ),
+        ),
+      );
     }
   }
   final currentValue = _currentValueFor(item);
-  if (currentValue > 0 &&
-      (values.isEmpty || (values.last - currentValue).abs() > 0.01)) {
-    values.add(currentValue);
+  if (currentValue > 0) {
+    final currentDate = item.lastValueRefreshedAt ?? DateTime.now();
+    points.add(
+      _ValueHistoryPoint(
+        date: currentDate,
+        value: convertHistorical(
+          currentValue,
+          from: itemCurrency,
+          to: displayCurrency,
+          date: currentDate,
+          rates: rates,
+        ),
+      ),
+    );
   }
-  if (values.isEmpty) {
-    return const [0, 0];
+  points.sort((left, right) => left.date.compareTo(right.date));
+
+  // Collapse same-day, same-value runs into one point -- e.g. the "current"
+  // value is often just a re-read of the same day's latest real snapshot,
+  // which otherwise plots two visually identical dots stacked at the same
+  // spot. Keeps the later point in each run.
+  final deduped = <_ValueHistoryPoint>[];
+  for (final point in points) {
+    if (deduped.isNotEmpty) {
+      final last = deduped.last;
+      final sameDay =
+          last.date.year == point.date.year &&
+          last.date.month == point.date.month &&
+          last.date.day == point.date.day;
+      if (sameDay && (last.value - point.value).abs() < 0.01) {
+        deduped[deduped.length - 1] = point;
+        continue;
+      }
+    }
+    deduped.add(point);
   }
-  if (values.length == 1) {
-    return [values.first, values.first];
-  }
-  return values;
+  return deduped;
 }
 
 String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
@@ -3174,13 +3558,51 @@ String _snapshotHistoryLabel(List<PortfolioValuationSnapshot> snapshots) {
     ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
   final latest = sortedSnapshots.last;
   final count = sortedSnapshots.length;
-  return '$count valuation snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
+  return '$count trusted snapshot${count == 1 ? '' : 's'} · latest ${_formatPricingDate(latest.pricedAt)}';
+}
+
+String _valueHistoryHint({
+  required bool isLoading,
+  required List<PortfolioValuationSnapshot> snapshots,
+  required bool hasMovement,
+  required bool hasTrustedValue,
+}) {
+  if (isLoading) {
+    return 'Loading saved valuation snapshots.';
+  }
+  if (!hasTrustedValue) {
+    return 'History starts when a trusted value is available.';
+  }
+  if (hasMovement) {
+    return '';
+  }
+  if (snapshots.isEmpty) {
+    return 'Refresh value to save the first trusted history point.';
+  }
+  if (snapshots.length == 1) {
+    return 'One trusted snapshot saved. Next refresh builds the trend.';
+  }
+  return 'No value movement across saved trusted snapshots.';
+}
+
+String _valueHistoryFooterLabel({
+  required bool isLoading,
+  required List<PortfolioValuationSnapshot> snapshots,
+  required CollectibleItem item,
+}) {
+  if (isLoading) {
+    return 'Loading history';
+  }
+  if (snapshots.isNotEmpty) {
+    return _snapshotHistoryLabel(snapshots);
+  }
+  return _lastRefreshedLabel(item);
 }
 
 String _lastRefreshedLabel(CollectibleItem item) {
   final refreshedAt = item.lastValueRefreshedAt;
   if (refreshedAt != null) {
-    return 'Last refreshed ${_formatPricingDate(refreshedAt)}';
+    return 'Last refreshed ${_formatPricingDate(refreshedAt)} · no saved history yet';
   }
   return 'Refresh value to start history';
 }
@@ -3193,15 +3615,47 @@ _DetailInfoRowData? _detailRow(String label, String? value) {
   return _DetailInfoRowData(label, clean);
 }
 
-String _detailValueLabel(BuildContext context, CollectibleItem item) {
+String _purchaseSummaryLabel(CollectibleItem item) {
+  final currency = item.pricing?.currency ?? 'AUD';
+  final paid = _formatMoney(item.purchasePrice!, currency);
+  if (!_shouldShowDetailValue(item) || item.estimatedValue <= 0) {
+    return 'Paid $paid';
+  }
+  final gain = item.estimatedValue - item.purchasePrice!;
+  final sign = gain >= 0 ? '+' : '-';
+  return 'Paid $paid · $sign${_formatMoney(gain.abs(), currency)}';
+}
+
+Color _purchaseGainColor(CollectibleItem item) {
+  if (item.purchasePrice == null ||
+      !_shouldShowDetailValue(item) ||
+      item.estimatedValue <= 0) {
+    return HomeTokens.textSecondary;
+  }
+  return item.estimatedValue - item.purchasePrice! >= 0
+      ? HomeTokens.positive
+      : HomeTokens.negative;
+}
+
+String _detailValueLabel(
+  BuildContext context,
+  CollectibleItem item, {
+  String displayCurrency = 'AUD',
+  Map<String, double> currentRates = const {'USD': 1.0},
+}) {
   if (!_shouldShowDetailValue(item)) {
     return 'Value unavailable';
   }
-  final currency = item.pricing?.currency ?? 'AUD';
   if (item.estimatedValue == 0) {
-    return _formatZeroMoney(currency);
+    return _formatZeroMoney(displayCurrency);
   }
-  return _formatMoney(item.estimatedValue, currency);
+  final converted = convertCurrent(
+    item.estimatedValue,
+    from: item.pricing?.currency ?? 'AUD',
+    to: displayCurrency,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted, displayCurrency);
 }
 
 String _formatZeroMoney(String currency) {
@@ -3261,6 +3715,79 @@ bool _isValuationPending(CollectibleItem item) {
     ValuationStatus.aiEstimated ||
     ValuationStatus.unavailable => false,
   };
+}
+
+List<String> _missingDetailLabels(CollectibleItem item) {
+  final missing = <String>[];
+  void requireField(String label, String? value) {
+    if (_clean(value) == null) {
+      missing.add(label);
+    }
+  }
+
+  requireField('condition', item.condition);
+  final category = item.category.toLowerCase();
+  final isCard =
+      category.contains('card') ||
+      category.contains('pokemon') ||
+      category.contains('magic') ||
+      category.contains('yugioh') ||
+      category.contains('one piece');
+  final isToyVehicle =
+      category.contains('toy') ||
+      category.contains('hot wheel') ||
+      category.contains('car');
+  final isGame = category.contains('game');
+  final isSneaker = category.contains('sneaker') || category.contains('shoe');
+
+  if (isCard) {
+    requireField('set', item.setName);
+    requireField('card number', item.cardNumber);
+    requireField('rarity', item.rarity);
+  } else if (isToyVehicle || isSneaker) {
+    requireField('brand', item.brand);
+    requireField('series', item.series);
+    requireField('year', item.year);
+  } else if (isGame) {
+    requireField('series', item.series);
+    requireField('year', item.year);
+  } else {
+    requireField('brand', item.brand);
+    requireField('year', item.year);
+  }
+
+  if (item.effectiveGalleryImages.isEmpty &&
+      _clean(item.cloudImageUrl) == null) {
+    missing.add('photos');
+  }
+  return missing;
+}
+
+bool _hasStaleDetailPricing(CollectibleItem item) {
+  if (_effectiveValuationStatus(item) != ValuationStatus.marketEstimated) {
+    return false;
+  }
+  final checkedAt = item.lastValueRefreshedAt ?? item.pricing?.lastUpdated;
+  if (checkedAt == null) {
+    return true;
+  }
+  return DateTime.now().difference(checkedAt) > const Duration(days: 30);
+}
+
+IconData _intelligenceIconFor(CollectibleItem item) {
+  if (_effectiveValuationStatus(item) != ValuationStatus.marketEstimated) {
+    return Icons.manage_search_outlined;
+  }
+  if (item.confidence < 0.75) {
+    return Icons.fact_check_outlined;
+  }
+  if (_missingDetailLabels(item).isNotEmpty) {
+    return Icons.tune_outlined;
+  }
+  if (_hasStaleDetailPricing(item)) {
+    return Icons.update_rounded;
+  }
+  return Icons.verified_user_outlined;
 }
 
 String _detailFallbackAssetFor(CollectibleItem item) {
@@ -3625,120 +4152,6 @@ class _DetailGalleryImage extends StatelessWidget {
       imagePath: path,
       fit: BoxFit.cover,
       placeholderBuilder: () => placeholder,
-    );
-  }
-}
-
-class _AnimatedDetailMetadata extends StatelessWidget {
-  const _AnimatedDetailMetadata({
-    required this.id,
-    required this.value,
-    required this.child,
-  });
-
-  final String id;
-  final Object? value;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 150),
-      reverseDuration: const Duration(milliseconds: 100),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      child: KeyedSubtree(
-        key: ValueKey('collectible-detail-metadata-$id-$value'),
-        child: child,
-      ),
-    );
-  }
-}
-
-class _DetailConfidenceMeter extends StatelessWidget {
-  const _DetailConfidenceMeter({required this.confidence});
-
-  final double confidence;
-
-  @override
-  Widget build(BuildContext context) {
-    final bounded = confidence.clamp(0.0, 1.0);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return _AnimatedDetailMetadata(
-      id: 'confidence-meter',
-      value: bounded,
-      child: DecoratedBox(
-        key: const ValueKey('collectible-detail-confidence-meter'),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Confidence',
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _confidencePercent(bounded),
-                    key: const ValueKey('collectible-detail-confidence-value'),
-                    style: textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: _confidenceMeterColor(context, bounded),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: SizedBox(
-                  height: 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                    ),
-                    child: TweenAnimationBuilder<double>(
-                      key: const ValueKey('collectible-detail-confidence-fill'),
-                      tween: Tween(begin: 0, end: bounded),
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      builder: (context, value, _) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: value,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: _confidenceMeterColor(context, bounded),
-                              ),
-                              child: const SizedBox.expand(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -4109,6 +4522,7 @@ class _NotesCard extends ConsumerStatefulWidget {
 
 class _NotesCardState extends ConsumerState<_NotesCard> {
   late final TextEditingController _controller;
+  var _isEditing = false;
 
   @override
   void initState() {
@@ -4133,28 +4547,65 @@ class _NotesCardState extends ConsumerState<_NotesCard> {
 
   @override
   Widget build(BuildContext context) {
+    final note = _clean(widget.item.notes);
     return AppProfileSection(
-      title: 'Notes',
+      title: 'Collector notes',
       children: [
-        TextField(
-          key: const ValueKey('collectible-detail-notes-field'),
-          controller: _controller,
-          minLines: 2,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Add private collection notes',
+        if (!_isEditing) ...[
+          Text(
+            note ??
+                'Add private notes such as purchase price, storage location, condition comments, or where you found this item.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: note == null
+                  ? PackLoxTokens.textSecondary
+                  : PackLoxTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            key: const ValueKey('collectible-detail-notes-save-button'),
-            onPressed: _save,
-            icon: const Icon(Icons.save_outlined),
-            label: const Text('Save notes'),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('collectible-detail-notes-edit-button'),
+              onPressed: () => setState(() => _isEditing = true),
+              icon: Icon(note == null ? Icons.add_outlined : Icons.edit_note),
+              label: Text(note == null ? 'Add note' : 'Edit note'),
+            ),
           ),
-        ),
+        ] else ...[
+          TextField(
+            key: const ValueKey('collectible-detail-notes-field'),
+            controller: _controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Add private collection notes',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              TextButton(
+                key: const ValueKey('collectible-detail-notes-cancel-button'),
+                onPressed: () {
+                  _controller.text = widget.item.notes ?? '';
+                  setState(() => _isEditing = false);
+                },
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                key: const ValueKey('collectible-detail-notes-save-button'),
+                onPressed: _save,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save note'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -4164,6 +4615,7 @@ class _NotesCardState extends ConsumerState<_NotesCard> {
         .read(portfolioControllerProvider.notifier)
         .updateItem(widget.item.copyWith(notes: _controller.text.trim()));
     if (mounted) {
+      setState(() => _isEditing = false);
       _showDetailSnackBar(context, 'Notes saved');
     }
   }
@@ -4189,32 +4641,48 @@ Future<void> _showEditCollectibleDialog({
   ValuationStatus? refreshedStatus;
   var hasRefreshedValue = false;
   if (editResult.retryPricing) {
+    // Repricing hits the pricing API and updates value, so it counts against
+    // the same monthly refresh quota as the manual refresh button. The edits
+    // themselves are always kept — only the reprice is metered.
+    var canReprice = true;
     try {
-      final quote = await ref
-          .read(scanPricingQuoteServiceProvider)
-          .repriceItem(nextItem);
-      refreshedStatus = quote.valuationStatus;
-      hasRefreshedValue =
-          quote.valuationStatus == ValuationStatus.marketEstimated &&
-          quote.estimatedValue > 0;
-      nextItem = nextItem.copyWith(
-        estimatedValue: hasRefreshedValue
-            ? quote.estimatedValue
-            : nextItem.estimatedValue,
-        pricing: quote.pricing,
-        marketSummary: hasRefreshedValue
-            ? quote.marketSummary ?? nextItem.marketSummary
-            : nextItem.marketSummary,
-        valuationStatus: quote.valuationStatus,
-        valuationSource: quote.valuationSource,
-        aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
-        valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
-        lastValueRefreshedAt: hasRefreshedValue
-            ? DateTime.now()
-            : nextItem.lastValueRefreshedAt,
-      );
-    } catch (_) {
-      refreshedStatus = null;
+      await ref
+          .read(subscriptionControllerProvider.notifier)
+          .ensureCanRefreshValue();
+    } on SubscriptionException {
+      canReprice = false;
+      if (context.mounted) {
+        await showUpgradeSheet(context, reason: PaywallReason.moreRefreshes);
+      }
+    }
+    if (canReprice) {
+      try {
+        final quote = await ref
+            .read(scanPricingQuoteServiceProvider)
+            .repriceItem(nextItem);
+        refreshedStatus = quote.valuationStatus;
+        hasRefreshedValue =
+            quote.valuationStatus == ValuationStatus.marketEstimated &&
+            quote.estimatedValue > 0;
+        nextItem = nextItem.copyWith(
+          estimatedValue: hasRefreshedValue
+              ? quote.estimatedValue
+              : nextItem.estimatedValue,
+          pricing: quote.pricing,
+          marketSummary: hasRefreshedValue
+              ? quote.marketSummary ?? nextItem.marketSummary
+              : nextItem.marketSummary,
+          valuationStatus: quote.valuationStatus,
+          valuationSource: quote.valuationSource,
+          aiEstimatedValue: quote.aiEstimatedValue ?? nextItem.aiEstimatedValue,
+          valueAtScan: nextItem.valueAtScan ?? nextItem.estimatedValue,
+          lastValueRefreshedAt: hasRefreshedValue
+              ? DateTime.now()
+              : nextItem.lastValueRefreshedAt,
+        );
+      } catch (_) {
+        refreshedStatus = null;
+      }
     }
   }
 
@@ -4251,9 +4719,9 @@ String _pricingRetryMessage(ValuationStatus? status) {
   };
 }
 
-String _valueRefreshMessage(ValuationStatus? status) {
+String _valueRefreshMessage(ValuationStatus? status, {String? reasonCode}) {
   if (status != null && status != ValuationStatus.marketEstimated) {
-    final copy = pricingUnavailableCopy(status: status);
+    final copy = pricingUnavailableCopy(status: status, reasonCode: reasonCode);
     return '${copy.shortLabel}. ${copy.actionLabel}.';
   }
   return switch (status) {
@@ -4300,15 +4768,12 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
   late final TextEditingController _editionController;
   late final TextEditingController _yearController;
   late final TextEditingController _countryController;
-  late final TextEditingController _lowValueController;
-  late final TextEditingController _highValueController;
   late final TextEditingController _notesController;
+  late final TextEditingController _purchasePriceController;
 
   @override
   void initState() {
     super.initState();
-    final pricing = widget.item.pricing;
-    final fallbackValue = widget.item.estimatedValue;
     _titleController = TextEditingController(text: widget.item.title);
     _categoryController = TextEditingController(text: widget.item.category);
     _manufacturerController = TextEditingController(
@@ -4327,13 +4792,12 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _editionController = TextEditingController(text: widget.item.edition ?? '');
     _yearController = TextEditingController(text: widget.item.year ?? '');
     _countryController = TextEditingController(text: widget.item.country ?? '');
-    _lowValueController = TextEditingController(
-      text: _decimalText(pricing?.lowEstimate ?? fallbackValue),
-    );
-    _highValueController = TextEditingController(
-      text: _decimalText(pricing?.highEstimate ?? fallbackValue),
-    );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
+    _purchasePriceController = TextEditingController(
+      text: widget.item.purchasePrice == null
+          ? ''
+          : widget.item.purchasePrice!.toStringAsFixed(2),
+    );
   }
 
   @override
@@ -4350,9 +4814,8 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
     _editionController.dispose();
     _yearController.dispose();
     _countryController.dispose();
-    _lowValueController.dispose();
-    _highValueController.dispose();
     _notesController.dispose();
+    _purchasePriceController.dispose();
     super.dispose();
   }
 
@@ -4553,19 +5016,14 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
-                              'edit-collectible-low-value-field',
+                              'edit-collectible-purchase-price-field',
                             ),
-                            controller: _lowValueController,
-                            label: 'Estimated value low',
-                            keyboardType: TextInputType.number,
-                          ),
-                          _EditTextField(
-                            fieldKey: const ValueKey(
-                              'edit-collectible-high-value-field',
+                            controller: _purchasePriceController,
+                            label: 'Purchase price (optional)',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
-                            controller: _highValueController,
-                            label: 'Estimated value high',
-                            keyboardType: TextInputType.number,
+                            validator: _optionalPrice,
                           ),
                           _EditTextField(
                             fieldKey: const ValueKey(
@@ -4651,31 +5109,18 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
       return;
     }
 
-    final low = _parseMoney(_lowValueController.text);
-    final high = _parseMoney(_highValueController.text);
-    final normalizedLow = low <= high ? low : high;
-    final normalizedHigh = high >= low ? high : low;
-    final estimatedValue = (normalizedLow + normalizedHigh) / 2;
+    final purchaseText = _purchasePriceController.text.trim();
+    final purchasePrice = purchaseText.isEmpty
+        ? null
+        : double.tryParse(purchaseText);
+
     Navigator.of(context).pop(
       _EditCollectibleResult(
         retryPricing: retryPricing,
         item: widget.item.copyWith(
           title: _titleController.text.trim(),
           category: _categoryController.text.trim(),
-          estimatedValue: estimatedValue,
           condition: _conditionController.text.trim(),
-          pricing: _updatedPricing(
-            widget.item,
-            normalizedLow,
-            normalizedHigh,
-            estimatedValue,
-          ),
-          marketSummary: _updatedMarketSummary(
-            widget.item.marketSummary,
-            normalizedLow,
-            normalizedHigh,
-            estimatedValue,
-          ),
           year: _yearController.text.trim(),
           brand: _manufacturerController.text.trim(),
           setName: _setController.text.trim(),
@@ -4686,6 +5131,8 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
           edition: _editionController.text.trim(),
           country: _countryController.text.trim(),
           notes: _notesController.text.trim(),
+          purchasePrice: purchasePrice,
+          clearPurchasePrice: purchaseText.isEmpty,
         ),
       ),
     );
@@ -4693,6 +5140,18 @@ class _EditCollectibleDialogState extends State<_EditCollectibleDialog> {
 
   String? _requiredText(String? value) {
     return (value ?? '').trim().isEmpty ? 'Required' : null;
+  }
+
+  String? _optionalPrice(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    final parsed = double.tryParse(text);
+    if (parsed == null || parsed < 0) {
+      return 'Enter a valid amount';
+    }
+    return null;
   }
 }
 
@@ -4924,8 +5383,11 @@ class _DetailSections extends StatelessWidget {
                   ),
                   AppMetadataItem(
                     label: 'Estimated Range',
-                    value:
-                        '${_formatMoney(item.pricing!.lowEstimate, item.pricing!.currency)} - ${_formatMoney(item.pricing!.highEstimate, item.pricing!.currency)}',
+                    value: _formatMoneyRange(
+                      item.pricing!.lowEstimate,
+                      item.pricing!.highEstimate,
+                      item.pricing!.currency,
+                    ),
                   ),
                   AppMetadataItem(
                     label: 'Pricing Source',
@@ -5434,8 +5896,11 @@ class _PriceHistorySection extends StatelessWidget {
           ),
         AppMetadataItem(
           label: 'Estimated range',
-          value:
-              '${_formatMoney(pricing.lowEstimate, pricing.currency)} - ${_formatMoney(pricing.highEstimate, pricing.currency)}',
+          value: _formatMoneyRange(
+            pricing.lowEstimate,
+            pricing.highEstimate,
+            pricing.currency,
+          ),
         ),
         AppMetadataItem(label: 'Pricing source', value: pricing.pricingSource),
         AppMetadataItem(
@@ -5471,7 +5936,7 @@ class _PriceHistorySection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Stored pricing evidence only. PackLox does not have a saved price-history series for this item yet.',
+            'Stored pricing evidence only. Refresh value to add trusted valuation snapshots over time.',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -5508,7 +5973,7 @@ class _PriceAlertSection extends ConsumerWidget {
       title: 'Price Alerts',
       children: [
         Text(
-          notificationState.settingsSubtitle,
+          _priceAlertSubtitle(notificationState),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -5536,6 +6001,23 @@ class _PriceAlertSection extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  // Detail-screen copy: alerts are always saved and listed below, so the
+  // subtitle must not read as "this feature is off". When the platform can't
+  // show a system notification we say so without contradicting the buttons.
+  String _priceAlertSubtitle(PriceAlertNotificationState state) {
+    switch (state.permissionStatus) {
+      case PriceAlertNotificationPermissionStatus.notSupported:
+        return 'Saved alerts appear below. This device can\'t show a system '
+            'notification when one triggers.';
+      case PriceAlertNotificationPermissionStatus.denied:
+        return 'Saved alerts appear below. Enable notifications in device '
+            'settings to also get a system alert when one triggers.';
+      case PriceAlertNotificationPermissionStatus.granted:
+      case PriceAlertNotificationPermissionStatus.unknown:
+        return state.settingsSubtitle;
+    }
   }
 }
 
@@ -5598,10 +6080,7 @@ class _CreateAlertButtons extends ConsumerWidget {
         .length;
     if (!planLimits.canCreatePriceAlert(activeAlertCount)) {
       if (context.mounted) {
-        _showDetailSnackBar(
-          context,
-          'Your ${planLimits.plan.displayName} plan supports ${planLimits.priceAlertsLabel}. Upgrade to create more alerts.',
-        );
+        await showUpgradeSheet(context, reason: PaywallReason.moreAlerts);
       }
       return;
     }
@@ -5698,7 +6177,11 @@ class _PriceAlertRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final triggered = alert.status == PriceAlertStatus.triggered;
+    // isTriggered covers both the freshly-triggered state and the post-push
+    // "notified" terminal state, so a reset stays offered until the alert
+    // is actually cleared -- not just for the brief triggered window before
+    // a push goes out.
+    final triggered = alert.isTriggered;
     final color = triggered ? AppColors.success : colorScheme.primary;
 
     return Container(
@@ -5850,31 +6333,63 @@ String _fallback(String? value, {String fallback = 'Unknown'}) {
   return trimmed.isEmpty ? fallback : trimmed;
 }
 
-String _confidenceBand(double confidence) {
-  if (confidence >= 0.85) {
-    return 'High confidence';
-  }
-  if (confidence >= 0.70) {
-    return 'Medium confidence';
-  }
-  return 'Needs review';
-}
-
 String _confidencePercent(double confidence) {
   final bounded = confidence.clamp(0.0, 1.0);
   return '${(bounded * 100).toStringAsFixed(0)}%';
 }
 
 String? _storedAiSummaryFor(CollectibleItem item) {
+  final friendlySummary = _collectorInsightSummaryFor(item);
+  if (friendlySummary != null) {
+    return friendlySummary;
+  }
   final parts = [
-    _clean(item.aiReasoning),
-    _clean(item.confidenceExplanation),
-    _clean(item.detectionQuality),
+    _collectorSafeInsight(item.aiReasoning),
+    _collectorSafeInsight(item.confidenceExplanation),
+    _collectorSafeInsight(item.detectionQuality),
   ].whereType<String>().toList(growable: false);
   if (parts.isEmpty) {
     return null;
   }
   return parts.join('\n\n');
+}
+
+String? _collectorInsightSummaryFor(CollectibleItem item) {
+  final hasInternalCopy = [
+    item.aiReasoning,
+    item.confidenceExplanation,
+    item.detectionQuality,
+  ].whereType<String>().any(_looksInternalInsight);
+  final hasTrustedValue = _hasTrustedPricingEvidence(item);
+  if (!hasInternalCopy && hasTrustedValue) {
+    return null;
+  }
+  final category = _fallback(item.category, fallback: 'collectible');
+  final title = _fallback(item.title, fallback: 'this item');
+  if (!hasTrustedValue) {
+    return 'PackLox identified $title as a $category, but more details are needed before a trusted valuation can be shown.\n\nTry adding the exact name, set, number, SKU, or condition, then recheck value.';
+  }
+  return 'PackLox matched this item with saved identity and pricing evidence. Review the details if the title, set, number, SKU, or condition looks incomplete.';
+}
+
+String? _collectorSafeInsight(String? value) {
+  final clean = _clean(value);
+  if (clean == null || _looksInternalInsight(clean)) {
+    return null;
+  }
+  return clean;
+}
+
+bool _looksInternalInsight(String? value) {
+  final text = (value ?? '').toLowerCase();
+  return text.contains('sit') ||
+      text.contains('analyzer') ||
+      text.contains('backend') ||
+      text.contains('noop') ||
+      text.contains('mock') ||
+      text.contains('debug') ||
+      text.contains('api-only') ||
+      text.contains('ai-only value is stored');
 }
 
 String? _clean(String? value) {
@@ -5939,22 +6454,8 @@ String _formatAud(double value) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final amount = _formatMoneyAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
+  final withCommas = _formatMoneyAmountWithCommas(value);
   return '\$$withCommas';
-}
-
-String _rarityLabel(CollectibleItem item) {
-  final explicit = _clean(item.rarity);
-  if (explicit != null) {
-    return explicit;
-  }
-  return 'Rarity unavailable';
 }
 
 Color _confidenceMeterColor(BuildContext context, double confidence) {
@@ -5965,77 +6466,6 @@ Color _confidenceMeterColor(BuildContext context, double confidence) {
     return const Color(0xFFEAB308);
   }
   return Theme.of(context).colorScheme.error;
-}
-
-double _parseMoney(String value) {
-  final normalized = value.replaceAll(',', '').replaceAll(r'$', '').trim();
-  return double.tryParse(normalized) ?? 0;
-}
-
-String _decimalText(double value) {
-  if (value % 1 == 0) {
-    return value.toStringAsFixed(0);
-  }
-  return value.toStringAsFixed(2);
-}
-
-PricingInfo _updatedPricing(
-  CollectibleItem item,
-  double low,
-  double high,
-  double estimatedValue,
-) {
-  final pricing = item.pricing;
-  return PricingInfo(
-    estimatedMarketValue: estimatedValue,
-    lowEstimate: low,
-    highEstimate: high,
-    currency: pricing?.currency ?? 'AUD',
-    pricingSource: pricing?.pricingSource ?? 'Local edit',
-    pricingConfidence: pricing?.pricingConfidence ?? 0,
-    lastUpdated: pricing?.lastUpdated,
-    valuationStatus: pricing?.valuationStatus ?? item.valuationStatus,
-    valuationSource: pricing?.valuationSource ?? item.valuationSource,
-    aiEstimatedValue: pricing?.aiEstimatedValue ?? item.aiEstimatedValue,
-    pricingExplanation: pricing?.pricingExplanation,
-    reasonCode: pricing?.reasonCode,
-    valuationStrategy: pricing?.valuationStrategy,
-    attributionText: pricing?.attributionText,
-    displayString: pricing?.displayString,
-    originalPrice: pricing?.originalPrice,
-    originalCurrency: pricing?.originalCurrency,
-    exchangeRateUsed: pricing?.exchangeRateUsed,
-    exchangeRateDate: pricing?.exchangeRateDate,
-    lowEstimateAud: pricing?.lowEstimateAud,
-    highEstimateAud: pricing?.highEstimateAud,
-    cacheTtlSeconds: pricing?.cacheTtlSeconds,
-    cacheExpiresAt: pricing?.cacheExpiresAt,
-    cachePolicyReason: pricing?.cachePolicyReason,
-  );
-}
-
-MarketSummary? _updatedMarketSummary(
-  MarketSummary? summary,
-  double low,
-  double high,
-  double estimatedValue,
-) {
-  if (summary == null) {
-    return null;
-  }
-
-  return MarketSummary(
-    averagePrice: estimatedValue,
-    medianPrice: estimatedValue,
-    lowPrice: low,
-    highPrice: high,
-    salesCount: summary.salesCount,
-    trendLabel: summary.trendLabel,
-    confidence: summary.confidence,
-    lastUpdated: summary.lastUpdated,
-    sources: summary.sources,
-    comps: summary.comps,
-  );
 }
 
 String _formatDate(DateTime date) {
@@ -6093,6 +6523,57 @@ String _formatMoney(double value, String currency) {
     return 'CAD \$$withCommas';
   }
   return '$normalizedCurrency $withCommas';
+}
+
+String _formatMoneyRange(double low, double high, String currency) {
+  if (low <= 0 && high <= 0) {
+    return 'Value unavailable';
+  }
+  final normalizedCurrency = currency.trim().toUpperCase();
+  final start = low > 0 ? _formatMoneyAmountWithCommas(low) : null;
+  final end = high > 0 ? _formatMoneyAmountWithCommas(high) : null;
+  if (start == null && end == null) {
+    return 'Value unavailable';
+  }
+  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
+    return '${_joinCurrencyRange(start, end, r'$')} AUD';
+  }
+  if (normalizedCurrency == 'USD') {
+    return 'USD ${_joinCurrencyRange(start, end, r'$')}';
+  }
+  if (normalizedCurrency == 'GBP') {
+    return _joinCurrencyRange(start, end, '£');
+  }
+  if (normalizedCurrency == 'CAD') {
+    return 'CAD ${_joinCurrencyRange(start, end, r'$')}';
+  }
+  final range = switch ((start, end)) {
+    (final String startValue, final String endValue) =>
+      '$startValue - $endValue',
+    (final String startValue, null) => startValue,
+    (null, final String endValue) => endValue,
+    _ => '',
+  };
+  return '$normalizedCurrency $range';
+}
+
+String _joinCurrencyRange(String? start, String? end, String symbol) {
+  return switch ((start, end)) {
+    (final String startValue, final String endValue) =>
+      '$symbol$startValue - $symbol$endValue',
+    (final String startValue, null) => '$symbol$startValue',
+    (null, final String endValue) => '$symbol$endValue',
+    _ => 'Value unavailable',
+  };
+}
+
+String _formatMoneyAmountWithCommas(double value) {
+  return _formatMoneyAmount(value).replaceFirstMapped(
+    RegExp(r'^\d+'),
+    (match) => match
+        .group(0)!
+        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
+  );
 }
 
 String _formatMoneyAmount(double value) {

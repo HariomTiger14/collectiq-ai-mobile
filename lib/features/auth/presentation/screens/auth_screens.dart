@@ -353,7 +353,7 @@ class _PremiumCollectibleHero extends StatelessWidget {
   const _PremiumCollectibleHero();
 
   static const _assetPath =
-      'assets/packlox/s01_hero_premium_collectibles_v0_7.png';
+      'assets/packlox/s01_hero_premium_collectibles_clean_original_slab_v1.png';
 
   @override
   Widget build(BuildContext context) {
@@ -361,17 +361,55 @@ class _PremiumCollectibleHero extends StatelessWidget {
       child: Semantics(
         image: true,
         label:
-            'Premium acrylic collectible slab with supporting collector car and coin.',
-        child: Image.asset(
-          _assetPath,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (context, error, stackTrace) {
-            return CustomPaint(
-              painter: _PremiumCollectibleHeroPainter(),
-              child: const SizedBox.expand(),
-            );
-          },
+            'Premium graded collectible slab surrounded by a sneaker, comic, '
+            'coin, vinyl figure, and game controller.',
+        // Feather the outer edges to transparent so the image's own dark
+        // backdrop melts into the screen instead of reading as a boxed photo.
+        // The opaque core keeps the collectibles crisp; only the empty corners
+        // fade.
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (Rect b) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.white,
+                  Colors.white,
+                  Colors.transparent,
+                ],
+                stops: [0.0, 0.07, 0.93, 1.0],
+              ).createShader(b),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (Rect b) => const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.transparent,
+                    Colors.white,
+                    Colors.white,
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.06, 0.94, 1.0],
+                ).createShader(b),
+                child: Image.asset(
+                  _assetPath,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (context, error, stackTrace) {
+                    return CustomPaint(
+                      painter: _PremiumCollectibleHeroPainter(),
+                      child: const SizedBox.expand(),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1070,10 +1108,13 @@ class _InlineLegalLink extends StatelessWidget {
         onPressed: onPressed,
         style: TextButton.styleFrom(
           foregroundColor: style.color,
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.only(left: 4),
-          tapTargetSize: MaterialTapTargetSize.padded,
-          visualDensity: VisualDensity.standard,
+          // Keep the link inline-height so a wrapped legal line sits tight to
+          // the line above (the old 48px min made each wrap run 48px tall,
+          // opening a big gap). Horizontal padding preserves a usable tap area.
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
           textStyle: style,
         ),
         child: Text(label),

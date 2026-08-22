@@ -8,6 +8,8 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.d
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
+import 'package:collectiq_ai/features/notifications/presentation/controllers/notification_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,37 +36,68 @@ final itemPriceAlertsProvider = FutureProvider.family<List<PriceAlert>, String>(
   },
 );
 
+/// Every alert across the whole portfolio, for the standalone Price Alerts
+/// screen (Settings row) -- as opposed to [itemPriceAlertsProvider], which is
+/// scoped to one collectible's detail page.
+final allPriceAlertsProvider = FutureProvider<List<PriceAlert>>((ref) async {
+  final repository = ref.watch(priceAlertRepositoryProvider);
+  return repository.getAlerts();
+});
+
 final priceAlertSummaryProvider =
     FutureProvider.family<PriceAlertSummary, List<CollectibleItem>>((
       ref,
       items,
     ) async {
-      final repository = ref.watch(priceAlertRepositoryProvider);
-      final evaluator = ref.watch(priceAlertEvaluatorProvider);
-      final alerts = await repository.getAlerts();
-      final evaluations = evaluator.evaluateAlerts(
-        alerts: alerts,
-        items: items,
-      );
-      for (final evaluation in evaluations) {
-        final previous = alerts.where(
-          (alert) => alert.id == evaluation.alert.id,
-        );
-        final previousAlert = previous.isEmpty ? null : previous.first;
-        if (previousAlert == null ||
-            previousAlert.status != evaluation.alert.status ||
-            previousAlert.message != evaluation.alert.message ||
-            previousAlert.triggeredAt != evaluation.alert.triggeredAt) {
-          await repository.saveAlert(evaluation.alert);
-        }
-      }
-      unawaited(
-        ref
-            .read(priceAlertNotificationDispatcherProvider)
-            .dispatchTriggeredAlerts(evaluations),
-      );
-      return evaluator.summaryFromEvaluations(evaluations);
+      return evaluateAndDispatchPriceAlerts(ref, items);
     });
+
+/// Evaluates saved price alerts against the current portfolio values, flips any
+/// that meet their condition to `triggered`, logs a notification event, and
+/// dispatches the local notification. Extracted from [priceAlertSummaryProvider]
+/// so it can also be invoked imperatively when the portfolio loads/syncs —
+/// previously the summary provider had no watchers, so alerts never fired.
+Future<PriceAlertSummary> evaluateAndDispatchPriceAlerts(
+  Ref ref,
+  List<CollectibleItem> items,
+) async {
+  final repository = ref.read(priceAlertRepositoryProvider);
+  final evaluator = ref.read(priceAlertEvaluatorProvider);
+  final alerts = await repository.getAlerts();
+  final evaluations = evaluator.evaluateAlerts(alerts: alerts, items: items);
+  for (final evaluation in evaluations) {
+    final previous = alerts.where((alert) => alert.id == evaluation.alert.id);
+    final previousAlert = previous.isEmpty ? null : previous.first;
+    if (previousAlert == null ||
+        previousAlert.status != evaluation.alert.status ||
+        previousAlert.message != evaluation.alert.message ||
+        previousAlert.triggeredAt != evaluation.alert.triggeredAt) {
+      await repository.saveAlert(evaluation.alert);
+    }
+    // Log a notification event on a fresh trigger. The event store dedupes by
+    // alertId@triggeredAt, so re-evaluations never double-log.
+    if (evaluation.triggered && evaluation.alert.isTriggered) {
+      await ref
+          .read(notificationEventStoreProvider)
+          .append(NotificationEvent.fromPriceAlert(evaluation.alert));
+    }
+  }
+  // Surface alerts that were triggered elsewhere (e.g. the server-side
+  // scheduler, synced in via SupabasePriceAlertRepository) in the in-app inbox.
+  // Dedup by alertId@triggeredAt means already-logged events never repeat.
+  final eventStore = ref.read(notificationEventStoreProvider);
+  for (final alert in alerts) {
+    if (alert.isTriggered) {
+      await eventStore.append(NotificationEvent.fromPriceAlert(alert));
+    }
+  }
+  unawaited(
+    ref
+        .read(priceAlertNotificationDispatcherProvider)
+        .dispatchTriggeredAlerts(evaluations),
+  );
+  return evaluator.summaryFromEvaluations(evaluations);
+}
 
 PriceAlert buildPriceAlert({
   required CollectibleItem item,

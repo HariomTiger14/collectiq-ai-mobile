@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:collectiq_ai/core/cloud/cloud_portfolio_sync_coordinator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
@@ -26,6 +30,7 @@ class PortfolioState {
     this.items = const [],
     this.isLoading = false,
     this.errorMessage,
+    this.collectionLimitReached = false,
   });
 
   /// Saved portfolio items.
@@ -39,6 +44,11 @@ class PortfolioState {
 
   /// User-safe portfolio error message.
   final String? errorMessage;
+
+  /// One-shot signal that a save was blocked by the free collectible cap, so
+  /// the UI can present the upgrade sheet. Consumed via
+  /// [PortfolioController.consumeCollectionLimitPrompt].
+  final bool collectionLimitReached;
 
   /// Total estimated portfolio value.
   double get totalValue {
@@ -57,6 +67,7 @@ class PortfolioState {
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
+    bool collectionLimitReached = false,
   }) {
     return PortfolioState(
       items: items ?? this.items,
@@ -64,6 +75,7 @@ class PortfolioState {
       errorMessage: clearErrorMessage
           ? null
           : errorMessage ?? this.errorMessage,
+      collectionLimitReached: collectionLimitReached,
     );
   }
 }
@@ -90,6 +102,19 @@ class PortfolioController extends Notifier<PortfolioState> {
   }
 
   /// Loads all portfolio items from the repository.
+  // Evaluates saved price alerts against the current portfolio values and fires
+  // any that meet their condition. Best-effort; runs whenever values may have
+  // changed (load / cloud sync) so alerts actually trigger.
+  void _evaluatePriceAlerts() {
+    final items = state.items;
+    if (items.isEmpty) {
+      return;
+    }
+    unawaited(
+      evaluateAndDispatchPriceAlerts(ref, items).then((_) {}, onError: (_) {}),
+    );
+  }
+
   Future<void> loadItems() async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
@@ -98,6 +123,7 @@ class PortfolioController extends Notifier<PortfolioState> {
         items: collectiblesNewestFirst(items),
         isLoading: false,
       );
+      _evaluatePriceAlerts();
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
@@ -106,8 +132,19 @@ class PortfolioController extends Notifier<PortfolioState> {
     }
   }
 
-  /// Saves [item] and refreshes portfolio state.
-  Future<void> saveItem(CollectibleItem item) async {
+  /// Clears the one-shot collectible-cap upgrade signal after the UI has shown
+  /// the upgrade sheet, so it doesn't re-trigger on the next rebuild.
+  void consumeCollectionLimitPrompt() {
+    if (!state.collectionLimitReached) {
+      return;
+    }
+    state = state.copyWith();
+  }
+
+  /// Saves [item] and refreshes portfolio state. Returns `true` when the item
+  /// was persisted, or `false` when it was blocked by the free cap or errored —
+  /// so callers (scan/search) don't show a false "saved" confirmation.
+  Future<bool> saveItem(CollectibleItem item) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
       final persistedItemsBeforeSave = await _repository.getItems();
@@ -123,8 +160,9 @@ class PortfolioController extends Notifier<PortfolioState> {
           items: collectiblesNewestFirst(persistedItemsBeforeSave),
           isLoading: false,
           errorMessage: planLimits.portfolioLimitMessage,
+          collectionLimitReached: true,
         );
-        return;
+        return false;
       }
 
       final itemForSave = item.valueAtScan == null
@@ -143,11 +181,13 @@ class PortfolioController extends Notifier<PortfolioState> {
         isLoading: false,
       );
       await _syncPendingCloudItems();
+      return true;
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Unable to save portfolio item.',
       );
+      return false;
     }
   }
 
@@ -197,8 +237,12 @@ class PortfolioController extends Notifier<PortfolioState> {
   /// Updates [item] and records a cloud valuation snapshot when available.
   Future<void> updateItemWithValuationSnapshot(CollectibleItem item) async {
     await updateItem(item);
-    await ref.read(valuationSnapshotRepositoryProvider).recordSnapshot(item);
-    await _syncCloudValuationSnapshot(item);
+    final recorded = await ref
+        .read(valuationSnapshotRepositoryProvider)
+        .recordSnapshotIfValueChanged(item);
+    if (recorded) {
+      await _syncCloudValuationSnapshot(item);
+    }
   }
 
   /// Removes the item with [id] and refreshes portfolio state.
@@ -279,6 +323,24 @@ class PortfolioController extends Notifier<PortfolioState> {
     await _syncPendingCloudItems();
   }
 
+  /// Pulls signed-in cloud portfolio items into the local portfolio cache.
+  Future<int> syncCloudPortfolioNow() async {
+    try {
+      final mergedCount = await CloudPortfolioSyncCoordinator(
+        registry: ref.read(cloudServiceRegistryProvider),
+        portfolioRepository: _repository,
+      ).syncNow();
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+      _evaluatePriceAlerts();
+      return mergedCount;
+    } catch (_) {
+      final items = collectiblesNewestFirst(await _repository.getItems());
+      state = state.copyWith(items: items, isLoading: false);
+      return 0;
+    }
+  }
+
   Future<void> _syncPendingCloudItems() async {
     try {
       await CloudPortfolioSyncCoordinator(
@@ -322,7 +384,10 @@ class PortfolioController extends Notifier<PortfolioState> {
         registry: ref.read(cloudServiceRegistryProvider),
         portfolioRepository: _repository,
       ).deleteCloudItem(id);
-    } catch (_) {}
+    } on Object catch (error, stackTrace) {
+      debugPrint('[PortfolioController] cloud delete failed for $id: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 }
 

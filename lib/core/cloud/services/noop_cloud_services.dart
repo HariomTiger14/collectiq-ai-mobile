@@ -1,9 +1,11 @@
 import 'analytics_service.dart';
 import 'auth_service.dart';
 import 'cloud_portfolio_sync_service.dart';
+import 'cloud_profile_sync_service.dart';
 import 'cloud_storage_service.dart';
 import 'crash_reporting_service.dart';
 import 'remote_config_service.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 
 class NoOpAuthService implements AuthService {
@@ -82,6 +84,11 @@ class NoOpCloudPortfolioSyncService implements CloudPortfolioSyncService {
   }
 
   @override
+  Future<List<PortfolioValuationSnapshot>> fetchAllValuationSnapshots() async {
+    return const [];
+  }
+
+  @override
   Future<List<CollectibleItem>> fetchItems() async {
     return const [];
   }
@@ -98,6 +105,22 @@ class NoOpCloudPortfolioSyncService implements CloudPortfolioSyncService {
       message: 'Cloud portfolio sync is not configured.',
     );
   }
+}
+
+class NoOpCloudProfileSyncService implements CloudProfileSyncService {
+  const NoOpCloudProfileSyncService();
+
+  @override
+  String get providerName => 'No-op Profile Sync';
+
+  @override
+  Future<void> pushProfile(
+    CollectorProfile profile, {
+    bool uploadAvatar = false,
+  }) async {}
+
+  @override
+  Future<CloudProfileSnapshot?> fetchProfile() async => null;
 }
 
 class NoOpAnalyticsService implements AnalyticsService {

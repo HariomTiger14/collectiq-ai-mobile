@@ -11,10 +11,12 @@ import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.da
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/auth/presentation/screens/auth_screens.dart';
 import 'package:collectiq_ai/features/cloud_sync/presentation/controllers/sync_controller.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
@@ -75,27 +77,39 @@ class _AppShellState extends ConsumerState<AppShell>
     super.dispose();
   }
 
+  // Re-sync the cloud portfolio when the app returns to the foreground so that
+  // server-side changes made while backgrounded (fresh valuations, newly
+  // triggered price alerts) surface promptly on reopen — not only on a full
+  // relaunch. Throttled via the shared marker so a quick background/foreground
+  // toggle doesn't hammer the network.
+  static const _resumeSyncThrottle = Duration(minutes: 2);
+
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {}
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _maybeSyncOnResume();
+    }
+  }
+
+  void _maybeSyncOnResume() {
+    if (!ref.read(authControllerProvider).isSignedIn) {
+      return;
+    }
+    final last = ref.read(homeLastAutoSyncProvider);
+    final now = DateTime.now();
+    if (last != null && now.difference(last) < _resumeSyncThrottle) {
+      return;
+    }
+    ref.read(homeLastAutoSyncProvider.notifier).mark(now);
+    unawaited(
+      ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow(),
+    );
+  }
 
   void _startNewScan() {
     ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
     _selectTab(_scanTabIndex, reason: 'start-new-scan');
-  }
-
-  void _startGalleryImport() {
-    ref.read(scannerControllerProvider.notifier).resetWhenStartingNewScan();
-    _selectTab(_scanTabIndex, reason: 'home-import-photo');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        ref
-            .read(scannerControllerProvider.notifier)
-            .pickImageFromGallery(context: context),
-      );
-    });
   }
 
   void _openPortfolio() {
@@ -150,7 +164,7 @@ class _AppShellState extends ConsumerState<AppShell>
       await ref.read(portfolioControllerProvider.notifier).loadItems();
       await ref
           .read(portfolioControllerProvider.notifier)
-          .syncPendingCloudItems();
+          .syncCloudPortfolioNow();
       await ref.read(syncControllerProvider.notifier).loadStatus();
       unawaited(
         ref
@@ -231,7 +245,7 @@ class _AppShellState extends ConsumerState<AppShell>
       return;
     }
 
-    await ref.read(portfolioControllerProvider.notifier).loadItems();
+    await ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow();
     if (!mounted) {
       return;
     }
@@ -299,7 +313,6 @@ class _AppShellState extends ConsumerState<AppShell>
       iconAsset: PackLoxAssets.navHome,
       builder: (_) => HomeScreen(
         onScanPressed: _startNewScan,
-        onImportPhotoPressed: _startGalleryImport,
         onPortfolioPressed: _openPortfolio,
       ),
     ),
@@ -490,6 +503,23 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authControllerProvider, _handleAuthChanged);
+
+    // A blocked save (free collectible cap reached) — from a scan or a
+    // catalog-add — presents the upgrade sheet from the always-mounted shell.
+    ref.listen<bool>(
+      portfolioControllerProvider.select(
+        (state) => state.collectionLimitReached,
+      ),
+      (previous, reachedLimit) {
+        if (!reachedLimit) {
+          return;
+        }
+        ref
+            .read(portfolioControllerProvider.notifier)
+            .consumeCollectionLimitPrompt();
+        showUpgradeSheet(context, reason: PaywallReason.collectionFull);
+      },
+    );
 
     final authState = ref.watch(authControllerProvider);
     final onboardingCompleted = ref.watch(onboardingControllerProvider);

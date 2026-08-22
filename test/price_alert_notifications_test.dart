@@ -112,9 +112,7 @@ void main() {
 
     expect(find.text('Price Alerts'), findsOneWidget);
     expect(
-      find.text(
-        'Enable notifications in device settings to receive local alerts.',
-      ),
+      find.text('Enable notifications in Settings to get price alerts.'),
       findsOneWidget,
     );
     expect(find.text('Denied'), findsWidgets);

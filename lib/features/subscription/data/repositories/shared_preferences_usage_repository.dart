@@ -6,23 +6,23 @@ class SharedPreferencesUsageRepository implements UsageRepository {
   /// Creates a local usage repository.
   const SharedPreferencesUsageRepository();
 
-  static const _usageDateKey = 'subscription_usage_date';
-  static const _scansUsedKey = 'subscription_scans_used_today';
+  static const _scanMonthKey = 'subscription_scan_month';
+  static const _scansUsedKey = 'subscription_scans_used_month';
   static const _priceRefreshMonthKey = 'subscription_price_refresh_month';
   static const _priceRefreshesUsedKey =
       'subscription_price_refreshes_used_month';
 
   @override
-  Future<int> scansUsedToday() async {
+  Future<int> scansUsedThisMonth() async {
     final preferences = await SharedPreferences.getInstance();
-    await _resetIfNewDay(preferences);
+    await _resetScansIfNewMonth(preferences);
     return preferences.getInt(_scansUsedKey) ?? 0;
   }
 
   @override
-  Future<int> incrementScansUsedToday() async {
+  Future<int> incrementScansUsedThisMonth() async {
     final preferences = await SharedPreferences.getInstance();
-    await _resetIfNewDay(preferences);
+    await _resetScansIfNewMonth(preferences);
     final nextValue = (preferences.getInt(_scansUsedKey) ?? 0) + 1;
     await preferences.setInt(_scansUsedKey, nextValue);
     return nextValue;
@@ -47,19 +47,19 @@ class SharedPreferencesUsageRepository implements UsageRepository {
   @override
   Future<void> resetUsage() async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_usageDateKey, _todayKey());
+    await preferences.setString(_scanMonthKey, _monthKey());
     await preferences.setInt(_scansUsedKey, 0);
     await preferences.setString(_priceRefreshMonthKey, _monthKey());
     await preferences.setInt(_priceRefreshesUsedKey, 0);
   }
 
-  Future<void> _resetIfNewDay(SharedPreferences preferences) async {
-    final today = _todayKey();
-    if (preferences.getString(_usageDateKey) == today) {
+  Future<void> _resetScansIfNewMonth(SharedPreferences preferences) async {
+    final month = _monthKey();
+    if (preferences.getString(_scanMonthKey) == month) {
       return;
     }
 
-    await preferences.setString(_usageDateKey, today);
+    await preferences.setString(_scanMonthKey, month);
     await preferences.setInt(_scansUsedKey, 0);
   }
 
@@ -71,13 +71,6 @@ class SharedPreferencesUsageRepository implements UsageRepository {
 
     await preferences.setString(_priceRefreshMonthKey, month);
     await preferences.setInt(_priceRefreshesUsedKey, 0);
-  }
-
-  String _todayKey() {
-    final now = DateTime.now();
-    final month = now.month.toString().padLeft(2, '0');
-    final day = now.day.toString().padLeft(2, '0');
-    return '${now.year}-$month-$day';
   }
 
   String _monthKey() {
