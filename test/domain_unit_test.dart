@@ -6469,6 +6469,59 @@ void main() {
       },
     );
 
+    test(
+      'historyFromCloudSnapshots ignores a deleted item\'s valuation '
+      'history (real bug: a deleted item\'s cloud snapshots -- priced '
+      'history, not portfolio membership -- kept inflating the total and '
+      'showed up as an ID-only "mover" since it has no CollectibleItem '
+      'to name it)',
+      () {
+        // Only card-a is still owned. never-owned's snapshots remain in
+        // the cloud table (valuation history isn't deleted alongside the
+        // item), but must not contribute once the item is gone.
+        final items = [
+          _analyticsItem(
+            id: 'card-a',
+            title: 'Kept Card',
+            category: 'Trading Card',
+            value: 10,
+            confidence: 0.9,
+            createdAt: DateTime.parse('2026-07-01T00:00:00Z'),
+          ),
+        ];
+        final cloudSnapshots = [
+          PortfolioValuationSnapshot(
+            id: 'a-1',
+            portfolioItemId: 'card-a',
+            valueAud: 10,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+          PortfolioValuationSnapshot(
+            id: 'deleted-1',
+            portfolioItemId: 'deleted-item',
+            valueAud: 500,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricedAt: DateTime.parse('2026-07-01T10:00:00Z'),
+          ),
+        ];
+
+        final history = service.historyFromCloudSnapshots(
+          cloudSnapshots,
+          items,
+          now: DateTime.parse('2026-07-01T18:00:00Z'),
+        );
+        final daily = history
+            .where((s) => s.period == TrendSnapshotPeriod.daily)
+            .toList();
+
+        expect(daily, hasLength(1));
+        expect(daily.single.totalPortfolioValue, 10);
+        expect(daily.single.itemValues.containsKey('deleted-item'), isFalse);
+        expect(daily.single.itemTitles.containsKey('deleted-item'), isFalse);
+      },
+    );
+
     test('historyFromCloudSnapshots returns empty when there is no data', () {
       expect(service.historyFromCloudSnapshots(const [], const []), isEmpty);
     });
