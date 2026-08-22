@@ -73,6 +73,38 @@ void main() {
     expect(find.text('Hari Om Bhatia'), findsOneWidget);
   });
 
+  testWidgets(
+    'edit-profile field starts with the name actually shown, not the raw '
+    'unset placeholder (real bug: the header derives "Hariomritesh" from '
+    'the signed-in email since no custom name was ever saved, but the edit '
+    'sheet pre-filled "PackLox Collector" -- tapping Save without changing '
+    'anything would have silently overwritten the real derived name)',
+    (tester) async {
+      await tester.pumpSettings(
+        repository: _SettingsAuthRepository(
+          initialUser: const AppUser(
+            id: 'user-1',
+            displayName: 'hariomritesh@gmail.com',
+            email: 'hariomritesh@gmail.com',
+          ),
+        ),
+      );
+
+      expect(find.text('Hariomritesh'), findsOneWidget);
+      expect(find.text('PackLox Collector'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-initial')),
+      );
+      await tester.pumpAndSettle();
+
+      final nameField = tester.widget<TextField>(
+        find.byKey(const ValueKey('settings-profile-name-field')),
+      );
+      expect(nameField.controller?.text, 'Hariomritesh');
+    },
+  );
+
   testWidgets('signed-out account entry opens separate auth screen', (
     tester,
   ) async {

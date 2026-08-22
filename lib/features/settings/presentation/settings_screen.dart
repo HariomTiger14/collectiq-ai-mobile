@@ -712,7 +712,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   bottomInset + HomeTokens.pageGutter,
                 ),
                 child: _ProfileEditSheet(
-                  initialDisplayName: currentProfile.displayName,
+                  initialDisplayName: resolvedDisplayName(
+                    profile: currentProfile,
+                    authState: ref.read(authControllerProvider),
+                  ),
                   isSaving: isSaving,
                   onPickAvatar: pickAvatar,
                   onSaveName: saveName,
@@ -1882,6 +1885,42 @@ String? _nameFromEmail(String? email) {
   return words.isEmpty ? null : words.join(' ');
 }
 
+/// The single source of truth for "what name do we show this person" --
+/// used for both the Settings headline and the edit-profile field's
+/// starting value. They must stay in sync: showing a derived name (e.g.
+/// "Hariomritesh" from an email) on the headline while the edit sheet
+/// pre-fills the raw unset placeholder ("PackLox Collector") means saving
+/// without changing anything silently overwrites the real name with that
+/// placeholder -- a real bug found live.
+String resolvedDisplayName({
+  required CollectorProfile? profile,
+  required AuthState authState,
+}) {
+  final rawSaved = profile?.displayName.trim();
+  // The profile ships with a generic default name, so treat that as "unset"
+  // and fall through to the person's real identity when they're signed in.
+  final savedName =
+      (rawSaved != null &&
+          rawSaved.isNotEmpty &&
+          rawSaved != CollectorProfile.defaultDisplayName)
+      ? rawSaved
+      : null;
+  final rawAuthName = authState.user?.displayName.trim();
+  final email = authState.user?.email;
+  // Providers often set the display name to the email; a raw address makes a
+  // poor headline, so only keep a real name and otherwise derive one.
+  final authName =
+      (rawAuthName != null &&
+          rawAuthName.isNotEmpty &&
+          !rawAuthName.contains('@'))
+      ? rawAuthName
+      : null;
+  return savedName ??
+      (authState.isSignedIn
+          ? (authName ?? _nameFromEmail(email) ?? 'Collector')
+          : CollectorProfile.defaultDisplayName);
+}
+
 class IdentityBlock extends StatelessWidget {
   const IdentityBlock({
     super.key,
@@ -1904,30 +1943,7 @@ class IdentityBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isSignedIn = authState.isSignedIn;
-    final rawSaved = profile?.displayName.trim();
-    // The profile ships with a generic default name, so treat that as "unset"
-    // and fall through to the person's real identity when they're signed in.
-    final savedName =
-        (rawSaved != null &&
-            rawSaved.isNotEmpty &&
-            rawSaved != CollectorProfile.defaultDisplayName)
-        ? rawSaved
-        : null;
-    final rawAuthName = authState.user?.displayName.trim();
-    final email = authState.user?.email;
-    // Providers often set the display name to the email; a raw address makes a
-    // poor headline, so only keep a real name and otherwise derive one.
-    final authName =
-        (rawAuthName != null &&
-            rawAuthName.isNotEmpty &&
-            !rawAuthName.contains('@'))
-        ? rawAuthName
-        : null;
-    final headline =
-        savedName ??
-        (isSignedIn
-            ? (authName ?? _nameFromEmail(email) ?? 'Collector')
-            : CollectorProfile.defaultDisplayName);
+    final headline = resolvedDisplayName(profile: profile, authState: authState);
     final initial = headline.trim().isNotEmpty
         ? headline.trim().substring(0, 1).toUpperCase()
         : 'P';
