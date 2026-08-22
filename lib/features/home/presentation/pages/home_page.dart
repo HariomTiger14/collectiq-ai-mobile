@@ -605,6 +605,14 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     final change = latest - baseline;
     final percent = baseline == 0 ? 0.0 : change / baseline;
     final isUp = change >= 0;
+    // The chart colors each point green/red relative to where its own
+    // visible line starts, not to the true-overall price basis -- those are
+    // different reference points (the true-overall baseline is often above
+    // most of the actual plotted history, which painted almost the whole
+    // MAX chart red even on a real net gain, since every point read as
+    // "below baseline"). Keep the chart's own reference independent of
+    // which number the headline above it is using.
+    final chartBaseline = showChart ? windowPoints.first.totalValue : 0.0;
 
     final String deltaText;
     // The period ("1M") renders as a quiet suffix so the change reads first.
@@ -703,7 +711,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
             _GainLossChart(
               key: const ValueKey('home-value-hero-trend'),
               values: [for (final point in windowPoints) point.totalValue],
-              baseline: baseline,
+              baseline: chartBaseline,
             ),
             const SizedBox(height: 8),
             _PeriodSelector(

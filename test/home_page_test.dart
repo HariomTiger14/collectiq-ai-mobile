@@ -163,6 +163,79 @@ void main() {
     },
   );
 
+  testWidgets(
+    'MAX chart colors segments relative to its own first plotted point, not '
+    'the true-overall price basis (real bug: wiring the true-overall '
+    'baseline into the chart painted almost the entire line red -- "below '
+    'baseline" -- even on a real net gain, because that baseline sits above '
+    'most of the actual plotted history)',
+    (tester) async {
+      final oldSnapshotDate = DateTime.now().subtract(const Duration(days: 60));
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            ..._item(
+              id: 'old-item',
+              title: 'Early Pikachu',
+              category: 'Trading Card',
+              value: 20,
+              createdAt: oldSnapshotDate,
+            ),
+            'valueAtScan': 15,
+          },
+          {
+            ..._item(
+              id: 'new-item',
+              title: 'Black Lotus',
+              category: 'Trading Card',
+              value: 6000,
+              createdAt: DateTime.now(),
+            ),
+            'valueAtScan': 6000,
+          },
+        ]),
+        'portfolio_value_history_snapshots': jsonEncode([
+          {
+            'id': 'daily-old',
+            'period': 'daily',
+            'periodStart': oldSnapshotDate.toIso8601String(),
+            'capturedAt': oldSnapshotDate.toIso8601String(),
+            'totalPortfolioValue': 15,
+            'totalItems': 1,
+            'averageValue': 15,
+            'categoryTotals': <String, double>{},
+            'collectionScore': 0,
+            'itemValues': {'old-item': 15},
+            'itemTitles': {'old-item': 'Early Pikachu'},
+            'itemCategories': {'old-item': 'Trading Card'},
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(_homeApp());
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      await tester.tap(find.byKey(const ValueKey('home-period-MAX')));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      final chartFinder = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_GainLossChart',
+      );
+      expect(chartFinder, findsOneWidget);
+      final chartWidget = tester.widget(chartFinder) as dynamic;
+      final chartValues = (chartWidget.values as List).cast<double>();
+      final chartBaseline = chartWidget.baseline as double;
+
+      // The chart's own reference must be its own first point (15) --
+      // never the true-overall baseline (6015) the headline number above
+      // it uses. Old buggy behavior wired the same value into both, which
+      // classified nearly every historical point as "below baseline".
+      expect(chartBaseline, chartValues.first);
+      expect(chartBaseline, isNot(6015));
+    },
+  );
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {
