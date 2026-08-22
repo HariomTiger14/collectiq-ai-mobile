@@ -1,8 +1,8 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
+import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
 import 'package:collectiq_ai/features/home/domain/entities/smart_collector_insights.dart';
-import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_local_image.dart';
 import 'package:collectiq_ai/features/wishlist/domain/entities/wishlist_status_entry.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -11,11 +11,13 @@ import 'package:flutter/material.dart';
 class PortfolioThumbnail extends StatelessWidget {
   const PortfolioThumbnail({
     required this.imagePath,
+    this.storagePath,
     this.size = 110,
     super.key,
   });
 
   final String imagePath;
+  final String? storagePath;
   final double size;
 
   @override
@@ -26,6 +28,7 @@ class PortfolioThumbnail extends StatelessWidget {
       child: _PortfolioItemImage(
         key: ValueKey('portfolio-thumbnail-$imagePath-$size'),
         imagePath: imagePath,
+        storagePath: storagePath,
         size: size,
       ),
     );
@@ -877,17 +880,18 @@ class _PortfolioItemCard extends StatelessWidget {
 class _PortfolioItemImage extends StatelessWidget {
   const _PortfolioItemImage({
     required this.imagePath,
+    this.storagePath,
     this.size = 110,
     super.key,
   });
 
   final String imagePath;
+  final String? storagePath;
   final double size;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final image = _imageForPath();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -899,40 +903,13 @@ class _PortfolioItemImage extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: colorScheme.outlineVariant),
         ),
-        child: image,
+        child: ResilientCollectibleImage(
+          localPath: imagePath,
+          storagePath: storagePath,
+          fit: BoxFit.cover,
+          placeholderBuilder: () => const _PortfolioImagePlaceholder(),
+        ),
       ),
-    );
-  }
-
-  Widget _imageForPath() {
-    final normalizedPath = imagePath.trim();
-    if (normalizedPath.isEmpty || normalizedPath.startsWith('sample://')) {
-      return const _PortfolioImagePlaceholder();
-    }
-
-    if (normalizedPath.startsWith('http://') ||
-        normalizedPath.startsWith('https://')) {
-      return Image.network(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    }
-
-    if (normalizedPath.startsWith('assets/')) {
-      return Image.asset(
-        normalizedPath,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const _PortfolioImagePlaceholder(),
-      );
-    }
-
-    return buildLocalPortfolioImage(
-      imagePath: normalizedPath,
-      fit: BoxFit.cover,
-      placeholderBuilder: () => const _PortfolioImagePlaceholder(),
     );
   }
 }

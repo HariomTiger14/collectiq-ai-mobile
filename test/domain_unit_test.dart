@@ -3696,6 +3696,87 @@ void main() {
         expect(reference, isNull);
       },
     );
+
+    test(
+      'uploadImage returns a real signed URL, not a guessed /object/public/ '
+      'one (real bug: the storage bucket is private, so that guessed URL '
+      '404s with "Bucket not found" even though the upload succeeded -- '
+      'every scanned item\'s photo showed "Preview unavailable")',
+      () async {
+        final gateway = _FakeStorageDataGateway(
+          session: const SupabaseAuthSession(
+            userId: 'user-1',
+            email: 'collector@example.com',
+            accessToken: 'token',
+            displayName: 'Collector',
+            isAnonymous: false,
+            projectUrl: 'https://example.supabase.co',
+          ),
+        );
+        final service = SupabaseCloudStorageService(
+          bootstrap: _configuredSupabaseBootstrap(),
+          authService: const _SignedInCloudAuthService(
+            userId: 'user-1',
+            email: 'collector@example.com',
+          ),
+          supabaseDataGateway: gateway,
+        );
+
+        final result = await service.uploadImage(
+          localPath: 'test/fixtures/image.jpg',
+          destinationPath: 'users/user-1/portfolio_images/item-1.jpg',
+        );
+
+        expect(result, isNotNull);
+        expect(gateway.uploadCalls, [
+          '/storage/v1/object/collectiq-portfolio-images/users/user-1/portfolio_images/item-1.jpg',
+        ]);
+        expect(gateway.signCalls, [
+          '/storage/v1/object/sign/collectiq-portfolio-images/users/user-1/portfolio_images/item-1.jpg',
+        ]);
+        expect(result!.publicUrl, isNotNull);
+        expect(result.publicUrl, isNot(contains('/object/public/')));
+        expect(
+          result.publicUrl,
+          'https://example.supabase.co/storage/v1/object/sign/collectiq-portfolio-images/users/user-1/portfolio_images/item-1.jpg?token=signed-token-1',
+        );
+      },
+    );
+
+    test(
+      'getImageUrl re-resolves a fresh signed URL rather than returning a '
+      'stale cached one',
+      () async {
+        final gateway = _FakeStorageDataGateway(
+          session: const SupabaseAuthSession(
+            userId: 'user-1',
+            email: 'collector@example.com',
+            accessToken: 'token',
+            displayName: 'Collector',
+            isAnonymous: false,
+            projectUrl: 'https://example.supabase.co',
+          ),
+        );
+        final service = SupabaseCloudStorageService(
+          bootstrap: _configuredSupabaseBootstrap(),
+          authService: const _SignedInCloudAuthService(
+            userId: 'user-1',
+            email: 'collector@example.com',
+          ),
+          supabaseDataGateway: gateway,
+        );
+
+        final url = await service.getImageUrl(
+          'users/user-1/portfolio_images/item-1.jpg',
+        );
+
+        expect(
+          url,
+          'https://example.supabase.co/storage/v1/object/sign/collectiq-portfolio-images/users/user-1/portfolio_images/item-1.jpg?token=signed-token-1',
+        );
+        expect(gateway.signCalls, hasLength(1));
+      },
+    );
   });
 
   group('SupabaseAuthSession refresh token', () {
@@ -8115,6 +8196,69 @@ class _FakeSupabaseAuthGateway implements SupabaseAuthGateway {
       projectUrl: 'https://example.supabase.co',
     );
   }
+}
+
+/// Minimal fake gateway covering only what storage upload/sign calls need
+/// -- unlike [_FakeSupabaseDataGateway], `data` here is raw image bytes for
+/// an upload and a JSON map for a sign request, neither of which fit that
+/// fake's List-typed assumptions.
+class _FakeStorageDataGateway implements SupabaseDataGateway {
+  _FakeStorageDataGateway({required this.session});
+
+  final SupabaseAuthSession? session;
+  final List<String> uploadCalls = [];
+  final List<String> signCalls = [];
+  var _signTokenCounter = 0;
+
+  @override
+  SupabaseConfig get config => const SupabaseConfig(
+    url: 'https://example.supabase.co',
+    anonKey: 'anon-key',
+    isEnabled: true,
+  );
+
+  @override
+  bool get isConfigured => true;
+
+  @override
+  Future<SupabaseAuthSession?> currentSession() async => session;
+
+  @override
+  Future<Response<T>> authenticatedPostWithSession<T>(
+    String path, {
+    required SupabaseAuthSession session,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    if (path.contains('/object/sign/')) {
+      signCalls.add(path);
+      _signTokenCounter += 1;
+      final bucketAndPath = path.substring(
+        '/storage/v1/object/sign/'.length,
+      );
+      return Response<T>(
+        requestOptions: RequestOptions(path: path),
+        data:
+            {
+                  'signedURL':
+                      '/object/sign/$bucketAndPath?token=signed-token-$_signTokenCounter',
+                }
+                as T,
+        statusCode: 200,
+      );
+    }
+
+    uploadCalls.add(path);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: null,
+      statusCode: 200,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeSupabaseDataGateway implements SupabaseDataGateway {

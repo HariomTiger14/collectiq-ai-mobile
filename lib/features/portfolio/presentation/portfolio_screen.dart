@@ -2349,7 +2349,11 @@ class _PortfolioItemRow extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            PortfolioThumbnail(imagePath: item.imagePath, size: 64),
+            PortfolioThumbnail(
+              imagePath: item.imagePath,
+              storagePath: item.imageStoragePath,
+              size: 64,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

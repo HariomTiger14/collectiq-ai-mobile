@@ -1173,6 +1173,7 @@ class HomeCollectionStripItem {
     required this.id,
     required this.title,
     required this.imagePath,
+    this.imageStoragePath,
     this.subtitle,
     this.onTap,
   });
@@ -1180,6 +1181,7 @@ class HomeCollectionStripItem {
   final String id;
   final String title;
   final String imagePath;
+  final String? imageStoragePath;
   final String? subtitle;
   final VoidCallback? onTap;
 }
@@ -1263,7 +1265,11 @@ class _HomeStripTile extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                child: PortfolioThumbnail(imagePath: item.imagePath, size: 72),
+                child: PortfolioThumbnail(
+                  imagePath: item.imagePath,
+                  storagePath: item.imageStoragePath,
+                  size: 72,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -1810,6 +1816,7 @@ class HomeRecentItemCard extends StatelessWidget {
     required this.category,
     required this.imagePath,
     required this.valueLabel,
+    this.imageStoragePath,
     this.condition,
     this.addedLabel,
     this.valueUnavailable = false,
@@ -1823,6 +1830,7 @@ class HomeRecentItemCard extends StatelessWidget {
   final String title;
   final String category;
   final String imagePath;
+  final String? imageStoragePath;
   final String valueLabel;
   final String? condition;
   final String? addedLabel;
@@ -1857,7 +1865,11 @@ class HomeRecentItemCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                child: PortfolioThumbnail(imagePath: imagePath, size: 64),
+                child: PortfolioThumbnail(
+                  imagePath: imagePath,
+                  storagePath: imageStoragePath,
+                  size: 64,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(

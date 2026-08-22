@@ -20,6 +20,11 @@ class SupabaseCloudStorageService implements CloudStorageService {
   final SupabaseDataGateway? supabaseDataGateway;
   final String bucketName;
 
+  // Comfortably under the server-side signed-URL lifetime so a URL handed
+  // to a widget doesn't expire mid-display; ResilientCollectibleImage's
+  // cache also refreshes before this window closes.
+  static const _signedUrlExpirySeconds = 60 * 60;
+
   @override
   String get providerName => 'Supabase Storage';
 
@@ -77,14 +82,21 @@ class SupabaseCloudStorageService implements CloudStorageService {
 
   @override
   Future<String?> getImageUrl(String path) async {
+    if (path.trim().isEmpty) {
+      return null;
+    }
+
     final gateway = supabaseDataGateway;
-    final restPublicUrl = _restPublicUrl(gateway, path);
-    if (restPublicUrl != null) {
-      return restPublicUrl;
+    final session = await _signedInRestSession(gateway);
+    if (gateway != null && session != null) {
+      final restSignedUrl = await _fetchSignedUrlRest(gateway, session, path);
+      if (restSignedUrl != null) {
+        return restSignedUrl;
+      }
     }
 
     final ready = await bootstrap.ensureInitialized();
-    if (!ready.isInitialized || path.trim().isEmpty) {
+    if (!ready.isInitialized) {
       return null;
     }
 
@@ -92,11 +104,9 @@ class SupabaseCloudStorageService implements CloudStorageService {
     try {
       return await bootstrap.client!.storage
           .from(bucketName)
-          .createSignedUrl(normalizedPath, 60 * 60);
+          .createSignedUrl(normalizedPath, _signedUrlExpirySeconds);
     } on Object {
-      return bootstrap.client!.storage
-          .from(bucketName)
-          .getPublicUrl(normalizedPath);
+      return null;
     }
   }
 
@@ -113,11 +123,8 @@ class SupabaseCloudStorageService implements CloudStorageService {
     required String destinationPath,
   }) async {
     final gateway = supabaseDataGateway;
-    if (gateway == null || !gateway.isConfigured) {
-      return null;
-    }
-    final session = await gateway.currentSession();
-    if (session == null || session.isAnonymous) {
+    final session = await _signedInRestSession(gateway);
+    if (gateway == null || session == null) {
       return null;
     }
 
@@ -143,19 +150,56 @@ class SupabaseCloudStorageService implements CloudStorageService {
 
     return CloudStorageUploadResult(
       path: normalizedPath,
-      publicUrl: _restPublicUrl(gateway, normalizedPath),
+      publicUrl: await _fetchSignedUrlRest(gateway, session, normalizedPath),
     );
   }
 
-  String? _restPublicUrl(SupabaseDataGateway? gateway, String path) {
-    final baseUri = gateway?.config.baseUri;
-    if (baseUri == null || path.trim().isEmpty) {
+  Future<SupabaseAuthSession?> _signedInRestSession(
+    SupabaseDataGateway? gateway,
+  ) async {
+    if (gateway == null || !gateway.isConfigured) {
       return null;
     }
+    final session = await gateway.currentSession();
+    if (session == null || session.isAnonymous) {
+      return null;
+    }
+    return session;
+  }
+
+  // The bucket is private, so the only URL that will ever actually resolve
+  // is a signed one -- there is no stable "public" URL to construct by
+  // string formatting (that was the bug: a blindly-built /object/public/...
+  // URL 404s with "Bucket not found" against a private bucket, even though
+  // the upload itself succeeded). Callers must treat the result as
+  // short-lived and re-resolve it via [getImageUrl] at display time rather
+  // than caching it indefinitely.
+  Future<String?> _fetchSignedUrlRest(
+    SupabaseDataGateway gateway,
+    SupabaseAuthSession session,
+    String path,
+  ) async {
     final normalizedPath = _normalizePath(path);
-    return baseUri
-        .resolve('/storage/v1/object/public/$bucketName/$normalizedPath')
-        .toString();
+    try {
+      final response = await gateway.authenticatedPostWithSession<
+        Map<String, dynamic>
+      >(
+        '/storage/v1/object/sign/$bucketName/$normalizedPath',
+        session: session,
+        data: {'expiresIn': _signedUrlExpirySeconds},
+      );
+      final signedPath = response.data?['signedURL'] as String?;
+      if (signedPath == null || signedPath.isEmpty) {
+        return null;
+      }
+      final baseUri = gateway.config.baseUri;
+      if (baseUri == null) {
+        return null;
+      }
+      return baseUri.resolve('/storage/v1$signedPath').toString();
+    } on Object {
+      return null;
+    }
   }
 }
 
