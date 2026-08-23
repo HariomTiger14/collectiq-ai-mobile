@@ -38,6 +38,7 @@ import 'package:collectiq_ai/features/profile/presentation/controllers/profile_c
 import 'package:collectiq_ai/features/settings/data/repositories/data_request_repository.dart';
 import 'package:collectiq_ai/features/support/presentation/screens/my_support_tickets_screen.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
@@ -1296,9 +1297,33 @@ class _PlanLimitsSummary extends StatelessWidget {
       // 'Bulk refresh' is intentionally omitted: the capability flag exists but
       // the feature isn't built yet, so we don't advertise it as a Pro perk.
     ];
+    // "Basic" undersold the free plan against its own "full core experience"
+    // positioning -- scanning, real pricing, and portfolio tracking are all
+    // fully there up to the item cap, just without the advanced tools below.
     final toolLabel = unlockedTools.isEmpty
-        ? 'Basic tools'
+        ? 'Core tools'
         : unlockedTools.join(', ');
+
+    // On the free plan, each metric doubles as a quiet upgrade pitch: the
+    // Pro number sits right next to the one you already see, so the
+    // comparison sells itself instead of needing separate promo copy. A
+    // paid-plan user has nothing to compare up to, so this stays null and
+    // the metric shows just its own value, as before.
+    final isFree = !state.entitlements.isPaid;
+    final proLimits = isFree
+        ? PlanLimits.forPlan(
+            plan: SubscriptionPlan.pro,
+            freeScanLimit: limits.scanLimit,
+          )
+        : null;
+    final proToolLabel = proLimits == null
+        ? null
+        : [
+            if (proLimits.canUseFullValueHistory) 'History',
+            if (proLimits.canUseAdvancedFilters) 'Advanced filters',
+            if (proLimits.canExportPortfolio) 'Export',
+            if (proLimits.canUsePortfolioIntelligence) 'Intelligence',
+          ].join(', ');
 
     return Column(
       children: [
@@ -1308,6 +1333,7 @@ class _PlanLimitsSummary extends StatelessWidget {
               child: _PlanLimitMetric(
                 label: 'Portfolio',
                 value: limits.portfolioItemsLabel,
+                proValue: proLimits?.portfolioItemsLabel,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -1315,6 +1341,7 @@ class _PlanLimitsSummary extends StatelessWidget {
               child: _PlanLimitMetric(
                 label: 'Photos',
                 value: limits.photosPerItemLabel,
+                proValue: proLimits?.photosPerItemLabel,
               ),
             ),
           ],
@@ -1326,6 +1353,7 @@ class _PlanLimitsSummary extends StatelessWidget {
               child: _PlanLimitMetric(
                 label: 'Alerts',
                 value: limits.priceAlertsLabel,
+                proValue: proLimits?.priceAlertsLabel,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -1333,22 +1361,37 @@ class _PlanLimitsSummary extends StatelessWidget {
               child: _PlanLimitMetric(
                 label: 'Refreshes',
                 value: state.priceRefreshUsageLabel,
+                proValue: proLimits == null ? null : 'Unlimited',
               ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        _PlanLimitMetric(label: 'Paid tools', value: toolLabel),
+        _PlanLimitMetric(
+          label: 'Tools',
+          value: toolLabel,
+          proValue: proToolLabel,
+        ),
       ],
     );
   }
 }
 
 class _PlanLimitMetric extends StatelessWidget {
-  const _PlanLimitMetric({required this.label, required this.value});
+  const _PlanLimitMetric({
+    required this.label,
+    required this.value,
+    this.proValue,
+  });
 
   final String label;
   final String value;
+
+  /// Shown as a quiet "Pro: X" line under [value] -- only ever passed for a
+  /// free-plan user, so the upgrade comparison sits right where they're
+  /// already looking instead of needing separate promo copy. Null (a Pro
+  /// user, or nothing to compare up to) renders exactly as before.
+  final String? proValue;
 
   @override
   Widget build(BuildContext context) {
@@ -1385,6 +1428,18 @@ class _PlanLimitMetric extends StatelessWidget {
               height: 1.1,
             ),
           ),
+          if (proValue != null && proValue != value) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Pro: $proValue',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                color: HomeTokens.accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
