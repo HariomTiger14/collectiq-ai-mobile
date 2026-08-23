@@ -9,6 +9,10 @@ import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.
 import 'package:collectiq_ai/features/profile/domain/repositories/profile_repository.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/settings/presentation/settings_screen.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/usage_limit.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/user_entitlements.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +145,47 @@ void main() {
     );
   });
 
+  testWidgets(
+    'free plan metrics compare directly against Pro so the numbers sell '
+    'the upgrade themselves, instead of a vague "Basic tools" label',
+    (tester) async {
+      await tester.pumpSettings();
+      await tester.revealText('Plan & Usage');
+
+      expect(find.text('10 items'), findsOneWidget);
+      expect(find.text('2 photos/item'), findsOneWidget);
+      expect(find.text('Core tools'), findsOneWidget);
+      expect(find.text('Basic tools'), findsNothing);
+      expect(find.text('Paid tools'), findsNothing);
+
+      // Every capped metric shows what Pro offers instead right underneath.
+      expect(find.text('Pro: Unlimited'), findsNWidgets(3));
+      expect(find.text('Pro: 12 photos/item'), findsOneWidget);
+      expect(
+        find.text('Pro: History, Advanced filters, Export, Intelligence'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Pro plan metrics show no comparison -- there is nothing left to '
+    'upgrade to',
+    (tester) async {
+      await tester.pumpSettings(
+        entitlements: UserEntitlements.forPlan(
+          plan: SubscriptionPlan.pro,
+          freeLimit: const UsageLimit(monthlyFreeScanLimit: 10),
+          paymentsConfigured: true,
+        ),
+      );
+      await tester.revealText('Plan & Usage');
+
+      expect(find.textContaining('Pro:'), findsNothing);
+      expect(find.text('Unlimited'), findsWidgets);
+    },
+  );
+
   testWidgets('signed-in account summary uses real data and signs out once', (
     tester,
   ) async {
@@ -257,6 +302,7 @@ extension on WidgetTester {
     EnvironmentConfig? environmentConfig,
     ThemeMode themeMode = ThemeMode.dark,
     MediaQueryData? mediaQueryData,
+    UserEntitlements? entitlements,
   }) async {
     final settings = mediaQueryData == null
         ? const SettingsScreen()
@@ -272,6 +318,8 @@ extension on WidgetTester {
           profileRepositoryProvider.overrideWithValue(
             profileRepository ?? _SettingsProfileRepository(),
           ),
+          if (entitlements != null)
+            userEntitlementsProvider.overrideWithValue(entitlements),
         ],
         child: MaterialApp(
           theme: AppTheme.light,
