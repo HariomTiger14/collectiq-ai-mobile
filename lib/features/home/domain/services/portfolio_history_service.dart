@@ -326,6 +326,7 @@ class PortfolioHistoryService {
   PortfolioPerformance buildPerformance({
     required List<CollectibleItem> currentItems,
     required List<PortfolioSnapshot> history,
+    List<PortfolioValuationSnapshot> cloudSnapshots = const [],
     DateTime? capturedAt,
     String displayCurrency = 'AUD',
     Map<String, double> currentRates = const {'USD': 1.0},
@@ -383,6 +384,7 @@ class PortfolioHistoryService {
       monthlyChange: _change('This Month', currentMonthly, monthPrevious),
       overallChange: _trueOverallChange(
         currentItems,
+        cloudSnapshots: cloudSnapshots,
         displayCurrency: displayCurrency,
         currentRates: currentRates,
       ),
@@ -511,33 +513,56 @@ class PortfolioHistoryService {
   /// collection growth, not returns. Real bug found live: a test/seed
   /// account showed a portfolio worth less than its own claimed gain.
   ///
-  /// Fixed by summing each currently-held item's OWN baseline (its value
-  /// at scan) against its current value, rather than comparing two
-  /// portfolio-wide totals from different points in the collection's size.
+  /// Fixed by summing each currently-held item's OWN baseline against its
+  /// current value, rather than comparing two portfolio-wide totals from
+  /// different points in the collection's size.
+  ///
+  /// The baseline itself prefers real market-tracked history over the
+  /// locally-stored `valueAtScan`: `valueAtScan` is set once at item-save
+  /// time from whatever `estimatedValue` happened to be at that exact
+  /// moment, which can be a stale/provisional AI estimate captured before
+  /// catalog/market pricing resolved -- and never gets corrected after.
+  /// Real bug found live: an item's `valueAtScan` said $62 and $2.99 for two
+  /// items whose actual cloud-tracked market price, from the day each was
+  /// added onward, was $1.50-$1.88 and $35.00 respectively -- so the badge
+  /// reported a ~36% "loss" that was really just stale scan data, while the
+  /// items' real market-tracked prices had gone up. See
+  /// `_marketBaselineFor` for the resolution order.
   PortfolioValueChange _trueOverallChange(
     List<CollectibleItem> currentItems, {
+    List<PortfolioValuationSnapshot> cloudSnapshots = const [],
     required String displayCurrency,
     required Map<String, double> currentRates,
   }) {
     double currentTotal = 0;
     double baselineTotal = 0;
     for (final item in currentItems) {
-      final currency = currencyForItem(item);
       final current = convertCurrent(
         item.estimatedValue,
-        from: currency,
+        from: currencyForItem(item),
         to: displayCurrency,
         currentRates: currentRates,
       );
-      final baselineRaw = item.valueAtScan != null && item.valueAtScan! > 0
-          ? item.valueAtScan!
-          : item.estimatedValue;
-      final baseline = convertCurrent(
-        baselineRaw,
-        from: currency,
-        to: displayCurrency,
-        currentRates: currentRates,
-      );
+      final marketBaseline = _marketBaselineFor(item, cloudSnapshots);
+      final double baseline;
+      if (marketBaseline != null) {
+        baseline = convertCurrent(
+          marketBaseline.valueAud!,
+          from: marketBaseline.currency,
+          to: displayCurrency,
+          currentRates: currentRates,
+        );
+      } else {
+        final baselineRaw = item.valueAtScan != null && item.valueAtScan! > 0
+            ? item.valueAtScan!
+            : item.estimatedValue;
+        baseline = convertCurrent(
+          baselineRaw,
+          from: currencyForItem(item),
+          to: displayCurrency,
+          currentRates: currentRates,
+        );
+      }
       currentTotal += current;
       baselineTotal += baseline;
     }
@@ -546,6 +571,34 @@ class PortfolioHistoryService {
       currentValue: currentTotal,
       previousValue: baselineTotal,
     );
+  }
+
+  /// The first real cloud-tracked valuation for [item] on or after the day
+  /// it entered the portfolio -- same ownership-anchor rule as
+  /// [historyFromCloudSnapshots]'s forward-fill, so a snapshot from before
+  /// the item was actually owned (e.g. pre-ownership catalog market history)
+  /// is never used as "the price when I got it". Returns null when no
+  /// qualifying snapshot exists, so the caller can fall back to
+  /// `valueAtScan`.
+  PortfolioValuationSnapshot? _marketBaselineFor(
+    CollectibleItem item,
+    List<PortfolioValuationSnapshot> cloudSnapshots,
+  ) {
+    final ownedSince = bucketDate(item.createdAt, TrendSnapshotPeriod.daily);
+    final candidates =
+        cloudSnapshots
+            .where(
+              (snapshot) =>
+                  snapshot.portfolioItemId == item.id &&
+                  snapshot.valueAud != null &&
+                  !bucketDate(
+                    snapshot.pricedAt,
+                    TrendSnapshotPeriod.daily,
+                  ).isBefore(ownedSince),
+            )
+            .toList()
+          ..sort((a, b) => a.pricedAt.compareTo(b.pricedAt));
+    return candidates.isEmpty ? null : candidates.first;
   }
 
   List<PortfolioValueMover> _movers(

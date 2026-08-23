@@ -625,14 +625,6 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     final change = latest - baseline;
     final percent = baseline == 0 ? 0.0 : change / baseline;
     final isUp = change >= 0;
-    // The chart colors each point green/red relative to where its own
-    // visible line starts, not to the true-overall price basis -- those are
-    // different reference points (the true-overall baseline is often above
-    // most of the actual plotted history, which painted almost the whole
-    // MAX chart red even on a real net gain, since every point read as
-    // "below baseline"). Keep the chart's own reference independent of
-    // which number the headline above it is using.
-    final chartBaseline = showChart ? windowPoints.first.totalValue : 0.0;
 
     final String deltaText;
     // The period ("1M") renders as a quiet suffix so the change reads first.
@@ -656,7 +648,14 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     } else {
       deltaText =
           '${_signedCurrency(change, data.displayCurrency)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
-      deltaPeriodLabel = effectivePeriod.label;
+      // MAX's number is price return on held items (see useTrueOverallChange
+      // above), a different quantity than the value-history line plotted
+      // below it -- label it as such so the two don't read as contradicting
+      // each other when their signs differ (e.g. items lost value even as
+      // the portfolio's total grew from adding more items).
+      deltaPeriodLabel = useTrueOverallChange
+          ? 'price return'
+          : effectivePeriod.label;
       deltaColor = isUp ? HomeTokens.positive : HomeTokens.negative;
       deltaIcon = isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded;
     }
@@ -731,7 +730,6 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
             _GainLossChart(
               key: const ValueKey('home-value-hero-trend'),
               values: [for (final point in windowPoints) point.totalValue],
-              baseline: chartBaseline,
             ),
             const SizedBox(height: 8),
             _PeriodSelector(
@@ -788,17 +786,19 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
   }
 }
 
-/// Gain/loss trend: area is filled green where the value sits at or above the
-/// period-start baseline and red where it sits below it.
+/// Portfolio value history: a plain balance chart, not a performance chart --
+/// it is expected to rise simply from adding items, so it carries no
+/// red/green verdict of its own. The one number that says whether the
+/// collection is actually gaining or losing value is the change badge above
+/// this chart (see useTrueOverallChange), which excludes that effect. This
+/// mirrors how investing apps (Robinhood, Wealthsimple) and collectibles
+/// trackers (Collectr, Card Ladder) keep "value over time" and "return"
+/// as two separate signals, so the chart's color can never contradict the
+/// badge's.
 class _GainLossChart extends StatelessWidget {
-  const _GainLossChart({
-    required this.values,
-    required this.baseline,
-    super.key,
-  });
+  const _GainLossChart({required this.values, super.key});
 
   final List<double> values;
-  final double baseline;
 
   @override
   Widget build(BuildContext context) {
@@ -808,26 +808,23 @@ class _GainLossChart extends StatelessWidget {
     return SizedBox(
       height: 84,
       width: double.infinity,
-      child: CustomPaint(
-        painter: _GainLossPainter(values: values, baseline: baseline),
-      ),
+      child: CustomPaint(painter: _GainLossPainter(values: values)),
     );
   }
 }
 
 class _GainLossPainter extends CustomPainter {
-  const _GainLossPainter({required this.values, required this.baseline});
+  const _GainLossPainter({required this.values});
 
   final List<double> values;
-  final double baseline;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (values.length < 2) {
       return;
     }
-    var minValue = baseline;
-    var maxValue = baseline;
+    var minValue = values.first;
+    var maxValue = values.first;
     for (final value in values) {
       if (value < minValue) minValue = value;
       if (value > maxValue) maxValue = value;
@@ -841,23 +838,20 @@ class _GainLossPainter extends CustomPainter {
     final usable = size.height - topInset - bottomInset;
     double yFor(double value) =>
         topInset + usable * (1 - (value - minValue) / (maxValue - minValue));
-    final baselineY = yFor(baseline);
     final dx = size.width / (values.length - 1);
     final points = [
       for (var i = 0; i < values.length; i++) Offset(i * dx, yFor(values[i])),
     ];
 
-    final areaPath = Path()..moveTo(points.first.dx, baselineY);
+    final areaPath = Path()..moveTo(points.first.dx, size.height);
     for (final point in points) {
       areaPath.lineTo(point.dx, point.dy);
     }
     areaPath
-      ..lineTo(points.last.dx, baselineY)
+      ..lineTo(points.last.dx, size.height)
       ..close();
     final fullRect = Offset.zero & size;
 
-    canvas.save();
-    canvas.clipRect(Rect.fromLTRB(0, 0, size.width, baselineY));
     canvas.drawPath(
       areaPath,
       Paint()
@@ -865,43 +859,11 @@ class _GainLossPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            HomeTokens.positive.withValues(alpha: 0.34),
-            HomeTokens.positive.withValues(alpha: 0),
+            HomeTokens.accent.withValues(alpha: 0.32),
+            HomeTokens.accent.withValues(alpha: 0),
           ],
         ).createShader(fullRect),
     );
-    canvas.restore();
-
-    canvas.save();
-    canvas.clipRect(Rect.fromLTRB(0, baselineY, size.width, size.height));
-    canvas.drawPath(
-      areaPath,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            HomeTokens.negative.withValues(alpha: 0.32),
-            HomeTokens.negative.withValues(alpha: 0),
-          ],
-        ).createShader(fullRect),
-    );
-    canvas.restore();
-
-    final dashPaint = Paint()
-      ..color = HomeTokens.textMuted.withValues(alpha: 0.7)
-      ..strokeWidth = 1;
-    const dashWidth = 4.0;
-    const dashGap = 4.0;
-    var startX = 0.0;
-    while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, baselineY),
-        Offset(startX + dashWidth, baselineY),
-        dashPaint,
-      );
-      startX += dashWidth + dashGap;
-    }
 
     final linePath = Path()..moveTo(points.first.dx, points.first.dy);
     for (final point in points.skip(1)) {
@@ -917,20 +879,17 @@ class _GainLossPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round,
     );
 
-    final endColor = values.last >= baseline
-        ? HomeTokens.positive
-        : HomeTokens.negative;
-    canvas.drawCircle(points.last, 3.5, Paint()..color = endColor);
+    canvas.drawCircle(points.last, 3.5, Paint()..color = HomeTokens.accent);
     canvas.drawCircle(
       points.last,
       6,
-      Paint()..color = endColor.withValues(alpha: 0.22),
+      Paint()..color = HomeTokens.accent.withValues(alpha: 0.22),
     );
   }
 
   @override
   bool shouldRepaint(covariant _GainLossPainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.baseline != baseline;
+    return oldDelegate.values != values;
   }
 }
 

@@ -13,7 +13,7 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 String formatCollectionValue(
   double value, {
   String currencyCode = 'AUD',
-  bool showDecimals = false,
+  bool showDecimals = true,
 }) {
   final amount = _withThousands(value, showDecimals);
   switch (currencyCode.trim().toUpperCase()) {

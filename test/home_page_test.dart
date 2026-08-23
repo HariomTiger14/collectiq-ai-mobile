@@ -76,7 +76,7 @@ void main() {
 
       // Shows up twice: the portfolio value hero and the recent-item card's
       // own value label -- both correctly converted, not just the hero.
-      expect(find.text('\$225'), findsNWidgets(2));
+      expect(find.text('\$225.00'), findsNWidgets(2));
       expect(find.text('\$150'), findsNothing);
       expect(find.text('US\$150'), findsNothing);
     },
@@ -164,11 +164,12 @@ void main() {
   );
 
   testWidgets(
-    'MAX chart colors segments relative to its own first plotted point, not '
-    'the true-overall price basis (real bug: wiring the true-overall '
-    'baseline into the chart painted almost the entire line red -- "below '
-    'baseline" -- even on a real net gain, because that baseline sits above '
-    'most of the actual plotted history)',
+    'MAX chart plots the raw value history with no baseline of its own -- '
+    'it is a value-over-time chart, not a red/green performance verdict, so '
+    'it cannot contradict the "price return" badge above it (real bug: the '
+    'chart used to color itself green/red relative to its own first plotted '
+    'point, a different number than the true-overall price basis the badge '
+    'uses, so the two could show opposite colors for the same period)',
     (tester) async {
       final oldSnapshotDate = DateTime.now().subtract(const Duration(days: 60));
       SharedPreferences.setMockInitialValues({
@@ -225,14 +226,14 @@ void main() {
       expect(chartFinder, findsOneWidget);
       final chartWidget = tester.widget(chartFinder) as dynamic;
       final chartValues = (chartWidget.values as List).cast<double>();
-      final chartBaseline = chartWidget.baseline as double;
 
-      // The chart's own reference must be its own first point (15) --
-      // never the true-overall baseline (6015) the headline number above
-      // it uses. Old buggy behavior wired the same value into both, which
-      // classified nearly every historical point as "below baseline".
-      expect(chartBaseline, chartValues.first);
-      expect(chartBaseline, isNot(6015));
+      // The chart is fed only the raw value-history series -- it has no
+      // baseline parameter at all, so it has no way to color itself
+      // relative to the true-overall price basis (6015) the headline number
+      // above it uses. The two can never visually disagree because the
+      // chart no longer renders a verdict of its own.
+      expect(chartValues.first, 15);
+      expect(chartValues, isNot(contains(6015)));
     },
   );
 
@@ -255,7 +256,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Portfolio value'), findsOneWidget);
-    expect(find.text('\$2,275'), findsOneWidget);
+    expect(find.text('\$2,275.00'), findsOneWidget);
     expect(find.text('3 of 5 items trusted'), findsOneWidget);
     // The "needs value" count is no longer duplicated as a chip in the card;
     // the attention strip below is the single actionable surface for it.
