@@ -359,11 +359,27 @@ class PortfolioHistoryService {
     final weekPrevious = _previousSnapshot(currentWeekly, allSnapshots);
     final monthPrevious = _previousSnapshot(currentMonthly, allSnapshots);
     final movers = _movers(currentDaily, todayPrevious);
+    // A change under meaningfulValueChangeThreshold displays as "$0.00"
+    // regardless of its true sign -- an item that tiny shouldn't be
+    // labeled a "Top gainer"/"Top loser" (real bug found live: Raichu
+    // showed as "Top loser -$0.00", a sub-cent rounding difference, not a
+    // real price move). Same threshold the value-change badge uses, so the
+    // two surfaces never disagree about what counts as a real move.
     final topGainers =
-        movers.where((mover) => mover.absoluteChange > 0).toList()
+        movers
+            .where(
+              (mover) => mover.absoluteChange > meaningfulValueChangeThreshold,
+            )
+            .toList()
           ..sort((a, b) => b.absoluteChange.compareTo(a.absoluteChange));
-    final topLosers = movers.where((mover) => mover.absoluteChange < 0).toList()
-      ..sort((a, b) => a.absoluteChange.compareTo(b.absoluteChange));
+    final topLosers =
+        movers
+            .where(
+              (mover) =>
+                  mover.absoluteChange < -meaningfulValueChangeThreshold,
+            )
+            .toList()
+          ..sort((a, b) => a.absoluteChange.compareTo(b.absoluteChange));
 
     final dailySnapshots = _snapshotsFor(
       allSnapshots,

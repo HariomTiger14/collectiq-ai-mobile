@@ -237,6 +237,128 @@ void main() {
     },
   );
 
+  group('chartYRange', () {
+    test(
+      'floors a rounding-noise range instead of stretching it across the '
+      'full chart height (real bug: \$41.3592 vs \$41.3591 -- a fraction of '
+      'a cent -- rendered as a steep decline because the naive min/max range '
+      'was that tiny gap itself)',
+      () {
+        final (min, max) = chartYRange([41.3592, 41.3591]);
+
+        // The resolved range must be much wider than the real ~$0.0001 gap
+        // between the two values, so that gap maps to a barely-visible
+        // sliver of the chart's height instead of the full height.
+        expect(max - min, greaterThan(0.01));
+      },
+    );
+
+    test('does not widen a genuinely large, meaningful range', () {
+      final (min, max) = chartYRange([35.00, 41.36]);
+
+      expect(min, 35.00);
+      expect(max, 41.36);
+    });
+
+    test('handles identical values without dividing by zero', () {
+      final (min, max) = chartYRange([41.36, 41.36]);
+
+      expect(max, greaterThan(min));
+    });
+
+    test('scales the floor to the series\' own magnitude, not a fixed '
+        'dollar amount (a \$0.01 wobble on a \$10 balance is proportionally '
+        'huge; the same \$0.01 wobble on a \$10,000 balance is noise)', () {
+      final smallBalance = chartYRange([10.00, 10.01]);
+      final largeBalance = chartYRange([10000.00, 10000.01]);
+
+      final smallSpan = smallBalance.$2 - smallBalance.$1;
+      final largeSpan = largeBalance.$2 - largeBalance.$1;
+      expect(largeSpan, greaterThan(smallSpan));
+    });
+  });
+
+  testWidgets(
+    '1D badge and chart agree when the real change rounds to \$0.00 (real '
+    'bug: the badge showed "-\$0.00 · 0.0%" in red with a down arrow next '
+    'to a chart line that sloped steeply downward, because a sub-cent '
+    'rounding difference between two snapshots got stretched across the '
+    'chart\'s full height)',
+    (tester) async {
+      final today = DateTime.now();
+      final yesterday = today.subtract(const Duration(days: 1));
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          _item(
+            id: 'stable-item',
+            title: 'Stable Card',
+            category: 'Trading Card',
+            value: 41.3592,
+            createdAt: yesterday,
+          ),
+        ]),
+        'portfolio_value_history_snapshots': jsonEncode([
+          {
+            'id': 'daily-yesterday',
+            'period': 'daily',
+            'periodStart': yesterday.toIso8601String(),
+            'capturedAt': yesterday.toIso8601String(),
+            'totalPortfolioValue': 41.3591,
+            'totalItems': 1,
+            'averageValue': 41.3591,
+            'categoryTotals': <String, double>{},
+            'collectionScore': 0,
+            'itemValues': {'stable-item': 41.3591},
+            'itemTitles': {'stable-item': 'Stable Card'},
+            'itemCategories': {'stable-item': 'Trading Card'},
+          },
+          {
+            'id': 'daily-today',
+            'period': 'daily',
+            'periodStart': today.toIso8601String(),
+            'capturedAt': today.toIso8601String(),
+            'totalPortfolioValue': 41.3592,
+            'totalItems': 1,
+            'averageValue': 41.3592,
+            'categoryTotals': <String, double>{},
+            'collectionScore': 0,
+            'itemValues': {'stable-item': 41.3592},
+            'itemTitles': {'stable-item': 'Stable Card'},
+            'itemCategories': {'stable-item': 'Trading Card'},
+          },
+        ]),
+      });
+
+      await tester.pumpWidget(_homeApp());
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // 1D is the default-selected tab already, but tap it explicitly so
+      // this test doesn't depend on that default staying true.
+      await tester.tap(find.byKey(const ValueKey('home-period-1D')));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      // Badge: no misleading sign or direction for a change under half a
+      // cent -- plain "$0.00 · 0.0%", not "-$0.00 · 0.0%".
+      expect(find.textContaining('\$0.00 · 0.0%'), findsOneWidget);
+      expect(find.textContaining('-\$0.00 · 0.0%'), findsNothing);
+      expect(find.byIcon(Icons.trending_flat_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.trending_down_rounded), findsNothing);
+
+      // Chart: the resolved y-range must not be the raw ~$0.0001 gap --
+      // confirms the widget is actually using the floored chartYRange, not
+      // just that the badge text was special-cased separately.
+      final chartFinder = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_GainLossChart',
+      );
+      expect(chartFinder, findsOneWidget);
+      final chartWidget = tester.widget(chartFinder) as dynamic;
+      final chartValues = (chartWidget.values as List).cast<double>();
+      final (min, max) = chartYRange(chartValues);
+      expect(max - min, greaterThan(0.01));
+    },
+  );
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {

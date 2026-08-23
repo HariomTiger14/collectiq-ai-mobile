@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
@@ -625,6 +626,13 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     final change = latest - baseline;
     final percent = baseline == 0 ? 0.0 : change / baseline;
     final isUp = change >= 0;
+    // A change under half a cent displays as "$0.00" either way (see
+    // _signedCurrency) -- treat it as no change rather than picking a
+    // red/green direction and an up/down arrow for a number that rounds to
+    // zero. Real bug found live: 1D showed "-$0.00 · 0.0%" in red with a
+    // down arrow next to a chart line that (before the chartYRange fix
+    // above) looked like a steep decline, for a day with no real move.
+    final roundsToZeroChange = change.abs() < meaningfulValueChangeThreshold;
 
     final String deltaText;
     // The period ("1M") renders as a quiet suffix so the change reads first.
@@ -646,8 +654,9 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       deltaColor = HomeTokens.textSecondary;
       deltaIcon = Icons.timeline_rounded;
     } else {
-      deltaText =
-          '${_signedCurrency(change, data.displayCurrency)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
+      deltaText = roundsToZeroChange
+          ? '${_formatCurrency(0, data.displayCurrency)} · 0.0%'
+          : '${_signedCurrency(change, data.displayCurrency)} · ${(percent.abs() * 100).toStringAsFixed(1)}%';
       // MAX's number is price return on held items (see useTrueOverallChange
       // above), a different quantity than the value-history line plotted
       // below it -- label it as such so the two don't read as contradicting
@@ -656,8 +665,12 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       deltaPeriodLabel = useTrueOverallChange
           ? 'price return'
           : effectivePeriod.label;
-      deltaColor = isUp ? HomeTokens.positive : HomeTokens.negative;
-      deltaIcon = isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+      deltaColor = roundsToZeroChange
+          ? HomeTokens.textSecondary
+          : (isUp ? HomeTokens.positive : HomeTokens.negative);
+      deltaIcon = roundsToZeroChange
+          ? Icons.trending_flat_rounded
+          : (isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded);
     }
 
     return HomeSurface(
@@ -786,6 +799,38 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
   }
 }
 
+/// The (min, max) the chart's y-axis should span for [values].
+///
+/// A plain min/max-of-the-series range breaks down when every point is
+/// almost identical: floating-point/rounding noise as small as a fraction
+/// of a cent (e.g. $41.3592 vs $41.3591) still has *some* min and max, so a
+/// naive range mapped that tiny gap across the chart's full height,
+/// rendering what looks like a dramatic decline for a period the badge
+/// above it correctly reports as "$0.00 · 0.0%". Real bug found live: the
+/// 1D tab showed a steep downward line while the badge said no change.
+///
+/// Floors the visible range at 1% of the series' own scale (or 2 cents for
+/// a near-zero portfolio) so real noise that small can't dominate the
+/// chart -- it renders near-flat instead, matching what the badge reports.
+(double, double) chartYRange(List<double> values) {
+  var minValue = values.first;
+  var maxValue = values.first;
+  for (final value in values) {
+    if (value < minValue) minValue = value;
+    if (value > maxValue) maxValue = value;
+  }
+  final scale = maxValue.abs() > minValue.abs()
+      ? maxValue.abs()
+      : minValue.abs();
+  final minSpan = scale > 0 ? math.max(scale * 0.01, 0.02) : 0.02;
+  if (maxValue - minValue < minSpan) {
+    final mid = (maxValue + minValue) / 2;
+    minValue = mid - minSpan / 2;
+    maxValue = mid + minSpan / 2;
+  }
+  return (minValue, maxValue);
+}
+
 /// Portfolio value history: a plain balance chart, not a performance chart --
 /// it is expected to rise simply from adding items, so it carries no
 /// red/green verdict of its own. The one number that says whether the
@@ -823,16 +868,7 @@ class _GainLossPainter extends CustomPainter {
     if (values.length < 2) {
       return;
     }
-    var minValue = values.first;
-    var maxValue = values.first;
-    for (final value in values) {
-      if (value < minValue) minValue = value;
-      if (value > maxValue) maxValue = value;
-    }
-    if (maxValue == minValue) {
-      maxValue += 1;
-      minValue -= 1;
-    }
+    final (minValue, maxValue) = chartYRange(values);
     const topInset = 8.0;
     const bottomInset = 8.0;
     final usable = size.height - topInset - bottomInset;

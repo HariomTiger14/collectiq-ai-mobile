@@ -7086,6 +7086,91 @@ void main() {
       expect(performance.recentlyDropped.single.itemId, 'loser');
     });
 
+    test(
+      'does not label an item a "Top loser" (or "Top gainer") for a change '
+      'that rounds to \$0.00 (real bug found live: Raichu showed as '
+      '"Top loser -\$0.00", a sub-cent rounding difference between two '
+      'snapshots, not a real price move)',
+      () {
+        final previous = service.createSnapshot(
+          [
+            _analyticsItem(
+              id: 'raichu',
+              title: 'Raichu',
+              category: 'Trading Card',
+              value: 1.8392,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-08-22T00:00:00Z'),
+            ),
+          ],
+          period: TrendSnapshotPeriod.daily,
+          capturedAt: DateTime.parse('2026-08-23T12:00:00Z'),
+        );
+
+        final performance = service.buildPerformance(
+          currentItems: [
+            _analyticsItem(
+              id: 'raichu',
+              title: 'Raichu',
+              category: 'Trading Card',
+              // A genuinely tiny move: -$0.0001, well under the
+              // meaningfulValueChangeThreshold, not a real price drop.
+              value: 1.8391,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-08-22T00:00:00Z'),
+            ),
+          ],
+          history: [previous],
+          capturedAt: DateTime.parse('2026-08-24T12:00:00Z'),
+        );
+
+        expect(performance.topLoser, isNull);
+        expect(performance.topGainer, isNull);
+        expect(performance.topLosers, isEmpty);
+        expect(performance.topGainers, isEmpty);
+      },
+    );
+
+    test(
+      'still labels a Top gainer/loser when the change is meaningfully '
+      'above the rounding threshold, so the fix does not just hide every '
+      'mover',
+      () {
+        final previous = service.createSnapshot(
+          [
+            _analyticsItem(
+              id: 'real-mover',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              value: 35.00,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+            ),
+          ],
+          period: TrendSnapshotPeriod.daily,
+          capturedAt: DateTime.parse('2026-08-23T12:00:00Z'),
+        );
+
+        final performance = service.buildPerformance(
+          currentItems: [
+            _analyticsItem(
+              id: 'real-mover',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              value: 39.52,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+            ),
+          ],
+          history: [previous],
+          capturedAt: DateTime.parse('2026-08-24T12:00:00Z'),
+        );
+
+        expect(performance.topGainer?.itemId, 'real-mover');
+        expect(performance.topGainer?.absoluteChange, closeTo(4.52, 0.001));
+      },
+    );
+
     test('generates trend recommendations', () {
       final previous = service.createSnapshot(
         [

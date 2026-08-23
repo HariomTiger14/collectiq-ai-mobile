@@ -1,5 +1,14 @@
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 
+/// Below this, a dollar change displays as "$0.00" either way (2-decimal
+/// display, see [formatCollectionValue]) -- so it isn't a real gain or
+/// loss as far as the user can see, just rounding/floating-point noise.
+/// Shared by every surface that decides whether to color a change red/green
+/// or label an item a "mover" (the portfolio value badge, its chart's
+/// y-axis floor, and the Movers card), so they can never disagree about
+/// what counts as "no real change".
+const meaningfulValueChangeThreshold = 0.005;
+
 /// Compact collection-value formatting shared by the Home and Portfolio value
 /// surfaces (hero total, metric tiles, per-item value labels).
 ///
