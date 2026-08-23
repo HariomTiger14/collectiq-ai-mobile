@@ -49,9 +49,10 @@ class SitDummyBillingRepository implements BillingRepository {
       id: 'sit_pro_monthly',
       plan: SubscriptionPlan.pro,
       title: 'PackLox Pro',
-      description:
-          'Unlimited scans and collection, price history, portfolio '
-          'intelligence, exports, and advanced filters.',
+      // Kept short: the plan metrics above this card already break out what
+      // Pro adds per-feature, so this only needs to be a one-line summary,
+      // not a repeat of the same list (which was also getting cut off).
+      description: 'Unlimited scans and collection, plus every advanced tool.',
       price: 'AUD 9.99 / month',
       currencyCode: 'AUD',
     ),

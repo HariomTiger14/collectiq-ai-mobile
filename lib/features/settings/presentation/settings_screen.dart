@@ -1493,7 +1493,13 @@ class _SubscriptionProductRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 product.description,
-                maxLines: 2,
+                // A real App/Play Store listing description isn't length-
+                // controlled by this app, so this can't assume it's short
+                // enough for 2 lines -- it was silently cutting off
+                // "...expo..." mid-word. The plan metrics above already
+                // cover the specifics, so this only needs room to not
+                // truncate awkwardly, not to show every word.
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(
                   color: HomeTokens.textSecondary,
