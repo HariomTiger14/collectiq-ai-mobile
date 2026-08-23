@@ -31,33 +31,52 @@ void main() {
 
   group('formatCollectionValue', () {
     test('AUD renders as a bare \$ with thousands separators', () {
-      expect(formatCollectionValue(2275, currencyCode: 'AUD'), '\$2,275');
-      expect(formatCollectionValue(0), '\$0');
-      expect(formatCollectionValue(196538), '\$196,538');
+      expect(formatCollectionValue(2275, currencyCode: 'AUD'), '\$2,275.00');
+      expect(formatCollectionValue(0), '\$0.00');
+      expect(formatCollectionValue(196538), '\$196,538.00');
     });
 
     test('empty currency defaults to bare \$ (AUD)', () {
-      expect(formatCollectionValue(350, currencyCode: ''), '\$350');
+      expect(formatCollectionValue(350, currencyCode: ''), '\$350.00');
     });
 
     test('non-AUD currencies get a disambiguating prefix', () {
-      expect(formatCollectionValue(2275, currencyCode: 'USD'), 'US\$2,275');
-      expect(formatCollectionValue(2275, currencyCode: 'CAD'), 'C\$2,275');
-      expect(formatCollectionValue(2275, currencyCode: 'GBP'), '£2,275');
-      expect(formatCollectionValue(2275, currencyCode: 'EUR'), '€2,275');
-      expect(formatCollectionValue(1000, currencyCode: 'CHF'), 'CHF 1,000');
+      expect(formatCollectionValue(2275, currencyCode: 'USD'), 'US\$2,275.00');
+      expect(formatCollectionValue(2275, currencyCode: 'CAD'), 'C\$2,275.00');
+      expect(formatCollectionValue(2275, currencyCode: 'GBP'), '£2,275.00');
+      expect(formatCollectionValue(2275, currencyCode: 'EUR'), '€2,275.00');
+      expect(formatCollectionValue(1000, currencyCode: 'CHF'), 'CHF 1,000.00');
     });
 
     test('never fabricates conversion — amount is passed through verbatim', () {
       // Same numeric amount, only the label changes with the currency.
-      expect(formatCollectionValue(500, currencyCode: 'USD'), 'US\$500');
-      expect(formatCollectionValue(500, currencyCode: 'AUD'), '\$500');
+      expect(formatCollectionValue(500, currencyCode: 'USD'), 'US\$500.00');
+      expect(formatCollectionValue(500, currencyCode: 'AUD'), '\$500.00');
     });
 
-    test('optional decimals', () {
+    test('decimals show exact cents, not rounded to whole dollars', () {
+      // Regression: whole-dollar rounding on each displayed amount made
+      // per-item prices not add up to the displayed total (e.g. $1.60 and
+      // $39.60 individually rounded to $2 and $40, which looks like it
+      // should sum to $42 even though the real total is $41.20).
       expect(
-        formatCollectionValue(1234.5, currencyCode: 'AUD', showDecimals: true),
+        formatCollectionValue(1234.5, currencyCode: 'AUD'),
         '\$1,234.50',
+      );
+      expect(
+        formatCollectionValue(1.6, currencyCode: 'AUD'),
+        '\$1.60',
+      );
+      expect(
+        formatCollectionValue(39.6, currencyCode: 'AUD'),
+        '\$39.60',
+      );
+    });
+
+    test('showDecimals: false still rounds to whole dollars when requested', () {
+      expect(
+        formatCollectionValue(1234.5, currencyCode: 'AUD', showDecimals: false),
+        '\$1,235',
       );
     });
   });

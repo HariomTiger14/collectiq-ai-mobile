@@ -6811,6 +6811,226 @@ void main() {
       },
     );
 
+    test(
+      'overallChange MAX baseline uses the first cloud valuation on/after '
+      'the item\'s createdAt instead of a stale valueAtScan (real bug: '
+      'valueAtScan is set once at save time from whatever estimatedValue '
+      'happened to be at that moment, which can be a stale/provisional '
+      'estimate that never gets corrected -- an item whose valueAtScan said '
+      '\$62 but whose real cloud-tracked price was \$1.84 the whole time it '
+      'was owned reported a false ~97% "loss")',
+      () {
+        final performance = service.buildPerformance(
+          currentItems: [
+            CollectibleItem(
+              id: 'raichu',
+              title: 'Raichu',
+              category: 'Trading Card',
+              estimatedValue: 1.84,
+              valueAtScan: 62.0, // stale -- never matched real market price
+              confidence: 0.9,
+              condition: 'Unknown',
+              recommendation: '',
+              imagePath: 'sample://raichu',
+              createdAt: DateTime.parse('2026-08-22T20:17:20Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: const [],
+          cloudSnapshots: [
+            // Pre-ownership market history for the catalog product -- must
+            // be ignored (see the "ignores snapshots before createdAt" test
+            // below); real ownership-period price has always been ~$1.84.
+            PortfolioValuationSnapshot(
+              id: 'pre-owned',
+              portfolioItemId: 'raichu',
+              valueAud: 1.88,
+              valuationStatus: ValuationStatus.marketEstimated,
+              pricedAt: DateTime.parse('2026-07-26T02:31:17Z'),
+            ),
+            PortfolioValuationSnapshot(
+              id: 'on-add-day',
+              portfolioItemId: 'raichu',
+              valueAud: 1.84,
+              valuationStatus: ValuationStatus.marketEstimated,
+              pricedAt: DateTime.parse('2026-08-22T16:00:25Z'),
+            ),
+          ],
+          capturedAt: DateTime.parse('2026-08-24T00:00:00Z'),
+        );
+
+        // Baseline must be the real $1.84 market price, not the stale $62
+        // valueAtScan -- so this is a near-flat return, not a ~97% loss.
+        expect(performance.overallChange.previousValue, 1.84);
+        expect(performance.overallChange.currentValue, 1.84);
+        expect(performance.overallChange.absoluteChange, 0);
+      },
+    );
+
+    test(
+      'overallChange MAX baseline ignores cloud snapshots priced before the '
+      'item\'s own createdAt (pre-ownership catalog market history must '
+      'never be used as "the price when I got it")',
+      () {
+        final performance = service.buildPerformance(
+          currentItems: [
+            CollectibleItem(
+              id: 'charizard',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              estimatedValue: 39.52,
+              valueAtScan: 2.99,
+              confidence: 0.9,
+              condition: 'Unspecified',
+              recommendation: '',
+              imagePath: 'sample://charizard',
+              createdAt: DateTime.parse('2026-07-28T16:35:42Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: const [],
+          cloudSnapshots: [
+            // Priced weeks before this collector owned it -- a much lower
+            // pre-ownership price that must not become the baseline.
+            PortfolioValuationSnapshot(
+              id: 'pre-owned',
+              portfolioItemId: 'charizard',
+              valueAud: 5.00,
+              valuationStatus: ValuationStatus.marketEstimated,
+              pricedAt: DateTime.parse('2026-06-01T00:00:00Z'),
+            ),
+            // The real first-owned-day price.
+            PortfolioValuationSnapshot(
+              id: 'on-add-day',
+              portfolioItemId: 'charizard',
+              valueAud: 35.00,
+              valuationStatus: ValuationStatus.marketEstimated,
+              pricedAt: DateTime.parse('2026-07-28T16:35:45Z'),
+            ),
+          ],
+          capturedAt: DateTime.parse('2026-08-24T00:00:00Z'),
+        );
+
+        expect(performance.overallChange.previousValue, 35.00);
+        expect(performance.overallChange.previousValue, isNot(5.00));
+      },
+    );
+
+    test(
+      'overallChange MAX baseline falls back to valueAtScan when no cloud '
+      'valuation exists for the item at all',
+      () {
+        final performance = service.buildPerformance(
+          currentItems: [
+            CollectibleItem(
+              id: 'no-cloud-history',
+              title: 'Local Only Card',
+              category: 'Trading Card',
+              estimatedValue: 30,
+              valueAtScan: 25,
+              confidence: 0.9,
+              condition: 'Near Mint',
+              recommendation: '',
+              imagePath: 'sample://local-only',
+              createdAt: DateTime.parse('2026-08-01T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: const [],
+          cloudSnapshots: const [], // never synced to the cloud
+          capturedAt: DateTime.parse('2026-08-24T00:00:00Z'),
+        );
+
+        expect(performance.overallChange.previousValue, 25);
+        expect(performance.overallChange.currentValue, 30);
+        expect(performance.overallChange.absoluteChange, 5);
+      },
+    );
+
+    test(
+      'the value-history chart still comes from the daily forward-filled '
+      'snapshots passed as `history`, unchanged by the MAX badge fix -- '
+      'the chart can show a real rise while the badge no longer reports a '
+      'false loss from stale scan values (the exact shape found live: '
+      'chart \$35.00 -> \$41.36 rising, badge previously said -36.4%)',
+      () {
+        final dailyHistory = [
+          service.createSnapshot(
+            [
+              _analyticsItem(
+                id: 'charizard',
+                title: 'Charizard #1',
+                category: 'Pokemon Card',
+                value: 35.00,
+                confidence: 0.9,
+                createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+              ),
+            ],
+            period: TrendSnapshotPeriod.daily,
+            capturedAt: DateTime.parse('2026-07-28T16:35:45Z'),
+          ),
+          service.createSnapshot(
+            [
+              _analyticsItem(
+                id: 'charizard',
+                title: 'Charizard #1',
+                category: 'Pokemon Card',
+                value: 41.36,
+                confidence: 0.9,
+                createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+              ),
+            ],
+            period: TrendSnapshotPeriod.daily,
+            capturedAt: DateTime.parse('2026-08-24T00:00:00Z'),
+          ),
+        ];
+
+        final performance = service.buildPerformance(
+          currentItems: [
+            CollectibleItem(
+              id: 'charizard',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              estimatedValue: 41.36,
+              valueAtScan: 2.99, // stale -- would have implied a false gain here, not the bug case, but still must not leak into the chart
+              confidence: 0.9,
+              condition: 'Unspecified',
+              recommendation: '',
+              imagePath: 'sample://charizard',
+              createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+              valuationStatus: ValuationStatus.marketEstimated,
+            ),
+          ],
+          history: dailyHistory,
+          cloudSnapshots: [
+            PortfolioValuationSnapshot(
+              id: 'on-add-day',
+              portfolioItemId: 'charizard',
+              valueAud: 35.00,
+              valuationStatus: ValuationStatus.marketEstimated,
+              pricedAt: DateTime.parse('2026-07-28T16:35:45Z'),
+            ),
+          ],
+          capturedAt: DateTime.parse('2026-08-24T00:00:00Z'),
+        );
+
+        // Chart data: untouched, still the real rising series from `history`.
+        final chartValues = performance.dailySnapshots
+            .map((s) => s.totalPortfolioValue)
+            .toList();
+        expect(chartValues, contains(35.00));
+        expect(chartValues, contains(41.36));
+        expect(chartValues.last, greaterThan(chartValues.first));
+
+        // Badge: baseline now the real $35.00 market price, not $2.99 --
+        // so this is a small real gain, not a fabricated ~1200% one.
+        expect(performance.overallChange.previousValue, 35.00);
+        expect(performance.overallChange.currentValue, 41.36);
+        expect(performance.overallChange.absoluteChange, closeTo(6.36, 0.01));
+        expect(performance.overallChange.percentageChange, lessThan(0.25));
+      },
+    );
+
     test('calculates top gainers and top losers', () {
       final previous = service.createSnapshot(
         [
@@ -6865,6 +7085,91 @@ void main() {
       expect(performance.recentlyAppreciated.single.itemId, 'gainer');
       expect(performance.recentlyDropped.single.itemId, 'loser');
     });
+
+    test(
+      'does not label an item a "Top loser" (or "Top gainer") for a change '
+      'that rounds to \$0.00 (real bug found live: Raichu showed as '
+      '"Top loser -\$0.00", a sub-cent rounding difference between two '
+      'snapshots, not a real price move)',
+      () {
+        final previous = service.createSnapshot(
+          [
+            _analyticsItem(
+              id: 'raichu',
+              title: 'Raichu',
+              category: 'Trading Card',
+              value: 1.8392,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-08-22T00:00:00Z'),
+            ),
+          ],
+          period: TrendSnapshotPeriod.daily,
+          capturedAt: DateTime.parse('2026-08-23T12:00:00Z'),
+        );
+
+        final performance = service.buildPerformance(
+          currentItems: [
+            _analyticsItem(
+              id: 'raichu',
+              title: 'Raichu',
+              category: 'Trading Card',
+              // A genuinely tiny move: -$0.0001, well under the
+              // meaningfulValueChangeThreshold, not a real price drop.
+              value: 1.8391,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-08-22T00:00:00Z'),
+            ),
+          ],
+          history: [previous],
+          capturedAt: DateTime.parse('2026-08-24T12:00:00Z'),
+        );
+
+        expect(performance.topLoser, isNull);
+        expect(performance.topGainer, isNull);
+        expect(performance.topLosers, isEmpty);
+        expect(performance.topGainers, isEmpty);
+      },
+    );
+
+    test(
+      'still labels a Top gainer/loser when the change is meaningfully '
+      'above the rounding threshold, so the fix does not just hide every '
+      'mover',
+      () {
+        final previous = service.createSnapshot(
+          [
+            _analyticsItem(
+              id: 'real-mover',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              value: 35.00,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+            ),
+          ],
+          period: TrendSnapshotPeriod.daily,
+          capturedAt: DateTime.parse('2026-08-23T12:00:00Z'),
+        );
+
+        final performance = service.buildPerformance(
+          currentItems: [
+            _analyticsItem(
+              id: 'real-mover',
+              title: 'Charizard #1',
+              category: 'Pokemon Card',
+              value: 39.52,
+              confidence: 0.9,
+              createdAt: DateTime.parse('2026-07-28T00:00:00Z'),
+            ),
+          ],
+          history: [previous],
+          capturedAt: DateTime.parse('2026-08-24T12:00:00Z'),
+        );
+
+        expect(performance.topGainer?.itemId, 'real-mover');
+        expect(performance.topGainer?.absoluteChange, closeTo(4.52, 0.001));
+      },
+    );
 
     test('generates trend recommendations', () {
       final previous = service.createSnapshot(

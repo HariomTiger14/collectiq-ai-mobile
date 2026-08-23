@@ -68,7 +68,7 @@ void main() {
     // now lead directly under the title.
     expect(find.text('Your collection at a glance'), findsNothing);
     expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$18'), findsOneWidget);
+    expect(find.text('\$18.00'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
     expect(find.text('1 need value'), findsWidgets);
@@ -252,7 +252,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-zero-card')),
-        matching: find.text('\$0'),
+        matching: find.text('\$0.00'),
       ),
       findsOneWidget,
     );
@@ -350,7 +350,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
-        matching: find.text('\$350'),
+        matching: find.text('\$350.00'),
       ),
       findsOneWidget,
     );

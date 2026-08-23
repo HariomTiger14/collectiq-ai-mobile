@@ -1,4 +1,5 @@
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
+import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
 import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/features/home/data/repositories/shared_preferences_portfolio_history_repository.dart';
@@ -51,8 +52,12 @@ final portfolioPerformanceProvider =
       // offline sessions, or before any cloud snapshot exists yet — so the
       // chart still shows something rather than going blank.
       var history = const <PortfolioSnapshot>[];
+      // Also feeds the MAX badge's baseline (see _trueOverallChange) so it
+      // can prefer real market-tracked price history over a stale/
+      // provisional valueAtScan.
+      var cloudSnapshots = const <PortfolioValuationSnapshot>[];
       try {
-        final cloudSnapshots = await ref
+        cloudSnapshots = await ref
             .watch(cloudServiceRegistryProvider)
             .cloudPortfolioSyncService
             .fetchAllValuationSnapshots();
@@ -73,6 +78,7 @@ final portfolioPerformanceProvider =
       return service.buildPerformance(
         currentItems: orderedItems,
         history: history,
+        cloudSnapshots: cloudSnapshots,
         displayCurrency: displayCurrency,
         currentRates: rates.currentRates,
       );
