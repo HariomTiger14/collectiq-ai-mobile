@@ -91,13 +91,19 @@ class _UpgradeSheet extends ConsumerWidget {
         );
       }
     }
-    return _copy;
+    return _copy(ref);
   }
 
-  ({String title, String subtitle}) get _copy {
+  ({String title, String subtitle}) _copy(WidgetRef ref) {
     return switch (reason) {
       PaywallReason.collectionFull => (
-        title: "You've reached your 10 free collectibles",
+        // Reads the real cap rather than hardcoding it -- kFreeMaxCollectibles
+        // is a tunable dart-define specifically so this can be A/B'd, and a
+        // hardcoded number here would silently go stale the moment it's
+        // tuned away from its current default.
+        title:
+            "You've reached your ${ref.watch(activePlanLimitsProvider).maxPortfolioItems} "
+            'free collectibles',
         subtitle: 'Upgrade to Pro to save your whole collection — no limits.',
       ),
       PaywallReason.priceHistory => (
