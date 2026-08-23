@@ -931,6 +931,80 @@ void main() {
 
     expect(find.text('Portfolio State Preview'), findsNothing);
   });
+
+  group('free-tier collectible counter', () {
+    // The default preview portfolio has 3 saved items -- used as the fixed
+    // "current usage" for these tests, varying only the cap.
+    testWidgets('below cap: shows live usage, not a lock', (tester) async {
+      await _pumpPortfolio(
+        tester,
+        previewScenario: PortfolioPreviewScenario.defaultData,
+        planLimits: _freePlanLimits(maxPortfolioItems: 10),
+      );
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('free-collectible-counter')),
+      );
+
+      expect(find.text('3 of 10 free collectibles saved'), findsOneWidget);
+      expect(
+        find.text('Free collection full — upgrade to save more'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('at cap: shows the full-collection message and a lock', (
+      tester,
+    ) async {
+      await _pumpPortfolio(
+        tester,
+        previewScenario: PortfolioPreviewScenario.defaultData,
+        planLimits: _freePlanLimits(maxPortfolioItems: 3),
+      );
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('free-collectible-counter')),
+      );
+
+      expect(
+        find.text('Free collection full — upgrade to save more'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Pro (unlimited) plan: counter is not shown at all', (
+      tester,
+    ) async {
+      await _pumpPortfolio(
+        tester,
+        previewScenario: PortfolioPreviewScenario.defaultData,
+        paidFeatures: true,
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('free-collectible-counter')),
+        findsNothing,
+      );
+      expect(find.textContaining('free collectibles'), findsNothing);
+    });
+  });
+}
+
+PlanLimits _freePlanLimits({required int maxPortfolioItems}) {
+  return PlanLimits(
+    plan: SubscriptionPlan.free,
+    scanLimit: const UsageLimit(monthlyFreeScanLimit: 10),
+    maxPortfolioItems: maxPortfolioItems,
+    maxPhotosPerItem: 2,
+    maxActivePriceAlerts: 1,
+    monthlyPriceRefreshes: 10,
+    canUseFullValueHistory: false,
+    canExportPortfolio: false,
+    canUseAdvancedFilters: false,
+    canBulkRefreshValues: false,
+    canUsePortfolioIntelligence: false,
+  );
 }
 
 class _FakeFxRatesRepository implements FxRatesRepository {
@@ -949,6 +1023,7 @@ Future<void> _pumpPortfolio(
   PortfolioPreviewScenario? previewScenario,
   VoidCallback? onScanPressed,
   bool paidFeatures = false,
+  PlanLimits? planLimits,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -956,7 +1031,9 @@ Future<void> _pumpPortfolio(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        if (paidFeatures)
+        if (planLimits != null)
+          activePlanLimitsProvider.overrideWithValue(planLimits)
+        else if (paidFeatures)
           activePlanLimitsProvider.overrideWithValue(
             PlanLimits.forPlan(
               plan: SubscriptionPlan.pro,

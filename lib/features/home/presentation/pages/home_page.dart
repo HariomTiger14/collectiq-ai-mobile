@@ -20,6 +20,10 @@ import 'package:collectiq_ai/features/home/presentation/widgets/home_shared_comp
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_focus_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
+import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/free_collectible_counter.dart';
+import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/shared/domain/collectible_category.dart';
 import 'package:collectiq_ai/shared/domain/collectible_sorting.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
@@ -317,6 +321,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     final triggeredAlertCount = isPreview
         ? 0
         : ref.watch(homeTriggeredAlertCountProvider).asData?.value ?? 0;
+    final freeItemCap = isPreview
+        ? kFreeMaxCollectibles
+        : ref.watch(activePlanLimitsProvider).maxPortfolioItems;
     final displayCurrency = isPreview ? 'AUD' : ref.watch(displayCurrencyProvider);
     final fxRates = isPreview
         ? FxRateSnapshot.empty
@@ -466,6 +473,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                               : _handleScanPressed),
                     ),
                   ),
+                  if (freeItemCap < kUnlimitedLabelThreshold)
+                    HomeSection(
+                      topPadding: AppSpacing.xs,
+                      child: FreeCollectibleCounter(
+                        compact: true,
+                        savedCount: homeData.itemCount,
+                        cap: freeItemCap,
+                        onUpgrade: () => showUpgradeSheet(
+                          context,
+                          reason: PaywallReason.collectionFull,
+                        ),
+                      ),
+                    ),
                   if (homeData.hasAttention)
                     HomeSection(
                       topPadding: AppSpacing.lg,

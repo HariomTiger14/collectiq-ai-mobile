@@ -40,9 +40,95 @@ void main() {
     expect(find.byType(InteractiveViewer), findsNothing);
     expect(find.text('Analysis Complete'), findsOneWidget);
   });
+
+  group('free-tier portfolio usage indicator', () {
+    testWidgets(
+      'below cap (9 of 10): shows the live counter and the full analysis '
+      'stays visible -- the cap must never hide what the user is about to '
+      'save',
+      (tester) async {
+        await _pumpScanResultScreen(
+          tester,
+          savedItemCount: 9,
+          freeItemCap: 10,
+          onUpgrade: () {},
+        );
+
+        expect(find.text('9 of 10 free collectibles saved'), findsOneWidget);
+        // The analysis itself -- name, value -- is never gated by the cap.
+        expect(find.text('Test Collectible'), findsWidgets);
+        expect(find.textContaining('120'), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'at cap (10 of 10): shows the full-collection message, and analysis '
+      'and the Add to Portfolio action both stay visible -- only the save '
+      'itself is gated (enforced by PortfolioController, not this screen)',
+      (tester) async {
+        await _pumpScanResultScreen(
+          tester,
+          savedItemCount: 10,
+          freeItemCap: 10,
+          onUpgrade: () {},
+        );
+
+        expect(
+          find.text('Free collection full — upgrade to save more'),
+          findsOneWidget,
+        );
+        expect(find.text('9 of 10 free collectibles saved'), findsNothing);
+        expect(find.text('Test Collectible'), findsWidgets);
+        final addButton = tester.widget<FilledButton>(
+          find.byKey(const ValueKey('result-primary-add-to-portfolio')),
+        );
+        expect(addButton.onPressed, isNotNull);
+      },
+    );
+
+    testWidgets('tapping the counter at cap opens the upgrade path', (
+      tester,
+    ) async {
+      var upgradeTapped = false;
+      await _pumpScanResultScreen(
+        tester,
+        savedItemCount: 10,
+        freeItemCap: 10,
+        onUpgrade: () => upgradeTapped = true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('free-collectible-counter')));
+      await tester.pump();
+
+      expect(upgradeTapped, isTrue);
+    });
+
+    testWidgets(
+      'no indicator when usage data is not supplied (e.g. a Pro user, '
+      'whose cap is unlimited)',
+      (tester) async {
+        await _pumpScanResultScreen(tester);
+
+        expect(
+          find.byKey(const ValueKey('free-collectible-counter')),
+          findsNothing,
+        );
+        expect(find.textContaining('free collectibles'), findsNothing);
+      },
+    );
+  });
 }
 
-Future<void> _pumpScanResultScreen(WidgetTester tester) async {
+Future<void> _pumpScanResultScreen(
+  WidgetTester tester, {
+  int? savedItemCount,
+  int? freeItemCap,
+  VoidCallback? onUpgrade,
+}) async {
   final now = DateTime(2026, 8, 6);
   await tester.pumpWidget(
     MaterialApp(
@@ -79,6 +165,9 @@ Future<void> _pumpScanResultScreen(WidgetTester tester) async {
         onScanAnother: () {},
         onViewPortfolio: null,
         onApplyReviewEdits: (_) async => true,
+        savedItemCount: savedItemCount,
+        freeItemCap: freeItemCap,
+        onUpgrade: onUpgrade,
       ),
     ),
   );
