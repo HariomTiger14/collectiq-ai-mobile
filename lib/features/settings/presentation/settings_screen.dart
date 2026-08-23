@@ -251,6 +251,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         state: subscriptionState,
         onActivatePlan: _activateSubscriptionPlan,
         onRestore: _restoreSubscriptionPlan,
+        onManageSubscription: _openManageSubscription,
       ),
     ];
 
@@ -549,6 +550,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _showSettingsSnackBar(
       state.purchaseMessage ?? state.errorMessage ?? 'Restore checked.',
     );
+  }
+
+  /// Cancelling (and changing/downgrading) a subscription is store-owned --
+  /// Apple/Google require it to happen on their native management surface,
+  /// not a custom in-app flow, and the backend's App Store Server
+  /// Notifications / Play RTDN webhooks pick up the resulting change and
+  /// downgrade the stored entitlement on their own. This just gets the user
+  /// to that native page in one tap instead of them having to know where to
+  /// look in iOS/Android settings.
+  Future<void> _openManageSubscription() async {
+    String? packageName;
+    if (Platform.isAndroid) {
+      packageName = (await ref.read(packageInfoProvider.future)).packageName;
+    }
+    final uri = manageSubscriptionUri(
+      isIOS: Platform.isIOS,
+      isAndroid: Platform.isAndroid,
+      androidPackageName: packageName,
+      androidProductId: Platform.isAndroid
+          ? ref.read(googlePlayBillingConfigProvider).proProductId
+          : null,
+    );
+    if (uri == null) {
+      _showSettingsSnackBar(
+        'Manage your subscription from your device\'s account settings.',
+      );
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted || launched) {
+      return;
+    }
+    _showSettingsSnackBar('Could not open subscription settings.');
   }
 
   Future<_AvatarSourceChoice?> _chooseAvatarSource(
@@ -1183,11 +1218,13 @@ class _SubscriptionPlanPanel extends StatelessWidget {
     required this.state,
     required this.onActivatePlan,
     required this.onRestore,
+    required this.onManageSubscription,
   });
 
   final SubscriptionState state;
   final ValueChanged<SubscriptionPlan> onActivatePlan;
   final VoidCallback onRestore;
+  final VoidCallback onManageSubscription;
 
   @override
   Widget build(BuildContext context) {
@@ -1251,6 +1288,26 @@ class _SubscriptionPlanPanel extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Divider(height: 1, color: HomeTokens.border),
               ),
+          ],
+          // Cancelling, downgrading, or changing payment method all happen
+          // on Apple's/Google's own subscription page -- not a custom
+          // in-app flow -- so this only makes sense once there's an active
+          // paid subscription to manage.
+          if (state.entitlements.isPaid) ...[
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('settings-manage-subscription-button'),
+                onPressed: onManageSubscription,
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Manage Subscription'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: HomeTokens.textPrimary,
+                  side: const BorderSide(color: HomeTokens.border),
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: AppSpacing.md),
           SizedBox(
@@ -1980,6 +2037,30 @@ String resolvedDisplayName({
       (authState.isSignedIn
           ? (authName ?? _nameFromEmail(email) ?? 'Collector')
           : CollectorProfile.defaultDisplayName);
+}
+
+/// The native store page a "Manage Subscription" tap should open, or null
+/// when neither platform check matched (a non-mobile test/dev host, or an
+/// Android package name that hasn't resolved yet) -- callers fall back to a
+/// plain instruction message in that case. Pulled out as a pure function so
+/// this can be verified directly without needing to fake dart:io's Platform
+/// or the url_launcher plugin channel.
+Uri? manageSubscriptionUri({
+  required bool isIOS,
+  required bool isAndroid,
+  String? androidPackageName,
+  String? androidProductId,
+}) {
+  if (isIOS) {
+    return Uri.parse('https://apps.apple.com/account/subscriptions');
+  }
+  if (isAndroid && androidPackageName != null && androidProductId != null) {
+    return Uri.parse(
+      'https://play.google.com/store/account/subscriptions'
+      '?sku=$androidProductId&package=$androidPackageName',
+    );
+  }
+  return null;
 }
 
 class IdentityBlock extends StatelessWidget {
