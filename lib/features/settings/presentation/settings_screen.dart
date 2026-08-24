@@ -973,15 +973,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return SafeArea(
           child: SingleChildScrollView(
             child: _HelpAndFeedbackSheet(
-              onCopy: (message) async {
-                final navigator = Navigator.of(sheetContext);
-                await Clipboard.setData(ClipboardData(text: message));
-                if (!mounted) {
-                  return;
-                }
-                navigator.pop();
-                _showSettingsSnackBar('Support details copied.');
-              },
               onEmail: (subject, body) =>
                   _launchSupportEmail(sheetContext, subject, body),
               onOpenSupportTickets: () {
@@ -1878,12 +1869,10 @@ class _SettingsSurface extends StatelessWidget {
 
 class _HelpAndFeedbackSheet extends StatelessWidget {
   const _HelpAndFeedbackSheet({
-    required this.onCopy,
     required this.onEmail,
     required this.onOpenSupportTickets,
   });
 
-  final Future<void> Function(String message) onCopy;
   final Future<void> Function(String subject, String body) onEmail;
   final VoidCallback onOpenSupportTickets;
 
@@ -1936,11 +1925,31 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
                 title: 'Privacy note',
                 subtitle: 'Images stay local unless cloud sync is configured.',
                 trailing: 'View',
-                onTap: () => onCopy(_privacyNote),
+                onTap: () => _showPrivacyNoteDialog(context),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
+        ],
+      ),
+    );
+  }
+
+  // The row's trailing label says "View" -- it must actually show the note,
+  // not silently copy it to the clipboard behind a generic "Support details
+  // copied." toast (the real bug found live: tapping it gave no visible
+  // feedback of what happened or what the note even said).
+  void _showPrivacyNoteDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Privacy note'),
+        content: const Text(_privacyNote),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );

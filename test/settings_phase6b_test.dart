@@ -52,6 +52,40 @@ void main() {
     expect(find.text('Help and feedback are coming soon.'), findsNothing);
   });
 
+  testWidgets(
+    'tapping "Privacy note" (labeled "View") actually shows the note, not '
+    'a silent clipboard copy (real bug: it copied the text to the '
+    'clipboard, closed the sheet, and showed an unrelated "Support '
+    'details copied." toast -- no visible way to actually read the note)',
+    (tester) async {
+      await tester.pumpSettings();
+
+      await tester.revealText('Help & Feedback');
+      await tester.tap(find.text('Help & Feedback'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Privacy note'));
+      await tester.pumpAndSettle();
+
+      // The sheet must NOT have closed on a silent copy -- the dialog opens
+      // on top of it instead.
+      expect(find.text('Support details copied.'), findsNothing);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.text(
+          'PackLox keeps images local unless cloud sync is configured. '
+          'Pricing and AI analysis may use backend services when enabled '
+          'for the current app environment.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
   testWidgets('profile name can be edited from settings header', (
     tester,
   ) async {
