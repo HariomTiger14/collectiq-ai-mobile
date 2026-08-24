@@ -534,6 +534,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                           ),
                           isUnlocked: planLimits.canUsePortfolioIntelligence,
                           onAttentionFocus: _applyIntelligenceFocus,
+                          activeFocus: _intelligenceFocus,
+                          onClearFocus: _clearFilters,
                           onAddMoreCollectibles: widget.onScanPressed,
                           onUpgrade: () => showUpgradeSheet(
                             context,
@@ -1492,6 +1494,8 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
     required this.isUnlocked,
     required this.onAttentionFocus,
     required this.onAddMoreCollectibles,
+    this.activeFocus,
+    this.onClearFocus,
     this.onUpgrade,
   });
 
@@ -1501,6 +1505,8 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
   final bool isUnlocked;
   final ValueChanged<_PortfolioIntelligenceFocus> onAttentionFocus;
   final VoidCallback? onAddMoreCollectibles;
+  final _PortfolioIntelligenceFocus? activeFocus;
+  final VoidCallback? onClearFocus;
   final VoidCallback? onUpgrade;
 
   @override
@@ -1635,6 +1641,8 @@ class _PortfolioIntelligencePanel extends StatelessWidget {
                 pendingItemCount: pendingItemCount,
                 attentionCount: attentionCount,
                 onFocusSelected: onAttentionFocus,
+                activeFocus: activeFocus,
+                onClearFocus: onClearFocus,
               ),
               if (analytics.topHighestValue.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -1753,12 +1761,16 @@ class _PortfolioAttentionQueue extends StatelessWidget {
     required this.pendingItemCount,
     required this.attentionCount,
     required this.onFocusSelected,
+    this.activeFocus,
+    this.onClearFocus,
   });
 
   final CollectorDashboardAnalytics analytics;
   final int pendingItemCount;
   final int attentionCount;
   final ValueChanged<_PortfolioIntelligenceFocus> onFocusSelected;
+  final _PortfolioIntelligenceFocus? activeFocus;
+  final VoidCallback? onClearFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -1836,10 +1848,21 @@ class _PortfolioAttentionQueue extends StatelessWidget {
               ),
             ],
           ),
+          if (activeFocus != null && onClearFocus != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _ActiveFilterChip(
+                label: activeFocus!.label,
+                onClear: onClearFocus!,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           for (final row in rows) ...[
             _PortfolioAttentionRow(
               data: row,
+              isActive: row.focus == activeFocus,
               onTap: () => onFocusSelected(row.focus),
             ),
             if (row != rows.last) const SizedBox(height: AppSpacing.xs),
@@ -1867,10 +1890,15 @@ class _AttentionQueueRowData {
 }
 
 class _PortfolioAttentionRow extends StatelessWidget {
-  const _PortfolioAttentionRow({required this.data, required this.onTap});
+  const _PortfolioAttentionRow({
+    required this.data,
+    required this.onTap,
+    this.isActive = false,
+  });
 
   final _AttentionQueueRowData data;
   final VoidCallback onTap;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
@@ -1884,9 +1912,16 @@ class _PortfolioAttentionRow extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: HomeTokens.background.withValues(alpha: .36),
+            color: isActive
+                ? HomeTokens.accentStrong.withValues(alpha: .16)
+                : HomeTokens.background.withValues(alpha: .36),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: HomeTokens.border.withValues(alpha: .72)),
+            border: Border.all(
+              color: isActive
+                  ? HomeTokens.accentStrong.withValues(alpha: .68)
+                  : HomeTokens.border.withValues(alpha: .72),
+              width: isActive ? 1.5 : 1,
+            ),
           ),
           child: Row(
             children: [
@@ -2418,6 +2453,63 @@ class _StatusPill extends StatelessWidget {
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact state indicator for when a shortcut filter (e.g. tapping "Low
+/// confidence" in Portfolio intelligence) has put the list into a filtered
+/// view. Without this, the only way back was discovering the Filter sheet's
+/// Reset button -- real UX gap found live: nothing on the Portfolio screen
+/// itself showed the user they were even in a filtered state. Rendered
+/// inside the Attention queue card itself (not up near the toolbar) so it
+/// visibly relates to the row that triggered it, per user feedback on the
+/// first version -- a chip floating near the search bar read as unrelated
+/// to the attention-queue row several screens' worth of scroll below it.
+class _ActiveFilterChip extends StatelessWidget {
+  const _ActiveFilterChip({required this.label, required this.onClear});
+
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('portfolio-active-filter-chip'),
+        onTap: onClear,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          decoration: BoxDecoration(
+            color: HomeTokens.accentStrong.withValues(alpha: .16),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: HomeTokens.accentStrong.withValues(alpha: .4),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: HomeTokens.accentStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: HomeTokens.accentStrong,
+                semanticLabel: 'Clear filter',
+              ),
+            ],
+          ),
         ),
       ),
     );

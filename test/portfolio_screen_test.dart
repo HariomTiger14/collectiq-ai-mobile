@@ -159,6 +159,123 @@ void main() {
     );
   });
 
+  testWidgets(
+    'tapping a shortcut filter shows a clearable chip, and clearing it '
+    'returns the full portfolio without opening the Filter sheet (real '
+    'gap: tapping "Low confidence" filtered the list with no visible way '
+    'back except discovering the Filter sheet\'s Reset button)',
+    (tester) async {
+      _seedPortfolio([
+        _item('confident-card', 'Pokemon Charizard', 1850, confidence: 0.9),
+        _item(
+          'weak-card',
+          'Blurry Scan',
+          40,
+          category: 'Trading Card',
+          confidence: 0.55,
+        ),
+      ]);
+
+      await _pumpPortfolio(tester, paidFeatures: true);
+
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('portfolio-intelligence-action-lowConfidence')),
+      );
+
+      // No chip before the shortcut is used.
+      expect(
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('portfolio-intelligence-action-lowConfidence')),
+      );
+      await tester.pumpAndSettle();
+
+      // Applying the shortcut auto-scrolls the list -- scroll back to where
+      // the chip lives (inside the Attention queue card itself, right next
+      // to the row that triggered it) before asserting on it.
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+      );
+
+      // Chip appears, labeled with the shortcut's own name, and the list is
+      // filtered down to only the low-confidence item.
+      expect(
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+        findsOneWidget,
+      );
+      expect(find.text('Low confidence'), findsWidgets);
+
+      // The chip renders inside the Attention queue card itself (not up
+      // near the toolbar, unrelated to where the shortcut lives) -- and the
+      // row that triggered it is visually flagged as the active one.
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey('portfolio-intelligence-attention-queue'),
+          ),
+          matching: find.byKey(const ValueKey('portfolio-active-filter-chip')),
+        ),
+        findsOneWidget,
+      );
+      final lowConfidenceRow = find.byWidgetPredicate(
+        (widget) =>
+            widget.runtimeType.toString() == '_PortfolioAttentionRow' &&
+            (widget as dynamic).data.title == 'Low confidence',
+      );
+      expect((lowConfidenceRow.evaluate().single.widget as dynamic).isActive, isTrue);
+      final trustedValueRow = find.byWidgetPredicate(
+        (widget) =>
+            widget.runtimeType.toString() == '_PortfolioAttentionRow' &&
+            (widget as dynamic).data.title == 'Needs trusted value',
+      );
+      expect((trustedValueRow.evaluate().single.widget as dynamic).isActive, isFalse);
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('portfolio-grid-item-weak-card')),
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-weak-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-confident-card')),
+        findsNothing,
+      );
+
+      // Tapping the chip clears the filter directly -- no Filter sheet.
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('portfolio-active-filter-chip')),
+        findsNothing,
+      );
+      await _revealPortfolio(
+        tester,
+        find.byKey(const ValueKey('portfolio-grid-item-weak-card')),
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-weak-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('portfolio-grid-item-confident-card')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('paid intelligence add-more recommendation opens scan flow', (
     tester,
   ) async {
