@@ -416,8 +416,20 @@ void main() {
     expect(find.text('MTG'), findsOneWidget);
     expect(find.text('Yu-Gi-Oh'), findsOneWidget);
     expect(find.text('One Piece'), findsOneWidget);
+    expect(find.text('Lorcana'), findsOneWidget);
     expect(find.text('Funko'), findsOneWidget);
-    expect(find.text('Sports'), findsOneWidget);
+    // "Sports Cards", not the ambiguous bare "Sports" -- and the generic
+    // "Cards" tile is gone entirely now that every card game has its own
+    // named tile (it would be redundant/ambiguous alongside them).
+    expect(find.text('Sports Cards'), findsOneWidget);
+    expect(find.text('Sports'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-section-category-explorer')),
+        matching: find.text('Cards'),
+      ),
+      findsNothing,
+    );
     expect(find.text('Watches'), findsNothing);
     expect(find.text('Toys'), findsNothing);
     expect(find.text('Memorabilia'), findsNothing);
