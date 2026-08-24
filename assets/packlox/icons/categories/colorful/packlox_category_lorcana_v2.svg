@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Storybook card</title>
+  <defs>
+    <linearGradient id="frame" x1="15" y1="9" x2="49" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C084FC"/><stop offset=".5" stop-color="#818CF8"/><stop offset="1" stop-color="#FBBF24"/>
+    </linearGradient>
+    <radialGradient id="ink" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(31 32) rotate(90) scale(11)">
+      <stop stop-color="#F5D0FE"/><stop offset=".55" stop-color="#A855F7"/><stop offset="1" stop-color="#5B21B6"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="32" cy="53" rx="18" ry="5" fill="#020617" opacity=".42"/>
+  <rect x="17" y="10" width="30" height="42" rx="6" fill="#1E1B3A" stroke="url(#frame)" stroke-width="3"/>
+  <path d="M31 20c-7 2-9 11-4 17 2.3 2.7 6 3.6 9 2-3-1-5.4-3.2-6-6.4-.8-4.2 1.7-8.8 6-9.6-1.6-2-3.3-3-5-3Z" fill="url(#ink)"/>
+  <circle cx="40" cy="19" r="2.4" fill="#FDE68A"/>
+  <path d="M23 47h18" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+</svg>

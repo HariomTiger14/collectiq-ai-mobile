@@ -1352,19 +1352,6 @@ class _CategoryCount {
 
 const _supportedCategories = [
   _SupportedCategory(
-    key: 'cards',
-    label: 'Trading Cards',
-    shortLabel: 'Cards',
-    description:
-        'PackLox supports trading card categories where trusted catalog data is connected.',
-    providers:
-        'PriceCharting is connected for Pokémon, MTG, Yu-Gi-Oh, and One Piece card catalogs.',
-    examples: ['Pokémon', 'MTG', 'Yu-Gi-Oh'],
-    icon: Icons.style_outlined,
-    assetPath: PackLoxAssets.categoryColorCards,
-    color: HomeTokens.categoryCards,
-  ),
-  _SupportedCategory(
     key: 'pokemon',
     label: 'Pokémon Cards',
     shortLabel: 'Pokémon',
@@ -1407,6 +1394,30 @@ const _supportedCategories = [
     examples: ['Leaders', 'Alt arts', 'Promos'],
     icon: Icons.style_outlined,
     assetPath: PackLoxAssets.categoryColorOnePiece,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'lorcana',
+    label: 'Disney Lorcana Cards',
+    shortLabel: 'Lorcana',
+    description: 'Modern card catalog matching with clear unavailable states.',
+    providers: 'PriceCharting is connected for supported catalog entries.',
+    examples: ['Ink colors', 'Enchanted rares', 'Promos'],
+    icon: Icons.auto_stories_outlined,
+    assetPath: PackLoxAssets.categoryColorLorcana,
+    color: HomeTokens.categoryCards,
+  ),
+  _SupportedCategory(
+    key: 'sports-cards',
+    label: 'Sports Cards',
+    shortLabel: 'Sports Cards',
+    description:
+        'Sports card pricing needs player, year, set, or card number evidence.',
+    providers:
+        'PriceCharting API is connected with stricter identity checks for sports card matches.',
+    examples: ['Player', 'Set/year', 'Card number'],
+    icon: Icons.sports_basketball_outlined,
+    assetPath: PackLoxAssets.categoryColorSports,
     color: HomeTokens.categoryCards,
   ),
   _SupportedCategory(
@@ -1471,19 +1482,6 @@ const _supportedCategories = [
     icon: Icons.album_outlined,
     assetPath: PackLoxAssets.categoryColorCoins,
     color: HomeTokens.categoryCoins,
-  ),
-  _SupportedCategory(
-    key: 'sports-cards',
-    label: 'Sports Cards',
-    shortLabel: 'Sports',
-    description:
-        'Sports card pricing needs player, year, set, or card number evidence.',
-    providers:
-        'PriceCharting API is connected with stricter identity checks for sports card matches.',
-    examples: ['Player', 'Set/year', 'Card number'],
-    icon: Icons.sports_basketball_outlined,
-    assetPath: PackLoxAssets.categoryColorSports,
-    color: HomeTokens.categoryCards,
   ),
   _SupportedCategory(
     key: 'sneakers',

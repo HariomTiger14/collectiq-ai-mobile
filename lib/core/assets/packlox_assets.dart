@@ -48,6 +48,8 @@ class PackLoxAssets {
       'assets/packlox/icons/categories/colorful/packlox_category_yugioh_v2.svg';
   static const categoryColorOnePiece =
       'assets/packlox/icons/categories/colorful/packlox_category_one_piece_v2.svg';
+  static const categoryColorLorcana =
+      'assets/packlox/icons/categories/colorful/packlox_category_lorcana_v2.svg';
   static const categoryColorGames =
       'assets/packlox/icons/categories/colorful/packlox_category_games_v2.svg';
   static const categoryColorComics =
@@ -97,6 +99,7 @@ class PackLoxAssets {
     categoryColorMtg,
     categoryColorYugioh,
     categoryColorOnePiece,
+    categoryColorLorcana,
     categoryColorGames,
     categoryColorComics,
     categoryColorLego,
