@@ -44,10 +44,16 @@ void main() {
 
     expect(find.text('Contact support'), findsOneWidget);
     expect(
-      find.text('Open a ticket and chat with the PackLox team.'),
+      find.text(
+        'Report a scan issue, bug, or question and chat with '
+        'the PackLox team.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Report scan issue'), findsOneWidget);
+    // Consolidated into "Contact support" -- a mailto draft disconnected
+    // from the real ticket system (no admin visibility, no notifications)
+    // was worse than just using the ticket flow that already exists.
+    expect(find.text('Report scan issue'), findsNothing);
     expect(find.text('Privacy note'), findsOneWidget);
     expect(find.text('Help and feedback are coming soon.'), findsNothing);
   });
