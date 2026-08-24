@@ -20,6 +20,7 @@ String canonicalCategory(String raw) {
       has('yu-gi') ||
       has('yugioh') ||
       has('one piece') ||
+      has('lorcana') ||
       has('trainer')) {
     return 'Cards';
   }
