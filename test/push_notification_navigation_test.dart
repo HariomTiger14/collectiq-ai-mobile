@@ -41,5 +41,43 @@ void main() {
       expect(intent, isNotNull);
       expect(intent!.target, PushNotificationNavigationTarget.home);
     });
+
+    test('routes a support ticket reply push to the ticket thread', () {
+      final intent = pushNotificationNavigationIntentFromData({
+        'type': 'support_ticket_reply',
+        'ticketId': 'ticket-123',
+      });
+
+      expect(intent, isNotNull);
+      expect(intent!.target, PushNotificationNavigationTarget.supportTicket);
+      expect(intent.ticketId, 'ticket-123');
+    });
+
+    test(
+      'routes a support ticket resolved push to the ticket thread too '
+      '(real gap found live: the backend added a new "resolved" push kind '
+      'alongside the existing "reply" one, but this switch only handled '
+      '"reply" -- tapping a resolved-ticket notification would have '
+      'silently gone nowhere)',
+      () {
+        final intent = pushNotificationNavigationIntentFromData({
+          'type': 'support_ticket_resolved',
+          'ticketId': 'ticket-123',
+        });
+
+        expect(intent, isNotNull);
+        expect(intent!.target, PushNotificationNavigationTarget.supportTicket);
+        expect(intent.ticketId, 'ticket-123');
+      },
+    );
+
+    test('falls back to settings for a resolved push without a ticket id', () {
+      final intent = pushNotificationNavigationIntentFromData({
+        'type': 'support_ticket_resolved',
+      });
+
+      expect(intent, isNotNull);
+      expect(intent!.target, PushNotificationNavigationTarget.settings);
+    });
   });
 }
