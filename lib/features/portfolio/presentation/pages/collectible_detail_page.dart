@@ -1328,6 +1328,17 @@ class _DetailInlineContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The photo prompt and the gallery are mutually exclusive views of the
+    // same thing, keyed on whether any real (non-placeholder) photo exists.
+    // Previously both could render at once for a catalog-saved item, which
+    // meant two buttons calling the same onAddPhoto a few pixels apart, and
+    // an "Image Gallery - 1 image" header counting the bundled placeholder
+    // asset as if it were the user's own photo.
+    final hasRealPhoto =
+        galleryImages.any(
+          (image) => !_isPackLoxCategoryPlaceholderPath(image.path),
+        ) ||
+        !_usesCatalogPlaceholderImage(item);
     return Column(
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
@@ -1340,11 +1351,11 @@ class _DetailInlineContent extends StatelessWidget {
           onEdit: onEdit,
           onRefreshValue: onRefreshValue,
         ),
-        if (_usesCatalogPlaceholderImage(item)) ...[
+        if (!hasRealPhoto) ...[
           const SizedBox(height: AppSpacing.sm),
-          _DetailPhotoEvidencePrompt(onEdit: onEdit),
+          _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
         ],
-        if (galleryImages.isNotEmpty) ...[
+        if (hasRealPhoto && galleryImages.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailGallerySection(
             item: item,
@@ -1736,8 +1747,12 @@ class _DetailGallerySection extends StatelessWidget {
 }
 
 class _DetailPhotoEvidencePrompt extends StatelessWidget {
-  const _DetailPhotoEvidencePrompt({required this.onEdit});
+  const _DetailPhotoEvidencePrompt({
+    required this.onAddPhoto,
+    required this.onEdit,
+  });
 
+  final VoidCallback onAddPhoto;
   final VoidCallback onEdit;
 
   @override
@@ -1761,24 +1776,39 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          // No "Add your photos" button here on purpose: the Image Gallery
-          // section directly below already carries an "Add photo" control
-          // wired to this same onAddPhoto callback, so a second button was
-          // pure duplication stacked a few pixels away. This callout keeps
-          // the part the gallery cannot express -- *why* a placeholder is
-          // showing -- plus the one action that isn't duplicated.
-          OutlinedButton.icon(
-            key: const ValueKey('collectible-detail-review-details-action'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Review details'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: HomeTokens.textPrimary,
-              side: const BorderSide(color: HomeTokens.border),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              textStyle: const TextStyle(fontWeight: FontWeight.w900),
-              minimumSize: const Size(double.infinity, 0),
-            ),
+          // This is the *only* add-photo control while the item has no real
+          // photo -- the Image Gallery section is hidden in that state, since
+          // it would otherwise present the bundled placeholder as if it were
+          // the user's own image. Once a real photo exists the two swap.
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton.icon(
+                key: const ValueKey('collectible-detail-add-photo-action'),
+                onPressed: onAddPhoto,
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+                label: const Text('Add your photos'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8BE7FF),
+                  foregroundColor: const Color(0xFF07111D),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              OutlinedButton.icon(
+                key: const ValueKey('collectible-detail-review-details-action'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Review details'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: HomeTokens.textPrimary,
+                  side: const BorderSide(color: HomeTokens.border),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
           ),
         ],
       ),

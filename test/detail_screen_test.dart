@@ -329,17 +329,47 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('saved from catalog search'), findsOneWidget);
-    // Exactly one add-photo control on the screen: the callout explains why
-    // a placeholder is showing, but the Image Gallery section owns the
-    // action -- both buttons previously called the same callback.
+    // With no real photo yet, this callout owns the add action and the
+    // Image Gallery is hidden -- otherwise the screen showed two buttons
+    // calling the same callback, and a gallery header counting the bundled
+    // placeholder asset as "1 image".
+    expect(
+      find.byKey(const ValueKey('collectible-detail-add-photo-action')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(
         const ValueKey('collectible-detail-gallery-add-photo-action'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.widgetWithText(FilledButton, 'Add your photos'), findsNothing);
+    expect(find.text('Image Gallery'), findsNothing);
   });
+
+  testWidgets(
+    'once a real photo exists the gallery takes over and the placeholder '
+    'prompt disappears, so only one add-photo control is ever shown',
+    (tester) async {
+      await _pumpDetail(tester, _authorityItem());
+
+      await _revealText(tester, 'Image Gallery');
+
+      expect(
+        find.byKey(
+          const ValueKey('collectible-detail-gallery-add-photo-action'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-photo-evidence-prompt')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-add-photo-action')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('adding a portfolio photo preserves existing gallery images', (
     tester,
