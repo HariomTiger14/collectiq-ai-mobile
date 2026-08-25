@@ -56,14 +56,82 @@ void main() {
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Pokemon Cards');
+    expect(input.controller?.text, 'Pokemon');
 
     // A quick-filter tap is a deliberate action, not a keystroke, so it
     // searches immediately rather than waiting out the typing debounce.
     await tester.pumpAndSettle();
-    expect(catalogRepository.queries, ['Pokemon Cards']);
+    expect(catalogRepository.queries, ['Pokemon']);
+    // The chip must narrow by category, not just seed the search box. Free
+    // text alone cannot represent a category: searching the bare word
+    // "Pokemon" against the whole catalog returns Pokemon-collab trainers
+    // that outrank the cards (confirmed live), and "LEGO" returns a LEGO
+    // video game.
+    expect(catalogRepository.lastCategoryGroup, 'trading-card-games');
+    expect(catalogRepository.lastSubcategory, 'pokemon');
     expect(find.text('Charizard #4 Base Set'), findsOneWidget);
   });
+
+  testWidgets(
+    'every category Home advertises has a Discover chip, and each carries a '
+    'real category filter rather than only a search term',
+    (tester) async {
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      for (final label in [
+        'Pokemon Cards',
+        'Magic Cards',
+        'Yu-Gi-Oh! Cards',
+        'Lorcana Cards',
+        'One Piece Cards',
+        'Sports Cards',
+        'Comics',
+        'Coins',
+        'Video Games',
+        'LEGO Sets',
+        'Funko Pops',
+        'Sneakers',
+      ]) {
+        expect(
+          find.text(label),
+          findsOneWidget,
+          reason: '$label is advertised on Home but missing from Discover',
+        );
+      }
+
+      // Sneakers live only in kicksdb_catalog, so the request pins source
+      // to kicksdb rather than sending a category the PriceCharting
+      // taxonomy has no entry for.
+      await tester.ensureVisible(find.text('Sneakers'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sneakers'));
+      await tester.pumpAndSettle();
+      expect(catalogRepository.lastSource, 'kicksdb');
+
+      // Clearing the box brings the chip grid back: it only renders while
+      // there is no active query (results take its place otherwise).
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        '',
+      );
+      await tester.pumpAndSettle();
+
+      // Every other category pins to pricecharting, so KicksDB rows cannot
+      // mix into a filtered view -- without this a Pokemon-filtered search
+      // surfaces Pokemon-collab trainers above the cards.
+      await tester.ensureVisible(find.text('LEGO Sets'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LEGO Sets'));
+      await tester.pumpAndSettle();
+      expect(catalogRepository.lastCategoryGroup, 'lego-sets');
+      expect(catalogRepository.lastSource, 'pricecharting');
+    },
+  );
 
   testWidgets(
     'filter sheet applies a category, deriving the right source for search',
