@@ -2859,7 +2859,7 @@ void main() {
     });
 
     test(
-      'auth error mapper handles unknown account separately when proven',
+      'auth error mapper never reveals whether an email is registered',
       () {
         final message = SupabaseService.authFailureMessageForTesting(
           DioException(
@@ -2872,7 +2872,7 @@ void main() {
           ),
         );
 
-        expect(message, 'Please sign up first.');
+        expect(message, 'Invalid email or password.');
       },
     );
 
@@ -7354,6 +7354,74 @@ void main() {
       expect(snapshots.first.valueAud, 150);
       expect(snapshots.last.valueAud, 165);
     });
+
+    test(
+      'recordCatalogHistory seeds the chart from PriceCharting catalog '
+      'history at save time, skipping unpriced versions',
+      () async {
+        final repository = SharedPreferencesValuationSnapshotRepository();
+        final history = [
+          CatalogPriceHistoryPoint(
+            validFrom: DateTime.utc(2026, 7, 26),
+            validTo: DateTime.utc(2026, 8, 8),
+            currency: 'USD',
+            // No price recorded for this version -- must be skipped, not
+            // written as a zero/null point.
+          ),
+          CatalogPriceHistoryPoint(
+            validFrom: DateTime.utc(2026, 8, 19),
+            isCurrent: true,
+            currency: 'USD',
+            marketValue: 300,
+            lowEstimate: 250,
+            highEstimate: 300,
+          ),
+        ];
+
+        await repository.recordCatalogHistory('catalog-item', history);
+        final snapshots = await repository.getSnapshots('catalog-item');
+
+        expect(snapshots, hasLength(1));
+        expect(snapshots.single.valueAud, 300);
+        expect(snapshots.single.lowEstimateAud, 250);
+        expect(snapshots.single.highEstimateAud, 300);
+        expect(snapshots.single.pricedAt, DateTime.utc(2026, 8, 19));
+        expect(snapshots.single.pricingProvider, 'PriceCharting');
+        expect(
+          snapshots.single.valuationStatus,
+          ValuationStatus.marketEstimated,
+        );
+      },
+    );
+
+    test(
+      'recordCatalogHistory does not clobber another item\'s snapshots',
+      () async {
+        final repository = SharedPreferencesValuationSnapshotRepository();
+        final otherItem = _analyticsItem(
+          id: 'other-item',
+          title: 'Blastoise',
+          category: 'Trading Card',
+          value: 90,
+          confidence: 0.9,
+          createdAt: DateTime.parse('2026-06-29T00:00:00Z'),
+        ).copyWith(lastValueRefreshedAt: DateTime.utc(2026, 8, 1));
+        await repository.recordSnapshot(otherItem);
+
+        await repository.recordCatalogHistory('catalog-item', [
+          CatalogPriceHistoryPoint(
+            validFrom: DateTime.utc(2026, 8, 19),
+            currency: 'USD',
+            marketValue: 300,
+          ),
+        ]);
+
+        final otherSnapshots = await repository.getSnapshots('other-item');
+        final newSnapshots = await repository.getSnapshots('catalog-item');
+        expect(otherSnapshots, hasLength(1));
+        expect(newSnapshots, hasLength(1));
+      },
+    );
   });
 
   group('PriceAlertEvaluator', () {

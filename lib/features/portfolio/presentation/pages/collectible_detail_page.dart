@@ -21,6 +21,8 @@ import 'package:collectiq_ai/features/price_alerts/presentation/controllers/pric
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -38,6 +40,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final _portfolioValuationSnapshotsProvider =
     FutureProvider.family<List<PortfolioValuationSnapshot>, String>((
@@ -135,6 +138,56 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           item: widget.item,
         );
       });
+    }
+    unawaited(_backfillCatalogHistoryIfNeeded());
+  }
+
+  /// Self-healing lazy backfill: an item saved from Discover search before
+  /// this feature existed (or one whose history-seed at save time failed)
+  /// has a known catalog id but zero valuation snapshots. Rather than a
+  /// one-time migration script, just check for that gap every time the
+  /// detail screen opens -- cheap (no-op once real snapshots exist) and
+  /// fixes every already-saved item in this state, not just new ones.
+  Future<void> _backfillCatalogHistoryIfNeeded() async {
+    final catalogId = _catalogIdFromNotes(widget.item.notes);
+    if (catalogId == null) {
+      return;
+    }
+    // Bounded end to end: this runs unawaited from initState, so nothing
+    // downstream is blocked by it -- but a slow/hanging network dependency
+    // must never leave it running indefinitely in the background either.
+    try {
+      final existing = await ref
+          .read(_portfolioValuationSnapshotsProvider(widget.item.id).future)
+          .timeout(const Duration(seconds: 10));
+      if (existing.isNotEmpty || !mounted) {
+        return;
+      }
+      final detail = await ref
+          .read(catalogSearchRepositoryProvider)
+          .getCatalogDetail(
+            result: CatalogSearchResult(
+              id: catalogId,
+              title: widget.item.title,
+              category: widget.item.category,
+              source: widget.item.pricing?.pricingSource ?? 'PriceCharting',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (detail.history.isEmpty || !mounted) {
+        return;
+      }
+      await ref
+          .read(valuationSnapshotRepositoryProvider)
+          .recordCatalogHistory(widget.item.id, detail.history);
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(_portfolioValuationSnapshotsProvider(widget.item.id));
+    } on Object catch (_) {
+      // Best-effort: the chart just stays empty, same as today, if the
+      // catalog lookup fails or times out (offline, id no longer valid,
+      // slow connection, etc.).
     }
   }
 
@@ -1289,7 +1342,7 @@ class _DetailInlineContent extends StatelessWidget {
         ),
         if (_usesCatalogPlaceholderImage(item)) ...[
           const SizedBox(height: AppSpacing.sm),
-          _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
+          _DetailPhotoEvidencePrompt(onEdit: onEdit),
         ],
         if (galleryImages.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
@@ -1683,12 +1736,8 @@ class _DetailGallerySection extends StatelessWidget {
 }
 
 class _DetailPhotoEvidencePrompt extends StatelessWidget {
-  const _DetailPhotoEvidencePrompt({
-    required this.onAddPhoto,
-    required this.onEdit,
-  });
+  const _DetailPhotoEvidencePrompt({required this.onEdit});
 
-  final VoidCallback onAddPhoto;
   final VoidCallback onEdit;
 
   @override
@@ -1712,35 +1761,24 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FilledButton.icon(
-                key: const ValueKey('collectible-detail-add-photo-action'),
-                onPressed: onAddPhoto,
-                icon: const Icon(Icons.photo_library_outlined, size: 18),
-                label: const Text('Add your photos'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF8BE7FF),
-                  foregroundColor: const Color(0xFF07111D),
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              OutlinedButton.icon(
-                key: const ValueKey('collectible-detail-review-details-action'),
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Review details'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: HomeTokens.textPrimary,
-                  side: const BorderSide(color: HomeTokens.border),
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
+          // No "Add your photos" button here on purpose: the Image Gallery
+          // section directly below already carries an "Add photo" control
+          // wired to this same onAddPhoto callback, so a second button was
+          // pure duplication stacked a few pixels away. This callout keeps
+          // the part the gallery cannot express -- *why* a placeholder is
+          // showing -- plus the one action that isn't duplicated.
+          OutlinedButton.icon(
+            key: const ValueKey('collectible-detail-review-details-action'),
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Review details'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: HomeTokens.textPrimary,
+              side: const BorderSide(color: HomeTokens.border),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              minimumSize: const Size(double.infinity, 0),
+            ),
           ),
         ],
       ),
@@ -2050,7 +2088,10 @@ class _PricingTrustPanel extends StatelessWidget {
           ],
           if (pricing?.attributionText?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.sm),
-            _DetailEmptyCopy(pricing!.attributionText!.trim()),
+            _DetailAttributionLine(
+              text: pricing!.attributionText!.trim(),
+              url: pricing.attributionUrl?.trim(),
+            ),
           ],
         ],
       ),
@@ -2179,7 +2220,11 @@ class _SnapshotEvidenceRows extends StatelessWidget {
   Widget build(BuildContext context) {
     final pricing = snapshot.pricing;
     final rows = [
-      _DetailInfoRowData('Attribution', snapshot.attribution),
+      _DetailInfoRowData(
+        'Attribution',
+        snapshot.attribution,
+        valueUrl: snapshot.attributionUrl,
+      ),
       if (pricing.lastUpdated != null)
         _DetailInfoRowData(
           'Provider checked',
@@ -3018,6 +3063,43 @@ class _DetailSectionTitle extends StatelessWidget {
   }
 }
 
+/// Pricing attribution text -- a tappable link to the priced item's real
+/// source page when one is available (required by pricing-provider
+/// attribution terms), otherwise plain text.
+class _DetailAttributionLine extends StatelessWidget {
+  const _DetailAttributionLine({required this.text, this.url});
+
+  final String text;
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) {
+      return _DetailEmptyCopy(text);
+    }
+    return InkWell(
+      key: const ValueKey('detail-attribution-link'),
+      onTap: () => _openAttributionUrl(url!),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: PackLoxTokens.blue,
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _openAttributionUrl(String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    return;
+  }
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
 class _DetailEmptyCopy extends StatelessWidget {
   const _DetailEmptyCopy(this.message);
 
@@ -3036,10 +3118,11 @@ class _DetailEmptyCopy extends StatelessWidget {
 }
 
 class _DetailInfoRowData {
-  const _DetailInfoRowData(this.label, this.value);
+  const _DetailInfoRowData(this.label, this.value, {this.valueUrl});
 
   final String label;
   final String value;
+  final String? valueUrl;
 }
 
 class _DetailAuthorityRows extends StatelessWidget {
@@ -3068,13 +3151,28 @@ class _DetailAuthorityRows extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 flex: 7,
-                child: Text(
-                  row.value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: row.valueUrl == null || row.valueUrl!.isEmpty
+                    ? Text(
+                        row.value,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(
+                              color: PackLoxTokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      )
+                    : InkWell(
+                        key: const ValueKey('detail-attribution-row-link'),
+                        onTap: () => _openAttributionUrl(row.valueUrl!),
+                        child: Text(
+                          row.value,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: PackLoxTokens.blue,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -3390,12 +3488,14 @@ class _CatalogSnapshotData {
     required this.pricing,
     required this.savedValue,
     required this.attribution,
+    this.attributionUrl,
     this.catalogId,
   });
 
   final PricingInfo pricing;
   final double savedValue;
   final String attribution;
+  final String? attributionUrl;
   final String? catalogId;
 }
 
@@ -3425,6 +3525,7 @@ _CatalogSnapshotData? _catalogSnapshotFor(CollectibleItem item) {
     pricing: pricing,
     savedValue: item.estimatedValue,
     attribution: attribution,
+    attributionUrl: _clean(pricing.attributionUrl),
     catalogId: catalogId,
   );
 }

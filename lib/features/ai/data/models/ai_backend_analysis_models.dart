@@ -359,6 +359,7 @@ class AiBackendAnalysisResponse {
         rawProviderPayload['valuationStrategy'],
       ),
       attributionText: _optionalString(pricingSourcePayload['attributionText']),
+      attributionUrl: _optionalString(pricingSourcePayload['attributionUrl']),
       displayString: _optionalString(rawProviderPayload['displayString']),
       originalPrice: parseNullableDouble(originalMarketPayload['price']),
       originalCurrency: _optionalString(originalMarketPayload['currency']),

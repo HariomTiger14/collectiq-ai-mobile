@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
@@ -20,6 +21,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
+
+/// A caught request failure was previously always shown as "Catalog search
+/// is not connected yet." -- indistinguishable from a live production outage
+/// (the backend genuinely raises 503 catalog_search_unavailable when its own
+/// dependencies are down). This gives the user an honest, distinct message
+/// per failure kind instead.
+String _catalogFailureMessage(Object error) {
+  if (error is! NetworkException) {
+    return 'Something went wrong loading search results. Please try again.';
+  }
+  if (error.statusCode != null && error.statusCode! >= 500) {
+    return 'Catalog search is temporarily unavailable. Please try again in a moment.';
+  }
+  switch (error.code) {
+    case 'connectionTimeout':
+    case 'sendTimeout':
+    case 'receiveTimeout':
+    case 'connectionError':
+      return 'Unable to reach the server. Check your internet connection.';
+    default:
+      return 'Something went wrong loading search results. Please try again.';
+  }
+}
 
 /// A category/subcategory filter option: [key] is the value sent to the
 /// backend (matches PRICECHARTING_CATEGORY_GROUPS/
@@ -457,7 +481,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() {
         _catalogResults = const [];
         _isCatalogLoading = false;
-        _catalogError = 'Catalog search is not connected yet.';
+        _catalogError = _catalogFailureMessage(error);
       });
     }
   }
@@ -1886,6 +1910,17 @@ class _CatalogResultDetailPageState
         setState(() => _isSaving = false);
         return;
       }
+      if (_result.history.isNotEmpty) {
+        // Seed the chart from PriceCharting's own catalog history -- already
+        // fetched to show on this very screen, so no server round-trip and
+        // no dependency on the item ever cloud-syncing.
+        await ref
+            .read(valuationSnapshotRepositoryProvider)
+            .recordCatalogHistory(item.id, _result.history);
+      }
+      if (!mounted) {
+        return;
+      }
       final savedItem = ref
           .read(portfolioControllerProvider)
           .items
@@ -1939,13 +1974,13 @@ class _CatalogResultDetailPageState
         _isLoadingDetail = false;
         _detailError = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _isLoadingDetail = false;
-        _detailError = 'History unavailable';
+        _detailError = _catalogFailureMessage(error);
       });
     }
   }
@@ -3646,6 +3681,7 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
     reasonCode: value > 0 ? 'CATALOG_SEARCH_MATCH' : 'CATALOG_NO_PRICE',
     valuationStrategy: 'catalog_lookup',
     attributionText: attribution,
+    attributionUrl: result.productUrl,
     displayString: value > 0 ? _formatCatalogValue(result) : null,
   );
   return CollectibleItem(

@@ -258,6 +258,7 @@ class ScanPricingQuote {
       'reasonCode': pricingJson['reasonCode'],
       'valuationStrategy': pricingJson['valuationStrategy'],
       'attributionText': sourceJson['attributionText'],
+      'attributionUrl': sourceJson['attributionUrl'],
       'displayString': pricingJson['displayString'],
       'originalPrice': originalJson['price'],
       'originalCurrency': originalJson['currency'],

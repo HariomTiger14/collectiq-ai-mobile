@@ -328,11 +328,17 @@ void main() {
       find.byKey(const ValueKey('collectible-detail-photo-evidence-prompt')),
       findsOneWidget,
     );
+    expect(find.textContaining('saved from catalog search'), findsOneWidget);
+    // Exactly one add-photo control on the screen: the callout explains why
+    // a placeholder is showing, but the Image Gallery section owns the
+    // action -- both buttons previously called the same callback.
     expect(
-      find.byKey(const ValueKey('collectible-detail-add-photo-action')),
+      find.byKey(
+        const ValueKey('collectible-detail-gallery-add-photo-action'),
+      ),
       findsOneWidget,
     );
-    expect(find.textContaining('saved from catalog search'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Add your photos'), findsNothing);
   });
 
   testWidgets('adding a portfolio photo preserves existing gallery images', (
@@ -610,7 +616,81 @@ void main() {
     expect(find.text('Pricing data by PriceCharting'), findsWidgets);
     expect(find.text('Strategy'), findsOneWidget);
     expect(find.text('Catalog Lookup'), findsOneWidget);
+    // A real attributionUrl is present on this item's pricing -- both the
+    // standalone attribution line and the "Attribution" evidence row must
+    // render as tappable links, not plain text, per PriceCharting's
+    // attribution requirements.
+    expect(
+      find.byKey(const ValueKey('detail-attribution-link')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-attribution-row-link')),
+      findsOneWidget,
+    );
   });
+
+  testWidgets(
+    'attribution renders as plain text (not a link) when no attributionUrl is available',
+    (tester) async {
+      final item = _authorityItem().copyWith(
+        pricing: const PricingInfo(
+          estimatedMarketValue: 245,
+          lowEstimate: 220,
+          highEstimate: 270,
+          currency: 'USD',
+          pricingSource: 'Saved provider',
+          pricingConfidence: 0.82,
+          lastUpdated: null,
+          attributionText: 'Pricing data by Saved provider',
+        ),
+      );
+      await _pumpDetail(tester, item);
+
+      expect(find.text('Pricing data by Saved provider'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('detail-attribution-link')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('detail-attribution-row-link')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'opening detail for a catalog-matched item with no history yet '
+    'lazily backfills it from the catalog, once',
+    (tester) async {
+      final item = _catalogSnapshotItem();
+      final apiClient = _CatalogDetailApiClient();
+
+      await _pumpDetail(tester, item, apiClient: apiClient);
+
+      expect(apiClient.requestCount, 1);
+      final snapshots = await const SharedPreferencesValuationSnapshotRepository()
+          .getSnapshots(item.id);
+      expect(snapshots, hasLength(2));
+      expect(snapshots.first.valueAud, 150);
+      expect(snapshots.last.valueAud, 161);
+
+      // Re-opening the same (now-backfilled) item must not re-fetch.
+      await _pumpDetail(tester, item, apiClient: apiClient);
+      expect(apiClient.requestCount, 1);
+    },
+  );
+
+  testWidgets(
+    'does not attempt a catalog backfill for an item with no catalog id',
+    (tester) async {
+      final apiClient = _CatalogDetailApiClient();
+
+      await _pumpDetail(tester, _authorityItem(), apiClient: apiClient);
+
+      expect(apiClient.requestCount, 0);
+    },
+  );
 
   testWidgets('QA capture exposes Portfolio Detail visual states', (
     tester,
@@ -1260,6 +1340,45 @@ class _SuccessfulRepriceApiClient extends ApiClient {
   }
 }
 
+class _CatalogDetailApiClient extends ApiClient {
+  _CatalogDetailApiClient()
+    : super(
+        config: const EnvironmentConfig(
+          environment: AppEnvironment.development,
+        ),
+      );
+
+  var requestCount = 0;
+
+  @override
+  Future<dio.Response<dynamic>> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    requestCount++;
+    return dio.Response<dynamic>(
+      requestOptions: dio.RequestOptions(path: path),
+      data: {
+        'history': [
+          {
+            'validFrom': '2026-07-19T00:00:00Z',
+            'currency': 'USD',
+            'marketValue': 150,
+          },
+          {
+            'validFrom': '2026-07-26T00:00:00Z',
+            'isCurrent': true,
+            'currency': 'USD',
+            'marketValue': 161,
+            'lowEstimate': 150,
+            'highEstimate': 800,
+          },
+        ],
+      },
+    );
+  }
+}
+
 class _MemoryWishlistRepository implements WishlistRepository {
   final Map<String, WishlistStatusEntry> _entries = {};
 
@@ -1366,7 +1485,12 @@ CollectibleItem _authorityItem({
       lastUpdated: null,
     ),
     valueAtScan: 200,
-    lastValueRefreshedAt: DateTime(2026, 7, 26),
+    // Relative, not a pinned calendar date: the detail screen treats pricing
+    // older than 30 days as stale, so a hardcoded date silently turns this
+    // shared fixture stale once the wall clock passes it -- which is exactly
+    // what happened, flipping "Evidence looks healthy" to a staleness
+    // callout and breaking otherwise-unrelated tests on a specific day.
+    lastValueRefreshedAt: DateTime.now().subtract(const Duration(days: 5)),
   );
 }
 
@@ -1398,6 +1522,7 @@ CollectibleItem _catalogSnapshotItem() {
       reasonCode: 'CATALOG_SEARCH_MATCH',
       valuationStrategy: 'catalog_lookup',
       attributionText: 'Pricing data by PriceCharting',
+      attributionUrl: 'https://www.pricecharting.com/offers?product=3666974',
       displayString: 'USD \$161',
     ),
     valueAtScan: 161,
