@@ -397,6 +397,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Adding a photo now asks camera-or-library first.
+    await tester.tap(find.byKey(const ValueKey('detail-photo-source-library')));
+    await tester.pumpAndSettle();
+    expect(galleryService.lastRequestedSource, ImageSource.gallery);
+
     final updated = repository.items.single;
     expect(updated.imagePath, '/persisted/new-front.jpg');
     expect(updated.galleryImages, hasLength(3));
@@ -414,6 +419,39 @@ void main() {
     );
     expect(find.text('Photo added to portfolio item'), findsOneWidget);
   });
+
+  testWidgets(
+    'adding a photo can shoot a new one instead of only picking from the '
+    'library, since the collectible is usually in hand',
+    (tester) async {
+      final item = _authorityItem();
+      final galleryService = _FakeGalleryService(
+        pickedImage: XFile('/source/shot.jpg', name: 'shot.jpg'),
+        persistedImage: XFile('/persisted/shot.jpg', name: 'shot.jpg'),
+      );
+
+      await _pumpDetail(
+        tester,
+        item,
+        portfolioRepository: _MemoryPortfolioRepository([item]),
+        galleryService: galleryService,
+        syncQueueRepository: _RecordingSyncQueueRepository(),
+        planLimits: _premiumPlanLimits,
+      );
+
+      await _revealText(tester, 'Image Gallery');
+      await tester.tap(
+        find.byKey(
+          const ValueKey('collectible-detail-gallery-add-photo-action'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('detail-photo-source-camera')));
+      await tester.pumpAndSettle();
+
+      expect(galleryService.lastRequestedSource, ImageSource.camera);
+    },
+  );
 
   testWidgets('unavailable refresh keeps saved valuation evidence', (
     tester,
@@ -1269,8 +1307,13 @@ class _FakeGalleryService extends GalleryService {
   final XFile pickedImage;
   final XFile persistedImage;
 
+  ImageSource? lastRequestedSource;
+
   @override
-  Future<XFile?> pickImage() async => pickedImage;
+  Future<XFile?> pickImage({ImageSource source = ImageSource.gallery}) async {
+    lastRequestedSource = source;
+    return pickedImage;
+  }
 
   @override
   Future<bool> validateImage(XFile image) async => true;

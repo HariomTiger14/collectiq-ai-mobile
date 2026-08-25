@@ -39,6 +39,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -500,6 +501,52 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     return updatedImage;
   }
 
+  /// Asks whether to shoot a new photo or pick an existing one.
+  ///
+  /// The collectible is normally in the user's hand, so jumping straight to
+  /// the photo library (the old behaviour) forced a detour through the system
+  /// Camera app and back. Returns null if the sheet is dismissed.
+  Future<ImageSource?> _askPhotoSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: PackLoxTokens.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+              ListTile(
+                key: const ValueKey('detail-photo-source-camera'),
+                leading: const Icon(
+                  Icons.photo_camera_outlined,
+                  color: PackLoxTokens.textPrimary,
+                ),
+                title: const Text('Take photo'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.camera),
+              ),
+              ListTile(
+                key: const ValueKey('detail-photo-source-library'),
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: PackLoxTokens.textPrimary,
+                ),
+                title: const Text('Choose from library'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.gallery),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _addPortfolioPhotoFromGallery(CollectibleItem item) async {
     try {
       final planLimits = ref.read(activePlanLimitsProvider);
@@ -509,8 +556,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
         return;
       }
 
+      final source = await _askPhotoSource();
+      if (source == null || !mounted) {
+        return;
+      }
+
       final galleryService = ref.read(galleryServiceProvider);
-      final pickedImage = await galleryService.pickImage();
+      final pickedImage = await galleryService.pickImage(source: source);
       if (pickedImage == null) {
         return;
       }

@@ -24,12 +24,18 @@ class GalleryService {
   final ImagePicker _imagePicker;
   final ScanImageProcessor _imageProcessor;
 
-  /// Opens the gallery and returns the selected image file.
-  Future<XFile?> pickImage() async {
-    debugPrint('[GalleryService] gallery picker launch requested');
+  /// Picks an image, from the photo library by default.
+  ///
+  /// Pass [ImageSource.camera] to shoot one instead -- the collectible is
+  /// usually in the user's hand, so making them leave the app, use the system
+  /// Camera, and come back to pick the result is a worse flow than capturing
+  /// it here. Both sources run through the same downscale/quality settings so
+  /// a captured photo costs no more to upload or analyze than a picked one.
+  Future<XFile?> pickImage({ImageSource source = ImageSource.gallery}) async {
+    debugPrint('[GalleryService] ${source.name} picker launch requested');
     _releaseImageCacheBeforeExternalPicker();
     final image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: _maxPickerDimension,
       maxHeight: _maxPickerDimension,
       imageQuality: _pickerImageQuality,

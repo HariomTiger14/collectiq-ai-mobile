@@ -39,6 +39,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PackLox uses the camera to scan your collectibles and photograph the items in your portfolio.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PackLox lets you choose photos of your collectibles from your library to add to your portfolio.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PackLox can save enhanced photos of your collectibles back to your library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
