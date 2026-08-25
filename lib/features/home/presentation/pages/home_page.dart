@@ -295,7 +295,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         .items
         .where((candidate) => candidate.id == mover.itemId);
     if (matches.isNotEmpty) {
-      _openCollectibleDetail(context, matches.first);
+      _openCollectibleDetail(context, ref, matches.first);
     }
   }
 
@@ -1056,7 +1056,7 @@ class _CategoryExplorer extends StatelessWidget {
   }
 }
 
-class _RecentItemsPreview extends StatelessWidget {
+class _RecentItemsPreview extends ConsumerWidget {
   const _RecentItemsPreview({
     required this.data,
     this.onOpenPortfolio,
@@ -1068,7 +1068,7 @@ class _RecentItemsPreview extends StatelessWidget {
   final VoidCallback? onScanPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final recentItems = data.recentItems.take(3).toList(growable: false);
     return HomeSectionSurface(
       keySeed: 'recent-items-preview',
@@ -1101,8 +1101,11 @@ class _RecentItemsPreview extends StatelessWidget {
                     valueUnavailable: !_hasDisplayValue(recentItems[index]),
                     condition: recentItems[index].condition,
                     addedLabel: _relativeAddedLabel(recentItems[index]),
-                    onTap: () =>
-                        _openCollectibleDetail(context, recentItems[index]),
+                    onTap: () => _openCollectibleDetail(
+                      context,
+                      ref,
+                      recentItems[index],
+                    ),
                   ),
                 ],
               ],
@@ -2068,10 +2071,22 @@ List<TrendSnapshot> _pointsForPeriod(
   return filtered.length >= 2 ? filtered : series;
 }
 
-void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
+void _openCollectibleDetail(
+  BuildContext context,
+  WidgetRef ref,
+  CollectibleItem item,
+) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => CollectibleDetailPage(
+        item: item,
+        onDelete: (itemId) async {
+          await ref.read(portfolioControllerProvider.notifier).removeItem(itemId);
+          return true;
+        },
+      ),
+    ),
+  );
 }
 
 bool _hasDisplayValue(CollectibleItem item) {
