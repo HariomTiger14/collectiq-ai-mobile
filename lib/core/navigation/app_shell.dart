@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/auth/local_user_data_cache.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
 import 'package:collectiq_ai/core/navigation/push_notification_navigation.dart';
@@ -16,6 +17,10 @@ import 'package:collectiq_ai/features/home/presentation/home_screen.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
+import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:collectiq_ai/features/subscription/presentation/widgets/upgrade_sheet.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/portfolio_screen.dart';
@@ -45,6 +50,7 @@ class _AppShellState extends ConsumerState<AppShell>
   _pushNotificationNavigationCoordinator =
       PushNotificationNavigationCoordinator();
   String? _lastPostSignInSyncUserId;
+  bool _hasClearedLocalDataForCurrentSignOut = false;
 
   @override
   void initState() {
@@ -146,9 +152,22 @@ class _AppShellState extends ConsumerState<AppShell>
   void _handleAuthChanged(AuthState? previous, AuthState next) {
     if (!next.isSignedIn) {
       _lastPostSignInSyncUserId = null;
+      if ((previous?.isSignedIn ?? false) &&
+          next.status == AuthFlowStatus.signedOut &&
+          !_hasClearedLocalDataForCurrentSignOut) {
+        // ref.listen can re-deliver the same signedOut transition (e.g. a
+        // rebuild in between), so guard this the same way
+        // _lastPostSignInSyncUserId guards the sign-in side below --
+        // otherwise a second delivery invalidates portfolioControllerProvider
+        // while the first invalidation's rebuild is still in flight, and its
+        // `late final` repository field throws on the double build.
+        _hasClearedLocalDataForCurrentSignOut = true;
+        unawaited(_clearLocalUserDataAfterSignOut());
+      }
       return;
     }
 
+    _hasClearedLocalDataForCurrentSignOut = false;
     final userId = next.user?.id;
     if (userId == null ||
         userId.isEmpty ||
@@ -157,6 +176,51 @@ class _AppShellState extends ConsumerState<AppShell>
     }
     _lastPostSignInSyncUserId = userId;
     unawaited(_syncLocalPortfolioAfterSignIn(userId: userId));
+  }
+
+  /// A signed-out device must not still show the previous account's cached
+  /// portfolio/wishlist/alerts/profile/subscription state to whoever signs
+  /// in next -- these SharedPreferences keys aren't namespaced by user id,
+  /// so they're wiped
+  /// explicitly here rather than relying on each feature's own repository
+  /// (some of those `clear()` implementations also delete the *cloud* copy,
+  /// which sign-out must never do).
+  Future<void> _clearLocalUserDataAfterSignOut() async {
+    try {
+      await clearLocalUserData();
+    } on Object catch (error, stackTrace) {
+      unawaited(
+        ref
+            .read(appTelemetryServiceProvider)
+            .recordNonFatalError(
+              error,
+              stackTrace: stackTrace,
+              reason: 'clear_local_user_data_after_sign_out_failed',
+            ),
+      );
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    // Posted rather than invalidated inline: this runs from a ref.listen
+    // callback that itself fires during a provider flush, and invalidating
+    // a NotifierProvider synchronously from in there can re-enter that same
+    // flush and call build() twice on one instance (its `late final` fields
+    // then throw "already initialized"). Deferring to the next frame runs
+    // the invalidation outside that flush entirely.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(portfolioControllerProvider);
+      ref.invalidate(profileControllerProvider);
+      ref.invalidate(wishlistEntriesProvider);
+      ref.invalidate(wishlistStatusForItemProvider);
+      ref.invalidate(allPriceAlertsProvider);
+      ref.invalidate(itemPriceAlertsProvider);
+      ref.invalidate(subscriptionControllerProvider);
+    });
   }
 
   Future<void> _syncLocalPortfolioAfterSignIn({required String userId}) async {
