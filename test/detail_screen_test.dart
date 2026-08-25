@@ -453,6 +453,79 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a superseded scan estimate is neither charted nor used as the baseline, '
+    'and a drifted displayString is ignored in favour of the real value',
+    (tester) async {
+      // The real Raichu record that exposed this. The scan matched a video
+      // game (its comps were "Box Only"/"Manual Only" tiers) and priced the
+      // card at $62; catalog repricing later corrected it to $1.84 but left
+      // valueAtScan and displayString behind. The screen then charted a $62
+      // spike on the item's createdAt and reported a -97% crash that never
+      // happened.
+      final item = _authorityItem().copyWith(
+        title: 'Raichu',
+        valueAtScan: 62.0,
+        lastValueRefreshedAt: DateTime.utc(2026, 8, 24, 16),
+        pricing: PricingInfo(
+          estimatedMarketValue: 1.8392,
+          lowEstimate: 1.8392,
+          highEstimate: 17.92,
+          currency: 'AUD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.96,
+          lastUpdated: DateTime.utc(2026, 8, 24, 16),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'PriceCharting',
+          displayString: '\$62.00 AUD',
+          originalPrice: 41.0,
+          originalCurrency: 'USD',
+          exchangeRateUsed: 1.52,
+        ),
+      );
+      final valuationSnapshots = _RecordingValuationSnapshotRepository();
+      for (final entry in [
+        (DateTime.utc(2026, 7, 26), 1.88),
+        (DateTime.utc(2026, 8, 11), 1.50),
+        (DateTime.utc(2026, 8, 24, 16), 1.84),
+      ]) {
+        valuationSnapshots.snapshots.add(
+          PortfolioValuationSnapshot(
+            id: '${item.id}-${entry.$1.toIso8601String()}',
+            portfolioItemId: item.id,
+            valueAud: entry.$2,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricingProvider: 'PriceCharting',
+            pricedAt: entry.$1,
+            currency: 'AUD',
+          ),
+        );
+      }
+
+      await _pumpDetail(
+        tester,
+        item,
+        valuationSnapshotRepository: valuationSnapshots,
+      );
+      await _revealText(tester, 'Value History');
+
+      // The oldest *tracked* price is the baseline, not the scan estimate,
+      // and it is labelled honestly.
+      expect(find.text('Oldest'), findsOneWidget);
+      expect(find.text('At scan'), findsNothing);
+      // The $62 figure must not appear anywhere: not as a baseline, not as
+      // the headline value via the stale displayString.
+      expect(find.textContaining('62'), findsNothing);
+
+      final points = valueHistoryPointsForTesting(
+        item,
+        valuationSnapshots.snapshots,
+      );
+      expect(points.any((value) => value > 50), isFalse);
+      expect(points.first, closeTo(1.88, 0.001));
+    },
+  );
+
   testWidgets('unavailable refresh keeps saved valuation evidence', (
     tester,
   ) async {

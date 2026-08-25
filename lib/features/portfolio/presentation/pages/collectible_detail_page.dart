@@ -2046,14 +2046,20 @@ class _DetailInfoSection extends StatelessWidget {
   }
 }
 
-class _DetailMarketSection extends StatelessWidget {
+class _DetailMarketSection extends ConsumerWidget {
   const _DetailMarketSection({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
-    final rows = _detailMarketRows(item);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshots = ref
+        .watch(_portfolioValuationSnapshotsProvider(item.id))
+        .maybeWhen(
+          data: (value) => value,
+          orElse: () => const <PortfolioValuationSnapshot>[],
+        );
+    final rows = _detailMarketRows(item, snapshots);
     final catalogSnapshot = _catalogSnapshotFor(item);
     return _DetailAuthorityPanel(
       key: const ValueKey('collectible-detail-market-section'),
@@ -2348,12 +2354,18 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       rates: fxRates,
     );
     final itemCurrency = item.pricing?.currency ?? 'AUD';
-    final scanValue = convertCurrent(
-      _valueAtScanFor(item),
-      from: itemCurrency,
-      to: displayCurrency,
-      currentRates: fxRates.currentRates,
-    );
+    final baseline = _valueHistoryBaseline(item, snapshots);
+    final scanValue = baseline == null
+        ? 0.0
+        : convertCurrent(
+            baseline.value,
+            from: baseline.currency,
+            to: displayCurrency,
+            currentRates: fxRates.currentRates,
+          );
+    // Only call it "At scan" when it really is the scan estimate; once real
+    // snapshots supersede it the figure is the oldest tracked price.
+    final baselineLabel = (baseline?.fromScan ?? true) ? 'At scan' : 'Oldest';
     final currentValue = convertCurrent(
       _currentValueFor(item),
       from: itemCurrency,
@@ -2408,7 +2420,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
             children: [
               Expanded(
                 child: _DetailValueHistoryMetric(
-                  label: 'At scan',
+                  label: baselineLabel,
                   value: _formatMoney(scanValue, displayCurrency),
                 ),
               ),
@@ -3285,10 +3297,18 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
   return rows;
 }
 
-List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
+List<_DetailInfoRowData> _detailMarketRows(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final trustedPricing = _hasTrustedPricingEvidence(item);
+  // Same rule as the Value History panel: once real snapshots exist they
+  // supersede the scan estimate, which may have come from a different
+  // (wrong) product entirely. Presenting that superseded figure as pricing
+  // *evidence* is worse than omitting it.
+  final baseline = _valueHistoryBaseline(item, snapshots);
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
@@ -3298,12 +3318,9 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
             : 'Value unavailable',
       ),
       _DetailInfoRowData(
-        'Value at scan',
-        trustedPricing
-            ? _formatMoney(
-                item.valueAtScan ?? item.estimatedValue,
-                pricing.currency,
-              )
+        (baseline?.fromScan ?? true) ? 'Value at scan' : 'Oldest tracked value',
+        trustedPricing && baseline != null
+            ? _formatMoney(baseline.value, baseline.currency)
             : 'Value unavailable',
       ),
       _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
@@ -3644,6 +3661,61 @@ double _valueAtScanFor(CollectibleItem item) {
   return item.estimatedValue;
 }
 
+/// The plotted chart values, exposed so tests can assert that a superseded
+/// scan estimate never reaches the chart.
+@visibleForTesting
+List<double> valueHistoryPointsForTesting(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  return _valueHistoryPoints(
+    item,
+    snapshots,
+  ).map((point) => point.value).toList();
+}
+
+/// The oldest trustworthy value for this item, and where it came from.
+///
+/// `valueAtScan` is captured once at save time from whatever the scan-time
+/// lookup happened to return, and is never corrected afterwards. When that
+/// lookup matched the wrong product -- e.g. a Pokemon card priced against a
+/// video game's "Box Only"/"Manual Only" tiers at $62 when the card is
+/// really worth $1.84 -- the wrong figure sticks forever, and charting it
+/// renders a ~97% "crash" that never happened.
+///
+/// Saved snapshots are strictly better evidence: they carry the
+/// catalog-matched identity and each one is a price the provider actually
+/// published on a given date. So whenever any priced snapshot exists it
+/// supersedes the scan estimate, which is kept only as a last-resort
+/// fallback for an item with no tracked history at all.
+({double value, String currency, DateTime date, bool fromScan})?
+_valueHistoryBaseline(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  for (final snapshot in snapshots) {
+    final value = snapshot.valueAud;
+    if (value != null && value > 0) {
+      return (
+        value: value,
+        currency: snapshot.currency,
+        date: snapshot.pricedAt,
+        fromScan: false,
+      );
+    }
+  }
+  final scanValue = _valueAtScanFor(item);
+  if (scanValue > 0) {
+    return (
+      value: scanValue,
+      currency: item.pricing?.currency ?? 'AUD',
+      date: item.createdAt,
+      fromScan: true,
+    );
+  }
+  return null;
+}
+
 double _currentValueFor(CollectibleItem item) {
   final marketValue = item.pricing?.estimatedMarketValue;
   if (marketValue != null && marketValue > 0) {
@@ -3664,7 +3736,16 @@ List<_ValueHistoryPoint> _valueHistoryPoints(
 }) {
   final itemCurrency = item.pricing?.currency ?? 'AUD';
   final points = <_ValueHistoryPoint>[];
-  final scanValue = _valueAtScanFor(item);
+  // Only plot the scan-time estimate when there is no real snapshot history
+  // to plot instead. Once snapshots exist they describe the same period with
+  // the catalog-matched identity, so charting the scan estimate alongside
+  // them draws a spike for a price this item was never actually worth --
+  // see _valueHistoryBaseline for the full reasoning.
+  final scanValue = snapshots.any(
+    (snapshot) => (snapshot.valueAud ?? 0) > 0,
+  )
+      ? 0.0
+      : _valueAtScanFor(item);
   if (scanValue > 0) {
     points.add(
       _ValueHistoryPoint(
@@ -6633,14 +6714,39 @@ String _formatDate(DateTime date) {
 }
 
 String _displayValue(PricingInfo pricing, {required double fallbackValue}) {
-  final displayString = pricing.displayString?.trim();
-  if (displayString != null && displayString.isNotEmpty) {
-    return displayString;
-  }
   final value = pricing.estimatedMarketValue > 0
       ? pricing.estimatedMarketValue
       : fallbackValue;
+  final displayString = pricing.displayString?.trim();
+  if (displayString != null &&
+      displayString.isNotEmpty &&
+      _displayStringAgreesWith(displayString, value)) {
+    return displayString;
+  }
   return _formatMoney(value, pricing.currency);
+}
+
+/// Whether a saved [displayString] still describes [value].
+///
+/// displayString is a denormalised copy of estimatedMarketValue, and the two
+/// can drift: repricing used to overwrite the number while leaving the string
+/// from the previous match in place, so an item repriced to $1.84 kept
+/// rendering "$62.00 AUD" -- the figure from a scan that had matched a video
+/// game rather than the card. Preferring the string unconditionally made that
+/// stale value the one users actually saw. Trust it only while it still
+/// agrees with the number it is supposed to describe, so a drifted record
+/// self-corrects instead of lying.
+bool _displayStringAgreesWith(String displayString, double value) {
+  final match = RegExp(r'\d[\d,]*(?:\.\d+)?').firstMatch(displayString);
+  if (match == null) {
+    return false;
+  }
+  final parsed = double.tryParse(match.group(0)!.replaceAll(',', ''));
+  if (parsed == null) {
+    return false;
+  }
+  // Tolerate normal rounding ("AUD $1.84" for 1.8392) but nothing wider.
+  return (parsed - value).abs() <= math.max(0.01, value.abs() * 0.01);
 }
 
 String? _sourceMarketValue(PricingInfo pricing) {
@@ -6651,6 +6757,20 @@ String? _sourceMarketValue(PricingInfo pricing) {
       originalCurrency == null ||
       originalCurrency.isEmpty ||
       originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
+    return null;
+  }
+  // Same drift problem as displayString: this is the pre-conversion price,
+  // so originalPrice * exchangeRateUsed should still land on the current
+  // estimate. When it does not, the pair is left over from an earlier
+  // (possibly wrong-product) match -- showing "USD $41.00" beside a $1.84
+  // item states a source price that was never the source of that figure.
+  final rate = pricing.exchangeRateUsed;
+  final converted = rate == null || rate <= 0
+      ? originalPrice
+      : originalPrice * rate;
+  final current = pricing.estimatedMarketValue;
+  if (current > 0 &&
+      (converted - current).abs() > math.max(0.01, current.abs() * 0.05)) {
     return null;
   }
   return _formatMoney(originalPrice, originalCurrency);
