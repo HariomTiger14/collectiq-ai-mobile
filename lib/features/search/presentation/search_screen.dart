@@ -654,7 +654,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         maxController.clear();
                         update(const _CatalogFilterSelection.defaults());
                       },
-                      child: const Text('Reset'),
+                      // "Clear all", not "Reset": this edits the draft like
+                      // every other control in the sheet and still needs
+                      // Apply to take effect. "Reset" reads as an action
+                      // that fires immediately, so users expected the
+                      // filters to change on tap; "clear" reads as editing
+                      // the form, which is what it actually does.
+                      child: const Text('Clear all'),
                     ),
                   ),
                   const SizedBox(width: 10),
