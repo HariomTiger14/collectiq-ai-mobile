@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
@@ -62,6 +63,7 @@ typedef _CatalogQuickFilter = ({
   String query,
   String? categoryGroup,
   String? subcategory,
+  String? assetPath,
 });
 
 /// Top-level categories -- mirrors PRICECHARTING_CATEGORY_GROUPS plus the
@@ -328,6 +330,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Pokemon',
         categoryGroup: 'trading-card-games',
         subcategory: 'pokemon',
+        assetPath: PackLoxAssets.categoryColorPokemon,
       ),
       (
         label: 'Magic Cards',
@@ -335,6 +338,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Magic',
         categoryGroup: 'trading-card-games',
         subcategory: 'magic',
+        assetPath: PackLoxAssets.categoryColorMtg,
       ),
       (
         label: 'Yu-Gi-Oh! Cards',
@@ -342,6 +346,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Yu-Gi-Oh',
         categoryGroup: 'trading-card-games',
         subcategory: 'yugioh',
+        assetPath: PackLoxAssets.categoryColorYugioh,
       ),
       (
         label: 'Lorcana Cards',
@@ -349,6 +354,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Lorcana',
         categoryGroup: 'trading-card-games',
         subcategory: 'lorcana',
+        assetPath: PackLoxAssets.categoryColorLorcana,
       ),
       // Needs its own subcategory: the bare query "One Piece" matches a
       // GameBoy platformer, PS3 beat'em-ups and the comic run before any
@@ -359,6 +365,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'One Piece Card',
         categoryGroup: 'trading-card-games',
         subcategory: 'onepiece',
+        assetPath: PackLoxAssets.categoryColorOnePiece,
       ),
       (
         label: 'Sports Cards',
@@ -366,6 +373,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Sports Cards',
         categoryGroup: 'sports-cards',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorSports,
       ),
       (
         label: 'Comics',
@@ -373,6 +381,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Comics',
         categoryGroup: 'comics',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorComics,
       ),
       (
         label: 'Coins',
@@ -380,6 +389,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Coins',
         categoryGroup: 'coins',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorCoins,
       ),
       (
         label: 'Video Games',
@@ -387,6 +397,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Video Games',
         categoryGroup: 'video-games',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorGames,
       ),
       (
         label: 'LEGO Sets',
@@ -394,6 +405,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'LEGO',
         categoryGroup: 'lego-sets',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorLego,
       ),
       (
         label: 'Funko Pops',
@@ -401,6 +413,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Funko',
         categoryGroup: 'funko-pops',
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorFunko,
       ),
       (
         label: 'Sneakers',
@@ -408,6 +421,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         query: 'Sneakers',
         categoryGroup: kSneakersCategoryKey,
         subcategory: null,
+        assetPath: PackLoxAssets.categoryColorSneakers,
       ),
     ];
     final hasQuery = query.isNotEmpty;
@@ -1112,6 +1126,7 @@ class _QuickFilterChips extends StatelessWidget {
             key: ValueKey('discover-quick-filter-$index'),
             label: filters[index].label,
             category: filters[index].category,
+            assetPath: filters[index].assetPath,
             onTap: () => onSelected(filters[index]),
           ),
       ],
@@ -1124,21 +1139,32 @@ class _QuickFilterChip extends StatelessWidget {
     required this.label,
     required this.category,
     required this.onTap,
+    this.assetPath,
     super.key,
   });
 
   final String label;
   final String category;
+  final String? assetPath;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // Same category → same icon/art/color everywhere in the app: resolve
-    // through the shared mapping (also used by Home's category tiles)
-    // instead of this screen's own icon logic. The category is passed in
-    // explicitly (not inferred from the label) since example product names
-    // like "Charizard 4/102" don't contain a recognizable category keyword.
-    final visual = categoryVisualFor(category);
+    // categoryVisualFor is a COARSE mapping -- every trading card game
+    // resolves to the same generic "Cards" art, so Pokemon, Magic,
+    // Yu-Gi-Oh, Lorcana and One Piece chips all rendered with one
+    // identical blue card icon and were only distinguishable by their
+    // text. Home's category tiles don't have that problem because each
+    // carries its own per-game asset, so prefer an explicit assetPath
+    // here (the same PackLoxAssets constants Home uses) and fall back to
+    // the shared mapping for anything that doesn't need the finer art.
+    final visual = assetPath == null
+        ? categoryVisualFor(category)
+        : CategoryVisual(
+            icon: categoryVisualFor(category).icon,
+            color: categoryVisualFor(category).color,
+            assetPath: assetPath,
+          );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
