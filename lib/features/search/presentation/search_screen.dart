@@ -60,7 +60,6 @@ typedef CatalogFilterGroup = ({String key, String label});
 typedef _CatalogQuickFilter = ({
   String label,
   String category,
-  String query,
   String? categoryGroup,
   String? subcategory,
   String? assetPath,
@@ -327,7 +326,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Pokémon',
         category: 'Cards',
-        query: 'Pokemon',
         categoryGroup: 'trading-card-games',
         subcategory: 'pokemon',
         assetPath: PackLoxAssets.categoryColorPokemon,
@@ -335,7 +333,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Magic',
         category: 'Cards',
-        query: 'Magic',
         categoryGroup: 'trading-card-games',
         subcategory: 'magic',
         assetPath: PackLoxAssets.categoryColorMtg,
@@ -343,7 +340,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Yu-Gi-Oh!',
         category: 'Cards',
-        query: 'Yu-Gi-Oh',
         categoryGroup: 'trading-card-games',
         subcategory: 'yugioh',
         assetPath: PackLoxAssets.categoryColorYugioh,
@@ -351,7 +347,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Lorcana',
         category: 'Cards',
-        query: 'Lorcana',
         categoryGroup: 'trading-card-games',
         subcategory: 'lorcana',
         assetPath: PackLoxAssets.categoryColorLorcana,
@@ -362,7 +357,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'One Piece',
         category: 'Cards',
-        query: 'One Piece Card',
         categoryGroup: 'trading-card-games',
         subcategory: 'onepiece',
         assetPath: PackLoxAssets.categoryColorOnePiece,
@@ -370,7 +364,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Sports Cards',
         category: 'Sports Cards',
-        query: 'Sports Cards',
         categoryGroup: 'sports-cards',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorSports,
@@ -378,7 +371,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Comics',
         category: 'Comics',
-        query: 'Comics',
         categoryGroup: 'comics',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorComics,
@@ -386,7 +378,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Coins',
         category: 'Coins',
-        query: 'Coins',
         categoryGroup: 'coins',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorCoins,
@@ -394,7 +385,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Video Games',
         category: 'Video Games',
-        query: 'Video Games',
         categoryGroup: 'video-games',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorGames,
@@ -402,7 +392,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'LEGO Sets',
         category: 'LEGO',
-        query: 'LEGO',
         categoryGroup: 'lego-sets',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorLego,
@@ -410,7 +399,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Funko Pops',
         category: 'Funko',
-        query: 'Funko',
         categoryGroup: 'funko-pops',
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorFunko,
@@ -418,14 +406,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       (
         label: 'Sneakers',
         category: 'Sneakers',
-        query: 'Sneakers',
         categoryGroup: kSneakersCategoryKey,
         subcategory: null,
         assetPath: PackLoxAssets.categoryColorSneakers,
       ),
     ];
     final hasQuery = query.isNotEmpty;
-    final isCatalogReady = query.length >= 2;
+    // An active category filter is a complete request on its own, so
+    // results should show for it even with an empty search box -- that is
+    // what browsing a category means.
+    final isBrowsingCategory = _filters.categoryGroup != null;
+    final isCatalogReady = query.length >= 2 || isBrowsingCategory;
     final isCatalogEmpty =
         isCatalogReady &&
         !_isCatalogLoading &&
@@ -555,8 +546,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         minPrice: _filters.minPrice,
         maxPrice: _filters.maxPrice,
       );
+      // Browse the category rather than searching for its name. The chip
+      // used to type a representative term into the box because the
+      // backend refused to return anything without one -- which looked
+      // like the app typing on the user's behalf when all they did was
+      // pick a category. The search box stays empty and theirs to use.
+      _queryController.clear();
     });
-    _setQuery(filter.query);
+    _catalogDebounceTimer?.cancel();
+    _runCatalogSearch('');
   }
 
   void _onQueryChanged(String query) {
@@ -575,7 +573,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _runCatalogSearch(String query) async {
     final trimmed = query.trim();
     final requestId = ++_catalogRequestId;
-    if (trimmed.length < 2) {
+    // With a category filter active there is nothing to type: the filter
+    // alone is a valid browse request, so don't bail on the empty box.
+    if (trimmed.length < 2 && _filters.categoryGroup == null) {
       setState(() {
         _catalogResults = const [];
         _isCatalogLoading = false;
@@ -671,7 +671,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         setState(() => _filters = draft);
                         Navigator.of(context).pop();
                         final query = _queryController.text.trim();
-                        if (query.length >= 2) {
+                        // Applying a category is itself a browse request,
+                        // so re-run even with an empty search box.
+                        if (query.length >= 2 || draft.categoryGroup != null) {
                           _runCatalogSearch(query);
                         }
                       },

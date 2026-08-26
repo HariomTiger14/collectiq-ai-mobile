@@ -27,7 +27,7 @@ void main() {
   // filter system, so Discover no longer duplicates it. See
   // search_screen.dart for the rationale.
 
-  testWidgets('quick filters fill the query and trigger a catalog search', (
+  testWidgets('quick filters browse their category without typing a query', (
     tester,
   ) async {
     final catalogRepository = _MemoryCatalogSearchRepository([
@@ -56,12 +56,16 @@ void main() {
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Pokemon');
+    // Picking a category browses it -- the search box stays empty and
+    // theirs to use. It used to be filled with a representative term
+    // because the backend refused to return anything without one, which
+    // read as the app typing on the user's behalf.
+    expect(input.controller?.text, '');
 
     // A quick-filter tap is a deliberate action, not a keystroke, so it
     // searches immediately rather than waiting out the typing debounce.
     await tester.pumpAndSettle();
-    expect(catalogRepository.queries, ['Pokemon']);
+    expect(catalogRepository.queries, ['']);
     // The chip must narrow by category, not just seed the search box. Free
     // text alone cannot represent a category: searching the bare word
     // "Pokemon" against the whole catalog returns Pokemon-collab trainers
@@ -113,21 +117,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(catalogRepository.lastSource, 'kicksdb');
 
-      // Clearing the box brings the chip grid back: it only renders while
-      // there is no active query (results take its place otherwise).
-      await tester.enterText(
-        find.byKey(const ValueKey('discover-search-input')),
-        '',
-      );
-      await tester.pumpAndSettle();
+    },
+  );
 
-      // Every other category pins to pricecharting, so KicksDB rows cannot
-      // mix into a filtered view -- without this a Pokemon-filtered search
-      // surfaces Pokemon-collab trainers above the cards.
+  testWidgets(
+    'a non-sneaker chip pins the request to pricecharting, so KicksDB rows '
+    'cannot mix into a filtered view',
+    (tester) async {
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
       await tester.ensureVisible(find.text('LEGO Sets'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('LEGO Sets'));
       await tester.pumpAndSettle();
+
       expect(catalogRepository.lastCategoryGroup, 'lego-sets');
       expect(catalogRepository.lastSource, 'pricecharting');
     },
