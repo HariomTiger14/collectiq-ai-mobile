@@ -42,7 +42,6 @@ import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.d
 import 'package:collectiq_ai/features/subscription/domain/entities/subscription_plan.dart';
 import 'package:collectiq_ai/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -973,17 +972,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return SafeArea(
           child: SingleChildScrollView(
             child: _HelpAndFeedbackSheet(
-              onCopy: (message) async {
-                final navigator = Navigator.of(sheetContext);
-                await Clipboard.setData(ClipboardData(text: message));
-                if (!mounted) {
-                  return;
-                }
-                navigator.pop();
-                _showSettingsSnackBar('Support details copied.');
-              },
-              onEmail: (subject, body) =>
-                  _launchSupportEmail(sheetContext, subject, body),
               onOpenSupportTickets: () {
                 Navigator.of(sheetContext).pop();
                 Navigator.of(context).push(
@@ -997,38 +985,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       },
     );
-  }
-
-  Future<void> _launchSupportEmail(
-    BuildContext sheetContext,
-    String subject,
-    String body,
-  ) async {
-    final navigator = Navigator.of(sheetContext);
-    final query = <String>[
-      'subject=${Uri.encodeComponent(subject)}',
-      if (body.isNotEmpty) 'body=${Uri.encodeComponent(body)}',
-    ].join('&');
-    final uri = Uri.parse(
-      'mailto:${_HelpAndFeedbackSheet._supportEmail}?$query',
-    );
-    var launched = false;
-    try {
-      launched = await launchUrl(uri);
-    } catch (_) {
-      launched = false;
-    }
-    if (!mounted) {
-      return;
-    }
-    navigator.pop();
-    if (!launched) {
-      // Fallback so the user can still reach support without a mail client.
-      await Clipboard.setData(
-        const ClipboardData(text: _HelpAndFeedbackSheet._supportEmail),
-      );
-      _showSettingsSnackBar('No email app found — support address copied.');
-    }
   }
 
   String _maskedEmail(String? email) {
@@ -1877,17 +1833,9 @@ class _SettingsSurface extends StatelessWidget {
 }
 
 class _HelpAndFeedbackSheet extends StatelessWidget {
-  const _HelpAndFeedbackSheet({
-    required this.onCopy,
-    required this.onEmail,
-    required this.onOpenSupportTickets,
-  });
+  const _HelpAndFeedbackSheet({required this.onOpenSupportTickets});
 
-  final Future<void> Function(String message) onCopy;
-  final Future<void> Function(String subject, String body) onEmail;
   final VoidCallback onOpenSupportTickets;
-
-  static const _supportEmail = 'support@packlox.com';
 
   @override
   Widget build(BuildContext context) {
@@ -1920,23 +1868,18 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
               _HelpActionRow(
                 icon: Icons.chat_bubble_outline_rounded,
                 title: 'Contact support',
-                subtitle: 'Open a ticket and chat with the PackLox team.',
+                subtitle:
+                    'Report a scan issue, bug, or question and chat with '
+                    'the PackLox team.',
                 trailing: 'Open',
                 onTap: onOpenSupportTickets,
-              ),
-              _HelpActionRow(
-                icon: Icons.document_scanner_outlined,
-                title: 'Report scan issue',
-                subtitle: 'Opens a ready-to-send scan report email.',
-                trailing: 'Email',
-                onTap: () => onEmail('PackLox scan issue', _scanIssueTemplate),
               ),
               _HelpActionRow(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy note',
                 subtitle: 'Images stay local unless cloud sync is configured.',
                 trailing: 'View',
-                onTap: () => onCopy(_privacyNote),
+                onTap: () => _showPrivacyNoteDialog(context),
               ),
             ],
           ),
@@ -1946,15 +1889,25 @@ class _HelpAndFeedbackSheet extends StatelessWidget {
     );
   }
 
-  static const _scanIssueTemplate = '''
-PackLox scan issue
-
-Item:
-Expected result:
-Actual result:
-Country/region:
-Screenshots or notes:
-''';
+  // The row's trailing label says "View" -- it must actually show the note,
+  // not silently copy it to the clipboard behind a generic "Support details
+  // copied." toast (the real bug found live: tapping it gave no visible
+  // feedback of what happened or what the note even said).
+  void _showPrivacyNoteDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Privacy note'),
+        content: const Text(_privacyNote),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   static const _privacyNote =
       'PackLox keeps images local unless cloud sync is configured. Pricing and AI analysis may use backend services when enabled for the current app environment.';

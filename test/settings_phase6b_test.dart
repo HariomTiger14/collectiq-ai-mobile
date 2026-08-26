@@ -44,13 +44,53 @@ void main() {
 
     expect(find.text('Contact support'), findsOneWidget);
     expect(
-      find.text('Open a ticket and chat with the PackLox team.'),
+      find.text(
+        'Report a scan issue, bug, or question and chat with '
+        'the PackLox team.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Report scan issue'), findsOneWidget);
+    // Consolidated into "Contact support" -- a mailto draft disconnected
+    // from the real ticket system (no admin visibility, no notifications)
+    // was worse than just using the ticket flow that already exists.
+    expect(find.text('Report scan issue'), findsNothing);
     expect(find.text('Privacy note'), findsOneWidget);
     expect(find.text('Help and feedback are coming soon.'), findsNothing);
   });
+
+  testWidgets(
+    'tapping "Privacy note" (labeled "View") actually shows the note, not '
+    'a silent clipboard copy (real bug: it copied the text to the '
+    'clipboard, closed the sheet, and showed an unrelated "Support '
+    'details copied." toast -- no visible way to actually read the note)',
+    (tester) async {
+      await tester.pumpSettings();
+
+      await tester.revealText('Help & Feedback');
+      await tester.tap(find.text('Help & Feedback'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Privacy note'));
+      await tester.pumpAndSettle();
+
+      // The sheet must NOT have closed on a silent copy -- the dialog opens
+      // on top of it instead.
+      expect(find.text('Support details copied.'), findsNothing);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.text(
+          'PackLox keeps images local unless cloud sync is configured. '
+          'Pricing and AI analysis may use backend services when enabled '
+          'for the current app environment.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
 
   testWidgets('profile name can be edited from settings header', (
     tester,

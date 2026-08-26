@@ -99,6 +99,7 @@ class ScanResultEnrichmentService {
             reasonCode: result.pricing.reasonCode,
             valuationStrategy: result.pricing.valuationStrategy,
             attributionText: result.pricing.attributionText,
+            attributionUrl: result.pricing.attributionUrl,
             displayString: result.pricing.displayString,
             originalPrice: result.pricing.originalPrice,
             originalCurrency: result.pricing.originalCurrency,
@@ -137,6 +138,7 @@ class ScanResultEnrichmentService {
       valuationStrategy:
           enriched.valuationStrategy ?? existing.valuationStrategy,
       attributionText: enriched.attributionText ?? existing.attributionText,
+      attributionUrl: enriched.attributionUrl ?? existing.attributionUrl,
       displayString: enriched.displayString ?? existing.displayString,
       originalPrice: enriched.originalPrice ?? existing.originalPrice,
       originalCurrency: enriched.originalCurrency ?? existing.originalCurrency,

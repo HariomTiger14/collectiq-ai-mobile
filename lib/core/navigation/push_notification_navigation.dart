@@ -128,6 +128,7 @@ PushNotificationNavigationIntent? pushNotificationNavigationIntentFromData(
         priceAlertId: _string(data['priceAlertId']),
       );
     case 'support_ticket_reply':
+    case 'support_ticket_resolved':
       final ticketId = _string(data['ticketId']);
       if (ticketId == null || ticketId.isEmpty) {
         return const PushNotificationNavigationIntent.settings();

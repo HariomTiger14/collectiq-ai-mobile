@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
@@ -21,11 +22,47 @@ import 'package:url_launcher/url_launcher.dart';
 
 enum SearchPreviewState { defaultView, active, results, empty }
 
+/// A caught request failure was previously always shown as "Catalog search
+/// is not connected yet." -- indistinguishable from a live production outage
+/// (the backend genuinely raises 503 catalog_search_unavailable when its own
+/// dependencies are down). This gives the user an honest, distinct message
+/// per failure kind instead.
+String _catalogFailureMessage(Object error) {
+  if (error is! NetworkException) {
+    return 'Something went wrong loading search results. Please try again.';
+  }
+  if (error.statusCode != null && error.statusCode! >= 500) {
+    return 'Catalog search is temporarily unavailable. Please try again in a moment.';
+  }
+  switch (error.code) {
+    case 'connectionTimeout':
+    case 'sendTimeout':
+    case 'receiveTimeout':
+    case 'connectionError':
+      return 'Unable to reach the server. Check your internet connection.';
+    default:
+      return 'Something went wrong loading search results. Please try again.';
+  }
+}
+
 /// A category/subcategory filter option: [key] is the value sent to the
 /// backend (matches PRICECHARTING_CATEGORY_GROUPS/
 /// PRICECHARTING_SUBCATEGORY_GROUPS/PRICECHARTING_PLATFORM_GROUPS in
 /// catalog_search_service.py), [label] is the display text.
 typedef CatalogFilterGroup = ({String key, String label});
+
+/// A Discover quick-filter chip. [query] seeds the search box, while
+/// [categoryGroup]/[subcategory] apply the same real filters the Filters
+/// sheet sets -- a chip that only set text would match same-named products
+/// in other categories (a "Pokemon" text search surfaces Pokemon-collab
+/// trainers above the cards). [category] selects the shared icon/art only.
+typedef _CatalogQuickFilter = ({
+  String label,
+  String category,
+  String query,
+  String? categoryGroup,
+  String? subcategory,
+});
 
 /// Top-level categories -- mirrors PRICECHARTING_CATEGORY_GROUPS plus the
 /// video-games key (PRICECHARTING_VIDEO_GAMES_CATEGORY_KEY). Keys must
@@ -73,6 +110,7 @@ const kCatalogTradingCardGamesSubgroups = <CatalogFilterGroup>[
   (key: 'pokemon', label: 'Pokémon'),
   (key: 'yugioh', label: 'Yu-Gi-Oh!'),
   (key: 'lorcana', label: 'Lorcana'),
+  (key: 'onepiece', label: 'One Piece'),
 ];
 
 /// Sneakers has no PriceCharting category_group -- it's an entirely
@@ -273,18 +311,104 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final bottomPadding = GlassBottomNavBar.scrollContentClearance(context);
     final query = _queryController.text.trim();
-    // Only categories with real catalog coverage belong here — a chip that
-    // searches to zero results reads as a broken/missing item, not an empty
-    // category. Sneakers has no catalog data yet, and this specific card
-    // isn't in the catalog, so both were removed (confirmed live against
-    // SIT: both returned zero results while every chip below returns real
-    // matches).
-    final catalogQuickFilters = const [
-      (label: 'Pokemon Cards', category: 'Cards'),
-      (label: 'Magic Cards', category: 'Cards'),
-      (label: 'Comics', category: 'Comics'),
-      (label: 'Coins', category: 'Coins'),
-      (label: 'Video Games', category: 'Video Games'),
+    // Every category Home advertises as supported now has a chip, so
+    // Discover stops under-representing the app. Each carries a real
+    // category filter rather than only seeding the search box: the label
+    // alone is just free text, and free text cannot separate a category
+    // from a same-named product in another one. Verified live against SIT
+    // -- searching the bare word "Sneakers" returns arcade games called
+    // Sneakers, "LEGO" returns LEGO 2K Drive (a racing game), and
+    // "Pokemon"/"One Piece" return Converse and Crocs collab trainers that
+    // outrank the actual cards. With the filter applied each chip returns
+    // its own category.
+    final catalogQuickFilters = const <_CatalogQuickFilter>[
+      (
+        label: 'Pokemon Cards',
+        category: 'Cards',
+        query: 'Pokemon',
+        categoryGroup: 'trading-card-games',
+        subcategory: 'pokemon',
+      ),
+      (
+        label: 'Magic Cards',
+        category: 'Cards',
+        query: 'Magic',
+        categoryGroup: 'trading-card-games',
+        subcategory: 'magic',
+      ),
+      (
+        label: 'Yu-Gi-Oh! Cards',
+        category: 'Cards',
+        query: 'Yu-Gi-Oh',
+        categoryGroup: 'trading-card-games',
+        subcategory: 'yugioh',
+      ),
+      (
+        label: 'Lorcana Cards',
+        category: 'Cards',
+        query: 'Lorcana',
+        categoryGroup: 'trading-card-games',
+        subcategory: 'lorcana',
+      ),
+      // Needs its own subcategory: the bare query "One Piece" matches a
+      // GameBoy platformer, PS3 beat'em-ups and the comic run before any
+      // card, and "Luffy" fuzzy-matches "Fluffy Berry" Pokemon cards.
+      (
+        label: 'One Piece Cards',
+        category: 'Cards',
+        query: 'One Piece Card',
+        categoryGroup: 'trading-card-games',
+        subcategory: 'onepiece',
+      ),
+      (
+        label: 'Sports Cards',
+        category: 'Sports Cards',
+        query: 'Sports Cards',
+        categoryGroup: 'sports-cards',
+        subcategory: null,
+      ),
+      (
+        label: 'Comics',
+        category: 'Comics',
+        query: 'Comics',
+        categoryGroup: 'comics',
+        subcategory: null,
+      ),
+      (
+        label: 'Coins',
+        category: 'Coins',
+        query: 'Coins',
+        categoryGroup: 'coins',
+        subcategory: null,
+      ),
+      (
+        label: 'Video Games',
+        category: 'Video Games',
+        query: 'Video Games',
+        categoryGroup: 'video-games',
+        subcategory: null,
+      ),
+      (
+        label: 'LEGO Sets',
+        category: 'LEGO',
+        query: 'LEGO',
+        categoryGroup: 'lego-sets',
+        subcategory: null,
+      ),
+      (
+        label: 'Funko Pops',
+        category: 'Funko',
+        query: 'Funko',
+        categoryGroup: 'funko-pops',
+        subcategory: null,
+      ),
+      (
+        label: 'Sneakers',
+        category: 'Sneakers',
+        query: 'Sneakers',
+        categoryGroup: kSneakersCategoryKey,
+        subcategory: null,
+      ),
     ];
     final hasQuery = query.isNotEmpty;
     final isCatalogReady = query.length >= 2;
@@ -351,7 +475,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             const SizedBox(height: 10),
                             _QuickFilterChips(
                               filters: catalogQuickFilters,
-                              onSelected: _setQuery,
+                              onSelected: _applyQuickFilter,
                             ),
                           ] else if (_isCatalogLoading)
                             const _CatalogLoadingState()
@@ -400,6 +524,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _catalogDebounceTimer?.cancel();
     setState(() {});
     _runCatalogSearch(query);
+  }
+
+  /// Applies a quick-filter chip: its query *and* its category filter.
+  ///
+  /// Setting only the query would leave the search unscoped, which is not
+  /// good enough to represent a category -- the backend's own catalog spans
+  /// cards, games, comics and sneakers, so a bare "LEGO" matches a LEGO
+  /// video game and a bare "Pokemon" matches Pokemon-collab trainers. The
+  /// filter is what makes a chip mean its category rather than its wording.
+  void _applyQuickFilter(_CatalogQuickFilter filter) {
+    setState(() {
+      _filters = _CatalogFilterSelection(
+        categoryGroup: filter.categoryGroup,
+        subcategory: filter.subcategory,
+        minPrice: _filters.minPrice,
+        maxPrice: _filters.maxPrice,
+      );
+    });
+    _setQuery(filter.query);
   }
 
   void _onQueryChanged(String query) {
@@ -457,7 +600,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() {
         _catalogResults = const [];
         _isCatalogLoading = false;
-        _catalogError = 'Catalog search is not connected yet.';
+        _catalogError = _catalogFailureMessage(error);
       });
     }
   }
@@ -954,8 +1097,8 @@ class _CatalogEmptyState extends StatelessWidget {
 class _QuickFilterChips extends StatelessWidget {
   const _QuickFilterChips({required this.filters, required this.onSelected});
 
-  final List<({String label, String category})> filters;
-  final ValueChanged<String> onSelected;
+  final List<_CatalogQuickFilter> filters;
+  final ValueChanged<_CatalogQuickFilter> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -969,7 +1112,7 @@ class _QuickFilterChips extends StatelessWidget {
             key: ValueKey('discover-quick-filter-$index'),
             label: filters[index].label,
             category: filters[index].category,
-            onTap: () => onSelected(filters[index].label),
+            onTap: () => onSelected(filters[index]),
           ),
       ],
     );
@@ -1886,6 +2029,17 @@ class _CatalogResultDetailPageState
         setState(() => _isSaving = false);
         return;
       }
+      if (_result.history.isNotEmpty) {
+        // Seed the chart from PriceCharting's own catalog history -- already
+        // fetched to show on this very screen, so no server round-trip and
+        // no dependency on the item ever cloud-syncing.
+        await ref
+            .read(valuationSnapshotRepositoryProvider)
+            .recordCatalogHistory(item.id, _result.history);
+      }
+      if (!mounted) {
+        return;
+      }
       final savedItem = ref
           .read(portfolioControllerProvider)
           .items
@@ -1939,13 +2093,13 @@ class _CatalogResultDetailPageState
         _isLoadingDetail = false;
         _detailError = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _isLoadingDetail = false;
-        _detailError = 'History unavailable';
+        _detailError = _catalogFailureMessage(error);
       });
     }
   }
@@ -3646,6 +3800,7 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
     reasonCode: value > 0 ? 'CATALOG_SEARCH_MATCH' : 'CATALOG_NO_PRICE',
     valuationStrategy: 'catalog_lookup',
     attributionText: attribution,
+    attributionUrl: result.productUrl,
     displayString: value > 0 ? _formatCatalogValue(result) : null,
   );
   return CollectibleItem(

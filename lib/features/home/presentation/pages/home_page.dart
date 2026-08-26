@@ -295,7 +295,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         .items
         .where((candidate) => candidate.id == mover.itemId);
     if (matches.isNotEmpty) {
-      _openCollectibleDetail(context, matches.first);
+      _openCollectibleDetail(context, ref, matches.first);
     }
   }
 
@@ -357,26 +357,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         data: AppTheme.dark,
         child: Scaffold(
           backgroundColor: HomeTokens.background,
-          floatingActionButton: widget.onScanPressed == null
-              ? null
-              : Padding(
-                  padding: EdgeInsets.only(
-                    bottom: GlassBottomNavBar.bodyContentInset(context),
-                  ),
-                  child: FloatingActionButton(
-                    key: const ValueKey('home-floating-scan-button'),
-                    heroTag: 'home-floating-scan',
-                    tooltip: 'Add item',
-                    onPressed: _handleScanPressed,
-                    backgroundColor: HomeTokens.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: const Icon(Icons.photo_camera_outlined),
-                  ),
-                ),
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          // No floating scan button here -- it duplicated the bottom nav
+          // bar's own always-visible Scan tab (same _startNewScan action,
+          // no extra context), and it visually overlapped the Movers/
+          // Recent items card. The in-content "Scan" CTAs below (empty/
+          // loading/error states) stay -- those are real, non-redundant
+          // calls to action, not a floating duplicate.
           body: SafeArea(
             bottom: false,
             child: HomeStateContainer(
@@ -1070,7 +1056,7 @@ class _CategoryExplorer extends StatelessWidget {
   }
 }
 
-class _RecentItemsPreview extends StatelessWidget {
+class _RecentItemsPreview extends ConsumerWidget {
   const _RecentItemsPreview({
     required this.data,
     this.onOpenPortfolio,
@@ -1082,7 +1068,7 @@ class _RecentItemsPreview extends StatelessWidget {
   final VoidCallback? onScanPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final recentItems = data.recentItems.take(3).toList(growable: false);
     return HomeSectionSurface(
       keySeed: 'recent-items-preview',
@@ -1115,8 +1101,11 @@ class _RecentItemsPreview extends StatelessWidget {
                     valueUnavailable: !_hasDisplayValue(recentItems[index]),
                     condition: recentItems[index].condition,
                     addedLabel: _relativeAddedLabel(recentItems[index]),
-                    onTap: () =>
-                        _openCollectibleDetail(context, recentItems[index]),
+                    onTap: () => _openCollectibleDetail(
+                      context,
+                      ref,
+                      recentItems[index],
+                    ),
                   ),
                 ],
               ],
@@ -2082,10 +2071,22 @@ List<TrendSnapshot> _pointsForPeriod(
   return filtered.length >= 2 ? filtered : series;
 }
 
-void _openCollectibleDetail(BuildContext context, CollectibleItem item) {
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute(builder: (_) => CollectibleDetailPage(item: item)));
+void _openCollectibleDetail(
+  BuildContext context,
+  WidgetRef ref,
+  CollectibleItem item,
+) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => CollectibleDetailPage(
+        item: item,
+        onDelete: (itemId) async {
+          await ref.read(portfolioControllerProvider.notifier).removeItem(itemId);
+          return true;
+        },
+      ),
+    ),
+  );
 }
 
 bool _hasDisplayValue(CollectibleItem item) {

@@ -472,9 +472,12 @@ void main() {
       await tester.pump();
 
       expect(scanTaps, 1);
+      // The floating scan button was removed -- it duplicated the bottom
+      // nav bar's own always-visible Scan tab with no extra context, and
+      // visually overlapped the Movers/Recent items card.
       expect(
         find.byKey(const ValueKey('home-floating-scan-button')),
-        findsOneWidget,
+        findsNothing,
       );
 
       await _scrollUntilVisible(

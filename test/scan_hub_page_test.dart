@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
@@ -297,7 +298,7 @@ class _TrackingGalleryService extends GalleryService {
   int pickCount = 0;
 
   @override
-  Future<XFile?> pickImage() async {
+  Future<XFile?> pickImage({ImageSource source = ImageSource.gallery}) async {
     pickCount += 1;
     return null;
   }

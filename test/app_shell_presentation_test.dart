@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:collectiq_ai/core/navigation/app_shell.dart';
@@ -13,12 +14,15 @@ import 'package:collectiq_ai/features/auth/domain/repositories/auth_repository.d
 import 'package:collectiq_ai/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:collectiq_ai/features/onboarding/domain/repositories/onboarding_repository.dart';
 import 'package:collectiq_ai/features/onboarding/presentation/controllers/onboarding_controller.dart';
+import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/controllers/scanner_controller.dart';
+import 'package:collectiq_ai/features/wishlist/presentation/controllers/wishlist_providers.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('default shell destination remains Home', (tester) async {
@@ -318,6 +322,90 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'signing out wipes local user data so the next account on this device '
+    'starts clean (real bug: SharedPreferences keys were not namespaced by '
+    'user id, so a second sign-up on a shared device would silently inherit '
+    'the previous account\'s portfolio/wishlist/alerts/profile/subscription '
+    'state)',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'portfolio_items': jsonEncode([
+          {
+            'id': 'user-a-item',
+            'title': 'User A Charizard',
+            'category': 'Trading Card',
+            'estimatedValue': 250.0,
+            'confidence': 0.9,
+            'condition': 'Near Mint',
+            'recommendation': 'Keep tracking.',
+            'imagePath': 'sample://user-a-item',
+            'createdAt': DateTime.now().toIso8601String(),
+            'valuationStatus': 'market_estimated',
+          },
+        ]),
+        'wishlist_status_entries': jsonEncode([
+          {
+            'itemId': 'user-a-item',
+            'status': 'wanted',
+            'updatedAt': DateTime.now().toIso8601String(),
+          },
+        ]),
+        'packlox.profile.display_name': 'User A',
+        'packlox.profile.preferred_currency': 'EUR',
+        'subscription_active_plan': 'pro',
+        'subscription_scans_used_month': 9,
+      });
+
+      await tester.pumpShell();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(AppShell)),
+      );
+
+      // User A is signed in (the shell test harness auto-signs-in) and their
+      // locally-cached data is loaded.
+      expect(container.read(authControllerProvider).isSignedIn, isTrue);
+      await container.read(portfolioControllerProvider.notifier).loadItems();
+      expect(container.read(portfolioControllerProvider).items, hasLength(1));
+
+      // User A signs out.
+      await container.read(authControllerProvider.notifier).signOut();
+      // Not pumpAndSettle: an unrelated background FX-rate retry loop never
+      // quiesces in this harness. One frame is enough to flush the
+      // post-frame-scheduled cache clear and provider invalidation.
+      await tester.pump();
+
+      expect(container.read(authControllerProvider).isSignedIn, isFalse);
+
+      final preferences = await SharedPreferences.getInstance();
+      for (final key in [
+        'portfolio_items',
+        'wishlist_status_entries',
+        'packlox.profile.display_name',
+        'packlox.profile.preferred_currency',
+        'subscription_active_plan',
+        'subscription_scans_used_month',
+      ]) {
+        expect(
+          preferences.containsKey(key),
+          isFalse,
+          reason: '"$key" should be cleared on sign-out',
+        );
+      }
+
+      // A brand-new account on this device must not see User A's data.
+      final freshPortfolio = await container
+          .read(portfolioRepositoryProvider)
+          .getItems();
+      expect(freshPortfolio, isEmpty);
+      final freshWishlist = await container.read(
+        wishlistRepositoryProvider,
+      ).getEntries();
+      expect(freshWishlist, isEmpty);
+    },
+  );
 }
 
 extension _ShellPump on WidgetTester {

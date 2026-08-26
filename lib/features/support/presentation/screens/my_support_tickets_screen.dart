@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:collectiq_ai/features/support/data/repositories/support_ticket_repository.dart';
 import 'package:collectiq_ai/features/support/presentation/screens/new_support_ticket_screen.dart';
-import 'package:collectiq_ai/features/support/presentation/screens/support_ticket_thread_screen.dart';
+import 'package:collectiq_ai/features/support/presentation/screens/support_ticket_thread_screen.dart'
+    show SupportTicketThreadScreen, formatMessageTimestamp;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -95,49 +96,89 @@ class _MySupportTicketsScreenState
                 ],
               );
             }
-            return ListView.separated(
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: tickets.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ticket = tickets[index];
                 final status = (ticket['status'] as String?) ?? 'open';
                 final unread = ticket['unreadByUser'] == true;
-                return ListTile(
-                  leading: Icon(
-                    status == 'resolved'
-                        ? Icons.check_circle_outline
-                        : Icons.chat_bubble_outline,
-                    color: status == 'resolved'
-                        ? Colors.green
-                        : colorScheme.primary,
+                // "Updated" reflects the most recent activity on the ticket
+                // (e.g. a new admin reply) -- more useful to scan than the
+                // creation date, which never changes once the ticket is old.
+                final date = formatMessageTimestamp(
+                  (ticket['updatedAt'] as String?) ??
+                      (ticket['createdAt'] as String?),
+                );
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  color: unread
+                      ? colorScheme.primaryContainer.withValues(alpha: .55)
+                      : colorScheme.surfaceContainerHighest,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: unread
+                        ? BorderSide(
+                            color: colorScheme.primary.withValues(alpha: .4),
+                          )
+                        : BorderSide.none,
                   ),
-                  title: Text(
-                    (ticket['subject'] as String?) ?? 'Support ticket',
-                    style: TextStyle(
-                      fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  ),
-                  subtitle: Text(_categoryLabel(ticket['category'] as String?)),
-                  trailing: unread
-                      ? Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        )
-                      : null,
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SupportTicketThreadScreen(
-                          ticketId: ticket['id'] as String,
-                        ),
+                    leading: Icon(
+                      status == 'resolved'
+                          ? Icons.check_circle_outline
+                          : Icons.chat_bubble_outline,
+                      color: status == 'resolved'
+                          ? Colors.green
+                          : colorScheme.primary,
+                    ),
+                    title: Text(
+                      (ticket['subject'] as String?) ?? 'Support ticket',
+                      style: TextStyle(
+                        fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
                       ),
-                    );
-                    unawaited(_refresh());
-                  },
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_categoryLabel(ticket['category'] as String?)),
+                        if (date != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Updated $date',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    trailing: unread
+                        ? Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          )
+                        : null,
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => SupportTicketThreadScreen(
+                            ticketId: ticket['id'] as String,
+                          ),
+                        ),
+                      );
+                      unawaited(_refresh());
+                    },
+                  ),
                 );
               },
             );

@@ -177,8 +177,10 @@ class SupabaseAuthResponseNormalizer {
       SupabaseAuthNormalizedStatus.passwordUpdated => 'Password updated.',
       SupabaseAuthNormalizedStatus.emailNotConfirmed =>
         'Please confirm your email before signing in.',
+      // Deliberately identical to invalidCredentials: revealing that an
+      // email isn't registered lets an attacker enumerate real accounts.
       SupabaseAuthNormalizedStatus.emailNotRegistered =>
-        'Please sign up first.',
+        'Invalid email or password.',
       SupabaseAuthNormalizedStatus.invalidCredentials =>
         'Invalid email or password.',
       SupabaseAuthNormalizedStatus.alreadyRegistered =>

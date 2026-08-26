@@ -43,6 +43,7 @@ class PricingInfo {
     this.reasonCode,
     this.valuationStrategy,
     this.attributionText,
+    this.attributionUrl,
     this.displayString,
     this.originalPrice,
     this.originalCurrency,
@@ -69,6 +70,7 @@ class PricingInfo {
   final String? reasonCode;
   final String? valuationStrategy;
   final String? attributionText;
+  final String? attributionUrl;
   final String? displayString;
   final double? originalPrice;
   final String? originalCurrency;
@@ -108,6 +110,7 @@ class PricingInfo {
       reasonCode: _emptyStringAsNull(json['reasonCode']),
       valuationStrategy: _emptyStringAsNull(json['valuationStrategy']),
       attributionText: _emptyStringAsNull(json['attributionText']),
+      attributionUrl: _emptyStringAsNull(json['attributionUrl']),
       displayString: _emptyStringAsNull(json['displayString']),
       originalPrice: parseNullableDouble(json['originalPrice']),
       originalCurrency: _emptyStringAsNull(json['originalCurrency']),
@@ -161,6 +164,7 @@ class PricingInfo {
       'reasonCode': reasonCode,
       'valuationStrategy': valuationStrategy,
       'attributionText': attributionText,
+      'attributionUrl': attributionUrl,
       'displayString': displayString,
       'originalPrice': originalPrice,
       'originalCurrency': originalCurrency,

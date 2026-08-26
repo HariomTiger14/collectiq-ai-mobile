@@ -164,12 +164,40 @@ class _SupportTicketThreadScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isAdmin
-                      ? ((message['senderLabel'] as String?) ??
-                            'PackLox Support')
-                      : 'You',
-                  style: Theme.of(context).textTheme.labelSmall,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isAdmin
+                          ? adminDisplayName(
+                              message['senderLabel'] as String?,
+                            )
+                          : 'You',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    Builder(
+                      builder: (context) {
+                        final timestamp = formatMessageTimestamp(
+                          message['createdAt'] as String?,
+                        );
+                        if (timestamp == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Text(
+                            timestamp,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text((message['body'] as String?) ?? ''),
@@ -284,4 +312,63 @@ class _SupportTicketThreadScreenState
       ),
     );
   }
+}
+
+/// The backend's admin-reply endpoint authenticates with a single shared
+/// admin token, not a per-person login, so it has no real identity to
+/// attribute a reply to -- it stores the literal internal placeholder
+/// "admin_token" as the sender label. Real bug found live: that internal
+/// string leaked straight into the chat UI as if it were the replier's
+/// name. Treat it (and a missing label) the same way: show the brand name
+/// instead of either a null field or an implementation detail.
+String adminDisplayName(String? senderLabel) {
+  final label = senderLabel?.trim() ?? '';
+  if (label.isEmpty || label == 'admin_token') {
+    return 'PackLox Support';
+  }
+  return label;
+}
+
+const _monthAbbreviations = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+/// Formats a message's ISO-8601 `createdAt` for display: just the time for
+/// a message from today, "Yesterday" + time for yesterday, otherwise the
+/// date and time -- no external `intl` dependency needed.
+String? formatMessageTimestamp(String? iso) {
+  if (iso == null || iso.isEmpty) {
+    return null;
+  }
+  final parsed = DateTime.tryParse(iso);
+  if (parsed == null) {
+    return null;
+  }
+  final local = parsed.toLocal();
+  final now = DateTime.now();
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final period = local.hour < 12 ? 'AM' : 'PM';
+  final time = '$hour12:${_twoDigits(local.minute)} $period';
+
+  final isSameDay =
+      local.year == now.year &&
+      local.month == now.month &&
+      local.day == now.day;
+  if (isSameDay) {
+    return time;
+  }
+
+  final yesterday = now.subtract(const Duration(days: 1));
+  final isYesterday =
+      local.year == yesterday.year &&
+      local.month == yesterday.month &&
+      local.day == yesterday.day;
+  if (isYesterday) {
+    return 'Yesterday, $time';
+  }
+
+  return '${_monthAbbreviations[local.month - 1]} ${local.day}, $time';
 }

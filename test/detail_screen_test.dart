@@ -328,12 +328,48 @@ void main() {
       find.byKey(const ValueKey('collectible-detail-photo-evidence-prompt')),
       findsOneWidget,
     );
+    expect(find.textContaining('saved from catalog search'), findsOneWidget);
+    // With no real photo yet, this callout owns the add action and the
+    // Image Gallery is hidden -- otherwise the screen showed two buttons
+    // calling the same callback, and a gallery header counting the bundled
+    // placeholder asset as "1 image".
     expect(
       find.byKey(const ValueKey('collectible-detail-add-photo-action')),
       findsOneWidget,
     );
-    expect(find.textContaining('saved from catalog search'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('collectible-detail-gallery-add-photo-action'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Image Gallery'), findsNothing);
   });
+
+  testWidgets(
+    'once a real photo exists the gallery takes over and the placeholder '
+    'prompt disappears, so only one add-photo control is ever shown',
+    (tester) async {
+      await _pumpDetail(tester, _authorityItem());
+
+      await _revealText(tester, 'Image Gallery');
+
+      expect(
+        find.byKey(
+          const ValueKey('collectible-detail-gallery-add-photo-action'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-photo-evidence-prompt')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('collectible-detail-add-photo-action')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('adding a portfolio photo preserves existing gallery images', (
     tester,
@@ -361,6 +397,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Adding a photo now asks camera-or-library first.
+    await tester.tap(find.byKey(const ValueKey('detail-photo-source-library')));
+    await tester.pumpAndSettle();
+    expect(galleryService.lastRequestedSource, ImageSource.gallery);
+
     final updated = repository.items.single;
     expect(updated.imagePath, '/persisted/new-front.jpg');
     expect(updated.galleryImages, hasLength(3));
@@ -378,6 +419,112 @@ void main() {
     );
     expect(find.text('Photo added to portfolio item'), findsOneWidget);
   });
+
+  testWidgets(
+    'adding a photo can shoot a new one instead of only picking from the '
+    'library, since the collectible is usually in hand',
+    (tester) async {
+      final item = _authorityItem();
+      final galleryService = _FakeGalleryService(
+        pickedImage: XFile('/source/shot.jpg', name: 'shot.jpg'),
+        persistedImage: XFile('/persisted/shot.jpg', name: 'shot.jpg'),
+      );
+
+      await _pumpDetail(
+        tester,
+        item,
+        portfolioRepository: _MemoryPortfolioRepository([item]),
+        galleryService: galleryService,
+        syncQueueRepository: _RecordingSyncQueueRepository(),
+        planLimits: _premiumPlanLimits,
+      );
+
+      await _revealText(tester, 'Image Gallery');
+      await tester.tap(
+        find.byKey(
+          const ValueKey('collectible-detail-gallery-add-photo-action'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('detail-photo-source-camera')));
+      await tester.pumpAndSettle();
+
+      expect(galleryService.lastRequestedSource, ImageSource.camera);
+    },
+  );
+
+  testWidgets(
+    'a superseded scan estimate is neither charted nor used as the baseline, '
+    'and a drifted displayString is ignored in favour of the real value',
+    (tester) async {
+      // The real Raichu record that exposed this. The scan matched a video
+      // game (its comps were "Box Only"/"Manual Only" tiers) and priced the
+      // card at $62; catalog repricing later corrected it to $1.84 but left
+      // valueAtScan and displayString behind. The screen then charted a $62
+      // spike on the item's createdAt and reported a -97% crash that never
+      // happened.
+      final item = _authorityItem().copyWith(
+        title: 'Raichu',
+        valueAtScan: 62.0,
+        lastValueRefreshedAt: DateTime.utc(2026, 8, 24, 16),
+        pricing: PricingInfo(
+          estimatedMarketValue: 1.8392,
+          lowEstimate: 1.8392,
+          highEstimate: 17.92,
+          currency: 'AUD',
+          pricingSource: 'PriceCharting',
+          pricingConfidence: 0.96,
+          lastUpdated: DateTime.utc(2026, 8, 24, 16),
+          valuationStatus: ValuationStatus.marketEstimated,
+          valuationSource: 'PriceCharting',
+          displayString: '\$62.00 AUD',
+          originalPrice: 41.0,
+          originalCurrency: 'USD',
+          exchangeRateUsed: 1.52,
+        ),
+      );
+      final valuationSnapshots = _RecordingValuationSnapshotRepository();
+      for (final entry in [
+        (DateTime.utc(2026, 7, 26), 1.88),
+        (DateTime.utc(2026, 8, 11), 1.50),
+        (DateTime.utc(2026, 8, 24, 16), 1.84),
+      ]) {
+        valuationSnapshots.snapshots.add(
+          PortfolioValuationSnapshot(
+            id: '${item.id}-${entry.$1.toIso8601String()}',
+            portfolioItemId: item.id,
+            valueAud: entry.$2,
+            valuationStatus: ValuationStatus.marketEstimated,
+            pricingProvider: 'PriceCharting',
+            pricedAt: entry.$1,
+            currency: 'AUD',
+          ),
+        );
+      }
+
+      await _pumpDetail(
+        tester,
+        item,
+        valuationSnapshotRepository: valuationSnapshots,
+      );
+      await _revealText(tester, 'Value History');
+
+      // The oldest *tracked* price is the baseline, not the scan estimate,
+      // and it is labelled honestly.
+      expect(find.text('Oldest'), findsOneWidget);
+      expect(find.text('At scan'), findsNothing);
+      // The $62 figure must not appear anywhere: not as a baseline, not as
+      // the headline value via the stale displayString.
+      expect(find.textContaining('62'), findsNothing);
+
+      final points = valueHistoryPointsForTesting(
+        item,
+        valuationSnapshots.snapshots,
+      );
+      expect(points.any((value) => value > 50), isFalse);
+      expect(points.first, closeTo(1.88, 0.001));
+    },
+  );
 
   testWidgets('unavailable refresh keeps saved valuation evidence', (
     tester,
@@ -610,7 +757,81 @@ void main() {
     expect(find.text('Pricing data by PriceCharting'), findsWidgets);
     expect(find.text('Strategy'), findsOneWidget);
     expect(find.text('Catalog Lookup'), findsOneWidget);
+    // A real attributionUrl is present on this item's pricing -- both the
+    // standalone attribution line and the "Attribution" evidence row must
+    // render as tappable links, not plain text, per PriceCharting's
+    // attribution requirements.
+    expect(
+      find.byKey(const ValueKey('detail-attribution-link')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('detail-attribution-row-link')),
+      findsOneWidget,
+    );
   });
+
+  testWidgets(
+    'attribution renders as plain text (not a link) when no attributionUrl is available',
+    (tester) async {
+      final item = _authorityItem().copyWith(
+        pricing: const PricingInfo(
+          estimatedMarketValue: 245,
+          lowEstimate: 220,
+          highEstimate: 270,
+          currency: 'USD',
+          pricingSource: 'Saved provider',
+          pricingConfidence: 0.82,
+          lastUpdated: null,
+          attributionText: 'Pricing data by Saved provider',
+        ),
+      );
+      await _pumpDetail(tester, item);
+
+      expect(find.text('Pricing data by Saved provider'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('detail-attribution-link')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('detail-attribution-row-link')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'opening detail for a catalog-matched item with no history yet '
+    'lazily backfills it from the catalog, once',
+    (tester) async {
+      final item = _catalogSnapshotItem();
+      final apiClient = _CatalogDetailApiClient();
+
+      await _pumpDetail(tester, item, apiClient: apiClient);
+
+      expect(apiClient.requestCount, 1);
+      final snapshots = await const SharedPreferencesValuationSnapshotRepository()
+          .getSnapshots(item.id);
+      expect(snapshots, hasLength(2));
+      expect(snapshots.first.valueAud, 150);
+      expect(snapshots.last.valueAud, 161);
+
+      // Re-opening the same (now-backfilled) item must not re-fetch.
+      await _pumpDetail(tester, item, apiClient: apiClient);
+      expect(apiClient.requestCount, 1);
+    },
+  );
+
+  testWidgets(
+    'does not attempt a catalog backfill for an item with no catalog id',
+    (tester) async {
+      final apiClient = _CatalogDetailApiClient();
+
+      await _pumpDetail(tester, _authorityItem(), apiClient: apiClient);
+
+      expect(apiClient.requestCount, 0);
+    },
+  );
 
   testWidgets('QA capture exposes Portfolio Detail visual states', (
     tester,
@@ -1159,8 +1380,13 @@ class _FakeGalleryService extends GalleryService {
   final XFile pickedImage;
   final XFile persistedImage;
 
+  ImageSource? lastRequestedSource;
+
   @override
-  Future<XFile?> pickImage() async => pickedImage;
+  Future<XFile?> pickImage({ImageSource source = ImageSource.gallery}) async {
+    lastRequestedSource = source;
+    return pickedImage;
+  }
 
   @override
   Future<bool> validateImage(XFile image) async => true;
@@ -1255,6 +1481,45 @@ class _SuccessfulRepriceApiClient extends ApiClient {
           'comparableSales': const [],
           'diagnostics': const {},
         },
+      },
+    );
+  }
+}
+
+class _CatalogDetailApiClient extends ApiClient {
+  _CatalogDetailApiClient()
+    : super(
+        config: const EnvironmentConfig(
+          environment: AppEnvironment.development,
+        ),
+      );
+
+  var requestCount = 0;
+
+  @override
+  Future<dio.Response<dynamic>> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    requestCount++;
+    return dio.Response<dynamic>(
+      requestOptions: dio.RequestOptions(path: path),
+      data: {
+        'history': [
+          {
+            'validFrom': '2026-07-19T00:00:00Z',
+            'currency': 'USD',
+            'marketValue': 150,
+          },
+          {
+            'validFrom': '2026-07-26T00:00:00Z',
+            'isCurrent': true,
+            'currency': 'USD',
+            'marketValue': 161,
+            'lowEstimate': 150,
+            'highEstimate': 800,
+          },
+        ],
       },
     );
   }
@@ -1366,7 +1631,12 @@ CollectibleItem _authorityItem({
       lastUpdated: null,
     ),
     valueAtScan: 200,
-    lastValueRefreshedAt: DateTime(2026, 7, 26),
+    // Relative, not a pinned calendar date: the detail screen treats pricing
+    // older than 30 days as stale, so a hardcoded date silently turns this
+    // shared fixture stale once the wall clock passes it -- which is exactly
+    // what happened, flipping "Evidence looks healthy" to a staleness
+    // callout and breaking otherwise-unrelated tests on a specific day.
+    lastValueRefreshedAt: DateTime.now().subtract(const Duration(days: 5)),
   );
 }
 
@@ -1398,6 +1668,7 @@ CollectibleItem _catalogSnapshotItem() {
       reasonCode: 'CATALOG_SEARCH_MATCH',
       valuationStrategy: 'catalog_lookup',
       attributionText: 'Pricing data by PriceCharting',
+      attributionUrl: 'https://www.pricecharting.com/offers?product=3666974',
       displayString: 'USD \$161',
     ),
     valueAtScan: 161,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -86,6 +87,49 @@ class SharedPreferencesValuationSnapshotRepository {
 
     await recordSnapshot(item);
     return true;
+  }
+
+  /// Seeds an item's value-history chart from PriceCharting's own catalog
+  /// price history at the moment it's saved from Discover search --
+  /// [history] is the same data already fetched and shown on the catalog
+  /// result's own detail screen (real, dated PriceCharting versions, not
+  /// fabricated), so this needs no server round-trip and works even for an
+  /// item that never successfully cloud-syncs.
+  Future<void> recordCatalogHistory(
+    String itemId,
+    List<CatalogPriceHistoryPoint> history,
+  ) async {
+    final priced = history.where(
+      (point) => point.marketValue != null && point.marketValue! > 0,
+    );
+    if (priced.isEmpty) {
+      return;
+    }
+    final byId = <String, PortfolioValuationSnapshot>{
+      for (final existing in await getAllSnapshots()) existing.id: existing,
+    };
+    for (final point in priced) {
+      final snapshot = PortfolioValuationSnapshot(
+        id: '$itemId-${point.validFrom.toIso8601String()}',
+        portfolioItemId: itemId,
+        valueAud: point.marketValue,
+        lowEstimateAud: point.lowEstimate,
+        highEstimateAud: point.highEstimate,
+        displayString: _snapshotDisplay(point.marketValue!, point.currency),
+        valuationStatus: ValuationStatus.marketEstimated,
+        pricingProvider: 'PriceCharting',
+        pricedAt: point.validFrom,
+        currency: point.currency,
+      );
+      byId[snapshot.id] = snapshot;
+    }
+    final merged = byId.values.toList()
+      ..sort((left, right) => left.pricedAt.compareTo(right.pricedAt));
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setStringList(
+      _key,
+      [for (final row in merged) jsonEncode(_jsonForSnapshot(row))],
+    );
   }
 }
 

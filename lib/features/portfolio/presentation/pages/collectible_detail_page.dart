@@ -21,6 +21,8 @@ import 'package:collectiq_ai/features/price_alerts/presentation/controllers/pric
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/image_enhancement_preset.dart';
+import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
+import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/features/scanner/presentation/pages/image_enhancement_preview_page.dart';
 import 'package:collectiq_ai/features/scanner/services/scan_pricing_quote_service.dart';
 import 'package:collectiq_ai/features/scanner/services/scanner_providers.dart';
@@ -37,7 +39,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final _portfolioValuationSnapshotsProvider =
     FutureProvider.family<List<PortfolioValuationSnapshot>, String>((
@@ -135,6 +139,56 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
           item: widget.item,
         );
       });
+    }
+    unawaited(_backfillCatalogHistoryIfNeeded());
+  }
+
+  /// Self-healing lazy backfill: an item saved from Discover search before
+  /// this feature existed (or one whose history-seed at save time failed)
+  /// has a known catalog id but zero valuation snapshots. Rather than a
+  /// one-time migration script, just check for that gap every time the
+  /// detail screen opens -- cheap (no-op once real snapshots exist) and
+  /// fixes every already-saved item in this state, not just new ones.
+  Future<void> _backfillCatalogHistoryIfNeeded() async {
+    final catalogId = _catalogIdFromNotes(widget.item.notes);
+    if (catalogId == null) {
+      return;
+    }
+    // Bounded end to end: this runs unawaited from initState, so nothing
+    // downstream is blocked by it -- but a slow/hanging network dependency
+    // must never leave it running indefinitely in the background either.
+    try {
+      final existing = await ref
+          .read(_portfolioValuationSnapshotsProvider(widget.item.id).future)
+          .timeout(const Duration(seconds: 10));
+      if (existing.isNotEmpty || !mounted) {
+        return;
+      }
+      final detail = await ref
+          .read(catalogSearchRepositoryProvider)
+          .getCatalogDetail(
+            result: CatalogSearchResult(
+              id: catalogId,
+              title: widget.item.title,
+              category: widget.item.category,
+              source: widget.item.pricing?.pricingSource ?? 'PriceCharting',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (detail.history.isEmpty || !mounted) {
+        return;
+      }
+      await ref
+          .read(valuationSnapshotRepositoryProvider)
+          .recordCatalogHistory(widget.item.id, detail.history);
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(_portfolioValuationSnapshotsProvider(widget.item.id));
+    } on Object catch (_) {
+      // Best-effort: the chart just stays empty, same as today, if the
+      // catalog lookup fails or times out (offline, id no longer valid,
+      // slow connection, etc.).
     }
   }
 
@@ -447,6 +501,52 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
     return updatedImage;
   }
 
+  /// Asks whether to shoot a new photo or pick an existing one.
+  ///
+  /// The collectible is normally in the user's hand, so jumping straight to
+  /// the photo library (the old behaviour) forced a detour through the system
+  /// Camera app and back. Returns null if the sheet is dismissed.
+  Future<ImageSource?> _askPhotoSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: PackLoxTokens.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+              ListTile(
+                key: const ValueKey('detail-photo-source-camera'),
+                leading: const Icon(
+                  Icons.photo_camera_outlined,
+                  color: PackLoxTokens.textPrimary,
+                ),
+                title: const Text('Take photo'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.camera),
+              ),
+              ListTile(
+                key: const ValueKey('detail-photo-source-library'),
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: PackLoxTokens.textPrimary,
+                ),
+                title: const Text('Choose from library'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.gallery),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _addPortfolioPhotoFromGallery(CollectibleItem item) async {
     try {
       final planLimits = ref.read(activePlanLimitsProvider);
@@ -456,8 +556,13 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
         return;
       }
 
+      final source = await _askPhotoSource();
+      if (source == null || !mounted) {
+        return;
+      }
+
       final galleryService = ref.read(galleryServiceProvider);
-      final pickedImage = await galleryService.pickImage();
+      final pickedImage = await galleryService.pickImage(source: source);
       if (pickedImage == null) {
         return;
       }
@@ -1275,6 +1380,17 @@ class _DetailInlineContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The photo prompt and the gallery are mutually exclusive views of the
+    // same thing, keyed on whether any real (non-placeholder) photo exists.
+    // Previously both could render at once for a catalog-saved item, which
+    // meant two buttons calling the same onAddPhoto a few pixels apart, and
+    // an "Image Gallery - 1 image" header counting the bundled placeholder
+    // asset as if it were the user's own photo.
+    final hasRealPhoto =
+        galleryImages.any(
+          (image) => !_isPackLoxCategoryPlaceholderPath(image.path),
+        ) ||
+        !_usesCatalogPlaceholderImage(item);
     return Column(
       key: const ValueKey('collectible-detail-inline-content'),
       children: [
@@ -1287,11 +1403,11 @@ class _DetailInlineContent extends StatelessWidget {
           onEdit: onEdit,
           onRefreshValue: onRefreshValue,
         ),
-        if (_usesCatalogPlaceholderImage(item)) ...[
+        if (!hasRealPhoto) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailPhotoEvidencePrompt(onAddPhoto: onAddPhoto, onEdit: onEdit),
         ],
-        if (galleryImages.isNotEmpty) ...[
+        if (hasRealPhoto && galleryImages.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           _DetailGallerySection(
             item: item,
@@ -1712,6 +1828,10 @@ class _DetailPhotoEvidencePrompt extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
+          // This is the *only* add-photo control while the item has no real
+          // photo -- the Image Gallery section is hidden in that state, since
+          // it would otherwise present the bundled placeholder as if it were
+          // the user's own image. Once a real photo exists the two swap.
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1926,14 +2046,20 @@ class _DetailInfoSection extends StatelessWidget {
   }
 }
 
-class _DetailMarketSection extends StatelessWidget {
+class _DetailMarketSection extends ConsumerWidget {
   const _DetailMarketSection({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
-    final rows = _detailMarketRows(item);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshots = ref
+        .watch(_portfolioValuationSnapshotsProvider(item.id))
+        .maybeWhen(
+          data: (value) => value,
+          orElse: () => const <PortfolioValuationSnapshot>[],
+        );
+    final rows = _detailMarketRows(item, snapshots);
     final catalogSnapshot = _catalogSnapshotFor(item);
     return _DetailAuthorityPanel(
       key: const ValueKey('collectible-detail-market-section'),
@@ -2050,7 +2176,10 @@ class _PricingTrustPanel extends StatelessWidget {
           ],
           if (pricing?.attributionText?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.sm),
-            _DetailEmptyCopy(pricing!.attributionText!.trim()),
+            _DetailAttributionLine(
+              text: pricing!.attributionText!.trim(),
+              url: pricing.attributionUrl?.trim(),
+            ),
           ],
         ],
       ),
@@ -2179,7 +2308,11 @@ class _SnapshotEvidenceRows extends StatelessWidget {
   Widget build(BuildContext context) {
     final pricing = snapshot.pricing;
     final rows = [
-      _DetailInfoRowData('Attribution', snapshot.attribution),
+      _DetailInfoRowData(
+        'Attribution',
+        snapshot.attribution,
+        valueUrl: snapshot.attributionUrl,
+      ),
       if (pricing.lastUpdated != null)
         _DetailInfoRowData(
           'Provider checked',
@@ -2221,12 +2354,18 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       rates: fxRates,
     );
     final itemCurrency = item.pricing?.currency ?? 'AUD';
-    final scanValue = convertCurrent(
-      _valueAtScanFor(item),
-      from: itemCurrency,
-      to: displayCurrency,
-      currentRates: fxRates.currentRates,
-    );
+    final baseline = _valueHistoryBaseline(item, snapshots);
+    final scanValue = baseline == null
+        ? 0.0
+        : convertCurrent(
+            baseline.value,
+            from: baseline.currency,
+            to: displayCurrency,
+            currentRates: fxRates.currentRates,
+          );
+    // Only call it "At scan" when it really is the scan estimate; once real
+    // snapshots supersede it the figure is the oldest tracked price.
+    final baselineLabel = (baseline?.fromScan ?? true) ? 'At scan' : 'Oldest';
     final currentValue = convertCurrent(
       _currentValueFor(item),
       from: itemCurrency,
@@ -2281,7 +2420,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
             children: [
               Expanded(
                 child: _DetailValueHistoryMetric(
-                  label: 'At scan',
+                  label: baselineLabel,
                   value: _formatMoney(scanValue, displayCurrency),
                 ),
               ),
@@ -3018,6 +3157,43 @@ class _DetailSectionTitle extends StatelessWidget {
   }
 }
 
+/// Pricing attribution text -- a tappable link to the priced item's real
+/// source page when one is available (required by pricing-provider
+/// attribution terms), otherwise plain text.
+class _DetailAttributionLine extends StatelessWidget {
+  const _DetailAttributionLine({required this.text, this.url});
+
+  final String text;
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) {
+      return _DetailEmptyCopy(text);
+    }
+    return InkWell(
+      key: const ValueKey('detail-attribution-link'),
+      onTap: () => _openAttributionUrl(url!),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: PackLoxTokens.blue,
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _openAttributionUrl(String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    return;
+  }
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
 class _DetailEmptyCopy extends StatelessWidget {
   const _DetailEmptyCopy(this.message);
 
@@ -3036,10 +3212,11 @@ class _DetailEmptyCopy extends StatelessWidget {
 }
 
 class _DetailInfoRowData {
-  const _DetailInfoRowData(this.label, this.value);
+  const _DetailInfoRowData(this.label, this.value, {this.valueUrl});
 
   final String label;
   final String value;
+  final String? valueUrl;
 }
 
 class _DetailAuthorityRows extends StatelessWidget {
@@ -3068,13 +3245,28 @@ class _DetailAuthorityRows extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 flex: 7,
-                child: Text(
-                  row.value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: PackLoxTokens.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: row.valueUrl == null || row.valueUrl!.isEmpty
+                    ? Text(
+                        row.value,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(
+                              color: PackLoxTokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      )
+                    : InkWell(
+                        key: const ValueKey('detail-attribution-row-link'),
+                        onTap: () => _openAttributionUrl(row.valueUrl!),
+                        child: Text(
+                          row.value,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: PackLoxTokens.blue,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -3105,10 +3297,18 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
   return rows;
 }
 
-List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
+List<_DetailInfoRowData> _detailMarketRows(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final trustedPricing = _hasTrustedPricingEvidence(item);
+  // Same rule as the Value History panel: once real snapshots exist they
+  // supersede the scan estimate, which may have come from a different
+  // (wrong) product entirely. Presenting that superseded figure as pricing
+  // *evidence* is worse than omitting it.
+  final baseline = _valueHistoryBaseline(item, snapshots);
   return [
     if (pricing != null) ...[
       _DetailInfoRowData(
@@ -3118,12 +3318,9 @@ List<_DetailInfoRowData> _detailMarketRows(CollectibleItem item) {
             : 'Value unavailable',
       ),
       _DetailInfoRowData(
-        'Value at scan',
-        trustedPricing
-            ? _formatMoney(
-                item.valueAtScan ?? item.estimatedValue,
-                pricing.currency,
-              )
+        (baseline?.fromScan ?? true) ? 'Value at scan' : 'Oldest tracked value',
+        trustedPricing && baseline != null
+            ? _formatMoney(baseline.value, baseline.currency)
             : 'Value unavailable',
       ),
       _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
@@ -3390,12 +3587,14 @@ class _CatalogSnapshotData {
     required this.pricing,
     required this.savedValue,
     required this.attribution,
+    this.attributionUrl,
     this.catalogId,
   });
 
   final PricingInfo pricing;
   final double savedValue;
   final String attribution;
+  final String? attributionUrl;
   final String? catalogId;
 }
 
@@ -3425,6 +3624,7 @@ _CatalogSnapshotData? _catalogSnapshotFor(CollectibleItem item) {
     pricing: pricing,
     savedValue: item.estimatedValue,
     attribution: attribution,
+    attributionUrl: _clean(pricing.attributionUrl),
     catalogId: catalogId,
   );
 }
@@ -3461,6 +3661,61 @@ double _valueAtScanFor(CollectibleItem item) {
   return item.estimatedValue;
 }
 
+/// The plotted chart values, exposed so tests can assert that a superseded
+/// scan estimate never reaches the chart.
+@visibleForTesting
+List<double> valueHistoryPointsForTesting(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  return _valueHistoryPoints(
+    item,
+    snapshots,
+  ).map((point) => point.value).toList();
+}
+
+/// The oldest trustworthy value for this item, and where it came from.
+///
+/// `valueAtScan` is captured once at save time from whatever the scan-time
+/// lookup happened to return, and is never corrected afterwards. When that
+/// lookup matched the wrong product -- e.g. a Pokemon card priced against a
+/// video game's "Box Only"/"Manual Only" tiers at $62 when the card is
+/// really worth $1.84 -- the wrong figure sticks forever, and charting it
+/// renders a ~97% "crash" that never happened.
+///
+/// Saved snapshots are strictly better evidence: they carry the
+/// catalog-matched identity and each one is a price the provider actually
+/// published on a given date. So whenever any priced snapshot exists it
+/// supersedes the scan estimate, which is kept only as a last-resort
+/// fallback for an item with no tracked history at all.
+({double value, String currency, DateTime date, bool fromScan})?
+_valueHistoryBaseline(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  for (final snapshot in snapshots) {
+    final value = snapshot.valueAud;
+    if (value != null && value > 0) {
+      return (
+        value: value,
+        currency: snapshot.currency,
+        date: snapshot.pricedAt,
+        fromScan: false,
+      );
+    }
+  }
+  final scanValue = _valueAtScanFor(item);
+  if (scanValue > 0) {
+    return (
+      value: scanValue,
+      currency: item.pricing?.currency ?? 'AUD',
+      date: item.createdAt,
+      fromScan: true,
+    );
+  }
+  return null;
+}
+
 double _currentValueFor(CollectibleItem item) {
   final marketValue = item.pricing?.estimatedMarketValue;
   if (marketValue != null && marketValue > 0) {
@@ -3481,7 +3736,16 @@ List<_ValueHistoryPoint> _valueHistoryPoints(
 }) {
   final itemCurrency = item.pricing?.currency ?? 'AUD';
   final points = <_ValueHistoryPoint>[];
-  final scanValue = _valueAtScanFor(item);
+  // Only plot the scan-time estimate when there is no real snapshot history
+  // to plot instead. Once snapshots exist they describe the same period with
+  // the catalog-matched identity, so charting the scan estimate alongside
+  // them draws a spike for a price this item was never actually worth --
+  // see _valueHistoryBaseline for the full reasoning.
+  final scanValue = snapshots.any(
+    (snapshot) => (snapshot.valueAud ?? 0) > 0,
+  )
+      ? 0.0
+      : _valueAtScanFor(item);
   if (scanValue > 0) {
     points.add(
       _ValueHistoryPoint(
@@ -6450,14 +6714,39 @@ String _formatDate(DateTime date) {
 }
 
 String _displayValue(PricingInfo pricing, {required double fallbackValue}) {
-  final displayString = pricing.displayString?.trim();
-  if (displayString != null && displayString.isNotEmpty) {
-    return displayString;
-  }
   final value = pricing.estimatedMarketValue > 0
       ? pricing.estimatedMarketValue
       : fallbackValue;
+  final displayString = pricing.displayString?.trim();
+  if (displayString != null &&
+      displayString.isNotEmpty &&
+      _displayStringAgreesWith(displayString, value)) {
+    return displayString;
+  }
   return _formatMoney(value, pricing.currency);
+}
+
+/// Whether a saved [displayString] still describes [value].
+///
+/// displayString is a denormalised copy of estimatedMarketValue, and the two
+/// can drift: repricing used to overwrite the number while leaving the string
+/// from the previous match in place, so an item repriced to $1.84 kept
+/// rendering "$62.00 AUD" -- the figure from a scan that had matched a video
+/// game rather than the card. Preferring the string unconditionally made that
+/// stale value the one users actually saw. Trust it only while it still
+/// agrees with the number it is supposed to describe, so a drifted record
+/// self-corrects instead of lying.
+bool _displayStringAgreesWith(String displayString, double value) {
+  final match = RegExp(r'\d[\d,]*(?:\.\d+)?').firstMatch(displayString);
+  if (match == null) {
+    return false;
+  }
+  final parsed = double.tryParse(match.group(0)!.replaceAll(',', ''));
+  if (parsed == null) {
+    return false;
+  }
+  // Tolerate normal rounding ("AUD $1.84" for 1.8392) but nothing wider.
+  return (parsed - value).abs() <= math.max(0.01, value.abs() * 0.01);
 }
 
 String? _sourceMarketValue(PricingInfo pricing) {
@@ -6468,6 +6757,20 @@ String? _sourceMarketValue(PricingInfo pricing) {
       originalCurrency == null ||
       originalCurrency.isEmpty ||
       originalCurrency.toUpperCase() == pricing.currency.toUpperCase()) {
+    return null;
+  }
+  // Same drift problem as displayString: this is the pre-conversion price,
+  // so originalPrice * exchangeRateUsed should still land on the current
+  // estimate. When it does not, the pair is left over from an earlier
+  // (possibly wrong-product) match -- showing "USD $41.00" beside a $1.84
+  // item states a source price that was never the source of that figure.
+  final rate = pricing.exchangeRateUsed;
+  final converted = rate == null || rate <= 0
+      ? originalPrice
+      : originalPrice * rate;
+  final current = pricing.estimatedMarketValue;
+  if (current > 0 &&
+      (converted - current).abs() > math.max(0.01, current.abs() * 0.05)) {
     return null;
   }
   return _formatMoney(originalPrice, originalCurrency);

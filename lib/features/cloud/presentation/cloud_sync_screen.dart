@@ -281,7 +281,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
           .where((item) => item.syncStatus == CloudItemSyncStatus.failed)
           .length;
       await ref.read(portfolioControllerProvider.notifier).loadItems();
-      await ref.read(imageSyncControllerProvider.notifier).loadSnapshot();
+      // processQueue, not just loadSnapshot -- otherwise a failed/retryable
+      // image upload only ever retries when the user happens to add another
+      // photo afterward, and can stall indefinitely.
+      await ref.read(imageSyncControllerProvider.notifier).processQueue();
       await ref.read(syncControllerProvider.notifier).loadStatus();
 
       if (failedCount > 0) {

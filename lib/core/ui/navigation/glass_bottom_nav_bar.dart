@@ -63,7 +63,13 @@ class GlassBottomNavBar extends StatelessWidget {
               decoration: BoxDecoration(
                 // Same violet as the PackLox app icon's own gradient
                 // (sampled from assets/brand/packlox_app_icon_master.png).
-                color: const Color(0xFF6211FA),
+                // Translucent, not solid -- a fully opaque fill here made
+                // the BackdropFilter blur above completely invisible (there
+                // was nothing behind it left to show through), so this bar
+                // read as a flat solid pill instead of the frosted-glass
+                // look its own name promised. Same hue, just letting the
+                // blurred content underneath actually show.
+                color: const Color(0xFF6211FA).withValues(alpha: 0.68),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
                   color: const Color(0xFF3B0A96).withValues(alpha: 0.5),

@@ -1,3 +1,4 @@
+import 'package:collectiq_ai/features/portfolio/data/repositories/shared_preferences_valuation_snapshot_repository.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
@@ -10,8 +11,17 @@ import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    // Required for any test whose flow touches SharedPreferences (saving a
+    // catalog result now seeds local valuation snapshots). Without a mock
+    // store the plugin channel has no handler and getInstance() never
+    // completes, hanging the test rather than failing it.
+    SharedPreferences.setMockInitialValues({});
+  });
+
   // Discover is Catalog-only (market-price lookup) — searching your own
   // saved items lives in Portfolio, which already has a richer search/sort/
   // filter system, so Discover no longer duplicates it. See
@@ -46,14 +56,82 @@ void main() {
     final input = tester.widget<TextField>(
       find.byKey(const ValueKey('discover-search-input')),
     );
-    expect(input.controller?.text, 'Pokemon Cards');
+    expect(input.controller?.text, 'Pokemon');
 
     // A quick-filter tap is a deliberate action, not a keystroke, so it
     // searches immediately rather than waiting out the typing debounce.
     await tester.pumpAndSettle();
-    expect(catalogRepository.queries, ['Pokemon Cards']);
+    expect(catalogRepository.queries, ['Pokemon']);
+    // The chip must narrow by category, not just seed the search box. Free
+    // text alone cannot represent a category: searching the bare word
+    // "Pokemon" against the whole catalog returns Pokemon-collab trainers
+    // that outrank the cards (confirmed live), and "LEGO" returns a LEGO
+    // video game.
+    expect(catalogRepository.lastCategoryGroup, 'trading-card-games');
+    expect(catalogRepository.lastSubcategory, 'pokemon');
     expect(find.text('Charizard #4 Base Set'), findsOneWidget);
   });
+
+  testWidgets(
+    'every category Home advertises has a Discover chip, and each carries a '
+    'real category filter rather than only a search term',
+    (tester) async {
+      final catalogRepository = _MemoryCatalogSearchRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: catalogRepository,
+      );
+
+      for (final label in [
+        'Pokemon Cards',
+        'Magic Cards',
+        'Yu-Gi-Oh! Cards',
+        'Lorcana Cards',
+        'One Piece Cards',
+        'Sports Cards',
+        'Comics',
+        'Coins',
+        'Video Games',
+        'LEGO Sets',
+        'Funko Pops',
+        'Sneakers',
+      ]) {
+        expect(
+          find.text(label),
+          findsOneWidget,
+          reason: '$label is advertised on Home but missing from Discover',
+        );
+      }
+
+      // Sneakers live only in kicksdb_catalog, so the request pins source
+      // to kicksdb rather than sending a category the PriceCharting
+      // taxonomy has no entry for.
+      await tester.ensureVisible(find.text('Sneakers'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sneakers'));
+      await tester.pumpAndSettle();
+      expect(catalogRepository.lastSource, 'kicksdb');
+
+      // Clearing the box brings the chip grid back: it only renders while
+      // there is no active query (results take its place otherwise).
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        '',
+      );
+      await tester.pumpAndSettle();
+
+      // Every other category pins to pricecharting, so KicksDB rows cannot
+      // mix into a filtered view -- without this a Pokemon-filtered search
+      // surfaces Pokemon-collab trainers above the cards.
+      await tester.ensureVisible(find.text('LEGO Sets'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LEGO Sets'));
+      await tester.pumpAndSettle();
+      expect(catalogRepository.lastCategoryGroup, 'lego-sets');
+      expect(catalogRepository.lastSource, 'pricecharting');
+    },
+  );
 
   testWidgets(
     'filter sheet applies a category, deriving the right source for search',
@@ -558,6 +636,87 @@ void main() {
     expect(find.text('USD \$161'), findsWidgets);
     expect(find.text('pokemon'), findsWidgets);
   });
+
+  testWidgets(
+    'saving a catalog result seeds its value-history chart from the '
+    'catalog\'s own price history, with no server round-trip',
+    (tester) async {
+      final repository = _MemoryPortfolioRepository([]);
+      await _pumpSearch(
+        tester,
+        repository: repository,
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-charizard',
+            title: 'Charizard #4 Base Set',
+            category: 'Pokemon Cards',
+            source: 'PriceCharting',
+            setName: 'Base Set',
+            currency: 'USD',
+            marketValue: 161,
+            confidence: 0.91,
+            lastUpdated: DateTime(2026, 7, 26),
+            attribution: 'Pricing data by PriceCharting',
+            history: [
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime.utc(2026, 7, 26),
+                isCurrent: true,
+                currency: 'USD',
+                marketValue: 161,
+                lowEstimate: 150,
+                highEstimate: 800,
+              ),
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime.utc(2026, 7, 19),
+                validTo: DateTime.utc(2026, 7, 26),
+                currency: 'USD',
+                // No price recorded for this version -- must not produce a
+                // snapshot.
+              ),
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime.utc(2026, 7, 12),
+                validTo: DateTime.utc(2026, 7, 19),
+                currency: 'USD',
+                marketValue: 150,
+              ),
+            ],
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+
+      expect(repository.items, hasLength(1));
+      final savedItemId = repository.items.single.id;
+      final snapshots =
+          await const SharedPreferencesValuationSnapshotRepository()
+              .getSnapshots(savedItemId);
+
+      expect(snapshots, hasLength(2));
+      expect(snapshots.first.valueAud, 150);
+      expect(snapshots.first.pricedAt, DateTime.utc(2026, 7, 12));
+      expect(snapshots.last.valueAud, 161);
+      expect(snapshots.last.pricedAt, DateTime.utc(2026, 7, 26));
+    },
+  );
 
   testWidgets(
     'catalog result detail shows only 5 history entries inline, with a '
