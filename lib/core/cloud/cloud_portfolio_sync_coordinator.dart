@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/cloud_storage_paths.dart';
+import 'package:collectiq_ai/core/cloud/services/cloud_storage_service.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:flutter/foundation.dart';
@@ -158,8 +159,17 @@ class CloudPortfolioSyncCoordinator {
       return;
     }
 
-    final localImage = File(item.imagePath);
-    if (!await localImage.exists()) {
+    // An item saved from catalog search with no photo of its own carries a
+    // BUNDLED ASSET path for its image, not a file on disk. File.exists()
+    // is always false for those (assets are compiled into the binary), so
+    // treating that as "the photo went missing" aborted the sync before it
+    // pushed any metadata -- leaving the item local-only, invisible to the
+    // cloud, and unrecoverable if the app was reinstalled or signed out.
+    // It also has no cloud row to soft-delete, so it silently sidesteps the
+    // safety net every other item gets. There is simply nothing to upload
+    // here, which is expected rather than an error.
+    final hasBundledAssetImage = _isBundledAssetPath(item.imagePath);
+    if (!hasBundledAssetImage && !await File(item.imagePath).exists()) {
       await portfolioRepository.upsertSyncedItem(
         item.copyWithCloudSync(
           syncStatus: CloudItemSyncStatus.failed,
@@ -176,17 +186,24 @@ class CloudPortfolioSyncCoordinator {
     await portfolioRepository.upsertSyncedItem(pendingItem);
 
     try {
-      final cloudPath = CloudStoragePaths.portfolioImage(
-        userId: userId,
-        itemId: item.id,
-        extension: _extensionFor(item.imagePath),
-      );
-      final uploadResult = await registry.cloudStorageService.uploadImage(
-        localPath: item.imagePath,
-        destinationPath: cloudPath,
-      );
-      if (uploadResult == null || uploadResult.publicUrl == null) {
-        throw StateError('Cloud image upload was skipped.');
+      // Skip the image upload entirely when the "image" is the bundled
+      // placeholder -- there is no file to send. The metadata still syncs,
+      // so the item exists in the cloud and is recoverable; the artwork
+      // fills in later if the user adds a real photo.
+      CloudStorageUploadResult? uploadResult;
+      if (!hasBundledAssetImage) {
+        final cloudPath = CloudStoragePaths.portfolioImage(
+          userId: userId,
+          itemId: item.id,
+          extension: _extensionFor(item.imagePath),
+        );
+        uploadResult = await registry.cloudStorageService.uploadImage(
+          localPath: item.imagePath,
+          destinationPath: cloudPath,
+        );
+        if (uploadResult == null || uploadResult.publicUrl == null) {
+          throw StateError('Cloud image upload was skipped.');
+        }
       }
       final uploadedGalleryImages = await _uploadGalleryImages(
         userId: userId,
@@ -194,8 +211,8 @@ class CloudPortfolioSyncCoordinator {
       );
 
       final uploadedItem = pendingItem.copyWithCloudSync(
-        imageStoragePath: uploadResult.path,
-        cloudImageUrl: uploadResult.publicUrl,
+        imageStoragePath: uploadResult?.path,
+        cloudImageUrl: uploadResult?.publicUrl,
         galleryImages: uploadedGalleryImages,
         syncStatus: CloudItemSyncStatus.pendingUpload,
         clearSyncError: true,
@@ -280,6 +297,14 @@ String _extensionFor(String path) {
     return '.jpeg';
   }
   return '.jpg';
+}
+
+/// Whether [path] points at an asset compiled into the app bundle rather
+/// than a file on disk. Catalog-saved items with no user photo use one of
+/// these as their image, and dart:io cannot see them -- File.exists() is
+/// always false -- so they must not be mistaken for a missing file.
+bool _isBundledAssetPath(String path) {
+  return path.trim().startsWith('assets/');
 }
 
 bool _isRemotePath(String path) {

@@ -174,6 +174,67 @@ void main() {
       },
     );
 
+    test(
+      'a catalog item whose only image is the bundled placeholder still '
+      'reaches the cloud, with the upload skipped rather than failed',
+      () async {
+        // Regression: File.exists() is always false for an asset compiled
+        // into the binary, so this was treated as "the photo went missing"
+        // and the sync aborted before pushing any metadata. The item stayed
+        // local-only and invisible to the cloud -- and with no cloud row it
+        // also had no soft-delete safety net, so a reinstall destroyed it
+        // outright. This actually happened to a real saved item.
+        final placeholderItem = _item().copyWith(
+          imagePath:
+              'assets/packlox/icons/categories/3d/'
+              'packlox_category_placeholder_card_v1.png',
+        );
+        final repository = _MemoryPortfolioRepository([placeholderItem]);
+        final storage = _RecordingStorageService();
+        final sync = _RecordingPortfolioSyncService();
+        final coordinator = CloudPortfolioSyncCoordinator(
+          registry: _registry(storageService: storage, syncService: sync),
+          portfolioRepository: repository,
+        );
+
+        await coordinator.syncPendingItems();
+
+        final item = repository.items.single;
+        // Nothing to upload -- that is expected here, not an error.
+        expect(storage.uploadCount, 0);
+        // ...but the metadata must still reach the cloud.
+        expect(sync.syncCount, 1);
+        expect(item.syncStatus, CloudItemSyncStatus.synced);
+        expect(item.syncError, isNull);
+        expect(item.cloudImageUrl, isNull);
+      },
+    );
+
+    test(
+      'a genuinely missing local file is still reported as a failure',
+      () async {
+        final repository = _MemoryPortfolioRepository([
+          _item().copyWith(imagePath: '/no/such/file/on/disk.jpg'),
+        ]);
+        final storage = _RecordingStorageService();
+        final sync = _RecordingPortfolioSyncService();
+        final coordinator = CloudPortfolioSyncCoordinator(
+          registry: _registry(storageService: storage, syncService: sync),
+          portfolioRepository: repository,
+        );
+
+        await coordinator.syncPendingItems();
+
+        expect(storage.uploadCount, 0);
+        expect(sync.syncCount, 0);
+        expect(repository.items.single.syncStatus, CloudItemSyncStatus.failed);
+        expect(
+          repository.items.single.syncError,
+          contains('Local image file is missing'),
+        );
+      },
+    );
+
     test('successful upload syncs metadata and marks item synced', () async {
       final repository = _MemoryPortfolioRepository([_item()]);
       final storage = _RecordingStorageService();
