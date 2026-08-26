@@ -325,7 +325,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // its own category.
     final catalogQuickFilters = const <_CatalogQuickFilter>[
       (
-        label: 'Pokemon Cards',
+        label: 'Pokémon',
         category: 'Cards',
         query: 'Pokemon',
         categoryGroup: 'trading-card-games',
@@ -333,7 +333,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         assetPath: PackLoxAssets.categoryColorPokemon,
       ),
       (
-        label: 'Magic Cards',
+        label: 'Magic',
         category: 'Cards',
         query: 'Magic',
         categoryGroup: 'trading-card-games',
@@ -341,7 +341,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         assetPath: PackLoxAssets.categoryColorMtg,
       ),
       (
-        label: 'Yu-Gi-Oh! Cards',
+        label: 'Yu-Gi-Oh!',
         category: 'Cards',
         query: 'Yu-Gi-Oh',
         categoryGroup: 'trading-card-games',
@@ -349,7 +349,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         assetPath: PackLoxAssets.categoryColorYugioh,
       ),
       (
-        label: 'Lorcana Cards',
+        label: 'Lorcana',
         category: 'Cards',
         query: 'Lorcana',
         categoryGroup: 'trading-card-games',
@@ -360,7 +360,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       // GameBoy platformer, PS3 beat'em-ups and the comic run before any
       // card, and "Luffy" fuzzy-matches "Fluffy Berry" Pokemon cards.
       (
-        label: 'One Piece Cards',
+        label: 'One Piece',
         category: 'Cards',
         query: 'One Piece Card',
         categoryGroup: 'trading-card-games',

@@ -50,7 +50,7 @@ void main() {
       catalogRepository: catalogRepository,
     );
 
-    await tester.tap(find.text('Pokemon Cards'));
+    await tester.tap(find.text('Pokémon'));
     await tester.pump();
 
     final input = tester.widget<TextField>(
@@ -84,11 +84,11 @@ void main() {
       );
 
       for (final label in [
-        'Pokemon Cards',
-        'Magic Cards',
-        'Yu-Gi-Oh! Cards',
-        'Lorcana Cards',
-        'One Piece Cards',
+        'Pokémon',
+        'Magic',
+        'Yu-Gi-Oh!',
+        'Lorcana',
+        'One Piece',
         'Sports Cards',
         'Comics',
         'Coins',
