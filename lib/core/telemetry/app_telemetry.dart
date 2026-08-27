@@ -41,6 +41,7 @@ class TelemetryEventNames {
 
 enum TelemetryProviderType {
   noop(displayName: 'Noop'),
+  firebase(displayName: 'Firebase'),
   sentry(displayName: 'Sentry placeholder');
 
   const TelemetryProviderType({required this.displayName});
@@ -87,6 +88,11 @@ class TelemetryConfig {
   bool get hasExternalConfiguration {
     return switch (providerType) {
       TelemetryProviderType.noop => false,
+      // Firebase's configuration ships in the app bundle
+      // (GoogleService-Info.plist / google-services.json) -- the same
+      // files push notifications already require -- so selecting the
+      // provider IS the configuration.
+      TelemetryProviderType.firebase => true,
       TelemetryProviderType.sentry => sentryConfigured,
     };
   }
@@ -242,9 +248,22 @@ final appTelemetryServiceProvider = Provider<AppTelemetryService>((ref) {
   return createAppTelemetryService(ref.watch(telemetryConfigProvider));
 });
 
+/// Set once at startup by the Firebase provider's registration (see
+/// registerFirebaseTelemetryBuilder in firebase_telemetry_service.dart);
+/// a plain mutable hook rather than an import so this file -- which the
+/// provider itself imports -- stays free of a circular dependency.
+AppTelemetryService Function(TelemetryConfig config)?
+    firebaseTelemetryBuilder;
+
 AppTelemetryService createAppTelemetryService(TelemetryConfig config) {
   if (!config.enabled || config.providerType == TelemetryProviderType.noop) {
     return NoopTelemetryService(config: config);
+  }
+  if (config.providerType == TelemetryProviderType.firebase) {
+    final builder = firebaseTelemetryBuilder;
+    if (builder != null) {
+      return builder(config);
+    }
   }
   return PlaceholderTelemetryService(config: config);
 }

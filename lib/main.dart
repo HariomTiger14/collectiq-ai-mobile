@@ -8,6 +8,7 @@ import 'package:collectiq_ai/core/navigation/app_shell.dart';
 import 'package:collectiq_ai/core/network/api_constants.dart' as backend_config;
 import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
+import 'package:collectiq_ai/core/telemetry/firebase_telemetry_service.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
 import 'package:collectiq_ai/qa_capture_app.dart';
@@ -31,6 +32,10 @@ void main() {
       _disableReleaseDebugLogs();
       _configureAndroidImagePicker();
 
+      registerFirebaseTelemetryBuilder(
+        apiBaseUrl:
+            backend_config.EnvironmentConfig.fromEnvironment().baseUrl,
+      );
       bootstrapTelemetry = createAppTelemetryService(
         TelemetryConfig.fromEnvironment(),
       );
