@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_profile_sync_service.dart';
 import 'package:collectiq_ai/features/profile/data/repositories/shared_preferences_profile_repository.dart';
@@ -48,8 +50,12 @@ class ProfileController extends AsyncNotifier<CollectorProfile> {
       }
       // No cloud record yet — seed it from the local profile.
       unawaited(_pushProfile(local, uploadAvatar: true));
-    } catch (_) {
-      // Fall back to the local cache.
+    } catch (error) {
+      // Fall back to the local cache -- but say why in the log. This path
+      // swallowed a schema mismatch for weeks (collector_profiles empty in
+      // production while the UI looked synced); silent catches hide
+      // exactly the failures this sync exists to prevent.
+      debugPrint('[ProfileSync] cloud fetch failed, using local cache: $error');
     }
     return local;
   }
@@ -60,8 +66,11 @@ class ProfileController extends AsyncNotifier<CollectorProfile> {
   }) async {
     try {
       await _cloudSync.pushProfile(profile, uploadAvatar: uploadAvatar);
-    } catch (_) {
-      // Cloud push is best-effort; the local save already succeeded.
+      debugPrint('[ProfileSync] profile pushed (uploadAvatar: $uploadAvatar)');
+    } catch (error) {
+      // Cloud push is best-effort; the local save already succeeded. But
+      // best-effort must not mean invisible -- see build()'s catch.
+      debugPrint('[ProfileSync] profile push FAILED: $error');
     }
   }
 
