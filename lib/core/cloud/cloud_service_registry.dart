@@ -94,6 +94,7 @@ class CloudServiceRegistry {
               bootstrap: supabaseBootstrap,
               authService: authService,
               cloudStorageService: cloudStorageService,
+              supabaseDataGateway: supabaseDataGateway,
             )
           : const NoOpCloudProfileSyncService(),
       analyticsService: const NoOpAnalyticsService(),
