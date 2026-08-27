@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
+import 'package:collectiq_ai/core/telemetry/firebase_telemetry_service.dart';
 
 import 'services/analytics_service.dart';
 import 'services/auth_service.dart';
@@ -18,9 +19,21 @@ import 'supabase/supabase_cloud_profile_sync_service.dart';
 import 'supabase/supabase_cloud_storage_service.dart';
 
 final cloudServiceRegistryProvider = Provider<CloudServiceRegistry>((ref) {
+  final gateway = ref.watch(supabaseServiceProvider);
+  // Bind the telemetry backend-reporter's late token hook to the live
+  // gateway session -- the same one every other cloud service uses, so
+  // its refresh state is shared and a telemetry report can never hold a
+  // staler token than the app itself.
+  telemetryAccessTokenProvider = () async {
+    final session = await gateway.currentSession();
+    if (session == null || session.isAnonymous) {
+      return null;
+    }
+    return session.accessToken;
+  };
   return CloudServiceRegistry.fromConfig(
     ref.watch(environmentConfigProvider),
-    supabaseDataGateway: ref.watch(supabaseServiceProvider),
+    supabaseDataGateway: gateway,
   );
 });
 
