@@ -308,6 +308,9 @@ class MarketplaceListing {
     required this.url,
     this.condition = '',
     this.source = 'eBay',
+    this.size,
+    this.totalAsks,
+    this.salesLast30Days,
   });
 
   /// The listing's title, as written by the seller.
@@ -328,6 +331,16 @@ class MarketplaceListing {
   /// Which marketplace this listing came from.
   final String source;
 
+  /// Shoe size label for sneaker (StockX) listings, null otherwise.
+  final String? size;
+
+  /// Active asks for this size on the marketplace, sneakers only. A
+  /// listing with this set is a current lowest ask, not a completed sale.
+  final int? totalAsks;
+
+  /// Completed sales in the last 30 days for this size, sneakers only.
+  final int? salesLast30Days;
+
   /// Parses a flexible backend response safely.
   factory MarketplaceListing.fromJson(Map<String, dynamic> json) {
     return MarketplaceListing(
@@ -337,8 +350,21 @@ class MarketplaceListing {
       condition: _string(json['condition']) ?? '',
       url: _string(json['url']) ?? '',
       source: _string(json['source']) ?? 'eBay',
+      size: _string(json['size']),
+      totalAsks: _int(json['totalAsks']),
+      salesLast30Days: _int(json['salesLast30Days']),
     );
   }
+}
+
+int? _int(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return int.tryParse(value?.toString() ?? '');
 }
 
 String? _string(Object? value) {

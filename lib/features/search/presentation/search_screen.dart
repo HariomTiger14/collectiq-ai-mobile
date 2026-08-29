@@ -2465,8 +2465,25 @@ class _CatalogMarketplaceListingRow extends StatelessWidget {
   /// it shows the whole title instead.
   final bool truncateTitle;
 
+  /// StockX sneaker listings carry per-size market depth; those numbers
+  /// say far more than the constant "New" condition, so they take its
+  /// place on the row. The price shown is a current lowest ask, and the
+  /// subtitle keeps that honest ("2 asks", not "2 sold") -- only the
+  /// 30-day figure is completed sales.
+  String get _marketDepth {
+    final parts = <String>[
+      if ((listing.totalAsks ?? 0) > 0)
+        '${listing.totalAsks} ask${listing.totalAsks == 1 ? '' : 's'}',
+      if ((listing.salesLast30Days ?? 0) > 0)
+        '${listing.salesLast30Days} sold in 30 days',
+    ];
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final depth = _marketDepth;
+    final subtitle = depth.isNotEmpty ? depth : listing.condition;
     return InkWell(
       onTap: () => _launchExternalLink(context, listing.url),
       child: Row(
@@ -2489,11 +2506,11 @@ class _CatalogMarketplaceListingRow extends StatelessWidget {
                 Row(
                   children: [
                     _SearchPill(label: listing.source),
-                    if (listing.condition.isNotEmpty) ...[
+                    if (subtitle.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          listing.condition,
+                          subtitle,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: PackLoxTokens.textSecondary),
