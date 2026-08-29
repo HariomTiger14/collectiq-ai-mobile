@@ -504,6 +504,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               ),
                               const SizedBox(height: 10),
                             ],
+                            if (_catalogResults
+                                .take(20)
+                                .any(_isVideoGameResultWithArt)) ...[
+                              const SizedBox(height: 2),
+                              const _RawgAttributionLine(),
+                            ],
                           ],
                         ],
                       ),
@@ -1486,6 +1492,41 @@ class _CatalogFilterPriceField extends StatelessWidget {
   }
 }
 
+/// True when a catalog result is showing RAWG imagery — video-game rows
+/// are the only category whose cover art comes from RAWG.
+bool _isVideoGameResultWithArt(CatalogSearchResult result) {
+  return (result.imageUrl ?? '').trim().isNotEmpty &&
+      result.category.toLowerCase().contains('video game');
+}
+
+/// RAWG's API terms require attribution and an active link on the pages
+/// where RAWG data/images are used — the About-screen credit alone does
+/// not satisfy that, so this renders directly under video-game imagery
+/// in search results and on the detail page.
+class _RawgAttributionLine extends StatelessWidget {
+  const _RawgAttributionLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('rawg-attribution-link'),
+      onTap: () => _launchExternalLink(context, 'https://rawg.io'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          'Video game data and cover art via RAWG.io',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            decoration: TextDecoration.underline,
+            decorationColor: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CatalogResultCard extends StatelessWidget {
   const _CatalogResultCard({required this.result, required this.onTap});
 
@@ -1883,6 +1924,10 @@ class _CatalogResultDetailPageState
                               );
                             },
                           ),
+                          if (_isVideoGameResultWithArt(result)) ...[
+                            const SizedBox(height: 8),
+                            const _RawgAttributionLine(),
+                          ],
                           const SizedBox(height: 24),
                           Text(
                             result.title,
