@@ -1492,6 +1492,14 @@ class _CatalogFilterPriceField extends StatelessWidget {
   }
 }
 
+/// True for categories whose real photo is trading-card art in the
+/// standard tall 63:88 card shape (TCGdex Pokemon today; the check is by
+/// category so Magic/Yu-Gi-Oh/Lorcana/One Piece card art gets the same
+/// portrait frame wherever it renders inline).
+bool _isCardArtCategory(String category) {
+  return category.toLowerCase().contains('card');
+}
+
 /// True when a catalog result is showing RAWG imagery — video-game rows
 /// are the only category whose cover art comes from RAWG.
 bool _isVideoGameResultWithArt(CatalogSearchResult result) {
@@ -1882,13 +1890,17 @@ class _CatalogResultDetailPageState
                             builder: (context) {
                               final hasRealPhoto =
                                   (result.imageUrl ?? '').trim().isNotEmpty;
-                              // A real photo (RAWG video-game covers/
-                              // screenshots especially) is almost always
-                              // widescreen -- give it a frame shaped to
-                              // match, filling edge to edge, rather than
-                              // squeezing it into the square the bucketed
-                              // placeholder illustrations use. The square
-                              // stays for the no-photo fallback case, since
+                              // Frame shape follows the artwork's real
+                              // shape. RAWG video-game covers/screenshots
+                              // are widescreen -> 16:9 edge to edge. Card
+                              // art (TCGdex Pokemon etc.) is tall portrait
+                              // (600x825) -- cover-cropping that into 16:9
+                              // showed a horizontal slice of the card's
+                              // middle (real bug found live on the first
+                              // TCGdex rollout day), so cards get a
+                              // centered portrait frame at the standard
+                              // 63:88 card ratio instead. The square stays
+                              // for the no-photo fallback case, since
                               // those illustrations are designed square.
                               final frame = ClipRRect(
                                 borderRadius: BorderRadius.circular(28),
@@ -1915,6 +1927,17 @@ class _CatalogResultDetailPageState
                                     width: 180,
                                     height: 180,
                                     child: frame,
+                                  ),
+                                );
+                              }
+                              if (_isCardArtCategory(result.category)) {
+                                return Center(
+                                  child: SizedBox(
+                                    width: 230,
+                                    child: AspectRatio(
+                                      aspectRatio: 63 / 88,
+                                      child: frame,
+                                    ),
                                   ),
                                 );
                               }
