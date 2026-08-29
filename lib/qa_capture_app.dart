@@ -73,6 +73,7 @@ class PackLoxQaCaptureApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       home: PackLoxQaCaptureScreen(screen: _qaScreen, scroll: _qaScroll),
     );
     return app;
