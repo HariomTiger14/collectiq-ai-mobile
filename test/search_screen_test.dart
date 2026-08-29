@@ -931,6 +931,84 @@ void main() {
   });
 
   testWidgets(
+    'RAWG attribution renders with video-game imagery in search and detail',
+    (tester) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          const CatalogSearchResult(
+            id: 'pc-mario-64',
+            title: 'Super Mario 64',
+            category: 'Video Games',
+            source: 'PriceCharting',
+            setName: 'Nintendo 64',
+            currency: 'USD',
+            marketValue: 45,
+            imageUrl: 'https://media.rawg.io/media/games/mario64.jpg',
+            attribution: 'Pricing data by PriceCharting',
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'mario 64',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Video game data and cover art via RAWG.io'),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-mario-64')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Video game data and cover art via RAWG.io'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'RAWG attribution is absent for non-video-game results',
+    (tester) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          const CatalogSearchResult(
+            id: 'pc-charizard',
+            title: 'Charizard #4 Base Set',
+            category: 'Pokemon Cards',
+            source: 'PriceCharting',
+            currency: 'USD',
+            marketValue: 161,
+            attribution: 'Pricing data by PriceCharting',
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Video game data and cover art via RAWG.io'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
     'sneaker listings show per-size StockX asks with market depth',
     (tester) async {
       await _pumpSearch(
