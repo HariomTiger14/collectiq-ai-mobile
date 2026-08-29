@@ -1506,17 +1506,28 @@ bool _isCardArtCategory(String category) {
   return category.toLowerCase().contains('card');
 }
 
-/// True when a catalog result is showing RAWG imagery — video-game rows
-/// are the only category whose cover art comes from RAWG.
+/// True when a catalog result is showing RAWG imagery. Detection keys off
+/// the image's own host: video-game rows carry PriceCharting GENRE
+/// categories ("Action & Adventure", not "Video Games"), so a category
+/// check silently missed most rows and their required attribution.
 bool _isVideoGameResultWithArt(CatalogSearchResult result) {
-  return (result.imageUrl ?? '').trim().isNotEmpty &&
+  final imageUrl = (result.imageUrl ?? '').trim();
+  if (imageUrl.isEmpty) {
+    return false;
+  }
+  return imageUrl.contains('media.rawg.io') ||
       result.category.toLowerCase().contains('video game');
 }
 
-/// True when a catalog result is showing Rebrickable imagery — LEGO rows
-/// are the only category whose set photos come from Rebrickable.
+/// True when a catalog result is showing Rebrickable imagery — keyed off
+/// the image host for the same reason as the RAWG check above, with the
+/// category as fallback.
 bool _isLegoResultWithArt(CatalogSearchResult result) {
-  return (result.imageUrl ?? '').trim().isNotEmpty &&
+  final imageUrl = (result.imageUrl ?? '').trim();
+  if (imageUrl.isEmpty) {
+    return false;
+  }
+  return imageUrl.contains('cdn.rebrickable.com') ||
       result.category.toLowerCase().contains('lego');
 }
 
