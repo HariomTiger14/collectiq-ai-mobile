@@ -1985,9 +1985,12 @@ class _CatalogResultDetailPageState
                                   size: 16,
                                 ),
                                 label: Text(
-                                  link.url == (result.imageUrl ?? '').trim()
-                                      ? 'View full image'
-                                      : link.isImage
+                                  // One label for every image link: since
+                                  // the link always opens the full-size
+                                  // asset now (externalImageUrl preferred),
+                                  // "full" vs plain no longer describes a
+                                  // real difference.
+                                  link.isImage
                                       ? 'View image'
                                       : 'View original listing',
                                 ),
