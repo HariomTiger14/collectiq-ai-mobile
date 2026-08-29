@@ -931,6 +931,70 @@ void main() {
   });
 
   testWidgets(
+    'sneaker listings show per-size StockX asks with market depth',
+    (tester) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          const CatalogSearchResult(
+            id: 'kdb-jordan4',
+            title: 'Air Jordan 4 Retro Infrared',
+            category: 'Sneakers',
+            source: 'KicksDB',
+            currency: 'USD',
+            marketValue: 180,
+            attribution: 'Pricing data by KicksDB',
+            marketplaceListings: [
+              MarketplaceListing(
+                title: 'Size US M 10',
+                price: 115,
+                currency: 'USD',
+                condition: 'New',
+                url: 'https://stockx.com/air-jordan-4-infrared',
+                source: 'StockX',
+                size: 'US M 10',
+                totalAsks: 13,
+                salesLast30Days: 8,
+              ),
+              MarketplaceListing(
+                title: 'Size US M 10.5',
+                price: 131,
+                currency: 'USD',
+                condition: 'New',
+                url: 'https://stockx.com/air-jordan-4-infrared',
+                source: 'StockX',
+                size: 'US M 10.5',
+                totalAsks: 1,
+              ),
+            ],
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'jordan',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-kdb-jordan4')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Where to buy'), findsOneWidget);
+      expect(find.text('Size US M 10'), findsOneWidget);
+      // Market depth replaces the constant "New" condition on the row.
+      expect(find.text('13 asks · 8 sold in 30 days'), findsOneWidget);
+      expect(find.text('Size US M 10.5'), findsOneWidget);
+      expect(find.text('1 ask'), findsOneWidget);
+      expect(find.text('New'), findsNothing);
+      expect(find.text('USD \$115'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'catalog result detail hides the eBay panel when there are no listings',
     (tester) async {
       await _pumpSearch(
