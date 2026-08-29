@@ -4133,18 +4133,20 @@ Future<void> _launchExternalLink(BuildContext context, String url) async {
 /// pipeline exists), otherwise a fallback to the source's product page.
 /// Returns null when neither is available.
 ({String url, bool isImage})? _catalogExternalLink(CatalogSearchResult result) {
-  // result.imageUrl is only ever set by the detail() endpoint (a real,
-  // confirmed match, already rendered inline above -- but cropped to fit
-  // the thumbnail frame). Prefer it here so there's always a way to open
-  // the same photo full-size externally, not just when no inline image
-  // exists.
-  final inlineImageUrl = (result.imageUrl ?? '').trim();
-  if (inlineImageUrl.isNotEmpty) {
-    return (url: inlineImageUrl, isImage: true);
-  }
+  // externalImageUrl first: when the backend sets both, imageUrl is the
+  // inline rendering size (Pokemon search rows carry the 245px TCGdex
+  // low.webp there) while externalImageUrl is the full-size asset -- the
+  // link exists to open the photo at full size, and preferring imageUrl
+  // sent people to a tiny thumbnail in the browser (real bug found
+  // live). Rows that only set imageUrl (KicksDB, detail() enrichments)
+  // fall through and behave exactly as before.
   final externalImageUrl = (result.externalImageUrl ?? '').trim();
   if (externalImageUrl.isNotEmpty) {
     return (url: externalImageUrl, isImage: true);
+  }
+  final inlineImageUrl = (result.imageUrl ?? '').trim();
+  if (inlineImageUrl.isNotEmpty) {
+    return (url: inlineImageUrl, isImage: true);
   }
   final productUrl = (result.productUrl ?? '').trim();
   if (productUrl.isNotEmpty) {
