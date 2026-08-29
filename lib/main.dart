@@ -28,13 +28,13 @@ void main() {
       WidgetsFlutterBinding.ensureInitialized();
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
+        if (_isTabletDisplay()) DeviceOrientation.portraitDown,
       ]);
       _disableReleaseDebugLogs();
       _configureAndroidImagePicker();
 
       registerFirebaseTelemetryBuilder(
-        apiBaseUrl:
-            backend_config.EnvironmentConfig.fromEnvironment().baseUrl,
+        apiBaseUrl: backend_config.EnvironmentConfig.fromEnvironment().baseUrl,
       );
       bootstrapTelemetry = createAppTelemetryService(
         TelemetryConfig.fromEnvironment(),
@@ -172,6 +172,17 @@ void _logSitConfigDiagnostics(EnvironmentConfig config) {
   );
 }
 
+/// Tablets (iPad) may rotate between the two portrait orientations; phones
+/// stay locked to portrait-up. Must run after `ensureInitialized`.
+bool _isTabletDisplay() {
+  final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+  if (view == null) {
+    return false;
+  }
+  final shortestSide = view.physicalSize.shortestSide / view.devicePixelRatio;
+  return shortestSide >= 600;
+}
+
 void _disableReleaseDebugLogs() {
   if (kReleaseMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
@@ -206,6 +217,9 @@ class _CollectIqAppState extends ConsumerState<CollectIqApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      // PackLox is a dark product: never follow the device appearance, so a
+      // screen missing its own Theme(AppTheme.dark) wrapper can't go light.
+      themeMode: ThemeMode.dark,
       home: const AppShell(),
     );
   }

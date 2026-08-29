@@ -134,7 +134,17 @@ class AuthWelcomeScreen extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compactHeight = constraints.maxHeight < 760;
-                final heroHeight = compactHeight ? 224.0 : 286.0;
+                // Tablets get a proportionate hero and vertically balanced
+                // content instead of the phone's top-anchored layout.
+                final isTabletCanvas =
+                    MediaQuery.sizeOf(context).shortestSide >= 600;
+                final heroHeight = isTabletCanvas
+                    ? (constraints.maxHeight * 0.32)
+                          .clamp(286.0, 430.0)
+                          .toDouble()
+                    : compactHeight
+                    ? 224.0
+                    : 286.0;
                 final topGap = compactHeight ? 18.0 : 28.0;
                 final heroGap = compactHeight ? 12.0 : 20.0;
                 final actionGap = compactHeight ? 14.0 : 20.0;
@@ -158,6 +168,7 @@ class AuthWelcomeScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (isTabletCanvas) const Spacer(),
                             const _AuthWelcomeBrandLockup(),
                             const SizedBox(height: AppSpacing.md),
                             Text(
@@ -196,7 +207,7 @@ class AuthWelcomeScreen extends StatelessWidget {
                               semanticLabel: 'Sign In',
                               onPressed: () => _openSignIn(context),
                             ),
-                            const Spacer(),
+                            Spacer(flex: isTabletCanvas ? 2 : 1),
                             const SizedBox(height: AppSpacing.lg),
                             const Padding(
                               padding: EdgeInsets.only(bottom: AppSpacing.xl),

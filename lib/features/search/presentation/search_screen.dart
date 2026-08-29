@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
+import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/category_visual.dart';
 import 'package:collectiq_ai/core/ui/product_language/product_language_tokens.dart';
@@ -424,100 +425,106 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _catalogResults.isEmpty &&
         _lastCatalogQuery == query;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        key: const ValueKey('search-screen'),
-        backgroundColor: PackLoxTokens.background,
-        body: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            key: const ValueKey('search-scroll-view'),
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding),
-                sliver: SliverToBoxAdapter(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 600),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const HomeBrandLockup(),
-                          const SizedBox(height: 20),
-                          const _SearchHeader(),
-                          const SizedBox(height: 22),
-                          _SearchField(
-                            controller: _queryController,
-                            hintText: 'Search catalog prices',
-                            onChanged: _onQueryChanged,
-                            // Clearing is a deliberate one-off action, not a
-                            // keystroke to debounce — route it the same way
-                            // as a quick-filter tap so results disappear
-                            // immediately instead of after the typing delay.
-                            onClear: () => _setQuery(''),
-                          ),
-                          const SizedBox(height: 10),
-                          _CatalogFilterButton(
-                            filters: _filters,
-                            onTap: () => _openFilterSheet(context),
-                          ),
-                          const SizedBox(height: 18),
-                          _CatalogStatusCard(
-                            resultCount: _catalogResults.length,
-                            hasQuery: hasQuery,
-                            isConnected:
-                                _catalogError == null ||
-                                _catalogResults.isNotEmpty,
-                          ),
-                          const SizedBox(height: 18),
-                          if (!isCatalogReady) ...[
-                            const _SectionTitle('Search the catalog'),
-                            const SizedBox(height: 10),
-                            _QuickFilterChips(
-                              filters: catalogQuickFilters,
-                              onSelected: _applyQuickFilter,
+    // Discover is a dark product-language surface like Home/Portfolio/Scan;
+    // without this wrapper it inherits the device theme, and light mode's
+    // filled InputDecoration paints a white capsule under the white text.
+    return Theme(
+      data: AppTheme.dark,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          key: const ValueKey('search-screen'),
+          backgroundColor: PackLoxTokens.background,
+          body: SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              key: const ValueKey('search-scroll-view'),
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding),
+                  sliver: SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const HomeBrandLockup(),
+                            const SizedBox(height: 20),
+                            const _SearchHeader(),
+                            const SizedBox(height: 22),
+                            _SearchField(
+                              controller: _queryController,
+                              hintText: 'Search catalog prices',
+                              onChanged: _onQueryChanged,
+                              // Clearing is a deliberate one-off action, not a
+                              // keystroke to debounce — route it the same way
+                              // as a quick-filter tap so results disappear
+                              // immediately instead of after the typing delay.
+                              onClear: () => _setQuery(''),
                             ),
-                          ] else if (_isCatalogLoading)
-                            const _CatalogLoadingState()
-                          else if (_catalogError != null)
-                            _CatalogErrorState(
-                              message: _catalogError!,
-                              onRetry: () => _runCatalogSearch(query),
-                            )
-                          else if (isCatalogEmpty)
-                            const _CatalogEmptyState()
-                          else ...[
-                            const _SectionTitle('Catalog matches'),
                             const SizedBox(height: 10),
-                            for (final result in _catalogResults.take(
-                              20,
-                            )) ...[
-                              _CatalogResultCard(
-                                result: result,
-                                onTap: () =>
-                                    _openCatalogResult(context, result),
-                              ),
+                            _CatalogFilterButton(
+                              filters: _filters,
+                              onTap: () => _openFilterSheet(context),
+                            ),
+                            const SizedBox(height: 18),
+                            _CatalogStatusCard(
+                              resultCount: _catalogResults.length,
+                              hasQuery: hasQuery,
+                              isConnected:
+                                  _catalogError == null ||
+                                  _catalogResults.isNotEmpty,
+                            ),
+                            const SizedBox(height: 18),
+                            if (!isCatalogReady) ...[
+                              const _SectionTitle('Search the catalog'),
                               const SizedBox(height: 10),
-                            ],
-                            if (_catalogResults
-                                .take(20)
-                                .any(_isVideoGameResultWithArt)) ...[
-                              const SizedBox(height: 2),
-                              const _RawgAttributionLine(),
+                              _QuickFilterChips(
+                                filters: catalogQuickFilters,
+                                onSelected: _applyQuickFilter,
+                              ),
+                            ] else if (_isCatalogLoading)
+                              const _CatalogLoadingState()
+                            else if (_catalogError != null)
+                              _CatalogErrorState(
+                                message: _catalogError!,
+                                onRetry: () => _runCatalogSearch(query),
+                              )
+                            else if (isCatalogEmpty)
+                              const _CatalogEmptyState()
+                            else ...[
+                              const _SectionTitle('Catalog matches'),
+                              const SizedBox(height: 10),
+                              for (final result in _catalogResults.take(
+                                20,
+                              )) ...[
+                                _CatalogResultCard(
+                                  result: result,
+                                  onTap: () =>
+                                      _openCatalogResult(context, result),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                              if (_catalogResults
+                                  .take(20)
+                                  .any(_isVideoGameResultWithArt)) ...[
+                                const SizedBox(height: 2),
+                                const _RawgAttributionLine(),
+                              ],
                             ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -699,9 +706,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   isActive: draft.categoryGroup != null,
                   itemBuilder: (context) => [
                     CheckedPopupMenuItem<String>(
-                      key: const ValueKey(
-                        'catalog-filter-category-option-all',
-                      ),
+                      key: const ValueKey('catalog-filter-category-option-all'),
                       value: 'all',
                       checked: draft.categoryGroup == null,
                       child: const Text('All categories'),
@@ -945,7 +950,6 @@ class _SearchField extends StatelessWidget {
     );
   }
 }
-
 
 class _CatalogStatusCard extends StatelessWidget {
   const _CatalogStatusCard({
@@ -1259,10 +1263,7 @@ class _CatalogFilterButton extends StatelessWidget {
             if (filters.activeCount > 0) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 7,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: PackLoxTokens.cyan.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(999),
@@ -1340,12 +1341,11 @@ class _CatalogFilterSheet extends StatelessWidget {
                         const SizedBox(height: 14),
                         Text(
                           'Filter catalog',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleMedium?.copyWith(
-                            color: PackLoxTokens.textPrimary,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: PackLoxTokens.textPrimary,
+                                fontWeight: FontWeight.w900,
+                              ),
                         ),
                         const SizedBox(height: 16),
                         ...children,
@@ -1740,7 +1740,11 @@ class _CatalogMetaPill extends StatelessWidget {
 /// publisher-sourced product image -- without the app hosting/rendering
 /// the image itself.
 class _CatalogListingLink extends StatelessWidget {
-  const _CatalogListingLink({super.key, required this.label, required this.onTap});
+  const _CatalogListingLink({
+    super.key,
+    required this.label,
+    required this.onTap,
+  });
 
   final String label;
   final VoidCallback onTap;
@@ -1859,257 +1863,267 @@ class _CatalogResultDetailPageState
         _CatalogDetailRowData('Attribution', result.attribution!.trim()),
     ];
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        key: const ValueKey('catalog-result-detail-screen'),
-        backgroundColor: PackLoxTokens.background,
-        body: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-                sliver: SliverToBoxAdapter(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 600),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _CatalogDetailTopBar(
-                            onBack: () => Navigator.of(context).maybePop(),
-                          ),
-                          const SizedBox(height: 18),
-                          Builder(
-                            builder: (context) {
-                              final hasRealPhoto =
-                                  (result.imageUrl ?? '').trim().isNotEmpty;
-                              // Frame shape follows the artwork's real
-                              // shape. RAWG video-game covers/screenshots
-                              // are widescreen -> 16:9 edge to edge. Card
-                              // art (TCGdex Pokemon etc.) is tall portrait
-                              // (600x825) -- cover-cropping that into 16:9
-                              // showed a horizontal slice of the card's
-                              // middle (real bug found live on the first
-                              // TCGdex rollout day), so cards get a
-                              // centered portrait frame at the standard
-                              // 63:88 card ratio instead. The square stays
-                              // for the no-photo fallback case, since
-                              // those illustrations are designed square.
-                              final frame = ClipRRect(
-                                borderRadius: BorderRadius.circular(28),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: PackLoxTokens.surfaceRaised,
-                                    borderRadius: BorderRadius.circular(28),
-                                    border: Border.all(
-                                      color: PackLoxTokens.border,
+    // Discover is a dark product-language surface like Home/Portfolio/Scan;
+    // without this wrapper it inherits the device theme, and light mode's
+    // filled InputDecoration paints a white capsule under the white text.
+    return Theme(
+      data: AppTheme.dark,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          key: const ValueKey('catalog-result-detail-screen'),
+          backgroundColor: PackLoxTokens.background,
+          body: SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                  sliver: SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _CatalogDetailTopBar(
+                              onBack: () => Navigator.of(context).maybePop(),
+                            ),
+                            const SizedBox(height: 18),
+                            Builder(
+                              builder: (context) {
+                                final hasRealPhoto = (result.imageUrl ?? '')
+                                    .trim()
+                                    .isNotEmpty;
+                                // Frame shape follows the artwork's real
+                                // shape. RAWG video-game covers/screenshots
+                                // are widescreen -> 16:9 edge to edge. Card
+                                // art (TCGdex Pokemon etc.) is tall portrait
+                                // (600x825) -- cover-cropping that into 16:9
+                                // showed a horizontal slice of the card's
+                                // middle (real bug found live on the first
+                                // TCGdex rollout day), so cards get a
+                                // centered portrait frame at the standard
+                                // 63:88 card ratio instead. The square stays
+                                // for the no-photo fallback case, since
+                                // those illustrations are designed square.
+                                final frame = ClipRRect(
+                                  borderRadius: BorderRadius.circular(28),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: PackLoxTokens.surfaceRaised,
+                                      borderRadius: BorderRadius.circular(28),
+                                      border: Border.all(
+                                        color: PackLoxTokens.border,
+                                      ),
+                                    ),
+                                    child: _CatalogPlaceholderArt(
+                                      category: result.category,
+                                      title: result.title,
+                                      setName: result.setName,
+                                      imageUrl: result.imageUrl,
+                                      fit: BoxFit.cover,
                                     ),
                                   ),
-                                  child: _CatalogPlaceholderArt(
-                                    category: result.category,
-                                    title: result.title,
-                                    setName: result.setName,
-                                    imageUrl: result.imageUrl,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              );
-                              if (!hasRealPhoto) {
-                                return Center(
-                                  child: SizedBox(
-                                    width: 180,
-                                    height: 180,
-                                    child: frame,
-                                  ),
                                 );
-                              }
-                              if (_isCardArtCategory(result.category)) {
-                                return Center(
-                                  child: SizedBox(
-                                    width: 230,
-                                    child: AspectRatio(
-                                      aspectRatio: 63 / 88,
+                                if (!hasRealPhoto) {
+                                  return Center(
+                                    child: SizedBox(
+                                      width: 180,
+                                      height: 180,
                                       child: frame,
                                     ),
-                                  ),
+                                  );
+                                }
+                                if (_isCardArtCategory(result.category)) {
+                                  return Center(
+                                    child: SizedBox(
+                                      width: 230,
+                                      child: AspectRatio(
+                                        aspectRatio: 63 / 88,
+                                        child: frame,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: frame,
                                 );
-                              }
-                              return AspectRatio(
-                                aspectRatio: 16 / 9,
-                                child: frame,
-                              );
-                            },
-                          ),
-                          if (_isVideoGameResultWithArt(result)) ...[
-                            const SizedBox(height: 8),
-                            const _RawgAttributionLine(),
-                          ],
-                          const SizedBox(height: 24),
-                          Text(
-                            result.title,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: PackLoxTokens.textPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.04,
-                                ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _SearchPill(label: result.category),
-                              _SearchPill(label: result.source),
+                              },
+                            ),
+                            if (_isVideoGameResultWithArt(result)) ...[
+                              const SizedBox(height: 8),
+                              const _RawgAttributionLine(),
                             ],
-                          ),
-                          if (_catalogExternalLink(result) case final link?) ...[
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                key: const ValueKey(
-                                  'catalog-detail-view-listing',
-                                ),
-                                onPressed: () =>
-                                    _launchExternalLink(context, link.url),
-                                icon: const Icon(
-                                  Icons.north_east_rounded,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  link.url == (result.imageUrl ?? '').trim()
-                                      ? 'View full image'
-                                      : link.isImage
-                                      ? 'View image'
-                                      : 'View original listing',
-                                ),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: PackLoxTokens.cyan,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
+                            const SizedBox(height: 24),
+                            Text(
+                              result.title,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: PackLoxTokens.textPrimary,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.04,
                                   ),
-                                  visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _SearchPill(label: result.category),
+                                _SearchPill(label: result.source),
+                              ],
+                            ),
+                            if (_catalogExternalLink(result)
+                                case final link?) ...[
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  key: const ValueKey(
+                                    'catalog-detail-view-listing',
+                                  ),
+                                  onPressed: () =>
+                                      _launchExternalLink(context, link.url),
+                                  icon: const Icon(
+                                    Icons.north_east_rounded,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    link.url == (result.imageUrl ?? '').trim()
+                                        ? 'View full image'
+                                        : link.isImage
+                                        ? 'View image'
+                                        : 'View original listing',
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: PackLoxTokens.cyan,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    textStyle: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            _CatalogValuePanel(result: result, value: value),
+                            const SizedBox(height: 14),
+                            _CatalogTrustPanel(result: result),
+                            if (result.marketplaceListings.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              _CatalogMarketplaceListingsPanel(
+                                itemTitle: result.title,
+                                result: result,
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            _CatalogHistoryChartPanel(
+                              history: result.history,
+                              isLoading: _isLoadingDetail,
+                              errorMessage: _detailError,
+                              currency: result.currency,
+                            ),
+                            const SizedBox(height: 14),
+                            _CatalogHistoryPanel(
+                              itemTitle: result.title,
+                              history: result.history,
+                              isLoading: _isLoadingDetail,
+                              errorMessage: _detailError,
+                            ),
+                            const SizedBox(height: 14),
+                            _SurfaceCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _SectionTitle('Catalog identity'),
+                                  const SizedBox(height: 12),
+                                  for (final row in rows) ...[
+                                    _CatalogDetailRow(row: row),
+                                    if (row != rows.last)
+                                      const Divider(
+                                        color: PackLoxTokens.border,
+                                        height: 18,
+                                      ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _SurfaceCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _SectionTitle('Portfolio snapshot'),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Saving stores this catalog match and current valuation as a dated portfolio snapshot. Browsing your portfolio will not call pricing APIs again.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: PackLoxTokens.textSecondary,
+                                          height: 1.34,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                key: const ValueKey(
+                                  'catalog-detail-add-to-portfolio',
+                                ),
+                                onPressed: _isSaving ? null : _saveToPortfolio,
+                                icon: _isSaving
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.add_rounded),
+                                label: Text(
+                                  _isSaving ? 'Saving' : 'Add to Portfolio',
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: PackLoxTokens.blue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
                                   textStyle: Theme.of(context)
                                       .textTheme
-                                      .labelLarge
-                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w900),
                                 ),
                               ),
                             ),
                           ],
-                          const SizedBox(height: 18),
-                          _CatalogValuePanel(result: result, value: value),
-                          const SizedBox(height: 14),
-                          _CatalogTrustPanel(result: result),
-                          if (result.marketplaceListings.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            _CatalogMarketplaceListingsPanel(
-                              itemTitle: result.title,
-                              result: result,
-                            ),
-                          ],
-                          const SizedBox(height: 14),
-                          _CatalogHistoryChartPanel(
-                            history: result.history,
-                            isLoading: _isLoadingDetail,
-                            errorMessage: _detailError,
-                            currency: result.currency,
-                          ),
-                          const SizedBox(height: 14),
-                          _CatalogHistoryPanel(
-                            itemTitle: result.title,
-                            history: result.history,
-                            isLoading: _isLoadingDetail,
-                            errorMessage: _detailError,
-                          ),
-                          const SizedBox(height: 14),
-                          _SurfaceCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _SectionTitle('Catalog identity'),
-                                const SizedBox(height: 12),
-                                for (final row in rows) ...[
-                                  _CatalogDetailRow(row: row),
-                                  if (row != rows.last)
-                                    const Divider(
-                                      color: PackLoxTokens.border,
-                                      height: 18,
-                                    ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _SurfaceCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _SectionTitle('Portfolio snapshot'),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Saving stores this catalog match and current valuation as a dated portfolio snapshot. Browsing your portfolio will not call pricing APIs again.',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: PackLoxTokens.textSecondary,
-                                        height: 1.34,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              key: const ValueKey(
-                                'catalog-detail-add-to-portfolio',
-                              ),
-                              onPressed: _isSaving ? null : _saveToPortfolio,
-                              icon: _isSaving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.add_rounded),
-                              label: Text(
-                                _isSaving ? 'Saving' : 'Add to Portfolio',
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: PackLoxTokens.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                textStyle: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2183,10 +2197,7 @@ class _CatalogResultDetailPageState
           : null;
       final detail = await ref
           .read(catalogSearchRepositoryProvider)
-          .getCatalogDetail(
-            result: widget.result,
-            currency: preferredCurrency,
-          );
+          .getCatalogDetail(result: widget.result, currency: preferredCurrency);
       if (!mounted) {
         return;
       }
@@ -2382,7 +2393,10 @@ class _CatalogTrustPanel extends StatelessWidget {
 const int _kInlineMarketplaceListingsLimit = 3;
 
 class _CatalogMarketplaceListingsPanel extends StatelessWidget {
-  const _CatalogMarketplaceListingsPanel({required this.itemTitle, required this.result});
+  const _CatalogMarketplaceListingsPanel({
+    required this.itemTitle,
+    required this.result,
+  });
 
   final String itemTitle;
   final CatalogSearchResult result;
@@ -2629,13 +2643,11 @@ class _CatalogChartPoint {
 List<_CatalogChartPoint> _catalogChartPoints(
   List<CatalogPriceHistoryPoint> history,
 ) {
-  final points =
-      [
-          for (final point in history)
-            if (point.marketValue != null && point.marketValue! > 0)
-              _CatalogChartPoint(date: point.validFrom, value: point.marketValue!),
-        ]
-        ..sort((a, b) => a.date.compareTo(b.date));
+  final points = [
+    for (final point in history)
+      if (point.marketValue != null && point.marketValue! > 0)
+        _CatalogChartPoint(date: point.validFrom, value: point.marketValue!),
+  ]..sort((a, b) => a.date.compareTo(b.date));
   return points;
 }
 
@@ -3423,9 +3435,7 @@ class _CatalogPlaceholderArt extends StatelessWidget {
         style.assetPath!,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        errorBuilder: (_, _, _) => _FallbackCatalogPlaceholderArt(
-          style: style,
-        ),
+        errorBuilder: (_, _, _) => _FallbackCatalogPlaceholderArt(style: style),
       );
     }
     return _FallbackCatalogPlaceholderArt(style: style);

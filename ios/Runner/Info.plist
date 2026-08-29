@@ -81,6 +81,10 @@
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<!-- Portrait-only on iPad requires opting out of multitasking, or App Store validation rejects the build. -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
 </dict>
 </plist>
