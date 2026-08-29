@@ -516,6 +516,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 const SizedBox(height: 2),
                                 const _RawgAttributionLine(),
                               ],
+                              if (_catalogResults
+                                  .take(20)
+                                  .any(_isLegoResultWithArt)) ...[
+                                const SizedBox(height: 2),
+                                const _RebrickableAttributionLine(),
+                              ],
                             ],
                           ],
                         ),
@@ -1507,6 +1513,40 @@ bool _isVideoGameResultWithArt(CatalogSearchResult result) {
       result.category.toLowerCase().contains('video game');
 }
 
+/// True when a catalog result is showing Rebrickable imagery — LEGO rows
+/// are the only category whose set photos come from Rebrickable.
+bool _isLegoResultWithArt(CatalogSearchResult result) {
+  return (result.imageUrl ?? '').trim().isNotEmpty &&
+      result.category.toLowerCase().contains('lego');
+}
+
+/// Rebrickable's terms permit commercial use of its data/images with
+/// attribution — rendered directly under LEGO imagery in search results
+/// and on the detail page, same treatment as RAWG below.
+class _RebrickableAttributionLine extends StatelessWidget {
+  const _RebrickableAttributionLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('rebrickable-attribution-link'),
+      onTap: () => _launchExternalLink(context, 'https://rebrickable.com'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          'LEGO set data and images via Rebrickable',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            decoration: TextDecoration.underline,
+            decorationColor: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// RAWG's API terms require attribution and an active link on the pages
 /// where RAWG data/images are used — the About-screen credit alone does
 /// not satisfy that, so this renders directly under video-game imagery
@@ -1960,6 +2000,10 @@ class _CatalogResultDetailPageState
                             if (_isVideoGameResultWithArt(result)) ...[
                               const SizedBox(height: 8),
                               const _RawgAttributionLine(),
+                            ],
+                            if (_isLegoResultWithArt(result)) ...[
+                              const SizedBox(height: 8),
+                              const _RebrickableAttributionLine(),
                             ],
                             const SizedBox(height: 24),
                             Text(
