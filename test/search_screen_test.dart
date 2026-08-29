@@ -556,8 +556,7 @@ void main() {
     );
     expect(find.text('Current value'), findsOneWidget);
     expect(find.text('USD \$82'), findsOneWidget);
-    expect(find.text('Low'), findsOneWidget);
-    expect(find.text('High'), findsOneWidget);
+    expect(find.text('Loose / Graded'), findsOneWidget);
     expect(find.text('Pricing evidence'), findsOneWidget);
     expect(find.text('Trusted provider value'), findsOneWidget);
     expect(find.text('Currency'), findsWidgets);
