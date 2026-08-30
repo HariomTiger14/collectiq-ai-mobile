@@ -122,12 +122,54 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                             ),
                             const SizedBox(height: 12),
                             InkWell(
-                              onTap: () => _launchAboutLink(
-                                context,
-                                'https://rawg.io',
-                              ),
+                              onTap: () =>
+                                  _launchAboutLink(context, 'https://rawg.io'),
                               child: Text(
                                 'Video game data and cover art via RAWG.io',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () => _launchAboutLink(
+                                context,
+                                'https://rebrickable.com',
+                              ),
+                              child: Text(
+                                'LEGO set data and images via Rebrickable',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // Verbatim notice required by Wizards of the
+                            // Coast's Fan Content Policy for Magic imagery.
+                            Text(
+                              'PackLox is unofficial Fan Content permitted '
+                              'under the Fan Content Policy. Not '
+                              'approved/endorsed by Wizards. Portions of the '
+                              'materials used are property of Wizards of the '
+                              'Coast. ©Wizards of the Coast LLC.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () => _launchAboutLink(
+                                context,
+                                'https://company.wizards.com/en/legal/fancontentpolicy',
+                              ),
+                              child: Text(
+                                'Wizards of the Coast Fan Content Policy',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(
                                       color: colorScheme.primary,
