@@ -4218,7 +4218,7 @@ Future<void> _openFullScreenImage(
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
-      barrierColor: Colors.black,
+      barrierColor: PackLoxTokens.background,
       pageBuilder: (_, _, _) =>
           _FullScreenImageViewer(imageUrl: imageUrl, heroTag: heroTag),
       transitionsBuilder: (_, animation, _, child) =>
@@ -4265,16 +4265,17 @@ class _FullScreenImageViewer extends StatelessWidget {
       image = Hero(tag: heroTag!, child: image);
     }
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: PackLoxTokens.background,
       body: Stack(
         children: [
-          // Solid black fills the whole screen (the route is non-opaque,
-          // so a transparent backdrop would let the screen behind bleed
-          // through around the image). Tapping it dismisses.
+          // App background fills the whole screen so the area around the
+          // image merges with the rest of the app (the route is
+          // non-opaque, so a transparent backdrop would let the screen
+          // behind bleed through). Tapping it dismisses.
           Positioned.fill(
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const ColoredBox(color: Colors.black),
+              child: const ColoredBox(color: PackLoxTokens.background),
             ),
           ),
           Positioned.fill(child: image),
