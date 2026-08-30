@@ -1991,20 +1991,45 @@ class _CatalogResultDetailPageState
                                     ),
                                   );
                                 }
+                                // Full-size asset when the backend supplies
+                                // a distinct one (e.g. Pokemon low.webp
+                                // inline vs full externalImageUrl), else the
+                                // inline image itself.
+                                final fullImageUrl =
+                                    (result.externalImageUrl ?? '')
+                                        .trim()
+                                        .isNotEmpty
+                                    ? result.externalImageUrl!.trim()
+                                    : (result.imageUrl ?? '').trim();
+                                Widget tappable(Widget child) =>
+                                    GestureDetector(
+                                      key: const ValueKey(
+                                        'catalog-detail-image-tap',
+                                      ),
+                                      onTap: () => _openFullScreenImage(
+                                        context,
+                                        fullImageUrl,
+                                      ),
+                                      child: Semantics(
+                                        button: true,
+                                        label: 'View full image',
+                                        child: child,
+                                      ),
+                                    );
                                 if (_isCardArtCategory(result.category)) {
                                   return Center(
                                     child: SizedBox(
                                       width: 230,
                                       child: AspectRatio(
                                         aspectRatio: 63 / 88,
-                                        child: frame,
+                                        child: tappable(frame),
                                       ),
                                     ),
                                   );
                                 }
                                 return AspectRatio(
                                   aspectRatio: 16 / 9,
-                                  child: frame,
+                                  child: tappable(frame),
                                 );
                               },
                             ),
@@ -2035,8 +2060,18 @@ class _CatalogResultDetailPageState
                                 _SearchPill(label: result.source),
                               ],
                             ),
-                            if (_catalogExternalLink(result)
-                                case final link?) ...[
+                            // The text link is only for cases the tappable
+                            // hero above doesn't already cover: product
+                            // listings, or image links with no inline photo
+                            // to tap (link-only sources). When the image is
+                            // shown inline, tapping it opens the full-screen
+                            // viewer instead of a browser -- no redundant
+                            // "View full image" link.
+                            if (_catalogExternalLink(result) case final link?
+                                when !(link.isImage &&
+                                    (result.imageUrl ?? '')
+                                        .trim()
+                                        .isNotEmpty)) ...[
                               const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerLeft,
@@ -2051,9 +2086,7 @@ class _CatalogResultDetailPageState
                                     size: 16,
                                   ),
                                   label: Text(
-                                    link.url == (result.imageUrl ?? '').trim()
-                                        ? 'View full image'
-                                        : link.isImage
+                                    link.isImage
                                         ? 'View image'
                                         : 'View original listing',
                                   ),
@@ -4172,6 +4205,96 @@ class _PlaceholderStyle {
 /// browser tab (SFSafariViewController on iOS, Chrome Custom Tabs on
 /// Android), failing silently with a brief snackbar if the link cannot be
 /// opened.
+/// Opens [imageUrl] in a native full-screen, pinch-to-zoom viewer instead
+/// of an in-app browser. Used for catalog imagery the app already renders
+/// inline (tapping the detail hero) — no third-party URL chrome, and the
+/// image stays inside the app's own UI. Link-only sources and product
+/// listings still use [_launchExternalLink] (the browser) on purpose.
+Future<void> _openFullScreenImage(
+  BuildContext context,
+  String imageUrl, {
+  String? heroTag,
+}) {
+  return Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      pageBuilder: (_, _, _) =>
+          _FullScreenImageViewer(imageUrl: imageUrl, heroTag: heroTag),
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}
+
+class _FullScreenImageViewer extends StatelessWidget {
+  const _FullScreenImageViewer({required this.imageUrl, this.heroTag});
+
+  final String imageUrl;
+  final String? heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    Widget image = InteractiveViewer(
+      minScale: 1,
+      maxScale: 5,
+      child: Center(
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) => progress == null
+              ? child
+              : const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white70,
+                    strokeWidth: 2,
+                  ),
+                ),
+          errorBuilder: (context, _, _) => const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white38,
+              size: 48,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (heroTag != null) {
+      image = Hero(tag: heroTag!, child: image);
+    }
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Tap the backdrop (outside the image) to dismiss.
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).maybePop(),
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+          Positioned.fill(child: image),
+          Positioned(
+            top: topInset + 8,
+            left: 12,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: IconButton(
+                key: const ValueKey('fullscreen-image-close'),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Future<void> _launchExternalLink(BuildContext context, String url) async {
   final uri = Uri.tryParse(url);
   if (uri == null) {
