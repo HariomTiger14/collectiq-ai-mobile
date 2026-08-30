@@ -384,7 +384,13 @@ int? _int(Object? value) {
 /// with the image when the source requires one.
 class CatalogImage {
   /// Creates a catalog image.
-  const CatalogImage({required this.url, this.label, this.credit});
+  const CatalogImage({
+    required this.url,
+    this.label,
+    this.credit,
+    this.attributionRequired = false,
+    this.attributionUrl,
+  });
 
   /// Direct image URL.
   final String url;
@@ -395,12 +401,27 @@ class CatalogImage {
   /// Required photo credit, displayed alongside the image when set.
   final String? credit;
 
+  /// Whether showing [credit] is a condition of the image's licence.
+  ///
+  /// True for CC BY / CC BY-SA images, where naming the author is what the
+  /// licence grants use in exchange for -- omitting it is infringement, not
+  /// an untidy UI. Public-domain images carry a credit for provenance but
+  /// leave this false, so surfaces that are too small for a caption may drop
+  /// it. Every surface that shows the image must show the credit when this
+  /// is true, including full-screen.
+  final bool attributionRequired;
+
+  /// Source page the required attribution should link to, when known.
+  final String? attributionUrl;
+
   /// Parses a flexible backend response safely.
   factory CatalogImage.fromJson(Map<String, dynamic> json) {
     return CatalogImage(
       url: _string(json['url']) ?? '',
       label: _string(json['label']),
       credit: _string(json['credit']),
+      attributionRequired: json['attributionRequired'] == true,
+      attributionUrl: _string(json['attributionUrl']),
     );
   }
 }
