@@ -4268,11 +4268,13 @@ class _FullScreenImageViewer extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Tap the backdrop (outside the image) to dismiss.
+          // Solid black fills the whole screen (the route is non-opaque,
+          // so a transparent backdrop would let the screen behind bleed
+          // through around the image). Tapping it dismisses.
           Positioned.fill(
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const ColoredBox(color: Colors.transparent),
+              child: const ColoredBox(color: Colors.black),
             ),
           ),
           Positioned.fill(child: image),
