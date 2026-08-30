@@ -522,6 +522,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 const SizedBox(height: 2),
                                 const _RebrickableAttributionLine(),
                               ],
+                              if (_catalogResults
+                                  .take(20)
+                                  .any(_isMagicResultWithArt)) ...[
+                                const SizedBox(height: 2),
+                                const _WizardsAttributionLine(),
+                              ],
                             ],
                           ],
                         ),
@@ -1531,6 +1537,49 @@ bool _isLegoResultWithArt(CatalogSearchResult result) {
       result.category.toLowerCase().contains('lego');
 }
 
+/// True when a catalog result is showing Scryfall (Magic) imagery —
+/// keyed off the image host, category as fallback.
+bool _isMagicResultWithArt(CatalogSearchResult result) {
+  final imageUrl = (result.imageUrl ?? '').trim();
+  if (imageUrl.isEmpty) {
+    return false;
+  }
+  return imageUrl.contains('cards.scryfall.io') ||
+      result.category.toLowerCase().contains('magic');
+}
+
+/// Magic card imagery is used under Wizards of the Coast's Fan Content
+/// Policy. The policy requires acknowledging Wizards' ownership where the
+/// content appears; this short line sits under Magic imagery (search +
+/// detail) and links to the policy, with the full verbatim notice on the
+/// About screen (too long for an inline row).
+class _WizardsAttributionLine extends StatelessWidget {
+  const _WizardsAttributionLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('wizards-attribution-link'),
+      onTap: () => _launchExternalLink(
+        context,
+        'https://company.wizards.com/en/legal/fancontentpolicy',
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          'Magic card images © Wizards of the Coast — unofficial Fan Content',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            decoration: TextDecoration.underline,
+            decorationColor: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Rebrickable's terms permit commercial use of its data/images with
 /// attribution — rendered directly under LEGO imagery in search results
 /// and on the detail page, same treatment as RAWG below.
@@ -2015,6 +2064,10 @@ class _CatalogResultDetailPageState
                             if (_isLegoResultWithArt(result)) ...[
                               const SizedBox(height: 8),
                               const _RebrickableAttributionLine(),
+                            ],
+                            if (_isMagicResultWithArt(result)) ...[
+                              const SizedBox(height: 8),
+                              const _WizardsAttributionLine(),
                             ],
                             const SizedBox(height: 24),
                             Text(
