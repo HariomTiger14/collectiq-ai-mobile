@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
@@ -4268,14 +4269,35 @@ class _FullScreenImageViewer extends StatelessWidget {
       backgroundColor: PackLoxTokens.background,
       body: Stack(
         children: [
-          // App background fills the whole screen so the area around the
-          // image merges with the rest of the app (the route is
-          // non-opaque, so a transparent backdrop would let the screen
-          // behind bleed through). Tapping it dismisses.
+          // App-background base (the route is non-opaque, so without this
+          // the screen behind bleeds through).
+          const Positioned.fill(
+            child: ColoredBox(color: PackLoxTokens.background),
+          ),
+          // A blurred, dimmed copy of the same art fills the whole screen
+          // behind the sharp image, so the areas around the card are never
+          // a flat bar -- they show the card's own colours softly. Errors
+          // fall back to the plain background above.
+          Positioned.fill(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: ColoredBox(
+                color: PackLoxTokens.background.withValues(alpha: 0.72),
+              ),
+            ),
+          ),
+          // Tapping the backdrop dismisses.
           Positioned.fill(
             child: GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
-              child: const ColoredBox(color: PackLoxTokens.background),
+              child: const ColoredBox(color: Colors.transparent),
             ),
           ),
           Positioned.fill(child: image),
