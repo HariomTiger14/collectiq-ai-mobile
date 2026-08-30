@@ -1998,6 +1998,18 @@ class _CatalogResultDetailPageState
                             const SizedBox(height: 18),
                             Builder(
                               builder: (context) {
+                                // Items with several genuine views (sneaker
+                                // galleries, coin obverse/reverse) get a
+                                // swipeable gallery; everything else keeps
+                                // the single framed image below.
+                                if (result.images.length > 1) {
+                                  return _CatalogImageGallery(
+                                    result: result,
+                                    isCardArt: _isCardArtCategory(
+                                      result.category,
+                                    ),
+                                  );
+                                }
                                 final hasRealPhoto = (result.imageUrl ?? '')
                                     .trim()
                                     .isNotEmpty;
@@ -3534,6 +3546,126 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
           imageUrl: imageUrl,
         ),
       ),
+    );
+  }
+}
+
+/// Swipeable gallery for catalog items that genuinely have several views
+/// (sneaker galleries, coin obverse/reverse). Single-image items never
+/// reach this -- they keep the plain framed image above.
+///
+/// Photo credits are rendered per image, not once for the item: sources
+/// like Numista credit each contributor separately, and the credit must
+/// travel with the picture it belongs to.
+class _CatalogImageGallery extends StatefulWidget {
+  const _CatalogImageGallery({
+    required this.result,
+    required this.isCardArt,
+  });
+
+  final CatalogSearchResult result;
+  final bool isCardArt;
+
+  @override
+  State<_CatalogImageGallery> createState() => _CatalogImageGalleryState();
+}
+
+class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
+  final PageController _controller = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.result.images;
+    final current = images[_index.clamp(0, images.length - 1)];
+    final gallery = PageView.builder(
+      key: const ValueKey('catalog-detail-gallery'),
+      controller: _controller,
+      itemCount: images.length,
+      onPageChanged: (index) => setState(() => _index = index),
+      itemBuilder: (context, index) {
+        final image = images[index];
+        return GestureDetector(
+          onTap: () => _openFullScreenImage(
+            context,
+            image.url,
+            isCardArt: widget.isCardArt,
+          ),
+          child: Semantics(
+            button: true,
+            label: image.label == null
+                ? 'View full image'
+                : 'View full image, ${image.label}',
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: PackLoxTokens.surfaceRaised,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: PackLoxTokens.border),
+                ),
+                child: _CatalogPlaceholderArt(
+                  category: widget.result.category,
+                  title: widget.result.title,
+                  setName: widget.result.setName,
+                  imageUrl: image.url,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return Column(
+      children: [
+        if (widget.isCardArt)
+          Center(
+            child: SizedBox(
+              width: 230,
+              child: AspectRatio(aspectRatio: 63 / 88, child: gallery),
+            ),
+          )
+        else
+          AspectRatio(aspectRatio: 16 / 9, child: gallery),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < images.length; i++) ...[
+              Container(
+                width: i == _index ? 18 : 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: i == _index
+                      ? PackLoxTokens.cyan
+                      : PackLoxTokens.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              if (i != images.length - 1) const SizedBox(width: 6),
+            ],
+          ],
+        ),
+        if ((current.credit ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Photo: ${current.credit!.trim()}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: PackLoxTokens.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

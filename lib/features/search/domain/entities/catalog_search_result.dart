@@ -22,6 +22,7 @@ class CatalogSearchResult {
     this.externalImageUrl,
     this.history = const <CatalogPriceHistoryPoint>[],
     this.marketplaceListings = const <MarketplaceListing>[],
+    this.images = const <CatalogImage>[],
   });
 
   /// Stable catalog identifier.
@@ -73,6 +74,12 @@ class CatalogSearchResult {
   /// today — PriceCharting's bulk catalog import has no image field).
   final String? imageUrl;
 
+  /// Additional views of the same item, detail surfaces only. Empty for
+  /// most items; populated where a source genuinely has several (sneaker
+  /// galleries, coin obverse/reverse). When non-empty the first entry is
+  /// the same photo as [imageUrl].
+  final List<CatalogImage> images;
+
   /// The source's own product page URL for this item (e.g. PriceCharting),
   /// used to let users view the original listing outside the app.
   final String? productUrl;
@@ -113,6 +120,7 @@ class CatalogSearchResult {
     String? reasonCode,
     String? displayMessage,
     String? imageUrl,
+    List<CatalogImage>? images,
     String? productUrl,
     String? externalImageUrl,
     List<CatalogPriceHistoryPoint>? history,
@@ -135,6 +143,7 @@ class CatalogSearchResult {
       reasonCode: reasonCode ?? this.reasonCode,
       displayMessage: displayMessage ?? this.displayMessage,
       imageUrl: imageUrl ?? this.imageUrl,
+      images: images ?? this.images,
       productUrl: productUrl ?? this.productUrl,
       externalImageUrl: externalImageUrl ?? this.externalImageUrl,
       history: history ?? this.history,
@@ -210,6 +219,7 @@ class CatalogSearchResult {
           _string(pricing['displayMessage']) ??
           _string(pricing['pricingExplanation']),
       imageUrl: _string(json['imageUrl']) ?? _string(json['image_url']),
+      images: catalogImagesFromJson(json['images']),
       productUrl: _string(json['productUrl']) ?? _string(json['product_url']),
       externalImageUrl:
           _string(json['externalImageUrl']) ??
@@ -365,6 +375,46 @@ int? _int(Object? value) {
     return value.toInt();
   }
   return int.tryParse(value?.toString() ?? '');
+}
+
+/// One image of a catalog item, for items that have more than one view.
+///
+/// [label] names the view ("Obverse"/"Reverse" for coins, "View 2" for a
+/// sneaker gallery). [credit] carries a photo credit that MUST be shown
+/// with the image when the source requires one.
+class CatalogImage {
+  /// Creates a catalog image.
+  const CatalogImage({required this.url, this.label, this.credit});
+
+  /// Direct image URL.
+  final String url;
+
+  /// Human-readable name of this view, when the source provides one.
+  final String? label;
+
+  /// Required photo credit, displayed alongside the image when set.
+  final String? credit;
+
+  /// Parses a flexible backend response safely.
+  factory CatalogImage.fromJson(Map<String, dynamic> json) {
+    return CatalogImage(
+      url: _string(json['url']) ?? '',
+      label: _string(json['label']),
+      credit: _string(json['credit']),
+    );
+  }
+}
+
+/// Parses the backend's `images` list safely, dropping entries with no URL.
+List<CatalogImage> catalogImagesFromJson(Object? value) {
+  if (value is! List) {
+    return const <CatalogImage>[];
+  }
+  return value
+      .whereType<Map<String, dynamic>>()
+      .map(CatalogImage.fromJson)
+      .where((image) => image.url.isNotEmpty)
+      .toList(growable: false);
 }
 
 String? _string(Object? value) {

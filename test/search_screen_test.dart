@@ -883,6 +883,96 @@ void main() {
     },
   );
 
+  testWidgets('multi-image items show a swipeable gallery with credits', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'kdb-butterfly',
+          title: 'Saucony The Butterfly',
+          category: 'Sneakers',
+          source: 'KicksDB',
+          currency: 'USD',
+          marketValue: 120,
+          imageUrl: 'https://images.stockx.com/images/A.jpg?w=700',
+          images: [
+            CatalogImage(
+              url: 'https://images.stockx.com/images/A.jpg?w=700',
+              label: 'View 1',
+            ),
+            CatalogImage(
+              url: 'https://images.stockx.com/images/A-2.jpg?w=700',
+              label: 'View 2',
+              credit: 'Test Contributor',
+            ),
+          ],
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'saucony',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-kdb-butterfly')),
+    );
+    await tester.pumpAndSettle();
+
+    // Gallery replaces the single framed image for multi-image items.
+    expect(find.byKey(const ValueKey('catalog-detail-gallery')), findsOneWidget);
+    // First page carries no credit; the second one does.
+    expect(find.text('Photo: Test Contributor'), findsNothing);
+
+    await tester.drag(
+      find.byKey(const ValueKey('catalog-detail-gallery')),
+      const Offset(-400, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Photo: Test Contributor'), findsOneWidget);
+  });
+
+  testWidgets('single-image items keep the plain framed image', (tester) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'kdb-single',
+          title: 'Air Jordan 1',
+          category: 'Sneakers',
+          source: 'KicksDB',
+          currency: 'USD',
+          marketValue: 200,
+          imageUrl: 'https://images.stockx.com/images/B.jpg?w=700',
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'jordan',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-kdb-single')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('catalog-detail-gallery')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('catalog-detail-image-tap')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('catalog result detail shows real eBay listings when present', (
     tester,
   ) async {
