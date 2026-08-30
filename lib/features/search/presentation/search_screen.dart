@@ -3596,6 +3596,10 @@ class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
             context,
             image.url,
             isCardArt: widget.isCardArt,
+            // Carry the whole set so fullscreen stays swipeable from
+            // whichever image was tapped.
+            imageUrls: [for (final entry in images) entry.url],
+            initialIndex: index,
           ),
           child: Semantics(
             button: true,
@@ -4399,18 +4403,26 @@ class _PlaceholderStyle {
 /// inline (tapping the detail hero) — no third-party URL chrome, and the
 /// image stays inside the app's own UI. Link-only sources and product
 /// listings still use [_launchExternalLink] (the browser) on purpose.
+/// Opens the fullscreen viewer. Pass [imageUrls] (and the tapped
+/// [initialIndex]) for items with several views so the set stays
+/// swipeable at full size -- tapping one image should not trap the
+/// viewer on it.
 Future<void> _openFullScreenImage(
   BuildContext context,
   String imageUrl, {
   String? heroTag,
   bool isCardArt = false,
+  List<String> imageUrls = const <String>[],
+  int initialIndex = 0,
 }) {
+  final urls = imageUrls.isNotEmpty ? imageUrls : <String>[imageUrl];
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
       barrierColor: PackLoxTokens.background,
       pageBuilder: (_, _, _) => _FullScreenImageViewer(
-        imageUrl: imageUrl,
+        imageUrls: urls,
+        initialIndex: initialIndex.clamp(0, urls.length - 1),
         heroTag: heroTag,
         isCardArt: isCardArt,
       ),
@@ -4420,14 +4432,16 @@ Future<void> _openFullScreenImage(
   );
 }
 
-class _FullScreenImageViewer extends StatelessWidget {
+class _FullScreenImageViewer extends StatefulWidget {
   const _FullScreenImageViewer({
-    required this.imageUrl,
+    required this.imageUrls,
+    this.initialIndex = 0,
     this.heroTag,
     this.isCardArt = false,
   });
 
-  final String imageUrl;
+  final List<String> imageUrls;
+  final int initialIndex;
   final String? heroTag;
 
   /// Card scans (Scryfall etc.) are rectangular files with the actual
@@ -4443,7 +4457,27 @@ class _FullScreenImageViewer extends StatelessWidget {
   final bool isCardArt;
 
   @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late final PageController _controller = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isCardArt = widget.isCardArt;
+    final heroTag = widget.heroTag;
+    final imageUrls = widget.imageUrls;
+    final imageUrl = imageUrls[_index.clamp(0, imageUrls.length - 1)];
     final topInset = MediaQuery.of(context).padding.top;
 
     Widget errorFallback() => const Center(
@@ -4459,7 +4493,7 @@ class _FullScreenImageViewer extends StatelessWidget {
             ),
           );
 
-    Widget photo = isCardArt
+    Widget photoFor(String url) => isCardArt
         // Lock to the standard trading-card ratio and clip with a
         // corner radius sized as a percentage of the rendered card
         // (real cards round at roughly 5% of their width) -- this
@@ -4472,7 +4506,7 @@ class _FullScreenImageViewer extends StatelessWidget {
               builder: (context, constraints) => ClipRRect(
                 borderRadius: BorderRadius.circular(constraints.maxWidth * 0.1),
                 child: Image.network(
-                  imageUrl,
+                  url,
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, progress) =>
                       loadingIndicator(child, progress),
@@ -4482,20 +4516,33 @@ class _FullScreenImageViewer extends StatelessWidget {
             ),
           )
         : Image.network(
-            imageUrl,
+            url,
             fit: BoxFit.contain,
             loadingBuilder: (context, child, progress) =>
                 loadingIndicator(child, progress),
             errorBuilder: (context, _, _) => errorFallback(),
           );
 
-    Widget image = InteractiveViewer(
+    // Each page is independently zoomable. While zoomed in the
+    // InteractiveViewer takes the horizontal drag, so paging resumes
+    // once the image is back at 1x -- the usual photo-viewer trade-off.
+    Widget pageFor(String url) => InteractiveViewer(
       minScale: 1,
       maxScale: 5,
-      child: Center(child: photo),
+      child: Center(child: photoFor(url)),
     );
+
+    Widget image = imageUrls.length == 1
+        ? pageFor(imageUrl)
+        : PageView.builder(
+            key: const ValueKey('fullscreen-image-pager'),
+            controller: _controller,
+            itemCount: imageUrls.length,
+            onPageChanged: (index) => setState(() => _index = index),
+            itemBuilder: (context, index) => pageFor(imageUrls[index]),
+          );
     if (heroTag != null) {
-      image = Hero(tag: heroTag!, child: image);
+      image = Hero(tag: heroTag, child: image);
     }
 
     return Scaffold(
@@ -4547,6 +4594,28 @@ class _FullScreenImageViewer extends StatelessWidget {
               ),
             ),
           ),
+          if (imageUrls.length > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).padding.bottom + 24,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < imageUrls.length; i++) ...[
+                    Container(
+                      width: i == _index ? 18 : 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: i == _index ? Colors.white : Colors.white38,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    if (i != imageUrls.length - 1) const SizedBox(width: 6),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );

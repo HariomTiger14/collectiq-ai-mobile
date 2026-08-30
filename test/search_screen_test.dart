@@ -938,6 +938,50 @@ void main() {
     expect(find.text('Photo: Test Contributor'), findsOneWidget);
   });
 
+  testWidgets('fullscreen viewer stays swipeable across the whole set', (
+    tester,
+  ) async {
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: _MemoryCatalogSearchRepository([
+        const CatalogSearchResult(
+          id: 'kdb-multi',
+          title: 'New Balance 574',
+          category: 'Sneakers',
+          source: 'KicksDB',
+          currency: 'USD',
+          marketValue: 199,
+          imageUrl: 'https://images.stockx.com/images/A.jpg?w=700',
+          images: [
+            CatalogImage(url: 'https://images.stockx.com/images/A.jpg?w=700'),
+            CatalogImage(url: 'https://images.stockx.com/images/A-2.jpg?w=700'),
+            CatalogImage(url: 'https://images.stockx.com/images/A-3.jpg?w=700'),
+          ],
+        ),
+      ]),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'new balance',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('discover-catalog-result-kdb-multi')),
+    );
+    await tester.pumpAndSettle();
+
+    // Tapping the gallery opens fullscreen with the whole set, not just
+    // the tapped image -- so a pager is present rather than one photo.
+    await tester.tap(find.byKey(const ValueKey('catalog-detail-gallery')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('fullscreen-image-pager')), findsOneWidget);
+    expect(find.byKey(const ValueKey('fullscreen-image-close')), findsOneWidget);
+  });
+
   testWidgets('single-image items keep the plain framed image', (tester) async {
     await _pumpSearch(
       tester,
