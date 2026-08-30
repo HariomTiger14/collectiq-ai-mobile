@@ -4285,9 +4285,7 @@ class _FullScreenImageViewer extends StatelessWidget {
             aspectRatio: 63 / 88,
             child: LayoutBuilder(
               builder: (context, constraints) => ClipRRect(
-                borderRadius: BorderRadius.circular(
-                  constraints.maxWidth * 0.05,
-                ),
+                borderRadius: BorderRadius.circular(constraints.maxWidth * 0.1),
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
