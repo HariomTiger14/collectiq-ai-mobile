@@ -3600,6 +3600,13 @@ class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
             // whichever image was tapped.
             imageUrls: [for (final entry in images) entry.url],
             initialIndex: index,
+            // Licence-required credits travel with the images: full
+            // screen is another display of the work, so a CC BY/BY-SA
+            // image has to be attributed there too.
+            requiredAttributions: [
+              for (final entry in images)
+                entry.attributionRequired ? entry.credit : null,
+            ],
           ),
           child: Semantics(
             button: true,
@@ -4414,6 +4421,7 @@ Future<void> _openFullScreenImage(
   bool isCardArt = false,
   List<String> imageUrls = const <String>[],
   int initialIndex = 0,
+  List<String?> requiredAttributions = const <String?>[],
 }) {
   final urls = imageUrls.isNotEmpty ? imageUrls : <String>[imageUrl];
   return Navigator.of(context).push(
@@ -4425,6 +4433,7 @@ Future<void> _openFullScreenImage(
         initialIndex: initialIndex.clamp(0, urls.length - 1),
         heroTag: heroTag,
         isCardArt: isCardArt,
+        requiredAttributions: requiredAttributions,
       ),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -4438,11 +4447,20 @@ class _FullScreenImageViewer extends StatefulWidget {
     this.initialIndex = 0,
     this.heroTag,
     this.isCardArt = false,
+    this.requiredAttributions = const <String?>[],
   });
 
   final List<String> imageUrls;
   final int initialIndex;
   final String? heroTag;
+
+  /// Attribution lines that MUST be shown, parallel to [imageUrls]; null
+  /// where the image's licence does not require one.
+  ///
+  /// Full screen is still a display of the image, so a CC BY / CC BY-SA
+  /// image has to carry its credit here too -- showing it only on the
+  /// detail card would satisfy the layout and not the licence.
+  final List<String?> requiredAttributions;
 
   /// Card scans (Scryfall etc.) are rectangular files with the actual
   /// rounded card centered on a plain background -- the corners between
@@ -4465,6 +4483,17 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
     initialPage: widget.initialIndex,
   );
   late int _index = widget.initialIndex;
+
+  /// The attribution that must be shown for the page at [index], or null.
+  /// Tolerates a short or absent list so callers that have no attribution
+  /// data simply show none.
+  String? _attributionFor(int index) {
+    if (index < 0 || index >= widget.requiredAttributions.length) {
+      return null;
+    }
+    final text = widget.requiredAttributions[index]?.trim();
+    return (text == null || text.isEmpty) ? null : text;
+  }
 
   @override
   void dispose() {
@@ -4594,6 +4623,35 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
               ),
             ),
           ),
+          if (_attributionFor(_index) != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom:
+                  MediaQuery.of(context).padding.bottom +
+                  (imageUrls.length > 1 ? 48 : 24),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    'Photo: ${_attributionFor(_index)}',
+                    key: const ValueKey('fullscreen-image-attribution'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (imageUrls.length > 1)
             Positioned(
               left: 0,

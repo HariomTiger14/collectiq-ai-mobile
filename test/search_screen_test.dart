@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  _attributionTests();
   setUp(() {
     // Required for any test whose flow touches SharedPreferences (saving a
     // catalog result now seeds local valuation snapshots). Without a mock
@@ -1462,4 +1463,49 @@ class _FailingCatalogSearchRepository implements CatalogSearchRepository {
   }) async {
     throw StateError('Catalog endpoint missing');
   }
+}
+
+/// Attribution for a CC BY / CC BY-SA image is a condition of the licence:
+/// the author must be named wherever the image is shown. These guard the
+/// parsing side of that -- the flag has to survive the wire, because the UI
+/// decides whether the credit is optional chrome or a legal obligation
+/// purely from it.
+void _attributionTests() {
+  group('CatalogImage attribution', () {
+    test('parses a licence-required attribution from the backend', () {
+      final image = CatalogImage.fromJson(const {
+        'url': 'https://cdn.example/coins/lincoln-shield-penny-reverse.png',
+        'label': 'Reverse',
+        'credit': 'MisfitMaid / CC BY-SA 4.0',
+        'attributionRequired': true,
+        'attributionUrl': 'https://commons.wikimedia.org/wiki/File:X.png',
+      });
+
+      expect(image.attributionRequired, isTrue);
+      expect(image.credit, 'MisfitMaid / CC BY-SA 4.0');
+      expect(image.attributionUrl, 'https://commons.wikimedia.org/wiki/File:X.png');
+    });
+
+    test('defaults to not-required when the backend omits the fields', () {
+      // Public-domain images are the overwhelming majority and send neither
+      // field; they must not be treated as attribution-required.
+      final image = CatalogImage.fromJson(const {
+        'url': 'https://cdn.example/coins/morgan-dollar-obverse.jpg',
+        'credit': 'United States Mint',
+      });
+
+      expect(image.attributionRequired, isFalse);
+      expect(image.attributionUrl, isNull);
+      expect(image.credit, 'United States Mint');
+    });
+
+    test('treats a non-boolean attributionRequired as not required', () {
+      final image = CatalogImage.fromJson(const {
+        'url': 'https://cdn.example/x.jpg',
+        'attributionRequired': 'yes',
+      });
+
+      expect(image.attributionRequired, isFalse);
+    });
+  });
 }
