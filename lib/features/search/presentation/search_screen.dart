@@ -2010,6 +2010,9 @@ class _CatalogResultDetailPageState
                                       onTap: () => _openFullScreenImage(
                                         context,
                                         fullImageUrl,
+                                        isCardArt: _isCardArtCategory(
+                                          result.category,
+                                        ),
                                       ),
                                       child: Semantics(
                                         button: true,
@@ -4215,13 +4218,17 @@ Future<void> _openFullScreenImage(
   BuildContext context,
   String imageUrl, {
   String? heroTag,
+  bool isCardArt = false,
 }) {
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
       barrierColor: PackLoxTokens.background,
-      pageBuilder: (_, _, _) =>
-          _FullScreenImageViewer(imageUrl: imageUrl, heroTag: heroTag),
+      pageBuilder: (_, _, _) => _FullScreenImageViewer(
+        imageUrl: imageUrl,
+        heroTag: heroTag,
+        isCardArt: isCardArt,
+      ),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
     ),
@@ -4229,42 +4236,85 @@ Future<void> _openFullScreenImage(
 }
 
 class _FullScreenImageViewer extends StatelessWidget {
-  const _FullScreenImageViewer({required this.imageUrl, this.heroTag});
+  const _FullScreenImageViewer({
+    required this.imageUrl,
+    this.heroTag,
+    this.isCardArt = false,
+  });
 
   final String imageUrl;
   final String? heroTag;
 
+  /// Card scans (Scryfall etc.) are rectangular files with the actual
+  /// rounded card centered on a plain background -- the corners between
+  /// the card's curve and the file's rectangular edge show as visible
+  /// white triangles at full screen size (baked into the source photo,
+  /// not app chrome). When true, the image is locked to the standard
+  /// trading-card ratio (63:88) and clipped with a corner radius sized
+  /// as a percentage of the rendered card, matching a real card's
+  /// corner and cropping those triangles away. Other categories (video
+  /// game covers, sneaker photos, LEGO sets) are plain rectangular
+  /// photos with no such artifact, so they render uncropped.
+  final bool isCardArt;
+
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
+
+    Widget errorFallback() => const Center(
+      child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48),
+    );
+    Widget loadingIndicator(Widget? child, ImageChunkEvent? progress) =>
+        progress == null
+        ? child!
+        : const Center(
+            child: CircularProgressIndicator(
+              color: Colors.white70,
+              strokeWidth: 2,
+            ),
+          );
+
+    Widget photo = isCardArt
+        // Lock to the standard trading-card ratio and clip with a
+        // corner radius sized as a percentage of the rendered card
+        // (real cards round at roughly 5% of their width) -- this
+        // crops the source photo's rectangular white corners away,
+        // rather than merely rounding the outer edge of a much larger
+        // box, which wouldn't reach far enough in to remove them.
+        ? AspectRatio(
+            aspectRatio: 63 / 88,
+            child: LayoutBuilder(
+              builder: (context, constraints) => ClipRRect(
+                borderRadius: BorderRadius.circular(
+                  constraints.maxWidth * 0.05,
+                ),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, progress) =>
+                      loadingIndicator(child, progress),
+                  errorBuilder: (context, _, _) => errorFallback(),
+                ),
+              ),
+            ),
+          )
+        : Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) =>
+                loadingIndicator(child, progress),
+            errorBuilder: (context, _, _) => errorFallback(),
+          );
+
     Widget image = InteractiveViewer(
       minScale: 1,
       maxScale: 5,
-      child: Center(
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.contain,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.white70,
-                    strokeWidth: 2,
-                  ),
-                ),
-          errorBuilder: (context, _, _) => const Center(
-            child: Icon(
-              Icons.broken_image_outlined,
-              color: Colors.white38,
-              size: 48,
-            ),
-          ),
-        ),
-      ),
+      child: Center(child: photo),
     );
     if (heroTag != null) {
       image = Hero(tag: heroTag!, child: image);
     }
+
     return Scaffold(
       backgroundColor: PackLoxTokens.background,
       body: Stack(
