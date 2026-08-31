@@ -10,6 +10,7 @@ import 'package:collectiq_ai/core/supabase/supabase_config.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/telemetry/firebase_telemetry_service.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
+import 'package:collectiq_ai/features/settings/presentation/screens/account_deletion_gate.dart';
 import 'package:collectiq_ai/features/auth/services/auth_deep_link_service.dart';
 import 'package:collectiq_ai/qa_capture_app.dart';
 import 'package:flutter/foundation.dart';
@@ -220,7 +221,10 @@ class _CollectIqAppState extends ConsumerState<CollectIqApp> {
       // PackLox is a dark product: never follow the device appearance, so a
       // screen missing its own Theme(AppTheme.dark) wrapper can't go light.
       themeMode: ThemeMode.dark,
-      home: const AppShell(),
+      // Wraps the shell rather than living inside it: a user whose account
+      // is scheduled for deletion should not reach any tab, and the gate must
+      // survive whatever navigation state the shell restores.
+      home: const AccountDeletionGate(child: AppShell()),
     );
   }
 }

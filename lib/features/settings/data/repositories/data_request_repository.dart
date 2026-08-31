@@ -3,12 +3,16 @@ import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Files GDPR/CCPA-style "export my data" / "delete my account" requests
-/// against the backend's `data_requests` queue. This only ever CREATES a
-/// request -- it never performs the export or the deletion itself. Both are
-/// processed by an admin from the admin console's Data requests page (a
-/// deliberate human-in-the-loop step, matching how every other irreversible
-/// action in this system requires a typed confirmation before it runs live).
+/// GDPR/CCPA-style "export my data" and "delete my account".
+///
+/// Export still files a request for an admin to process from the console.
+///
+/// Deletion does NOT: Apple's guideline 5.1.1(v) requires an account to be
+/// deletable from inside the app without a human approving it, so
+/// [scheduleDeletion] starts a 30-day grace period server-side and a backend
+/// cron carries it out when the window closes. Nothing is deleted at the
+/// moment the user confirms -- until then [cancelDeletion] fully restores the
+/// account, which is what signing back in offers.
 class DataRequestRepository {
   DataRequestRepository({
     required this.baseUrl,
@@ -34,7 +38,76 @@ class DataRequestRepository {
 
   Future<void> requestExport() => _create('export');
 
-  Future<void> requestDeletion() => _create('deletion');
+  /// Starts the grace period. Returns the date the account will be erased.
+  ///
+  /// Idempotent server-side: confirming twice returns the deletion already
+  /// scheduled rather than moving the date.
+  Future<DateTime?> scheduleDeletion() async {
+    final token = await _requireAccessToken();
+    final response = await _dio.post<Map<String, dynamic>>(
+      '$baseUrl/data-requests/deletion/schedule',
+      options: _authOptions(token),
+    );
+    return _parseScheduledFor(response.data?['request']);
+  }
+
+  /// Cancels a pending deletion. Nothing was deleted, so this fully restores
+  /// the account.
+  Future<void> cancelDeletion() async {
+    final token = await _requireAccessToken();
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '$baseUrl/data-requests/deletion/cancel',
+        options: _authOptions(token),
+      );
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        // Already cancelled or already purged -- either way there is nothing
+        // pending, which is the state the caller wanted.
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  /// When the account is due to be erased, or null if no deletion is pending.
+  ///
+  /// Read at launch to decide whether to show the deletion gate. Network
+  /// failures deliberately surface to the caller rather than being swallowed
+  /// as "nothing scheduled" -- see AccountDeletionGate for why that direction
+  /// of failure is the safe one.
+  Future<DateTime?> pendingDeletionDate() async {
+    final token = await _requireAccessToken();
+    final response = await _dio.get<Map<String, dynamic>>(
+      '$baseUrl/data-requests/deletion/status',
+      options: _authOptions(token),
+    );
+    final data = response.data;
+    if (data == null || data['scheduled'] != true) {
+      return null;
+    }
+    return _parseDate(data['scheduledFor']);
+  }
+
+  Options _authOptions(String token) => Options(
+    headers: {'Authorization': 'Bearer $token'},
+    sendTimeout: _timeout,
+    receiveTimeout: _timeout,
+  );
+
+  DateTime? _parseScheduledFor(Object? request) {
+    if (request is Map) {
+      return _parseDate(request['scheduledFor'] ?? request['scheduled_for']);
+    }
+    return null;
+  }
+
+  DateTime? _parseDate(Object? raw) {
+    if (raw is! String || raw.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(raw)?.toLocal();
+  }
 
   Future<void> _create(String type) async {
     final token = await _requireAccessToken();

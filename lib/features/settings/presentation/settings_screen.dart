@@ -36,6 +36,7 @@ import 'package:collectiq_ai/features/portfolio/domain/services/demo_collectible
 import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/settings/data/repositories/data_request_repository.dart';
+import 'package:collectiq_ai/features/settings/presentation/screens/account_deletion_gate.dart';
 import 'package:collectiq_ai/features/support/presentation/screens/my_support_tickets_screen.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/billing_product.dart';
 import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.dart';
@@ -1086,25 +1087,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context,
       title: 'Delete my account?',
       message:
-          'This files a request to permanently erase your account: '
-          'portfolio, images, alerts, devices, and profile. An admin '
-          'reviews every deletion request before it runs, and it cannot be '
-          'undone once processed.',
-      confirmLabel: 'Request deletion',
+          'Your account and everything in it — portfolio, images, alerts, '
+          'devices and profile — will be permanently deleted in 30 days. '
+          'Nothing is deleted today: you can cancel any time before then by '
+          'signing back in.',
+      confirmLabel: 'Delete my account',
       action: () async {
         try {
-          await ref.read(dataRequestRepositoryProvider).requestDeletion();
+          final scheduledFor = await ref
+              .read(dataRequestRepositoryProvider)
+              .scheduleDeletion();
           if (!context.mounted) {
             return;
           }
+          // Re-runs the gate's status check so the deletion screen takes over
+          // immediately, rather than only on the next cold start.
+          ref.invalidate(pendingAccountDeletionProvider);
           _showSettingsSnackBar(
-            'Deletion requested — an admin will review and confirm it.',
+            scheduledFor == null
+                ? 'Your account is scheduled for deletion.'
+                : 'Your account will be deleted on '
+                      '${formatDeletionDate(scheduledFor)}.',
           );
         } catch (error) {
           if (!context.mounted) {
             return;
           }
-          _showSettingsSnackBar('Could not request deletion: $error');
+          _showSettingsSnackBar('Could not schedule deletion: $error');
         }
       },
     );
