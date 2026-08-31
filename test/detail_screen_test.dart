@@ -1399,7 +1399,7 @@ class _UnavailablePricingApiClient extends ApiClient {
   _UnavailablePricingApiClient()
     : super(
         config: const EnvironmentConfig(
-          environment: AppEnvironment.development,
+          environment: AppEnvironment.dev,
         ),
       );
 
@@ -1439,7 +1439,7 @@ class _SuccessfulRepriceApiClient extends ApiClient {
   _SuccessfulRepriceApiClient({this.value = 310})
     : super(
         config: const EnvironmentConfig(
-          environment: AppEnvironment.development,
+          environment: AppEnvironment.dev,
         ),
       );
 
@@ -1490,7 +1490,7 @@ class _CatalogDetailApiClient extends ApiClient {
   _CatalogDetailApiClient()
     : super(
         config: const EnvironmentConfig(
-          environment: AppEnvironment.development,
+          environment: AppEnvironment.dev,
         ),
       );
 

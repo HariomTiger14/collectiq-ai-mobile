@@ -2394,7 +2394,7 @@ void main() {
 
     test('development keeps backend analyzer disabled unless configured', () {
       final endpoint = resolveBackendAnalysisEndpointUrl(
-        environment: network_config.AppEnvironment.development,
+        environment: network_config.AppEnvironment.dev,
         backendAnalysisEndpointUrl: '',
         apiBaseUrl: '',
       );

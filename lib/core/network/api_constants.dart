@@ -1,19 +1,14 @@
 import 'package:flutter/foundation.dart';
 
-/// Supported backend environments for CollectIQ AI.
-enum AppEnvironment {
-  /// Local development and developer testing.
-  development,
+import '../config/app_environment.dart';
 
-  /// Phone/system integration testing against safe non-production services.
-  sit,
-
-  /// Pre-production validation environment.
-  staging,
-
-  /// Live production environment.
-  production,
-}
+// AppEnvironment is defined once, in core/config/app_environment.dart. It used
+// to be declared a second time here with different members (development /
+// production instead of local / dev / prod), and both copies independently
+// parsed the same APP_ENV flag with different fallbacks -- so a build could be
+// "production" to one half of the app and something else to the other.
+// Re-exported so existing importers of api_constants.dart keep resolving it.
+export '../config/app_environment.dart' show AppEnvironment;
 
 /// Runtime environment configuration for API access.
 class EnvironmentConfig {
@@ -51,19 +46,11 @@ class EnvironmentConfig {
         : legacyApiBaseUrl;
 
     return EnvironmentConfig(
-      environment: _parseEnvironment(value),
+      environment: AppEnvironment.parse(value),
       baseUrlOverride: baseUrlOverride,
     );
   }
 
-  static AppEnvironment _parseEnvironment(String value) {
-    return switch (value.toLowerCase()) {
-      'production' || 'prod' => AppEnvironment.production,
-      'sit' || 'system-test' || 'system_integration_test' => AppEnvironment.sit,
-      'staging' || 'stage' => AppEnvironment.staging,
-      _ => AppEnvironment.development,
-    };
-  }
 }
 
 /// Centralized API constants for Azure backend integration.
@@ -116,10 +103,13 @@ class ApiConstants {
   /// Returns the base URL for an environment.
   static String baseUrlFor(AppEnvironment environment) {
     return switch (environment) {
-      AppEnvironment.development => _developmentBaseUrl,
+      AppEnvironment.local || AppEnvironment.dev => _developmentBaseUrl,
       AppEnvironment.sit => 'https://api-sit.packlox.com',
+      // TODO: both of these are stale CollectIQ domains that do not resolve.
+      // They must become real packlox.com hosts before a staging or production
+      // build can talk to anything.
       AppEnvironment.staging => 'https://staging-api.collectiq.ai',
-      AppEnvironment.production => 'https://api.collectiq.ai',
+      AppEnvironment.prod => 'https://api.collectiq.ai',
     };
   }
 
