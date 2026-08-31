@@ -339,7 +339,14 @@ String _twoDigits(int value) => value.toString().padLeft(2, '0');
 /// Formats a message's ISO-8601 `createdAt` for display: just the time for
 /// a message from today, "Yesterday" + time for yesterday, otherwise the
 /// date and time -- no external `intl` dependency needed.
-String? formatMessageTimestamp(String? iso) {
+/// Formats a message timestamp as a bare time for today, "Yesterday, <time>"
+/// for yesterday, and "<Mon> <day>, <time>" for anything older.
+///
+/// [now] exists so tests can pin the reference point. Without it these
+/// relative labels can only be tested against the wall clock, which made the
+/// "today" case fail for the hour after midnight: a timestamp an hour before
+/// a 00:18 "now" is genuinely yesterday.
+String? formatMessageTimestamp(String? iso, {DateTime? now}) {
   if (iso == null || iso.isEmpty) {
     return null;
   }
@@ -348,20 +355,20 @@ String? formatMessageTimestamp(String? iso) {
     return null;
   }
   final local = parsed.toLocal();
-  final now = DateTime.now();
+  final referenceNow = now ?? DateTime.now();
   final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
   final period = local.hour < 12 ? 'AM' : 'PM';
   final time = '$hour12:${_twoDigits(local.minute)} $period';
 
   final isSameDay =
-      local.year == now.year &&
-      local.month == now.month &&
-      local.day == now.day;
+      local.year == referenceNow.year &&
+      local.month == referenceNow.month &&
+      local.day == referenceNow.day;
   if (isSameDay) {
     return time;
   }
 
-  final yesterday = now.subtract(const Duration(days: 1));
+  final yesterday = referenceNow.subtract(const Duration(days: 1));
   final isYesterday =
       local.year == yesterday.year &&
       local.month == yesterday.month &&

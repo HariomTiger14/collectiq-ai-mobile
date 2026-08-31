@@ -37,26 +37,49 @@ void main() {
       expect(formatMessageTimestamp(''), isNull);
     });
 
+    // A fixed reference point, so these relative labels do not depend on what
+    // time of day the suite happens to run. The "today" case previously used
+    // DateTime.now() minus an hour, which is yesterday between midnight and
+    // 01:00 -- the test failed for one hour every night.
+    final now = DateTime(2026, 3, 15, 14, 30);
+
     test('shows just the time for a message from today', () {
-      final today = DateTime.now().subtract(const Duration(hours: 1));
-      final result = formatMessageTimestamp(today.toIso8601String());
-      expect(result, isNotNull);
-      expect(result, matches(RegExp(r'^\d{1,2}:\d{2} (AM|PM)$')));
+      final today = DateTime(2026, 3, 15, 13, 5);
+      expect(
+        formatMessageTimestamp(today.toIso8601String(), now: now),
+        '1:05 PM',
+      );
+    });
+
+    test('shows just the time for a message from earlier this morning', () {
+      final earlyToday = DateTime(2026, 3, 15, 0, 18);
+      expect(
+        formatMessageTimestamp(earlyToday.toIso8601String(), now: now),
+        '12:18 AM',
+      );
     });
 
     test('prefixes "Yesterday" for a message from yesterday', () {
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      final result = formatMessageTimestamp(yesterday.toIso8601String());
-      expect(result, startsWith('Yesterday, '));
+      final yesterday = DateTime(2026, 3, 14, 23, 18);
+      expect(
+        formatMessageTimestamp(yesterday.toIso8601String(), now: now),
+        'Yesterday, 11:18 PM',
+      );
     });
 
     test('shows the month and day for an older message', () {
-      final older = DateTime.now().subtract(const Duration(days: 10));
-      final result = formatMessageTimestamp(older.toIso8601String());
-      expect(result, isNotNull);
-      // Not "Yesterday" and not a bare time -- a real date is shown.
-      expect(result, isNot(startsWith('Yesterday')));
-      expect(result, matches(RegExp(r'^[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d{2} (AM|PM)$')));
+      final older = DateTime(2026, 3, 5, 9, 5);
+      expect(
+        formatMessageTimestamp(older.toIso8601String(), now: now),
+        'Mar 5, 9:05 AM',
+      );
+    });
+
+    test('falls back to the wall clock when no reference time is given', () {
+      // The production call site passes no `now`; a timestamp of "right now"
+      // is today at any hour, so this stays deterministic.
+      final result = formatMessageTimestamp(DateTime.now().toIso8601String());
+      expect(result, matches(RegExp(r'^\d{1,2}:\d{2} (AM|PM)$')));
     });
   });
 
