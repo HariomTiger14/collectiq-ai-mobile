@@ -69,7 +69,12 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
-	<array/>
+	<array>
+		<!-- Required for firebase_messaging to deliver notifications while
+		     the app is backgrounded. Was an empty array, so background
+		     delivery would have failed even once APNs was configured. -->
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

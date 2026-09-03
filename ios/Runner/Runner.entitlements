@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict/>
+<dict>
+	<!-- Development APNs. Used by Debug and Profile for BOTH flavors.
+	     Release configs point at Runner-Release.entitlements instead: a build
+	     signed with a distribution profile must declare "production", and a
+	     dev-signed build must declare "development" - one shared file cannot
+	     satisfy both, which is why this is split rather than a single file. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
 </plist>

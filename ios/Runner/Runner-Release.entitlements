@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Production APNs. Used by Release for BOTH flavors (TestFlight and
+	     App Store builds are signed with a distribution profile, which
+	     requires "production"). Debug/Profile use Runner.entitlements. -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>
