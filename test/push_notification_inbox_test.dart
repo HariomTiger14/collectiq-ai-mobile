@@ -63,6 +63,16 @@ void main() {
     expect(build(title: '   ').title, 'PackLox');
   });
 
+  test('a push with no item is not presented as a broken link', () {
+    // Regression: the inbox looked itemId up in the portfolio, found nothing,
+    // and said "That item is no longer in your collection" -- wrong twice
+    // over for a broadcast, which never had an item and lost nothing.
+    // The row is now non-tappable instead, keyed off an empty itemId.
+    expect(build().itemId, isEmpty);
+    expect(build(data: const {'itemId': ''}).itemId, isEmpty);
+    expect(build(data: const {'itemId': 'item-9'}).itemId, isNotEmpty);
+  });
+
   test('uses the send time when known, so ordering reflects reality', () {
     final sent = DateTime.utc(2026, 9, 5, 11, 30);
     expect(build(sentAt: sent).createdAt, sent);

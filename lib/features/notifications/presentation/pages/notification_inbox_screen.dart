@@ -89,6 +89,13 @@ class _NotificationInboxScreenState
   }
 
   void _openItem(AppNotification notification) {
+    // A push that isn't about a collectible -- a broadcast, an admin message
+    // -- carries no itemId. There is nothing to open, and saying the item is
+    // "no longer in your collection" would be wrong twice over: there never
+    // was one, and nothing was removed.
+    if (notification.itemId.trim().isEmpty) {
+      return;
+    }
     final item = ref
         .read(portfolioControllerProvider)
         .items
@@ -177,7 +184,11 @@ class _NotificationInboxScreenState
           child: _NotificationRow(
             notification: notification,
             unread: _unreadAtOpen.contains(notification.id),
-            onTap: () => _openItem(notification),
+            // Null when the notification has nothing to open, so the row
+            // does not look tappable and then do nothing.
+            onTap: notification.itemId.trim().isEmpty
+                ? null
+                : () => _openItem(notification),
           ),
         );
       },
@@ -206,12 +217,12 @@ class _NotificationRow extends StatelessWidget {
   const _NotificationRow({
     required this.notification,
     required this.unread,
-    required this.onTap,
+    this.onTap,
   });
 
   final AppNotification notification;
   final bool unread;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
