@@ -1636,6 +1636,31 @@ class _RawgAttributionLine extends StatelessWidget {
   }
 }
 
+/// Joins catalog facets for display, dropping repeats.
+///
+/// PriceCharting supplies no category column, so ingestion falls back to the
+/// console name: for ~99% of catalog rows `category` and `setName` hold the
+/// same string, which used to render as "Comic Books Sensational Spider-Man -
+/// Comic Books Sensational Spider-Man".
+String _joinCatalogFacets(List<String?> facets) {
+  final seen = <String>{};
+  final parts = <String>[];
+  for (final facet in facets) {
+    final value = _clean(facet);
+    if (value == null || !seen.add(_catalogFacetKey(value))) {
+      continue;
+    }
+    parts.add(value);
+  }
+  return parts.join(' - ');
+}
+
+/// Normalizes a facet so wording differing only in case, spacing, or
+/// punctuation still counts as a repeat.
+String _catalogFacetKey(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
+
 class _CatalogResultCard extends StatelessWidget {
   const _CatalogResultCard({required this.result, required this.onTap});
 
@@ -1646,11 +1671,11 @@ class _CatalogResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final value = _formatCatalogValue(result);
     final hasValue = _hasCatalogValue(result);
-    final subtitle = [
+    final subtitle = _joinCatalogFacets([
       result.category,
       result.setName,
       result.identifier,
-    ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' - ');
+    ]);
     final sourceLabel = result.source;
     return Semantics(
       button: true,
@@ -1951,7 +1976,8 @@ class _CatalogResultDetailPageState
         : '${(result.confidence!.clamp(0, 1) * 100).round()}%';
     final rows = [
       _CatalogDetailRowData('Category', result.category),
-      if (_clean(result.setName) != null)
+      if (_clean(result.setName) != null &&
+          _catalogFacetKey(result.setName!) != _catalogFacetKey(result.category))
         _CatalogDetailRowData('Set / product family', result.setName!.trim()),
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),

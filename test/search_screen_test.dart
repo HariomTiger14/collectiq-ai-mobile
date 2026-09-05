@@ -426,6 +426,48 @@ void main() {
     },
   );
 
+  testWidgets('catalog result subtitle shows a repeated facet only once', (
+    tester,
+  ) async {
+    // PriceCharting supplies no category column, so ingestion falls back to
+    // the console name and ~99% of catalog rows carry the same string in
+    // both category and setName.
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-sensational-19',
+        title: 'The Sensational Spider Man #19 (1997)',
+        category: 'Comic Books Sensational Spider-Man',
+        source: 'PriceCharting',
+        setName: 'Comic Books Sensational Spider-Man',
+        currency: 'USD',
+        marketValue: 5,
+        confidence: 0.9,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'spider man',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comic Books Sensational Spider-Man'), findsOneWidget);
+    expect(
+      find.text(
+        'Comic Books Sensational Spider-Man - '
+        'Comic Books Sensational Spider-Man',
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('catalog search shows backend catalog results', (tester) async {
     final catalogRepository = _MemoryCatalogSearchRepository([
       const CatalogSearchResult(
