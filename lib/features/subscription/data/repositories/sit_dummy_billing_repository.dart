@@ -18,21 +18,43 @@ class SitDummyBillingConfig {
   final SubscriptionPlan restorePlan;
 
   /// Reads config from build-time environment.
+  ///
+  /// SIT builds default to dummy billing, because the point of SIT is to
+  /// exercise the app without a store. But that default has to be
+  /// overridable: `billingRepositoryProvider` checks this config FIRST, so
+  /// while it is on, a SIT build can never reach StoreKit -- and a sandbox
+  /// purchase would appear to succeed without Apple ever being involved.
+  ///
+  /// Passing `--dart-define=SIT_DUMMY_BILLING=false` now turns it off, which
+  /// is what a real sandbox-subscription test needs.
   factory SitDummyBillingConfig.fromEnvironment() {
     const appEnv = String.fromEnvironment('APP_ENV');
-    const explicitlyEnabled = bool.fromEnvironment(
-      'SIT_DUMMY_BILLING',
-      defaultValue: false,
-    );
+    // Three states, not two: unset (fall back to the APP_ENV default),
+    // explicitly true, explicitly false. A plain bool.fromEnvironment cannot
+    // tell "unset" from "false", which is why an override was impossible.
+    const overrideRaw = String.fromEnvironment('SIT_DUMMY_BILLING');
     const restorePlanName = String.fromEnvironment(
       'SIT_DUMMY_BILLING_RESTORE_PLAN',
       defaultValue: 'pro',
     );
 
     return SitDummyBillingConfig(
-      enabled: explicitlyEnabled || appEnv == 'sit',
+      enabled: resolveEnabled(override: overrideRaw, appEnv: appEnv),
       restorePlan: SubscriptionPlan.fromName(restorePlanName),
     );
+  }
+
+  /// Resolves the enabled flag from the raw override and APP_ENV.
+  ///
+  /// Split out because fromEnvironment() reads compile-time constants that a
+  /// test cannot vary -- this is the part worth pinning, since getting it
+  /// wrong silently routes a sandbox test to fake billing.
+  static bool resolveEnabled({required String override, required String appEnv}) {
+    return switch (override.trim().toLowerCase()) {
+      '' => appEnv == 'sit',
+      'false' || '0' || 'no' || 'off' => false,
+      _ => true,
+    };
   }
 }
 
