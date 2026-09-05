@@ -66,6 +66,19 @@ void main() {
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
   });
 
+  testWidgets('bottom navigation returns as soon as the keyboard retreats', (
+    tester,
+  ) async {
+    await tester.pumpShell(viewInsets: const EdgeInsets.only(bottom: 336));
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+
+    // The dismiss animation walks the inset down over several frames. The bar
+    // must come back on the first of them, not once the inset reaches zero.
+    await tester.pumpShell(viewInsets: const EdgeInsets.only(bottom: 300));
+
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+  });
+
   testWidgets('primary destinations follow F62 five item order', (
     tester,
   ) async {

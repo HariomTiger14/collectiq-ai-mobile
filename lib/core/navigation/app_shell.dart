@@ -51,6 +51,8 @@ class _AppShellState extends ConsumerState<AppShell>
       PushNotificationNavigationCoordinator();
   String? _lastPostSignInSyncUserId;
   bool _hasClearedLocalDataForCurrentSignOut = false;
+  double _previousBottomInset = 0;
+  bool _keyboardIsDismissing = false;
 
   @override
   void initState() {
@@ -600,7 +602,21 @@ class _AppShellState extends ConsumerState<AppShell>
     // keyboard resize lifts it to sit on top of the keyboard, covering the
     // page content underneath. Hide it while the keyboard is open, which is
     // also what a platform tab bar does.
-    final keyboardIsOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    //
+    // The inset animates, so waiting for it to reach zero would leave the bar
+    // missing for the whole dismiss animation. Watching the direction instead
+    // brings it back on the first frame of the keyboard going away.
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset > _previousBottomInset) {
+      _keyboardIsDismissing = false;
+    } else if (bottomInset < _previousBottomInset) {
+      _keyboardIsDismissing = true;
+    }
+    if (bottomInset == 0) {
+      _keyboardIsDismissing = false;
+    }
+    _previousBottomInset = bottomInset;
+    final keyboardIsOpen = bottomInset > 0 && !_keyboardIsDismissing;
     final hideBottomNavigation =
         keyboardIsOpen ||
         (selectedIndex == _scanTabIndex && hasActiveScannerSession);
