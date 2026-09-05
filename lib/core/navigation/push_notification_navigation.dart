@@ -9,27 +9,44 @@ class PushNotificationNavigationCoordinator {
 
   final FirebaseMessaging? messaging;
   StreamSubscription<RemoteMessage>? _openedSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
   String? _lastHandledMessageKey;
 
+  /// [onReceived] is called for every push this app observes, so the inbox can
+  /// keep a copy. Separate from [onIntent], which only fires for messages that
+  /// carry a navigation target -- a broadcast has nothing to navigate to but
+  /// still belongs in the inbox.
   Future<void> start({
     required Future<void> Function(PushNotificationNavigationIntent intent)
     onIntent,
+    Future<void> Function(RemoteMessage message)? onReceived,
   }) async {
     await _ensureFirebaseInitialized();
     final firebaseMessaging = messaging ?? FirebaseMessaging.instance;
     final initialMessage = await firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
+      unawaited(onReceived?.call(initialMessage));
       unawaited(_handleMessage(initialMessage, onIntent: onIntent));
     }
     _openedSubscription?.cancel();
-    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => unawaited(_handleMessage(message, onIntent: onIntent)),
-    );
+    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      unawaited(onReceived?.call(message));
+      unawaited(_handleMessage(message, onIntent: onIntent));
+    });
+    // Foreground arrivals. iOS shows no banner while the app is open and this
+    // stream is the only signal that a push landed at all -- without it, a
+    // user actively using PackLox sees nothing whatsoever.
+    _foregroundSubscription?.cancel();
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
+      unawaited(onReceived?.call(message));
+    });
   }
 
   Future<void> dispose() async {
     await _openedSubscription?.cancel();
     _openedSubscription = null;
+    await _foregroundSubscription?.cancel();
+    _foregroundSubscription = null;
   }
 
   Future<void> _handleMessage(

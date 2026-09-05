@@ -5,6 +5,9 @@ import 'package:collectiq_ai/core/auth/local_user_data_cache.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_destination.dart';
 import 'package:collectiq_ai/core/navigation/push_notification_navigation.dart';
+import 'package:collectiq_ai/features/notifications/domain/entities/notification_event.dart';
+import 'package:collectiq_ai/features/notifications/presentation/controllers/notification_providers.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:collectiq_ai/core/telemetry/app_telemetry.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/ui/product_language/packlox_bootstrap_surface.dart';
@@ -63,6 +66,7 @@ class _AppShellState extends ConsumerState<AppShell>
       unawaited(
         _pushNotificationNavigationCoordinator.start(
           onIntent: _handlePushNotificationNavigationIntent,
+          onReceived: _recordPushInInbox,
         ),
       );
       unawaited(
@@ -74,6 +78,48 @@ class _AppShellState extends ConsumerState<AppShell>
             ),
       );
     });
+  }
+
+  /// Keeps a copy of every push in the inbox.
+  ///
+  /// Only price alerts used to reach the bell, because the app logs those
+  /// itself when it evaluates them. Anything else -- a broadcast, an admin
+  /// message, a support reply -- existed as a banner and nowhere else, so
+  /// dismissing it destroyed the only copy the user had.
+  Future<void> _recordPushInInbox(RemoteMessage message) async {
+    final notification = message.notification;
+    final title = notification?.title;
+    final body = notification?.body;
+    // A data-only push (a silent sync signal) has nothing to show, so there
+    // is nothing worth putting in the inbox.
+    if ((title == null || title.trim().isEmpty) &&
+        (body == null || body.trim().isEmpty)) {
+      return;
+    }
+    final messageId = message.messageId;
+    if (messageId == null || messageId.isEmpty) {
+      return;
+    }
+    try {
+      await ref
+          .read(notificationEventStoreProvider)
+          .append(
+            NotificationEvent.fromPushMessage(
+              messageId: messageId,
+              title: title,
+              body: body,
+              data: message.data,
+              sentAt: message.sentTime,
+            ),
+          );
+      if (mounted) {
+        ref.invalidate(notificationInboxProvider);
+        ref.invalidate(unreadNotificationCountProvider);
+      }
+    } on Object catch (error) {
+      // Never let inbox bookkeeping break notification handling.
+      debugPrint('[Push] Could not record push in inbox: $error');
+    }
   }
 
   @override

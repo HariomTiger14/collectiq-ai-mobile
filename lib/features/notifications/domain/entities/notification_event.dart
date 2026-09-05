@@ -56,6 +56,37 @@ class NotificationEvent {
     );
   }
 
+  /// Builds an inbox entry from an incoming push.
+  ///
+  /// Every push is something PackLox told the user, so it should be findable
+  /// afterwards. Before this, only price alerts reached the inbox -- a
+  /// broadcast or an admin message existed as a banner and nowhere else, so
+  /// dismissing it destroyed the only copy.
+  ///
+  /// Dedupes on the FCM message id, so a push that arrives in the foreground
+  /// and is then tapped logs once, not twice.
+  factory NotificationEvent.fromPushMessage({
+    required String messageId,
+    required String? title,
+    required String? body,
+    required Map<String, dynamic> data,
+    DateTime? sentAt,
+  }) {
+    final itemId = (data['itemId'] ?? data['item_id'] ?? '').toString();
+    return NotificationEvent(
+      id: 'push@$messageId',
+      itemId: itemId,
+      title: (title ?? '').trim().isEmpty ? 'PackLox' : title!.trim(),
+      body: (body ?? '').trim(),
+      createdAt: sentAt ?? DateTime.now(),
+      // A push carrying no explicit kind is generic rather than guessed at --
+      // a wrong price-direction icon is worse than a neutral one.
+      kind: NotificationKind.fromName(
+        (data['kind'] ?? data['type'] ?? '').toString(),
+      ),
+    );
+  }
+
   factory NotificationEvent.fromPriceAlert(PriceAlert alert) {
     final createdAt = alert.triggeredAt ?? alert.updatedAt;
     final kind = switch (alert.rule.type) {
