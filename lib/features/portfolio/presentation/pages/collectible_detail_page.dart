@@ -17,6 +17,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
@@ -6536,11 +6537,25 @@ class _PriceAlertRow extends ConsumerWidget {
     PriceAlert alert,
   ) async {
     final repository = ref.read(priceAlertRepositoryProvider);
-    await repository.deleteAlert(alert.id);
+    var deleted = true;
+    String? failure;
+    try {
+      await repository.deleteAlert(alert.id);
+    } on PriceAlertDeleteFailedException catch (error) {
+      // The local row is gone but the cloud still has it, so the next sync
+      // brings it back. Saying "deleted" here is what made this look like a
+      // UI bug rather than a failed write.
+      debugPrint('[PriceAlerts] delete did not reach the cloud: $error');
+      deleted = false;
+      failure = "Couldn't delete that alert. Check your connection and try again.";
+    }
     ref.invalidate(itemPriceAlertsProvider(alert.itemId));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
-      _showDetailSnackBar(context, 'Price alert deleted');
+      _showDetailSnackBar(
+        context,
+        deleted ? 'Price alert deleted' : failure!,
+      );
     }
   }
 }

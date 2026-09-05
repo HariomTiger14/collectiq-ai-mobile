@@ -99,13 +99,30 @@ Future<PriceAlertSummary> evaluateAndDispatchPriceAlerts(
   return evaluator.summaryFromEvaluations(evaluations);
 }
 
+/// Stable identity for an alert: one per item per rule type.
+///
+/// Creating the "same" alert again therefore updates the existing row rather
+/// than adding a duplicate, and gives the cloud upsert a key it can match.
+String buildPriceAlertId({
+  required String itemId,
+  required PriceAlertRuleType type,
+}) => 'alert-$itemId-${type.name}';
+
 PriceAlert buildPriceAlert({
   required CollectibleItem item,
   required PriceAlertRuleType type,
 }) {
   final now = DateTime.now();
   return PriceAlert(
-    id: 'alert-${item.id}-${type.name}-${now.microsecondsSinceEpoch}',
+    // Deterministic: one alert per (item, rule type). The id used to carry
+    // microsecondsSinceEpoch, so every tap of "Alert if value rises 10%"
+    // minted a fresh id and a fresh row -- three identical "Increases by 10%"
+    // alerts on one item, observed 2026-09-05.
+    //
+    // It also broke deletion. The cloud delete upserts on (id, user_id) to
+    // mark the row disabled; with a timestamped id the local and cloud rows
+    // could never be matched reliably.
+    id: buildPriceAlertId(itemId: item.id, type: type),
     itemId: item.id,
     itemTitle: item.title,
     rule: _ruleForType(item: item, type: type),

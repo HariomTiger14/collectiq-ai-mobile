@@ -91,7 +91,13 @@ class SupabasePriceAlertRepository implements PriceAlertRepository {
         ),
       );
     } on Object catch (error) {
+      // Rethrow. Swallowing this is why "Price alert deleted" appeared while
+      // the alert stayed on screen: the local row went, the cloud row kept
+      // enabled=true, and the next fetch restored it. Measured 2026-09-05:
+      // zero rows had ever reached enabled=false, so this had never once
+      // succeeded and nothing ever said so.
       debugPrint('[PriceAlerts] cloud delete failed: $error');
+      throw PriceAlertDeleteFailedException(alertId, error);
     }
   }
 
