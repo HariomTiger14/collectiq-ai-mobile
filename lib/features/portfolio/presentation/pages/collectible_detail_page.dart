@@ -6597,15 +6597,50 @@ String? _storedAiSummaryFor(CollectibleItem item) {
   if (friendlySummary != null) {
     return friendlySummary;
   }
-  final parts = [
+  // The three stored fields overlap: some analyzer paths write the same
+  // sentence into more than one of them, which used to render as the same
+  // paragraph repeated. Keep the first occurrence of each distinct insight.
+  final seen = <String>{};
+  final parts = <String>[];
+  for (final raw in [
     _collectorSafeInsight(item.aiReasoning),
     _collectorSafeInsight(item.confidenceExplanation),
     _collectorSafeInsight(item.detectionQuality),
-  ].whereType<String>().toList(growable: false);
+  ]) {
+    if (raw == null || !seen.add(_insightDedupeKey(raw))) {
+      continue;
+    }
+    parts.add(raw);
+  }
+  final quality = _collectorSafeInsight(item.detectionQuality);
+  if (quality != null && parts.isNotEmpty && parts.last == quality) {
+    // Some analyzer paths store a bare grade such as "Partial", which reads
+    // as a stray word on its own line unless it is labelled.
+    parts[parts.length - 1] = _labelledDetectionQuality(quality);
+  }
   if (parts.isEmpty) {
     return null;
   }
   return parts.join('\n\n');
+}
+
+/// Normalizes an insight for comparison so wording that differs only in
+/// casing, spacing, or trailing punctuation still counts as a repeat.
+String _insightDedupeKey(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
+
+/// Labels a detection-quality grade that is too terse to stand alone as a
+/// sentence. Full sentences from the analyzer are left untouched.
+String _labelledDetectionQuality(String value) {
+  final trimmed = value.trim();
+  if (trimmed.contains(' ')) {
+    return trimmed;
+  }
+  final withoutTrailingDot = trimmed.endsWith('.')
+      ? trimmed.substring(0, trimmed.length - 1)
+      : trimmed;
+  return 'Detection quality: $withoutTrailingDot.';
 }
 
 String? _collectorInsightSummaryFor(CollectibleItem item) {

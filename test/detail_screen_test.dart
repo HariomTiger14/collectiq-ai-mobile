@@ -41,6 +41,41 @@ void main() {
   });
 
   testWidgets(
+    'item insights shows a repeated analyzer sentence only once',
+    (tester) async {
+      // The Gemini title-rescue path stores the same sentence in both
+      // aiReasoning and confidenceExplanation, and a bare grade in
+      // detectionQuality, which used to render as the paragraph twice
+      // followed by a stray word.
+      const repeated =
+          "The card prominently features the name 'Raichu' at the top, along "
+          'with Pokemon game mechanics, HP, attacks, and copyright information.';
+      await _pumpDetail(
+        tester,
+        _authorityItem(
+          aiReasoning: repeated,
+          confidenceExplanation: repeated,
+          detectionQuality: 'Partial',
+        ),
+      );
+
+      final summary = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(
+                const ValueKey('collectible-detail-insights-section'),
+              ),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data ?? '')
+          .firstWhere((data) => data.contains('Raichu'));
+      expect(repeated.allMatches(summary).length, 1);
+      expect(summary, contains('Detection quality: Partial.'));
+    },
+  );
+
+  testWidgets(
     'approved detail surface renders compact header and inline sections',
     (tester) async {
       await _pumpDetail(tester, _authorityItem());
@@ -1599,6 +1634,10 @@ CollectibleItem _authorityItem({
     ),
     CollectibleImage(path: 'sample://detail', role: 'detail', source: 'sample'),
   ],
+  String aiReasoning = 'Stored scan reasoning only.',
+  String confidenceExplanation =
+      'Saved evidence matched the front and detail photos.',
+  String detectionQuality = 'Clear packaging and model markings.',
 }) {
   return CollectibleItem(
     id: 'detail-authority-item',
@@ -1616,10 +1655,9 @@ CollectibleItem _authorityItem({
     year: '2026',
     rarity: 'Limited',
     notes: 'Stored owner note.',
-    aiReasoning: 'Stored scan reasoning only.',
-    confidenceExplanation:
-        'Saved evidence matched the front and detail photos.',
-    detectionQuality: 'Clear packaging and model markings.',
+    aiReasoning: aiReasoning,
+    confidenceExplanation: confidenceExplanation,
+    detectionQuality: detectionQuality,
     galleryImages: galleryImages,
     pricing: const PricingInfo(
       estimatedMarketValue: 245,
