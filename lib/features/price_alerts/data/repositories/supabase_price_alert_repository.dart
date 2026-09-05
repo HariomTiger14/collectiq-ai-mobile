@@ -71,24 +71,29 @@ class SupabasePriceAlertRepository implements PriceAlertRepository {
     }
 
     try {
-      await supabaseDataGateway.authenticatedPostWithSession<List<dynamic>>(
+      // PATCH, not an upsert. PostgREST implements upsert as INSERT ... ON
+      // CONFLICT DO UPDATE, so the INSERT half must supply every NOT NULL
+      // column -- and price_alerts requires portfolio_item_id, item_title and
+      // rule_type, none of which a delete has any business sending. The
+      // insert therefore failed on a not-null violation before the conflict
+      // clause was ever reached, and the error was swallowed.
+      //
+      // Measured 2026-09-05: not one row had ever reached enabled=false, so
+      // this had never worked at all. The portfolio sync service hit the same
+      // PostgREST behaviour and already uses PATCH for exactly this reason.
+      await supabaseDataGateway.authenticatedPatchWithSession<List<dynamic>>(
         '/rest/v1/$tableName',
         session: session,
-        queryParameters: const {'on_conflict': 'id,user_id'},
-        data: [
-          {
-            'id': alertId,
-            'user_id': session.userId,
-            'status': PriceAlertStatus.paused.name,
-            'enabled': false,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-        ],
-        options: Options(
-          headers: const {
-            'Prefer': 'resolution=merge-duplicates,return=minimal',
-          },
-        ),
+        queryParameters: {
+          'id': 'eq.$alertId',
+          'user_id': 'eq.${session.userId}',
+        },
+        data: {
+          'status': PriceAlertStatus.paused.name,
+          'enabled': false,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        options: Options(headers: const {'Prefer': 'return=minimal'}),
       );
     } on Object catch (error) {
       // Rethrow. Swallowing this is why "Price alert deleted" appeared while

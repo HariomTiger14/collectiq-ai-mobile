@@ -12,6 +12,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.d
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -431,12 +432,25 @@ class _AlertListRow extends ConsumerWidget {
 
   Future<void> _deleteAlert(BuildContext context, WidgetRef ref) async {
     final repository = ref.read(priceAlertRepositoryProvider);
-    await repository.deleteAlert(alert.id);
+    var deleted = true;
+    try {
+      await repository.deleteAlert(alert.id);
+    } on PriceAlertDeleteFailedException catch (error) {
+      // Local is gone but the cloud still has it, so the next sync restores
+      // it. Reporting success here is what made this look like a UI bug.
+      debugPrint('[PriceAlerts] delete did not reach the cloud: $error');
+      deleted = false;
+    }
     ref.invalidate(allPriceAlertsProvider);
     ref.invalidate(itemPriceAlertsProvider(alert.itemId));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
-      _showSnackBar(context, 'Price alert deleted');
+      _showSnackBar(
+        context,
+        deleted
+            ? 'Price alert deleted'
+            : "Couldn't delete that alert. Check your connection and try again.",
+      );
     }
   }
 
