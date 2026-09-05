@@ -596,8 +596,14 @@ class _AppShellState extends ConsumerState<AppShell>
         scannerState.isLoading ||
         scannerState.isPreparingImage ||
         scannerState.errorMessage != null;
+    // The bar is a Positioned child of the shell Stack, so the Scaffold's
+    // keyboard resize lifts it to sit on top of the keyboard, covering the
+    // page content underneath. Hide it while the keyboard is open, which is
+    // also what a platform tab bar does.
+    final keyboardIsOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final hideBottomNavigation =
-        selectedIndex == _scanTabIndex && hasActiveScannerSession;
+        keyboardIsOpen ||
+        (selectedIndex == _scanTabIndex && hasActiveScannerSession);
 
     final authResolving =
         authState.isLoading ||
