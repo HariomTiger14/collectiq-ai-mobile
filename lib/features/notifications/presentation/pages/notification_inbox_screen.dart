@@ -89,11 +89,12 @@ class _NotificationInboxScreenState
   }
 
   void _openItem(AppNotification notification) {
-    // A push that isn't about a collectible -- a broadcast, an admin message
-    // -- carries no itemId. There is nothing to open, and saying the item is
-    // "no longer in your collection" would be wrong twice over: there never
-    // was one, and nothing was removed.
+    // A notification about a collectible opens it. One that isn't -- a
+    // broadcast, an admin message -- has no item to open, so it shows its own
+    // message instead. Every row leads somewhere; none of them lie about
+    // where.
     if (notification.itemId.trim().isEmpty) {
+      _showMessage(notification);
       return;
     }
     final item = ref
@@ -102,17 +103,72 @@ class _NotificationInboxScreenState
         .where((candidate) => candidate.id == notification.itemId)
         .firstOrNull;
     if (item == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('That item is no longer in your collection.'),
-        ),
-      );
+      // Genuinely removed: the notification named an item that is no longer
+      // in the collection. Falling back to the message beats a dead end.
+      _showMessage(notification);
       return;
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CollectibleDetailPage(item: item),
       ),
+    );
+  }
+
+  void _showMessage(AppNotification notification) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: HomeTokens.surfaceRaised,
+      showDragHandle: true,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final textTheme = Theme.of(sheetContext).textTheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notification.title,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: HomeTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _relativeTime(notification.createdAt),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: HomeTokens.textMuted,
+                  ),
+                ),
+                if (notification.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  // Scrollable: the list truncates the title to one line, and
+                  // a message long enough to need this sheet is exactly the
+                  // one that would otherwise be unreadable.
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        notification.body,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: HomeTokens.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -184,11 +240,7 @@ class _NotificationInboxScreenState
           child: _NotificationRow(
             notification: notification,
             unread: _unreadAtOpen.contains(notification.id),
-            // Null when the notification has nothing to open, so the row
-            // does not look tappable and then do nothing.
-            onTap: notification.itemId.trim().isEmpty
-                ? null
-                : () => _openItem(notification),
+            onTap: () => _openItem(notification),
           ),
         );
       },
@@ -217,12 +269,12 @@ class _NotificationRow extends StatelessWidget {
   const _NotificationRow({
     required this.notification,
     required this.unread,
-    this.onTap,
+    required this.onTap,
   });
 
   final AppNotification notification;
   final bool unread;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
