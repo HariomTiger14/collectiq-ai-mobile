@@ -1,2 +1,0 @@
-"""Backend analyzer service abstraction."""
-

@@ -1,6 +1,27 @@
-# collectiq_ai
+# PackLox mobile
 
-A new Flutter project.
+The PackLox Flutter application (iOS and Android).
+
+## Repository boundaries
+
+PackLox is three independent repositories. This one holds the mobile app
+only:
+
+| what | where |
+|---|---|
+| Flutter app (this repo) | `packlox-mobile-final` |
+| Backend API and ingestion jobs | `collectiq-ai-backend` — deploys to Render |
+| Admin portal | `packlox-admin-portal` — hosted separately |
+
+This repo previously carried copies of the other two, under `backend/` and
+`web/admin/`. Both were removed once they became their own projects: the
+copies had diverged (the `backend/` copy was ~60 files behind and two months
+stale) while nothing in the Flutter app referenced either directory. They are
+in git history if you need them, and both are reachable from the
+`archive/main-before-reconciliation-20260905` tag.
+
+If you find yourself about to add a top-level `backend/` or `web/admin/`
+here, it belongs in one of the repositories above instead.
 
 ## Onboarding + First-Time UX
 
