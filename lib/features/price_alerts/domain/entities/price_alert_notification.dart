@@ -151,6 +151,13 @@ class PriceAlertNotificationState {
         PriceAlertNotificationPermissionStatus.notSupported) {
       return "Alerts aren't available on this device yet.";
     }
+    if (!permissionStatus.canNotify) {
+      // Permission has never been asked for. Say so plainly rather than
+      // describing a future that cannot happen yet -- the row is tappable in
+      // this state, and the old copy promised notifications that could never
+      // arrive.
+      return 'Allow notifications so price alerts can reach you.';
+    }
     return "You'll be notified when a saved price alert triggers.";
   }
 

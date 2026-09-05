@@ -14,6 +14,7 @@ import 'package:collectiq_ai/features/price_alerts/presentation/controllers/pric
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Every price alert across the whole portfolio, reached from Settings.
@@ -122,13 +123,32 @@ class _PriceAlertsScreenState extends ConsumerState<PriceAlertsScreen> {
   }
 }
 
-class _NotificationStatusRow extends StatelessWidget {
+class _NotificationStatusRow extends ConsumerWidget {
   const _NotificationStatusRow({required this.state});
 
   final PriceAlertNotificationState state;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // This row used to be display-only, which made "Needs permission" a dead
+    // end: the ONLY code path that asked iOS for permission was creating a
+    // price alert, so a user who read this row had nowhere to act on it.
+    // Tapping now does whatever is actually possible from the current state.
+    final VoidCallback? onTap = switch (state.permissionStatus) {
+      // Never asked. Requesting shows the system prompt, and the controller
+      // registers the push device straight after it is granted.
+      PriceAlertNotificationPermissionStatus.unknown => () => ref
+          .read(priceAlertNotificationControllerProvider.notifier)
+          .requestPermission(),
+      // Already refused. iOS will not prompt a second time, so the only route
+      // left is the system settings page for this app.
+      PriceAlertNotificationPermissionStatus.denied => openAppSettings,
+      // Granted, or the device cannot do notifications at all -- nothing a
+      // tap could usefully change.
+      PriceAlertNotificationPermissionStatus.granted ||
+      PriceAlertNotificationPermissionStatus.notSupported => null,
+    };
+
     return GradientListRow(
       icon: state.permissionStatus.canNotify
           ? Icons.notifications_active_outlined
@@ -141,6 +161,7 @@ class _NotificationStatusRow extends StatelessWidget {
           : state.settingsStatusLabel == 'On'
           ? GradientRowTone.positive
           : GradientRowTone.neutral,
+      onTap: state.isLoading ? null : onTap,
     );
   }
 }

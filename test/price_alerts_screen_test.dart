@@ -6,6 +6,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_n
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/screens/price_alerts_screen.dart';
+import 'package:collectiq_ai/core/ui/hero/gradient_list_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -174,12 +175,59 @@ void main() {
     expect(repository.alerts.single.status, PriceAlertStatus.active);
     expect(find.text('Active'), findsOneWidget);
   });
+  testWidgets(
+    'tapping the notifications row asks for permission when never asked',
+    (tester) async {
+      // Regression: this row was display-only, so "Needs permission" was a
+      // dead end -- the only path that ever prompted was creating an alert.
+      final service = _FakeNotificationService(
+        status: PriceAlertNotificationPermissionStatus.unknown,
+      );
+      await tester.pumpPriceAlerts(alerts: [], notificationService: service);
+
+      expect(service.requestPermissionCalls, 0);
+      await tester.tap(find.text('Notifications'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+
+      expect(service.requestPermissionCalls, 1);
+    },
+  );
+
+  testWidgets('the notifications row explains what tapping will do', (
+    tester,
+  ) async {
+    final service = _FakeNotificationService(
+      status: PriceAlertNotificationPermissionStatus.unknown,
+    );
+    await tester.pumpPriceAlerts(alerts: [], notificationService: service);
+
+    expect(
+      find.text('Allow notifications so price alerts can reach you.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the notifications row is inert once permission is granted', (
+    tester,
+  ) async {
+    await tester.pumpPriceAlerts(alerts: []);
+
+    final row = tester.widget<GradientListRow>(
+      find.ancestor(
+        of: find.text('Notifications'),
+        matching: find.byType(GradientListRow),
+      ),
+    );
+    expect(row.onTap, isNull);
+  });
 }
 
 extension on WidgetTester {
   Future<void> pumpPriceAlerts({
     List<PriceAlert>? alerts,
     PriceAlertRepository? repository,
+    _FakeNotificationService? notificationService,
   }) async {
     await pumpWidget(
       ProviderScope(
@@ -191,7 +239,7 @@ extension on WidgetTester {
             _FakeNotificationRepository(),
           ),
           priceAlertNotificationServiceProvider.overrideWithValue(
-            _FakeNotificationService(),
+            notificationService ?? _FakeNotificationService(),
           ),
         ],
         child: const MaterialApp(home: PriceAlertsScreen()),
@@ -276,9 +324,16 @@ class _FakeNotificationRepository implements PriceAlertNotificationRepository {
 }
 
 class _FakeNotificationService implements PriceAlertNotificationService {
+  _FakeNotificationService({
+    this.status = PriceAlertNotificationPermissionStatus.granted,
+  });
+
+  final PriceAlertNotificationPermissionStatus status;
+  int requestPermissionCalls = 0;
+
   @override
   Future<PriceAlertNotificationPermissionStatus> getPermissionStatus() async {
-    return PriceAlertNotificationPermissionStatus.granted;
+    return status;
   }
 
   @override
@@ -289,6 +344,7 @@ class _FakeNotificationService implements PriceAlertNotificationService {
 
   @override
   Future<PriceAlertNotificationPermissionStatus> requestPermission() async {
+    requestPermissionCalls += 1;
     return PriceAlertNotificationPermissionStatus.granted;
   }
 
