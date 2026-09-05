@@ -422,8 +422,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Collection snapshot'));
-    expect(find.text('Collection snapshot'), findsWidgets);
+    await tester.reveal(
+      find.byKey(const ValueKey('home-portfolio-valuation-card')),
+    );
+    expect(find.text('Portfolio value'), findsOneWidget);
     await tester.reveal(find.byKey(const ValueKey('home-recent-alert-card')));
     expect(find.text('Alert Charizard'), findsWidgets);
     expect(find.text('Collection Value'), findsNothing);
@@ -445,15 +447,16 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Collection snapshot'));
-    expect(find.text('Collection snapshot'), findsWidgets);
+    await tester.reveal(
+      find.byKey(const ValueKey('home-portfolio-valuation-card')),
+    );
+    expect(find.text('Portfolio value'), findsOneWidget);
+    expect(find.text(r'$2,750'), findsWidgets);
+    expect(find.textContaining('of 3 items trusted'), findsOneWidget);
+    expect(find.text('Trend'), findsNothing);
+    await tester.reveal(find.byKey(const ValueKey('home-recent-home-card')));
     expect(find.text('Dashboard Charizard'), findsWidgets);
     expect(find.text('Dashboard Silver Eagle'), findsWidgets);
-    expect(find.text('3 categories'), findsOneWidget);
-    expect(find.text('Top collectible'), findsWidgets);
-    expect(find.text('Trend'), findsNothing);
-    expect(find.text(r'$2,750 estimated value'), findsWidgets);
-    await tester.reveal(find.byKey(const ValueKey('home-recent-home-card')));
     final recentThumbnail = tester.widget<PortfolioThumbnail>(
       find.descendant(
         of: find.byKey(const ValueKey('home-recent-home-card')),
@@ -594,8 +597,10 @@ void main() {
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
 
-    await tester.reveal(find.text('Collection snapshot'));
-    expect(find.text('Collection snapshot'), findsWidgets);
+    await tester.reveal(
+      find.byKey(const ValueKey('home-portfolio-valuation-card')),
+    );
+    expect(find.text('Portfolio value'), findsOneWidget);
     await tester.reveal(find.text('Recent collectibles'));
     expect(find.text('Recent collectibles'), findsWidgets);
     expect(find.textContaining('Charizard'), findsWidgets);
@@ -5202,8 +5207,10 @@ void main() {
 
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    await tester.reveal(find.text('Collection snapshot'));
-    expect(find.text('Collection snapshot'), findsWidgets);
+    await tester.reveal(
+      find.byKey(const ValueKey('home-portfolio-valuation-card')),
+    );
+    expect(find.text('Portfolio value'), findsOneWidget);
     expect(find.text('Collection Value'), findsNothing);
     expect(find.text(r'$300'), findsWidgets);
   });

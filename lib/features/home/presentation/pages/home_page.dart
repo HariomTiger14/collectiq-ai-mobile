@@ -1,7 +1,10 @@
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
+import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/domain/services/collector_dashboard_analytics_service.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_detail_page.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/widgets/portfolio_widgets.dart';
@@ -39,8 +42,24 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final portfolio = ref.watch(portfolioControllerProvider);
     final items = portfolio.orderedItems;
+    // Use the controller's stored list (a stable reference across rebuilds) as
+    // the family argument so the async providers cache correctly instead of
+    // refetching on every build.
+    final stableItems = portfolio.items;
     final insights = const CollectorDashboardAnalyticsService().build(items);
-    final homeData = _HomeViewData.fromInsights(insights);
+    final performance = ref
+        .watch(portfolioPerformanceProvider(stableItems))
+        .asData
+        ?.value;
+    final triggeredAlertCount =
+        ref.watch(homeTriggeredAlertCountProvider).asData?.value ?? 0;
+    final homeData = _HomeViewData.fromInsights(
+      insights,
+      valueTrend: _dailyTrendFromSnapshots(performance?.dailySnapshots),
+      triggeredAlertCount: triggeredAlertCount,
+      topGainer: performance?.topGainer,
+      topLoser: performance?.topLoser,
+    );
     final recentItems = homeData.recentItems.take(4).toList(growable: false);
 
     return Scaffold(
@@ -72,6 +91,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                 SliverToBoxAdapter(
                   child: _HomeFrame(
                     horizontalPadding: horizontalPadding,
+                    topPadding: AppSpacing.lg,
+                    child: _CollectionSnapshotSection(
+                      data: homeData,
+                      dailySnapshots: homeData.dailySnapshots,
+                      onScanPressed: widget.onScanPressed,
+                      onReviewPressed: widget.onPortfolioPressed,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _HomeFrame(
+                    horizontalPadding: horizontalPadding,
                     topPadding: AppSpacing.md,
                     child: _PrimaryScanCta(onPressed: widget.onScanPressed),
                   ),
@@ -87,37 +118,44 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: _HomeFrame(
-                    horizontalPadding: horizontalPadding,
-                    topPadding: AppSpacing.lg,
-                    child: _CollectionSnapshotSection(
-                      data: homeData,
-                      dailySnapshots: homeData.dailySnapshots,
-                      onScanPressed: widget.onScanPressed,
-                      onReviewPressed: widget.onPortfolioPressed,
+                if (homeData.showAttention)
+                  SliverToBoxAdapter(
+                    child: _HomeFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.lg,
+                      child: _AttentionSection(
+                        data: homeData,
+                        onPressed: widget.onPortfolioPressed,
+                      ),
                     ),
                   ),
-                ),
+                if (homeData.itemCount > 0)
+                  SliverToBoxAdapter(
+                    child: _HomeFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.lg,
+                      child: _HealthCategorySection(data: homeData),
+                    ),
+                  ),
+                if (homeData.hasMovers)
+                  SliverToBoxAdapter(
+                    child: _HomeFrame(
+                      horizontalPadding: horizontalPadding,
+                      topPadding: AppSpacing.lg,
+                      child: _MoversSection(data: homeData),
+                    ),
+                  ),
                 if (recentItems.isNotEmpty)
                   SliverToBoxAdapter(
                     child: _HomeFrame(
                       horizontalPadding: horizontalPadding,
                       topPadding: AppSpacing.lg,
+                      bottomPadding: AppSpacing.xxl,
                       child: _RecentCollectiblesSection(
                         items: recentItems,
                         hasMore: homeData.itemCount > recentItems.length,
                         onViewAll: widget.onPortfolioPressed,
                       ),
-                    ),
-                  ),
-                if (homeData.unvaluedCount > 0 && homeData.itemCount > 0)
-                  SliverToBoxAdapter(
-                    child: _HomeFrame(
-                      horizontalPadding: horizontalPadding,
-                      topPadding: AppSpacing.lg,
-                      bottomPadding: AppSpacing.xxl,
-                      child: _GroundedInsightCard(data: homeData),
                     ),
                   )
                 else
@@ -145,6 +183,11 @@ class _HomeViewData {
     required this.topCollectible,
     required this.recentItems,
     required this.dailySnapshots,
+    required this.triggeredAlertCount,
+    required this.collectionHealth,
+    required this.categoryDistribution,
+    this.topGainer,
+    this.topLoser,
   });
 
   final List<CollectibleItem> items;
@@ -157,6 +200,11 @@ class _HomeViewData {
   final CollectibleItem? topCollectible;
   final List<CollectibleItem> recentItems;
   final List<TrendSnapshot> dailySnapshots;
+  final int triggeredAlertCount;
+  final CollectionHealthScore collectionHealth;
+  final Map<CollectorCategory, int> categoryDistribution;
+  final PortfolioValueMover? topGainer;
+  final PortfolioValueMover? topLoser;
 
   bool get isEmpty => itemCount == 0;
   bool get hasValuedItems => valuedItemCount > 0;
@@ -165,14 +213,35 @@ class _HomeViewData {
 
   int get needsReviewCount => itemCount - trustedPricingCount;
 
+  bool get showAttention =>
+      itemCount > 0 && (unvaluedCount > 0 || triggeredAlertCount > 0);
+
+  bool get hasMovers => topGainer != null || topLoser != null;
+
+  List<_CategoryShare> topCategoryShares(int limit) {
+    final entries =
+        categoryDistribution.entries
+            .where((entry) => entry.value > 0)
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+    final total = entries.fold<int>(0, (sum, entry) => sum + entry.value);
+    if (total == 0) {
+      return const <_CategoryShare>[];
+    }
+    return [
+      for (final entry in entries.take(limit))
+        _CategoryShare(label: entry.key.label, fraction: entry.value / total),
+    ];
+  }
+
   String get heroSupport {
     if (isEmpty) {
       return 'Scan your first collectible and start building your collection.';
     }
-    final valueText = hasValuedItems
-        ? ' worth an estimated ${_formatCurrency(totalValuedAmount)}'
+    final categoryText = categoryCount > 0
+        ? ' across $categoryCount ${categoryCount == 1 ? 'category' : 'categories'}'
         : '';
-    return 'You have $_itemCountLabel$valueText.';
+    return 'You have $_itemCountLabel$categoryText.';
   }
 
   String get _itemCountLabel =>
@@ -196,7 +265,13 @@ class _HomeViewData {
       ? null
       : 'Last scan ${_formatRelativeTime(lastScanAt!)}';
 
-  factory _HomeViewData.fromInsights(CollectorDashboardAnalytics insights) {
+  factory _HomeViewData.fromInsights(
+    CollectorDashboardAnalytics insights, {
+    required List<TrendSnapshot> valueTrend,
+    required int triggeredAlertCount,
+    PortfolioValueMover? topGainer,
+    PortfolioValueMover? topLoser,
+  }) {
     final items = insights.items;
     final valuedItems = items.where(_hasDisplayValue).toList(growable: false);
     final totalValuedAmount = valuedItems.fold<double>(
@@ -220,7 +295,12 @@ class _HomeViewData {
       lastScanAt: insights.mostRecentItem?.createdAt,
       topCollectible: topCollectible,
       recentItems: items,
-      dailySnapshots: insights.dailySnapshots,
+      dailySnapshots: valueTrend,
+      triggeredAlertCount: triggeredAlertCount,
+      collectionHealth: insights.collectionHealth,
+      categoryDistribution: insights.categoryDistribution,
+      topGainer: topGainer,
+      topLoser: topLoser,
     );
   }
 }
@@ -1063,42 +1143,413 @@ class _RecentCollectibleTile extends StatelessWidget {
   }
 }
 
-class _GroundedInsightCard extends StatelessWidget {
-  const _GroundedInsightCard({required this.data});
+class _CategoryShare {
+  const _CategoryShare({required this.label, required this.fraction});
+
+  final String label;
+  final double fraction;
+}
+
+class _AttentionSection extends StatelessWidget {
+  const _AttentionSection({required this.data, this.onPressed});
+
+  final _HomeViewData data;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final alertCount = data.triggeredAlertCount;
+    final unvalued = data.unvaluedCount;
+    final accent = alertCount > 0 ? AppColors.danger : _warningAmber;
+
+    final alertLine = alertCount > 0
+        ? '$alertCount price ${alertCount == 1 ? 'alert' : 'alerts'} triggered'
+        : null;
+    final valuationLine = unvalued > 0
+        ? '$unvalued ${unvalued == 1 ? 'collectible needs' : 'collectibles need'} a valuation'
+        : null;
+    final primaryLine = alertLine ?? valuationLine!;
+    final secondaryLine = alertLine != null ? valuationLine : null;
+
+    return MotionReveal(
+      child: MotionTapScale(
+        onTap: onPressed,
+        enabled: onPressed != null,
+        child: Container(
+          key: const ValueKey('home-attention-card'),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: accent.withValues(alpha: 0.32)),
+            boxShadow: AppElevation.level1,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(
+                  alertCount > 0
+                      ? Icons.notifications_active_outlined
+                      : Icons.error_outline,
+                  color: accent,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      primaryLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (secondaryLine != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        secondaryLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HealthCategorySection extends StatelessWidget {
+  const _HealthCategorySection({required this.data});
+
+  final _HomeViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return MotionReveal(
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _HealthCard(data: data)),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: _CategoryMixCard(data: data)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HealthCard extends StatelessWidget {
+  const _HealthCard({required this.data});
 
   final _HomeViewData data;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final count = data.unvaluedCount;
+    final textTheme = Theme.of(context).textTheme;
+    final score = data.collectionHealth.score.clamp(0, 100);
+    final color = score >= 70
+        ? AppColors.success
+        : score >= 50
+        ? _warningAmber
+        : AppColors.danger;
 
-    return MotionReveal(
-      child: Container(
-        key: const ValueKey('home-grounded-insight'),
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.50),
+    return _MiniCard(
+      key: const ValueKey('home-health-card'),
+      title: 'Collection health',
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    value: score / 100,
+                    strokeWidth: 5,
+                    backgroundColor: colorScheme.outlineVariant.withValues(
+                      alpha: 0.32,
+                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+                Text(
+                  '$score',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Row(
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              data.collectionHealth.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryMixCard extends StatelessWidget {
+  const _CategoryMixCard({required this.data});
+
+  final _HomeViewData data;
+
+  static const List<Color> _barColors = [
+    AppColors.accent,
+    AppColors.secondaryAccent,
+    AppColors.violet,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final shares = data.topCategoryShares(3);
+
+    return _MiniCard(
+      key: const ValueKey('home-category-mix-card'),
+      title: 'Category mix',
+      child: shares.isEmpty
+          ? Text(
+              'No categories yet',
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < shares.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AppSpacing.sm),
+                  _CategoryBar(
+                    share: shares[i],
+                    color: _barColors[i % _barColors.length],
+                  ),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _CategoryBar extends StatelessWidget {
+  const _CategoryBar({required this.share, required this.color});
+
+  final _CategoryShare share;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Icon(Icons.info_outline, color: colorScheme.primary),
-            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
-                '$count ${count == 1 ? 'collectible still needs' : 'collectibles still need'} a valuation',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface,
+                share.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+            Text(
+              '${(share.fraction * 100).round()}%',
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: Container(
+            height: 6,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.32),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: share.fraction.clamp(0.03, 1.0),
+              child: Container(color: color),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoversSection extends StatelessWidget {
+  const _MoversSection({required this.data});
+
+  final _HomeViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final gainer = data.topGainer;
+    final loser = data.topLoser;
+
+    return MotionReveal(
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (gainer != null)
+              Expanded(child: _MoverCard(mover: gainer, positive: true)),
+            if (gainer != null && loser != null)
+              const SizedBox(width: AppSpacing.md),
+            if (loser != null)
+              Expanded(child: _MoverCard(mover: loser, positive: false)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoverCard extends StatelessWidget {
+  const _MoverCard({required this.mover, required this.positive});
+
+  final PortfolioValueMover mover;
+  final bool positive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final color = positive ? AppColors.success : AppColors.danger;
+
+    return _MiniCard(
+      key: ValueKey(positive ? 'home-mover-gainer' : 'home-mover-loser'),
+      title: positive ? 'Top gainer' : 'Top loser',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                positive ? Icons.trending_up : Icons.trending_down,
+                size: 16,
+                color: color,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  mover.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _formatSignedCurrency(mover.absoluteChange),
+            style: textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniCard extends StatelessWidget {
+  const _MiniCard({required this.title, required this.child, super.key});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.52),
+        ),
+        boxShadow: AppElevation.level1,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          child,
+        ],
       ),
     );
   }
@@ -1157,6 +1608,24 @@ class _SectionSurface extends StatelessWidget {
       ),
     );
   }
+}
+
+List<TrendSnapshot> _dailyTrendFromSnapshots(
+  List<PortfolioSnapshot>? snapshots,
+) {
+  if (snapshots == null || snapshots.isEmpty) {
+    return const <TrendSnapshot>[];
+  }
+  return [
+    for (final snapshot in snapshots)
+      TrendSnapshot(
+        period: TrendSnapshotPeriod.daily,
+        date: snapshot.periodStart,
+        totalValue: snapshot.totalPortfolioValue,
+        itemCount: snapshot.totalItems,
+        averageConfidence: 0,
+      ),
+  ];
 }
 
 _ThirtyDayDelta? _portfolioThirtyDayDelta(List<TrendSnapshot> snapshots) {
