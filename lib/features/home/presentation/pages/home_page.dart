@@ -338,6 +338,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     final fxRates = isPreview
         ? FxRateSnapshot.empty
         : ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    // A total is only meaningful once every item's currency can reach the
+    // display one. Rates are fetched once per session, so on a cold launch
+    // this is briefly false -- summing at an implicit 1.0 and labelling the
+    // result with the display currency would state a figure the portfolio
+    // is not worth.
+    final canStateTotal =
+        isPreview ||
+        canTotalIn(
+          portfolio.items.map(currencyForItem),
+          displayCurrency,
+          fxRates.currentRates,
+        );
     final homeData = _HomeViewData.fromInsights(
       const CollectorDashboardAnalyticsService().build(
         portfolio.orderedItems,
@@ -463,6 +475,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: _PortfolioValueHero(
                       data: homeData,
                       isValueHistoryLoading: isValueHistoryLoading,
+                      isTotalPending: !canStateTotal,
                       onReview:
                           widget.onPortfolioPressed ??
                           (widget.onScanPressed == null
@@ -564,6 +577,7 @@ class _PortfolioValueHero extends StatefulWidget {
   const _PortfolioValueHero({
     required this.data,
     this.isValueHistoryLoading = false,
+    this.isTotalPending = false,
     this.onReview,
   });
 
@@ -573,6 +587,10 @@ class _PortfolioValueHero extends StatefulWidget {
   /// the hero (total, trust bar, CTA) is ready before it arrives, so only the
   /// trend and its delta wait behind a placeholder.
   final bool isValueHistoryLoading;
+
+  /// Whether the total cannot yet be stated in the display currency, because
+  /// exchange rates for at least one item's currency have not arrived.
+  final bool isTotalPending;
   final VoidCallback? onReview;
 
   @override
@@ -699,20 +717,33 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            hasValue
-                ? _formatCurrency(data.totalValuedAmount, data.displayCurrency)
-                : 'Add valued items',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: HomeTokens.textPrimary,
-              fontSize: hasValue ? 40 : 28,
-              fontWeight: FontWeight.w900,
-              height: 1,
-              letterSpacing: -0.5,
+          if (hasValue && widget.isTotalPending)
+            const SizedBox(
+              key: ValueKey('home-value-hero-total-loading'),
+              height: 40,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: HomeSkeletonLine(width: 190, height: 30),
+              ),
+            )
+          else
+            Text(
+              hasValue
+                  ? _formatCurrency(
+                      data.totalValuedAmount,
+                      data.displayCurrency,
+                    )
+                  : 'Add valued items',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: HomeTokens.textPrimary,
+                fontSize: hasValue ? 40 : 28,
+                fontWeight: FontWeight.w900,
+                height: 1,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
           const SizedBox(height: 10),
           if (isHistoryLoading)
             const Padding(

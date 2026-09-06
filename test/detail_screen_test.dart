@@ -75,6 +75,29 @@ void main() {
     },
   );
 
+  testWidgets('an amount with no exchange rate keeps its own currency', (
+    tester,
+  ) async {
+    // Rates are fetched once per session, so there is a window on every cold
+    // launch where the display currency's rate is missing. Converting at an
+    // implicit 1.0 and labelling the result AUD would show a USD amount
+    // wearing an AUD label.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      fxRates: const {'USD': 1.0},
+    );
+
+    final value = tester
+        .widget<Text>(
+          find.byKey(const ValueKey('collectible-detail-value-card-value')),
+        )
+        .data!;
+
+    expect(value, 'USD \$245');
+    expect(value, isNot(contains('AUD')));
+  });
+
   testWidgets(
     'approved detail surface renders compact header and inline sections',
     (tester) async {
@@ -1189,6 +1212,7 @@ Future<void> _pumpDetail(
   GalleryService? galleryService,
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
+  Map<String, double>? fxRates,
   PlanLimits? planLimits,
   SharedPreferencesValuationSnapshotRepository? valuationSnapshotRepository,
 }) async {
@@ -1229,12 +1253,10 @@ Future<void> _pumpDetail(
         // converting at parity only changes which currency label is shown,
         // never the number.
         fxRatesRepositoryProvider.overrideWithValue(
-          const _FixedRateFxRatesRepository({
-            'USD': 1.0,
-            'AUD': 1.0,
-            'CAD': 1.0,
-            'GBP': 1.0,
-          }),
+          _FixedRateFxRatesRepository(
+            fxRates ??
+                const {'USD': 1.0, 'AUD': 1.0, 'CAD': 1.0, 'GBP': 1.0},
+          ),
         ),
       ],
       child: MaterialApp(

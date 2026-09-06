@@ -509,6 +509,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                             displayCurrency: displayCurrency,
                             currentRates: fxRates.currentRates,
                           ),
+                          // Rates arrive once per session. Until every item's
+                          // currency can reach the display one, a total would
+                          // be a mixed-currency sum wearing the display
+                          // currency's label.
+                          isTotalPending: !canTotalIn(
+                            portfolioState.items.map(currencyForItem),
+                            displayCurrency,
+                            fxRates.currentRates,
+                          ),
                           displayCurrency: displayCurrency,
                           itemCount: portfolioState.items.length,
                           valuedItemCount: _valuedItemCount(
@@ -1427,10 +1436,15 @@ class _PortfolioMetrics extends StatelessWidget {
     required this.itemCount,
     required this.valuedItemCount,
     required this.pendingItemCount,
+    this.isTotalPending = false,
     this.filteredCount,
   });
 
   final double totalValue;
+
+  /// Whether exchange rates for at least one item's currency are missing, so
+  /// no total can honestly be labelled in [displayCurrency] yet.
+  final bool isTotalPending;
   final String displayCurrency;
   final int itemCount;
   final int valuedItemCount;
@@ -1442,13 +1456,17 @@ class _PortfolioMetrics extends StatelessWidget {
     final metrics = <Widget>[
       HomeMetricTile(
         label: 'Collection value',
-        value: _formatAud(totalValue, displayCurrency),
-        supportingText: pendingItemCount == 0
-            ? 'Estimated'
-            : '$pendingItemCount need value',
-        supportingColor: pendingItemCount == 0
-            ? HomeTokens.positive
-            : HomeTokens.warning,
+        value: isTotalPending ? '--' : _formatAud(totalValue, displayCurrency),
+        supportingText: isTotalPending
+            ? 'Updating rates'
+            : (pendingItemCount == 0
+                  ? 'Estimated'
+                  : '$pendingItemCount need value'),
+        supportingColor: isTotalPending
+            ? HomeTokens.textSecondary
+            : (pendingItemCount == 0
+                  ? HomeTokens.positive
+                  : HomeTokens.warning),
       ),
       HomeMetricTile(
         label: 'Collection items',
@@ -2030,7 +2048,10 @@ class _PortfolioTopValueRow extends ConsumerWidget {
     final displayCurrency = ref.watch(displayCurrencyProvider);
     final currentRates =
         ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
-    final convertedValue = convertCurrent(
+    // Label the amount with the currency it is genuinely in: until rates
+    // load (or if that fetch failed) an unconvertible amount stays in its
+    // own currency rather than being relabelled as the display one.
+    final converted = convertCurrentForDisplay(
       item.estimatedValue,
       from: currencyForItem(item),
       to: displayCurrency,
@@ -2051,7 +2072,7 @@ class _PortfolioTopValueRow extends ConsumerWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(
-          _formatAud(convertedValue, displayCurrency),
+          _formatAud(converted.value, converted.currency),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: HomeTokens.positive,
             fontWeight: FontWeight.w900,
@@ -2285,16 +2306,14 @@ class _PortfolioItemRow extends ConsumerWidget {
     final needsValue = !hasValue;
     final statusColor = needsValue ? HomeTokens.warning : HomeTokens.positive;
     final statusLabel = needsValue ? 'Needs value' : 'Valued';
+    final rowValue = convertCurrentForDisplay(
+      item.estimatedValue,
+      from: currencyForItem(item),
+      to: displayCurrency,
+      currentRates: currentRates,
+    );
     final valueLabel = hasValue
-        ? _formatAud(
-            convertCurrent(
-              item.estimatedValue,
-              from: currencyForItem(item),
-              to: displayCurrency,
-              currentRates: currentRates,
-            ),
-            displayCurrency,
-          )
+        ? _formatAud(rowValue.value, rowValue.currency)
         : _valuationDisplayLabel(item);
 
     return MotionTapScale(

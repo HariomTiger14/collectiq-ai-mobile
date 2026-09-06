@@ -3,6 +3,66 @@ import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('conversion availability', () {
+    test('a currency with no rate row cannot be converted', () {
+      // convertCurrent falls back to 1.0 here and returns 152 unchanged --
+      // correct arithmetic, but a caller must not label it USD.
+      expect(canConvertCurrent('AUD', 'USD', const {'USD': 1.0}), isFalse);
+      expect(
+        convertCurrent(
+          152,
+          from: 'AUD',
+          to: 'USD',
+          currentRates: const {'USD': 1.0},
+        ),
+        152,
+      );
+    });
+
+    test('same currency needs no rate at all', () {
+      expect(canConvertCurrent('AUD', 'aud', const {}), isTrue);
+    });
+
+    test('a zero source rate cannot be converted', () {
+      expect(
+        canConvertCurrent('AUD', 'USD', const {'USD': 1.0, 'AUD': 0}),
+        isFalse,
+      );
+    });
+
+    test('display conversion keeps the source currency when no rate is known', () {
+      final result = convertCurrentForDisplay(
+        152,
+        from: 'aud',
+        to: 'USD',
+        currentRates: const {'USD': 1.0},
+      );
+
+      expect(result.value, 152);
+      expect(result.currency, 'AUD');
+    });
+
+    test('display conversion converts and retags once the rate is known', () {
+      final result = convertCurrentForDisplay(
+        152,
+        from: 'AUD',
+        to: 'USD',
+        currentRates: const {'USD': 1.0, 'AUD': 1.52},
+      );
+
+      expect(result.value, closeTo(100, 0.0001));
+      expect(result.currency, 'USD');
+    });
+
+    test('a total needs every contributing currency to be convertible', () {
+      const rates = {'USD': 1.0, 'AUD': 1.52};
+
+      expect(canTotalIn(['AUD', 'USD'], 'USD', rates), isTrue);
+      expect(canTotalIn(['AUD', 'GBP'], 'USD', rates), isFalse);
+      expect(canTotalIn(const <String>[], 'USD', const {}), isTrue);
+    });
+  });
+
   group('convertCurrent', () {
     test('returns the same value when from and to match', () {
       final result = convertCurrent(

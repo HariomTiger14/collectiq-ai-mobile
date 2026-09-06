@@ -3914,13 +3914,16 @@ String _detailValueLabel(
   if (item.estimatedValue == 0) {
     return _formatZeroMoney(displayCurrency);
   }
-  final converted = convertCurrent(
+  // Rates load once per session; until they arrive (or if that fetch
+  // failed) an amount that cannot be converted keeps its own currency
+  // rather than being relabelled as the display one.
+  final converted = convertCurrentForDisplay(
     item.estimatedValue,
     from: item.pricing?.currency ?? 'AUD',
     to: displayCurrency,
     currentRates: currentRates,
   );
-  return _formatMoney(converted, displayCurrency);
+  return _formatMoney(converted.value, converted.currency);
 }
 
 String _formatZeroMoney(String currency) {
