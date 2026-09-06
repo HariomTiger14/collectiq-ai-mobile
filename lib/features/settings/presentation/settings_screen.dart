@@ -2025,6 +2025,70 @@ Uri? manageSubscriptionUri({
   return null;
 }
 
+/// Opens the profile photo full screen.
+///
+/// Same shape as the scan result and catalog image viewers: a fullscreen
+/// dialog on black, an InteractiveViewer for pinch-zoom, and one close
+/// button. Reused rather than restyled so image preview behaves the same
+/// everywhere in the app.
+void showProfileAvatarViewer(BuildContext context, String path) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.92),
+    builder: (_) => _ProfileAvatarViewer(path: path),
+  );
+}
+
+class _ProfileAvatarViewer extends StatelessWidget {
+  const _ProfileAvatarViewer({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      key: const ValueKey('settings-profile-avatar-viewer'),
+      backgroundColor: Colors.black,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Image.file(
+                  File(path),
+                  key: const ValueKey('settings-profile-avatar-viewer-image'),
+                  fit: BoxFit.contain,
+                  // A photo that vanished between render and tap should not
+                  // leave a broken-image glyph on a black screen.
+                  errorBuilder: (context, error, stackTrace) => const Padding(
+                    padding: EdgeInsets.all(AppSpacing.lg),
+                    child: Text(
+                      'That photo could not be opened.',
+                      style: TextStyle(color: HomeTokens.textPrimary),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: AppSpacing.md,
+              right: AppSpacing.md,
+              child: IconButton.filledTonal(
+                key: const ValueKey('settings-profile-avatar-viewer-close'),
+                tooltip: 'Close photo preview',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class IdentityBlock extends StatelessWidget {
   const IdentityBlock({
     super.key,
@@ -2056,6 +2120,7 @@ class IdentityBlock extends StatelessWidget {
     final avatarFile = avatarPath == null || avatarPath.isEmpty
         ? null
         : File(avatarPath);
+    final hasAvatarImage = avatarFile != null && avatarFile.existsSync();
 
     return Column(
       key: const ValueKey('settings-account-overview-card'),
@@ -2094,7 +2159,13 @@ class IdentityBlock extends StatelessWidget {
         ),
         const SizedBox(height: 26),
         GestureDetector(
-          onTap: onEditProfile,
+          // With a photo saved, tapping it views it -- the edit sheet is
+          // still one tap away via the camera badge, the name below, and
+          // Account. With no photo there is nothing to view, so the tap
+          // keeps doing the only useful thing: opening the picker.
+          onTap: hasAvatarImage
+              ? () => showProfileAvatarViewer(context, avatarFile.path)
+              : onEditProfile,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -2114,7 +2185,7 @@ class IdentityBlock extends StatelessWidget {
                   ),
                   border: Border.all(color: HomeTokens.border, width: 2),
                 ),
-                child: avatarFile != null && avatarFile.existsSync()
+                child: hasAvatarImage
                     ? Image.file(
                         avatarFile,
                         key: const ValueKey('settings-profile-avatar-image'),
@@ -2145,18 +2216,28 @@ class IdentityBlock extends StatelessWidget {
               Positioned(
                 right: -2,
                 bottom: 4,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: HomeTokens.surfaceRaised,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: HomeTokens.border),
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt_outlined,
-                    color: HomeTokens.textPrimary,
-                    size: 18,
+                // Its own tap target, so changing the photo stays one tap
+                // away now that tapping the photo itself previews it.
+                child: GestureDetector(
+                  key: const ValueKey('settings-profile-avatar-edit-badge'),
+                  onTap: onEditProfile,
+                  child: Semantics(
+                    button: true,
+                    label: 'Change profile photo',
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: HomeTokens.surfaceRaised,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: HomeTokens.border),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_outlined,
+                        color: HomeTokens.textPrimary,
+                        size: 18,
+                      ),
+                    ),
                   ),
                 ),
               ),

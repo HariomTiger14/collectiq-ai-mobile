@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:collectiq_ai/core/config/app_environment.dart';
 import 'package:collectiq_ai/core/config/environment_config.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
@@ -91,6 +94,119 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
     },
   );
+
+  group('profile photo', () {
+    // Image.file decodes for real, so these need a genuine PNG on disk: a
+    // 1x1 transparent pixel, written per-test and cleaned up.
+    late Directory tempDir;
+    late File avatar;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('packlox-avatar-test');
+      avatar = File('${tempDir.path}/avatar.png')
+        ..writeAsBytesSync(_onePixelPng);
+    });
+
+    tearDown(() async {
+      if (tempDir.existsSync()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    testWidgets('tapping a saved photo opens it full size', (tester) async {
+      await tester.pumpSettings(
+        profileRepository: _SettingsProfileRepository(
+          initialProfile: CollectorProfile(
+            displayName: 'Hari',
+            avatarPath: avatar.path,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-image')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('settings-profile-avatar-viewer')),
+        findsOneWidget,
+      );
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      // Viewing must not be a detour into the edit sheet.
+      expect(find.text('Edit profile'), findsNothing);
+    });
+
+    testWidgets('the preview closes from its close button', (tester) async {
+      await tester.pumpSettings(
+        profileRepository: _SettingsProfileRepository(
+          initialProfile: CollectorProfile(
+            displayName: 'Hari',
+            avatarPath: avatar.path,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-image')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-viewer-close')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('settings-profile-avatar-viewer')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('settings-profile-avatar-image')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the camera badge still opens the edit sheet', (tester) async {
+      // Tapping the photo now previews it, so changing the photo has to stay
+      // reachable -- the badge is that affordance.
+      await tester.pumpSettings(
+        profileRepository: _SettingsProfileRepository(
+          initialProfile: CollectorProfile(
+            displayName: 'Hari',
+            avatarPath: avatar.path,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-edit-badge')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit profile'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('settings-profile-avatar-viewer')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('with no photo, tapping the placeholder opens edit profile', (
+      tester,
+    ) async {
+      await tester.pumpSettings();
+
+      await tester.tap(
+        find.byKey(const ValueKey('settings-profile-avatar-initial')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit profile'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('settings-profile-avatar-viewer')),
+        findsNothing,
+      );
+    });
+  });
 
   testWidgets('profile name can be edited from settings header', (
     tester,
@@ -485,3 +601,10 @@ class _SettingsProfileRepository implements ProfileRepository {
     return this.profile;
   }
 }
+
+
+/// A 1x1 transparent PNG -- the smallest thing Image.file will actually
+/// decode, so the avatar renders as an image rather than the initial.
+final _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+);
