@@ -4,6 +4,8 @@ import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/supabase/supabase_service.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/shared_preferences_price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/data/repositories/supabase_price_alert_repository.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/services/price_alert_evaluator.dart';
@@ -99,16 +101,41 @@ Future<PriceAlertSummary> evaluateAndDispatchPriceAlerts(
   return evaluator.summaryFromEvaluations(evaluations);
 }
 
+/// Stable identity for an alert: one per item per rule type.
+///
+/// Creating the "same" alert again therefore updates the existing row rather
+/// than adding a duplicate, and gives the cloud upsert a key it can match.
+String buildPriceAlertId({
+  required String itemId,
+  required PriceAlertRuleType type,
+}) => 'alert-$itemId-${type.name}';
+
 PriceAlert buildPriceAlert({
   required CollectibleItem item,
   required PriceAlertRuleType type,
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
 }) {
   final now = DateTime.now();
   return PriceAlert(
-    id: 'alert-${item.id}-${type.name}-${now.microsecondsSinceEpoch}',
+    // Deterministic: one alert per (item, rule type). The id used to carry
+    // microsecondsSinceEpoch, so every tap of "Alert if value rises 10%"
+    // minted a fresh id and a fresh row -- three identical "Increases by 10%"
+    // alerts on one item, observed 2026-09-05.
+    //
+    // It also broke deletion. The cloud delete upserts on (id, user_id) to
+    // mark the row disabled; with a timestamped id the local and cloud rows
+    // could never be matched reliably.
+    id: buildPriceAlertId(itemId: item.id, type: type),
     itemId: item.id,
     itemTitle: item.title,
-    rule: _ruleForType(item: item, type: type),
+    rule: _ruleForType(
+      item: item,
+      type: type,
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
+      now: now,
+    ),
     status: PriceAlertStatus.active,
     createdAt: now,
     updatedAt: now,
@@ -118,17 +145,69 @@ PriceAlert buildPriceAlert({
 PriceAlertRule _ruleForType({
   required CollectibleItem item,
   required PriceAlertRuleType type,
+  required DateTime now,
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
 }) {
-  final value = item.estimatedValue;
+  // A threshold is written twice on purpose. The collector sees the item in
+  // their own currency, so "10% above" means 10% above the figure they are
+  // looking at -- that intent is `amount`, in `displayCurrency`. The server
+  // compares against a price stored in the provider's USD, so it needs the
+  // same threshold in USD -- that is `normalizedAmountUsd`. Recording one
+  // without the other either shows the collector a number they never chose
+  // or compares two different currencies.
+  final itemCurrency = currencyForItem(item);
+  final requested = (displayCurrency?.trim().isNotEmpty ?? false)
+      ? displayCurrency!.trim().toUpperCase()
+      : itemCurrency;
+  // Only claim the collector's currency if the amount can actually reach it.
+  // Without a rate the threshold stays the item's own figure, so calling it
+  // AUD would put a currency on a number that was never converted.
+  final target = canConvertCurrent(itemCurrency, requested, currentRates)
+      ? requested
+      : itemCurrency;
+  final displayValue = convertCurrent(
+    item.estimatedValue,
+    from: itemCurrency,
+    to: target,
+    currentRates: currentRates,
+  );
+  final usdValue = convertCurrent(
+    item.estimatedValue,
+    from: itemCurrency,
+    to: 'USD',
+    currentRates: currentRates,
+  );
+  final rate = canConvertCurrent(target, 'USD', currentRates)
+      ? convertCurrent(1, from: target, to: 'USD', currentRates: currentRates)
+      : null;
+
+  PriceAlertRule amountRule(double factor) {
+    return PriceAlertRule(
+      type: type,
+      amount: displayValue * factor,
+      displayCurrency: target,
+      normalizedAmountUsd: usdValue * factor,
+      exchangeRateUsed: rate,
+      exchangeRateDate: rate == null ? null : now,
+    );
+  }
+
   switch (type) {
     case PriceAlertRuleType.priceRisesAboveAmount:
-      return PriceAlertRule(type: type, amount: value * 1.1);
+      return amountRule(1.1);
     case PriceAlertRuleType.priceDropsBelowAmount:
-      return PriceAlertRule(type: type, amount: value * 0.9);
+      return amountRule(0.9);
     case PriceAlertRuleType.percentageIncrease:
-      return PriceAlertRule(type: type, percentage: 0.1, baselineValue: value);
     case PriceAlertRuleType.percentageDecrease:
-      return PriceAlertRule(type: type, percentage: 0.1, baselineValue: value);
+      // Percentages are currency-free, but the baseline is compared against
+      // the item's stored price, so it is kept in that same USD.
+      return PriceAlertRule(
+        type: type,
+        percentage: 0.1,
+        baselineValue: usdValue,
+        displayCurrency: target,
+      );
     case PriceAlertRuleType.stalePricingReminder:
       return PriceAlertRule(type: type, staleAfterDays: 30);
   }

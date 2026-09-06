@@ -8,7 +8,10 @@ class CatalogSearchResult {
     required this.source,
     this.setName,
     this.identifier,
-    this.currency = 'AUD',
+    // Catalog rows are provider data, and every provider PackLox uses quotes
+    // in USD (PriceCharting, SportsCardsPro, KicksDB). Defaulting to AUD
+    // would relabel an unstated provider price as a currency it is not.
+    this.currency = 'USD',
     this.marketValue,
     this.lowEstimate,
     this.highEstimate,
@@ -185,7 +188,7 @@ class CatalogSearchResult {
           _string(json['cardNumber']) ??
           _string(json['productNumber']),
       currency:
-          (_string(json['currency']) ?? _string(pricing['currency']) ?? 'AUD')
+          (_string(json['currency']) ?? _string(pricing['currency']) ?? 'USD')
               .toUpperCase(),
       marketValue:
           _number(json['marketValue']) ??
@@ -287,7 +290,7 @@ class CatalogPriceHistoryPoint {
           DateTime.tryParse(_string(json['valid_to']) ?? ''),
       isCurrent: json['isCurrent'] == true || json['is_current'] == true,
       currency:
-          (_string(json['currency']) ?? _string(pricing['currency']) ?? 'AUD')
+          (_string(json['currency']) ?? _string(pricing['currency']) ?? 'USD')
               .toUpperCase(),
       marketValue:
           _number(json['marketValue']) ??

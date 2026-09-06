@@ -1,10 +1,21 @@
 import 'package:collectiq_ai/features/scanner/presentation/pages/scan_result_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/features/scanner/domain/entities/scan_result.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    // fxRatesProvider reads its device cache before the network, so without a
+    // mocked store it errors and the screen sees no rates at all.
+    SharedPreferences.setMockInitialValues({});
+  });
+
   // Tap-to-zoom on the "Analysis Complete" hero image — added so it matches
   // the existing tap-to-zoom pattern already used on Portfolio's collectible
   // detail screen, since this screen's image previously had no interactivity
@@ -32,13 +43,43 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('result-hero-image-preview')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('result-image-viewer-close')),
-    );
+    await tester.tap(find.byKey(const ValueKey('result-image-viewer-close')));
     await tester.pumpAndSettle();
 
     expect(find.byType(InteractiveViewer), findsNothing);
     expect(find.text('Analysis Complete'), findsOneWidget);
+  });
+
+  testWidgets('scan values follow the collector\'s display currency', (
+    tester,
+  ) async {
+    // The scan came back priced in the provider's USD; the collector reads in
+    // AUD, worth half a USD here. Both the headline value and the range have
+    // to convert -- they used to render the provider's currency verbatim.
+    await _pumpScanResultScreen(
+      tester,
+      displayCurrency: 'AUD',
+      pricingCurrency: 'USD',
+      fxRates: const {'USD': 1.0, 'AUD': 2.0},
+    );
+
+    expect(find.text('\$240 AUD'), findsWidgets);
+    expect(find.text('USD \$120'), findsNothing);
+    expect(find.text('\$200 AUD - \$280 AUD'), findsWidgets);
+  });
+
+  testWidgets('a scan value with no rate keeps the provider currency', (
+    tester,
+  ) async {
+    await _pumpScanResultScreen(
+      tester,
+      displayCurrency: 'AUD',
+      pricingCurrency: 'USD',
+      fxRates: const {'USD': 1.0},
+    );
+
+    expect(find.text('USD \$120'), findsWidgets);
+    expect(find.textContaining('AUD'), findsNothing);
   });
 
   group('free-tier portfolio usage indicator', () {
@@ -128,48 +169,81 @@ Future<void> _pumpScanResultScreen(
   int? savedItemCount,
   int? freeItemCap,
   VoidCallback? onUpgrade,
+  String displayCurrency = 'USD',
+  Map<String, double> fxRates = const {
+    'USD': 1.0,
+    'AUD': 1.0,
+    'CAD': 1.0,
+    'GBP': 1.0,
+  },
+  String pricingCurrency = 'AUD',
 }) async {
   final now = DateTime(2026, 8, 6);
   await tester.pumpWidget(
-    MaterialApp(
-      home: ScanResultScreen(
-        result: ScanResult(
-          id: 'test-result',
-          title: 'Test Collectible',
-          category: 'Trading Card',
-          estimatedValue: 120,
-          confidence: 0.86,
-          condition: 'Good',
-          thumbnail: 'sample://test-result',
-          scanDate: now,
-          primaryMatch: 'Test Collectible',
-          alternativeMatches: const [],
-          confidenceExplanation: 'Test confidence.',
-          detectionQuality: 'Good',
-          aiReasoning: 'Test reasoning.',
-          pricing: PricingInfo(
-            estimatedMarketValue: 120,
-            lowEstimate: 100,
-            highEstimate: 140,
-            currency: 'AUD',
-            pricingSource: 'Test',
-            pricingConfidence: 0.8,
-            lastUpdated: now,
-          ),
+    ProviderScope(
+      overrides: [
+        // Parity rates and a USD display currency: the screen converts
+        // provider prices for display now, so it needs both. Parity keeps
+        // every existing amount assertion in this file valid.
+        displayCurrencyProvider.overrideWithValue(displayCurrency),
+        fxRatesRepositoryProvider.overrideWithValue(
+          _ParityFxRatesRepository(fxRates),
         ),
-        activeSlot: null,
-        isSaved: false,
-        isSaving: false,
-        isRefreshingPricing: false,
-        onSave: () async {},
-        onScanAnother: () {},
-        onViewPortfolio: null,
-        onApplyReviewEdits: (_) async => true,
-        savedItemCount: savedItemCount,
-        freeItemCap: freeItemCap,
-        onUpgrade: onUpgrade,
+      ],
+      child: MaterialApp(
+        home: ScanResultScreen(
+          result: ScanResult(
+            id: 'test-result',
+            title: 'Test Collectible',
+            category: 'Trading Card',
+            estimatedValue: 120,
+            confidence: 0.86,
+            condition: 'Good',
+            thumbnail: 'sample://test-result',
+            scanDate: now,
+            primaryMatch: 'Test Collectible',
+            alternativeMatches: const [],
+            confidenceExplanation: 'Test confidence.',
+            detectionQuality: 'Good',
+            aiReasoning: 'Test reasoning.',
+            pricing: PricingInfo(
+              estimatedMarketValue: 120,
+              lowEstimate: 100,
+              highEstimate: 140,
+              currency: pricingCurrency,
+              pricingSource: 'Test',
+              pricingConfidence: 0.8,
+              lastUpdated: now,
+            ),
+          ),
+          activeSlot: null,
+          isSaved: false,
+          isSaving: false,
+          isRefreshingPricing: false,
+          onSave: () async {},
+          onScanAnother: () {},
+          onViewPortfolio: null,
+          onApplyReviewEdits: (_) async => true,
+          savedItemCount: savedItemCount,
+          freeItemCap: freeItemCap,
+          onUpgrade: onUpgrade,
+        ),
       ),
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _ParityFxRatesRepository implements FxRatesRepository {
+  const _ParityFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
 }

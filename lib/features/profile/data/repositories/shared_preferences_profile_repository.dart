@@ -18,12 +18,20 @@ class SharedPreferencesProfileRepository implements ProfileRepository {
     final preferences = await SharedPreferences.getInstance();
     final displayName = preferences.getString(_displayNameKey)?.trim();
     final avatarPath = preferences.getString(_avatarPathKey)?.trim();
+    // normalizeCountryCode maps an empty string to AU, so the stored value
+    // has to be read before normalising: otherwise "never chose a country"
+    // and "chose Australia" are indistinguishable, and deriving a currency
+    // from that guess is how an untouched install ended up on AUD no matter
+    // what defaultPreferredCurrency said.
+    final storedCountry = preferences.getString(_countryCodeKey)?.trim();
     final countryCode = CollectorProfile.normalizeCountryCode(
-      preferences.getString(_countryCodeKey) ?? '',
+      storedCountry ?? '',
     );
     final preferredCurrency = CollectorProfile.normalizeCurrency(
       preferences.getString(_preferredCurrencyKey) ??
-          CollectorProfile.currencyForCountry(countryCode),
+          (storedCountry == null || storedCountry.isEmpty
+              ? CollectorProfile.defaultPreferredCurrency
+              : CollectorProfile.currencyForCountry(countryCode)),
     );
     return CollectorProfile(
       displayName: displayName?.isNotEmpty == true

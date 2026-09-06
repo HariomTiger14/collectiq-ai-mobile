@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
@@ -439,7 +441,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         child: Scaffold(
           key: const ValueKey('search-screen'),
-          backgroundColor: PackLoxTokens.background,
+          backgroundColor: HomeTokens.background,
           body: SafeArea(
             bottom: false,
             child: CustomScrollView(
@@ -904,10 +906,10 @@ class _SearchField extends StatelessWidget {
     return Container(
       key: const ValueKey('discover-search-field'),
       decoration: BoxDecoration(
-        color: PackLoxTokens.surface,
+        color: HomeTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isActive ? PackLoxTokens.blue : PackLoxTokens.border,
+          color: isActive ? PackLoxTokens.blue : HomeTokens.border,
           width: isActive ? 1.6 : 1,
         ),
         boxShadow: [
@@ -1202,9 +1204,9 @@ class _QuickFilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: PackLoxTokens.surface,
+          color: HomeTokens.surfaceRaised,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: PackLoxTokens.border),
+          border: Border.all(color: HomeTokens.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1244,10 +1246,10 @@ class _CatalogFilterButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: PackLoxTokens.surface,
+          color: HomeTokens.surfaceRaised,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+            color: isActive ? PackLoxTokens.cyan : HomeTokens.border,
             width: isActive ? 1.4 : 1,
           ),
         ),
@@ -1329,9 +1331,9 @@ class _CatalogFilterSheet extends StatelessWidget {
             margin: const EdgeInsets.all(10),
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
             decoration: BoxDecoration(
-              color: PackLoxTokens.surfaceRaised,
+              color: HomeTokens.surfaceInteractive,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: PackLoxTokens.border),
+              border: Border.all(color: HomeTokens.border),
             ),
             child: Material(
               type: MaterialType.transparency,
@@ -1346,7 +1348,7 @@ class _CatalogFilterSheet extends StatelessWidget {
                             width: 42,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: PackLoxTokens.border,
+                              color: HomeTokens.border,
                               borderRadius: BorderRadius.circular(999),
                             ),
                           ),
@@ -1412,19 +1414,19 @@ class _CatalogFilterDropdown extends StatelessWidget {
           itemBuilder: itemBuilder,
           onSelected: onSelected,
           constraints: const BoxConstraints(maxHeight: 420, minWidth: 260),
-          color: PackLoxTokens.surfaceRaised,
+          color: HomeTokens.surfaceInteractive,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: PackLoxTokens.border),
+            side: BorderSide(color: HomeTokens.border),
           ),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: PackLoxTokens.surface,
+              color: HomeTokens.surfaceRaised,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isActive ? PackLoxTokens.cyan : PackLoxTokens.border,
+                color: isActive ? PackLoxTokens.cyan : HomeTokens.border,
                 width: isActive ? 1.4 : 1,
               ),
             ),
@@ -1473,9 +1475,9 @@ class _CatalogFilterPriceField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: PackLoxTokens.surface,
+        color: HomeTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PackLoxTokens.border),
+        border: Border.all(color: HomeTokens.border),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: TextField(
@@ -1636,21 +1638,51 @@ class _RawgAttributionLine extends StatelessWidget {
   }
 }
 
-class _CatalogResultCard extends StatelessWidget {
+/// Joins catalog facets for display, dropping repeats.
+///
+/// PriceCharting supplies no category column, so ingestion falls back to the
+/// console name: for ~99% of catalog rows `category` and `setName` hold the
+/// same string, which used to render as "Comic Books Sensational Spider-Man -
+/// Comic Books Sensational Spider-Man".
+String _joinCatalogFacets(List<String?> facets) {
+  final seen = <String>{};
+  final parts = <String>[];
+  for (final facet in facets) {
+    final value = _clean(facet);
+    if (value == null || !seen.add(_catalogFacetKey(value))) {
+      continue;
+    }
+    parts.add(value);
+  }
+  return parts.join(' - ');
+}
+
+/// Normalizes a facet so wording differing only in case, spacing, or
+/// punctuation still counts as a repeat.
+String _catalogFacetKey(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
+
+class _CatalogResultCard extends ConsumerWidget {
   const _CatalogResultCard({required this.result, required this.onTap});
 
   final CatalogSearchResult result;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final value = _formatCatalogValue(result);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = _formatCatalogValue(
+      result,
+      displayCurrency: ref.watch(displayCurrencyProvider),
+      currentRates:
+          ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {},
+    );
     final hasValue = _hasCatalogValue(result);
-    final subtitle = [
+    final subtitle = _joinCatalogFacets([
       result.category,
       result.setName,
       result.identifier,
-    ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' - ');
+    ]);
     final sourceLabel = result.source;
     return Semantics(
       button: true,
@@ -1778,7 +1810,7 @@ class _CatalogValueBadge extends StatelessWidget {
           border: Border.all(
             color: hasValue
                 ? PackLoxTokens.cyan.withValues(alpha: 0.28)
-                : PackLoxTokens.border.withValues(alpha: 0.82),
+                : HomeTokens.border.withValues(alpha: 0.82),
           ),
         ),
         child: Padding(
@@ -1814,10 +1846,10 @@ class _CatalogMetaPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: PackLoxTokens.surfaceRaised.withValues(alpha: 0.72),
+          color: HomeTokens.surfaceInteractive.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: PackLoxTokens.border.withValues(alpha: 0.8),
+            color: HomeTokens.border.withValues(alpha: 0.8),
           ),
         ),
         child: Text(
@@ -1951,7 +1983,8 @@ class _CatalogResultDetailPageState
         : '${(result.confidence!.clamp(0, 1) * 100).round()}%';
     final rows = [
       _CatalogDetailRowData('Category', result.category),
-      if (_clean(result.setName) != null)
+      if (_clean(result.setName) != null &&
+          _catalogFacetKey(result.setName!) != _catalogFacetKey(result.category))
         _CatalogDetailRowData('Set / product family', result.setName!.trim()),
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),
@@ -1977,7 +2010,7 @@ class _CatalogResultDetailPageState
         ),
         child: Scaffold(
           key: const ValueKey('catalog-result-detail-screen'),
-          backgroundColor: PackLoxTokens.background,
+          backgroundColor: HomeTokens.background,
           body: SafeArea(
             bottom: false,
             child: CustomScrollView(
@@ -2029,10 +2062,10 @@ class _CatalogResultDetailPageState
                                   borderRadius: BorderRadius.circular(28),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: PackLoxTokens.surfaceRaised,
+                                      color: HomeTokens.surfaceInteractive,
                                       borderRadius: BorderRadius.circular(28),
                                       border: Border.all(
-                                        color: PackLoxTokens.border,
+                                        color: HomeTokens.border,
                                       ),
                                     ),
                                     child: _CatalogPlaceholderArt(
@@ -2209,7 +2242,7 @@ class _CatalogResultDetailPageState
                                     _CatalogDetailRow(row: row),
                                     if (row != rows.last)
                                       const Divider(
-                                        color: PackLoxTokens.border,
+                                        color: HomeTokens.border,
                                         height: 18,
                                       ),
                                   ],
@@ -2389,7 +2422,7 @@ class _CatalogDetailTopBar extends StatelessWidget {
           onPressed: onBack,
           icon: const Icon(Icons.close_rounded),
           style: IconButton.styleFrom(
-            backgroundColor: PackLoxTokens.surfaceRaised,
+            backgroundColor: HomeTokens.surfaceInteractive,
             foregroundColor: PackLoxTokens.textPrimary,
           ),
         ),
@@ -2533,7 +2566,7 @@ class _CatalogTrustPanel extends StatelessWidget {
           for (final row in rows) ...[
             _CatalogDetailRow(row: row),
             if (row != rows.last)
-              const Divider(color: PackLoxTokens.border, height: 18),
+              const Divider(color: HomeTokens.border, height: 18),
           ],
         ],
       ),
@@ -2581,10 +2614,10 @@ class _CatalogMarketplaceListingsPanel extends StatelessWidget {
           for (final listing in visible) ...[
             _CatalogMarketplaceListingRow(listing: listing),
             if (listing != visible.last)
-              const Divider(color: PackLoxTokens.border, height: 18),
+              const Divider(color: HomeTokens.border, height: 18),
           ],
           if (hasMore) ...[
-            const Divider(color: PackLoxTokens.border, height: 18),
+            const Divider(color: HomeTokens.border, height: 18),
             InkWell(
               key: const ValueKey('catalog-view-full-marketplace-listings'),
               onTap: () => Navigator.of(context).push(
@@ -2639,9 +2672,9 @@ class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PackLoxTokens.background,
+      backgroundColor: HomeTokens.background,
       appBar: AppBar(
-        backgroundColor: PackLoxTokens.background,
+        backgroundColor: HomeTokens.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -2678,7 +2711,7 @@ class _CatalogFullMarketplaceListingsPage extends StatelessWidget {
                       truncateTitle: false,
                     ),
                     if (listing != listings.last)
-                      const Divider(color: PackLoxTokens.border, height: 18),
+                      const Divider(color: HomeTokens.border, height: 18),
                   ],
                 ],
               ),
@@ -2852,10 +2885,10 @@ class _CatalogHistoryChartPanel extends StatelessWidget {
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: PackLoxTokens.background.withValues(alpha: 0.48),
+                color: HomeTokens.background.withValues(alpha: 0.48),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: PackLoxTokens.border.withValues(alpha: 0.62),
+                  color: HomeTokens.border.withValues(alpha: 0.62),
                 ),
               ),
               child: Text(
@@ -2923,7 +2956,7 @@ class _CatalogHistoryChart extends StatelessWidget {
             drawVerticalLine: false,
             horizontalInterval: yInterval,
             getDrawingHorizontalLine: (_) => FlLine(
-              color: PackLoxTokens.border.withValues(alpha: 0.4),
+              color: HomeTokens.border.withValues(alpha: 0.4),
               strokeWidth: 1,
             ),
           ),
@@ -3023,7 +3056,7 @@ class _CatalogHistoryChart extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: yInterval,
           getDrawingHorizontalLine: (_) => FlLine(
-            color: PackLoxTokens.border.withValues(alpha: 0.4),
+            color: HomeTokens.border.withValues(alpha: 0.4),
             strokeWidth: 1,
           ),
         ),
@@ -3290,10 +3323,10 @@ class _CatalogHistoryPanel extends StatelessWidget {
             for (final point in visible) ...[
               _CatalogHistoryRow(point: point),
               if (point != visible.last)
-                const Divider(color: PackLoxTokens.border, height: 18),
+                const Divider(color: HomeTokens.border, height: 18),
             ],
             if (hasMore) ...[
-              const Divider(color: PackLoxTokens.border, height: 18),
+              const Divider(color: HomeTokens.border, height: 18),
               InkWell(
                 key: const ValueKey('catalog-view-full-price-history'),
                 onTap: () => Navigator.of(context).push(
@@ -3361,9 +3394,9 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final mergedHistory = _mergeConsecutiveSamePriceHistory(history);
     return Scaffold(
-      backgroundColor: PackLoxTokens.background,
+      backgroundColor: HomeTokens.background,
       appBar: AppBar(
-        backgroundColor: PackLoxTokens.background,
+        backgroundColor: HomeTokens.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -3397,7 +3430,7 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
                   for (final point in mergedHistory) ...[
                     _CatalogHistoryRow(point: point),
                     if (point != mergedHistory.last)
-                      const Divider(color: PackLoxTokens.border, height: 18),
+                      const Divider(color: HomeTokens.border, height: 18),
                   ],
                 ],
               ),
@@ -3535,9 +3568,9 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
         width: 56,
         height: 64,
         decoration: BoxDecoration(
-          color: PackLoxTokens.surfaceRaised,
+          color: HomeTokens.surfaceInteractive,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: PackLoxTokens.border),
+          border: Border.all(color: HomeTokens.border),
         ),
         child: _CatalogPlaceholderArt(
           category: category,
@@ -3617,9 +3650,9 @@ class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
               borderRadius: BorderRadius.circular(28),
               child: Container(
                 decoration: BoxDecoration(
-                  color: PackLoxTokens.surfaceRaised,
+                  color: HomeTokens.surfaceInteractive,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: PackLoxTokens.border),
+                  border: Border.all(color: HomeTokens.border),
                 ),
                 child: _CatalogPlaceholderArt(
                   category: widget.result.category,
@@ -3657,7 +3690,7 @@ class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
                 decoration: BoxDecoration(
                   color: i == _index
                       ? PackLoxTokens.cyan
-                      : PackLoxTokens.border,
+                      : HomeTokens.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -3796,7 +3829,7 @@ class _FallbackCatalogPlaceholderArt extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 5),
             decoration: BoxDecoration(
-              color: PackLoxTokens.surface.withValues(alpha: 0.62),
+              color: HomeTokens.surfaceRaised.withValues(alpha: 0.62),
               border: Border(
                 top: BorderSide(color: style.accent.withValues(alpha: 0.24)),
               ),
@@ -3829,9 +3862,9 @@ class _SearchPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: PackLoxTokens.surfaceRaised,
+        color: HomeTokens.surfaceInteractive,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: PackLoxTokens.border),
+        border: Border.all(color: HomeTokens.border),
       ),
       child: Text(
         label,
@@ -4427,7 +4460,7 @@ Future<void> _openFullScreenImage(
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
-      barrierColor: PackLoxTokens.background,
+      barrierColor: HomeTokens.background,
       pageBuilder: (_, _, _) => _FullScreenImageViewer(
         imageUrls: urls,
         initialIndex: initialIndex.clamp(0, urls.length - 1),
@@ -4575,13 +4608,13 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
     }
 
     return Scaffold(
-      backgroundColor: PackLoxTokens.background,
+      backgroundColor: HomeTokens.background,
       body: Stack(
         children: [
           // App-background base (the route is non-opaque, so without this
           // the screen behind bleeds through).
           const Positioned.fill(
-            child: ColoredBox(color: PackLoxTokens.background),
+            child: ColoredBox(color: HomeTokens.background),
           ),
           // A blurred, dimmed copy of the same art fills the whole screen
           // behind the sharp image, so the areas around the card are never
@@ -4598,7 +4631,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
               child: ColoredBox(
-                color: PackLoxTokens.background.withValues(alpha: 0.72),
+                color: HomeTokens.background.withValues(alpha: 0.72),
               ),
             ),
           ),
@@ -4728,11 +4761,29 @@ Future<void> _launchExternalLink(BuildContext context, String url) async {
   return null;
 }
 
-String _formatCatalogValue(CatalogSearchResult result) {
-  final value = result.marketValue;
-  if (value == null || value <= 0) {
+/// Formats a catalog price in the collector's display currency.
+///
+/// Catalog rows are the provider's own USD. Discover used to render them in
+/// whatever currency the backend returned, so picking AUD converted every
+/// portfolio value but left Discover in USD. Converts here, at display time,
+/// against the live dated rates -- and leaves the amount in its own currency
+/// when no rate is available rather than relabelling it.
+String _formatCatalogValue(
+  CatalogSearchResult result, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
+  final rawValue = result.marketValue;
+  if (rawValue == null || rawValue <= 0) {
     return 'Price unavailable';
   }
+  final converted = convertCurrentForDisplay(
+    rawValue,
+    from: result.currency,
+    to: displayCurrency ?? result.currency,
+    currentRates: currentRates,
+  );
+  final value = converted.value;
   final amount = _formatCatalogAmount(value);
   final withCommas = amount.replaceFirstMapped(
     RegExp(r'^\d+'),
@@ -4740,7 +4791,7 @@ String _formatCatalogValue(CatalogSearchResult result) {
         .group(0)!
         .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
-  final currency = result.currency.trim().toUpperCase();
+  final currency = converted.currency;
   if (currency == 'AUD' || currency.isEmpty) {
     return '\$$withCommas AUD';
   }
@@ -4834,6 +4885,13 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+/// A Discover panel.
+///
+/// Discover was built on PackLoxTokens (slate-grey surfaces, a light
+/// #334155 outline) while Portfolio and Home use HomeTokens (deeper
+/// blue-navy, a much subtler border), so the two tabs did not read as the
+/// same app. Discover's surfaces now come from the same palette Portfolio
+/// uses; accents and text still come from PackLoxTokens.
 class _SurfaceCard extends StatelessWidget {
   const _SurfaceCard({
     required this.child,
@@ -4849,9 +4907,9 @@ class _SurfaceCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: PackLoxTokens.surface,
+        color: HomeTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: PackLoxTokens.border),
+        border: Border.all(color: HomeTokens.border),
       ),
       padding: padding,
       child: child,

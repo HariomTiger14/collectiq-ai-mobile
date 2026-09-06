@@ -50,21 +50,59 @@ class PriceAlertRule {
     this.percentage,
     this.baselineValue,
     this.staleAfterDays,
+    this.displayCurrency,
+    this.normalizedAmountUsd,
+    this.exchangeRateUsed,
+    this.exchangeRateDate,
   });
 
   final PriceAlertRuleType type;
+
+  /// The threshold as the collector entered it, in [displayCurrency].
+  ///
+  /// This is intent, not a comparison value: "alert me at AUD 50" stays AUD
+  /// 50 however the item is priced, and is what the app shows back.
   final double? amount;
   final double? percentage;
   final double? baselineValue;
   final int? staleAfterDays;
 
+  /// The currency [amount] was entered in. Null on alerts created before
+  /// currencies were tracked, which were all AUD.
+  final String? displayCurrency;
+
+  /// [amount] converted to USD, which is what item prices are stored in, so
+  /// the server compares two figures in the same currency. Null means the
+  /// alert predates this and its [amount] is compared as-is.
+  final double? normalizedAmountUsd;
+
+  /// The rate and date behind [normalizedAmountUsd], so the conversion can be
+  /// checked or redone later rather than being an unexplained number.
+  final double? exchangeRateUsed;
+  final DateTime? exchangeRateDate;
+
+  /// The currency to show [amount] in: what the collector chose, falling back
+  /// to AUD for alerts created before this was recorded.
+  String get effectiveDisplayCurrency =>
+      (displayCurrency?.trim().isNotEmpty ?? false)
+      ? displayCurrency!.trim().toUpperCase()
+      : 'AUD';
+
+  /// The figure the server should compare against a USD item price.
+  double? get comparisonAmountUsd => normalizedAmountUsd ?? amount;
+
   factory PriceAlertRule.fromJson(Map<String, dynamic> json) {
+    final rateDate = json['exchangeRateDate'];
     return PriceAlertRule(
       type: PriceAlertRuleType.fromName(json['type'] as String?),
       amount: (json['amount'] as num?)?.toDouble(),
       percentage: (json['percentage'] as num?)?.toDouble(),
       baselineValue: (json['baselineValue'] as num?)?.toDouble(),
       staleAfterDays: (json['staleAfterDays'] as num?)?.toInt(),
+      displayCurrency: (json['displayCurrency'] as String?)?.trim(),
+      normalizedAmountUsd: (json['normalizedAmountUsd'] as num?)?.toDouble(),
+      exchangeRateUsed: (json['exchangeRateUsed'] as num?)?.toDouble(),
+      exchangeRateDate: rateDate is String ? DateTime.tryParse(rateDate) : null,
     );
   }
 
@@ -75,6 +113,10 @@ class PriceAlertRule {
       'percentage': percentage,
       'baselineValue': baselineValue,
       'staleAfterDays': staleAfterDays,
+      'displayCurrency': displayCurrency,
+      'normalizedAmountUsd': normalizedAmountUsd,
+      'exchangeRateUsed': exchangeRateUsed,
+      'exchangeRateDate': exchangeRateDate?.toIso8601String(),
     };
   }
 }

@@ -41,6 +41,104 @@ void main() {
   });
 
   testWidgets(
+    'item insights shows a repeated analyzer sentence only once',
+    (tester) async {
+      // The Gemini title-rescue path stores the same sentence in both
+      // aiReasoning and confidenceExplanation, and a bare grade in
+      // detectionQuality, which used to render as the paragraph twice
+      // followed by a stray word.
+      const repeated =
+          "The card prominently features the name 'Raichu' at the top, along "
+          'with Pokemon game mechanics, HP, attacks, and copyright information.';
+      await _pumpDetail(
+        tester,
+        _authorityItem(
+          aiReasoning: repeated,
+          confidenceExplanation: repeated,
+          detectionQuality: 'Partial',
+        ),
+      );
+
+      final summary = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(
+                const ValueKey('collectible-detail-insights-section'),
+              ),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data ?? '')
+          .firstWhere((data) => data.contains('Raichu'));
+      expect(repeated.allMatches(summary).length, 1);
+      expect(summary, contains('Detection quality: Partial.'));
+    },
+  );
+
+  testWidgets('value history states its figures in a currency it can back', (
+    tester,
+  ) async {
+    // With no AUD rate, every figure in the panel stays in the item's own
+    // USD rather than being relabelled -- the chart included, since a
+    // series plotted at an implicit 1.0 would carry an AUD axis.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      fxRates: const {'USD': 1.0},
+    );
+    await _revealText(tester, 'Value History');
+
+    expect(find.textContaining('AUD'), findsNothing);
+    expect(find.textContaining('USD \$'), findsWidgets);
+  });
+
+  testWidgets('market and evidence rows follow the chosen display currency', (
+    tester,
+  ) async {
+    // The item is priced by the provider in USD; the collector reads in AUD.
+    // These rows are the item's value, so they convert like every other
+    // amount -- only the row that exists to disclose the provider's own
+    // currency stays USD.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      displayCurrency: 'AUD',
+      fxRates: const {'USD': 1.0, 'AUD': 2.0},
+    );
+    await _revealText(tester, 'Market & Value');
+
+    // 245 USD at 2 AUD per USD.
+    expect(find.text('\$490 AUD'), findsWidgets);
+    // 220-270 USD becomes 440-540 AUD.
+    expect(find.textContaining('440'), findsWidgets);
+    // Nothing left on the screen still labelled in the provider's currency.
+    expect(find.text('USD'), findsNothing);
+  });
+
+  testWidgets('an amount with no exchange rate keeps its own currency', (
+    tester,
+  ) async {
+    // Rates are fetched once per session, so there is a window on every cold
+    // launch where the display currency's rate is missing. Converting at an
+    // implicit 1.0 and labelling the result AUD would show a USD amount
+    // wearing an AUD label.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      fxRates: const {'USD': 1.0},
+    );
+
+    final value = tester
+        .widget<Text>(
+          find.byKey(const ValueKey('collectible-detail-value-card-value')),
+        )
+        .data!;
+
+    expect(value, 'USD \$245');
+    expect(value, isNot(contains('AUD')));
+  });
+
+  testWidgets(
     'approved detail surface renders compact header and inline sections',
     (tester) async {
       await _pumpDetail(tester, _authorityItem());
@@ -89,13 +187,20 @@ void main() {
       expect(find.text('At scan'), findsOneWidget);
       expect(find.text('Current'), findsOneWidget);
       expect(find.text('Gain/Loss'), findsOneWidget);
+      // Market & Value used to render these in the provider's USD while the
+      // Value History panel right beside it converted to the display
+      // currency, so one screen showed the same figure two ways.
+      // The display currency defaults to USD now, and this item is priced
+      // in USD, so no conversion applies at all -- the figures are the
+      // provider's own.
       expect(find.text('USD \$200'), findsWidgets);
       expect(find.text('USD \$245'), findsWidgets);
-      // Converted to the display currency (AUD, the default with no profile
-      // override) at parity, not left in the item's own USD -- this is the
-      // exact bug being fixed: a value/movement label must respect the
-      // user's chosen display currency, not just the item's stored one.
-      expect(find.text('+\$45 AUD'), findsOneWidget);
+      expect(find.text('\$245 AUD'), findsNothing);
+      // The movement follows the display currency like every other figure.
+      // With the default now USD and this item priced in USD, that means no
+      // conversion at all -- the guarantee is that the label tracks the
+      // display currency, which the AUD case below pins.
+      expect(find.text('+USD \$45'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
       await _revealText(tester, 'Pricing evidence');
       expect(find.text('Pricing evidence'), findsOneWidget);
@@ -103,8 +208,15 @@ void main() {
       expect(find.text('Verified'), findsOneWidget);
       expect(find.text('Provider'), findsWidgets);
       expect(find.text('Saved provider'), findsWidgets);
-      expect(find.text('Currency'), findsWidgets);
+      // No stored-currency row: it named the currency the saved figure was
+      // written in, which is neither the provider's (PriceCharting quotes in
+      // USD) nor the one the amounts beside it now show, so it read as a
+      // contradiction.
+      expect(find.text('Value saved in'), findsNothing);
+      expect(find.text('Currency'), findsNothing);
       expect(find.text('Value range'), findsWidgets);
+      // The range follows the display currency too -- USD by default, and
+      // this item is priced in USD, so it is shown untouched.
       expect(find.text('USD \$220 - \$270'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
@@ -742,6 +854,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Snapshot value'), findsOneWidget);
+    // The saved snapshot is a value like any other: shown in the currency the
+    // collector reads in, with the provider's own currency still disclosed by
+    // the Currency row in the pricing evidence panel.
     expect(find.text('USD \$161'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
     expect(
@@ -1154,6 +1269,8 @@ Future<void> _pumpDetail(
   GalleryService? galleryService,
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
+  Map<String, double>? fxRates,
+  String? displayCurrency,
   PlanLimits? planLimits,
   SharedPreferencesValuationSnapshotRepository? valuationSnapshotRepository,
 }) async {
@@ -1193,13 +1310,13 @@ Future<void> _pumpDetail(
         // every pre-existing dollar-amount assertion in this file valid --
         // converting at parity only changes which currency label is shown,
         // never the number.
+        if (displayCurrency != null)
+          displayCurrencyProvider.overrideWithValue(displayCurrency),
         fxRatesRepositoryProvider.overrideWithValue(
-          const _FixedRateFxRatesRepository({
-            'USD': 1.0,
-            'AUD': 1.0,
-            'CAD': 1.0,
-            'GBP': 1.0,
-          }),
+          _FixedRateFxRatesRepository(
+            fxRates ??
+                const {'USD': 1.0, 'AUD': 1.0, 'CAD': 1.0, 'GBP': 1.0},
+          ),
         ),
       ],
       child: MaterialApp(
@@ -1599,6 +1716,10 @@ CollectibleItem _authorityItem({
     ),
     CollectibleImage(path: 'sample://detail', role: 'detail', source: 'sample'),
   ],
+  String aiReasoning = 'Stored scan reasoning only.',
+  String confidenceExplanation =
+      'Saved evidence matched the front and detail photos.',
+  String detectionQuality = 'Clear packaging and model markings.',
 }) {
   return CollectibleItem(
     id: 'detail-authority-item',
@@ -1616,10 +1737,9 @@ CollectibleItem _authorityItem({
     year: '2026',
     rarity: 'Limited',
     notes: 'Stored owner note.',
-    aiReasoning: 'Stored scan reasoning only.',
-    confidenceExplanation:
-        'Saved evidence matched the front and detail photos.',
-    detectionQuality: 'Clear packaging and model markings.',
+    aiReasoning: aiReasoning,
+    confidenceExplanation: confidenceExplanation,
+    detectionQuality: detectionQuality,
     galleryImages: galleryImages,
     pricing: const PricingInfo(
       estimatedMarketValue: 245,

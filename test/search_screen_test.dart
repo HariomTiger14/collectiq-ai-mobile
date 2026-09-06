@@ -5,6 +5,9 @@ import 'package:collectiq_ai/features/portfolio/presentation/pages/collectible_d
 import 'package:collectiq_ai/features/search/data/repositories/api_catalog_search_repository.dart';
 import 'package:collectiq_ai/features/search/domain/entities/catalog_search_result.dart';
 import 'package:collectiq_ai/features/search/domain/repositories/catalog_search_repository.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/features/search/presentation/search_screen.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
@@ -425,6 +428,85 @@ void main() {
       expect(find.text('Filters'), findsOneWidget);
     },
   );
+
+  testWidgets('catalog prices follow the chosen display currency', (
+    tester,
+  ) async {
+    // Catalog rows are the provider's own USD. Discover used to render them
+    // in whatever currency the backend returned, so picking AUD converted
+    // every portfolio value but left Discover in USD.
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-charizard-fx',
+        title: 'Charizard #4 Base Set',
+        category: 'Pokemon Cards',
+        source: 'PriceCharting',
+        currency: 'USD',
+        marketValue: 100,
+        confidence: 0.9,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+      displayCurrency: 'AUD',
+      fxRates: const {'USD': 1.0, 'AUD': 2.0},
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'charizard',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('\$200 AUD'), findsOneWidget);
+    expect(find.text('USD \$100'), findsNothing);
+  });
+
+  testWidgets('catalog result subtitle shows a repeated facet only once', (
+    tester,
+  ) async {
+    // PriceCharting supplies no category column, so ingestion falls back to
+    // the console name and ~99% of catalog rows carry the same string in
+    // both category and setName.
+    final catalogRepository = _MemoryCatalogSearchRepository([
+      const CatalogSearchResult(
+        id: 'pc-sensational-19',
+        title: 'The Sensational Spider Man #19 (1997)',
+        category: 'Comic Books Sensational Spider-Man',
+        source: 'PriceCharting',
+        setName: 'Comic Books Sensational Spider-Man',
+        currency: 'USD',
+        marketValue: 5,
+        confidence: 0.9,
+        attribution: 'Pricing data by PriceCharting',
+      ),
+    ]);
+    await _pumpSearch(
+      tester,
+      repository: _MemoryPortfolioRepository([]),
+      catalogRepository: catalogRepository,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('discover-search-input')),
+      'spider man',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comic Books Sensational Spider-Man'), findsOneWidget);
+    expect(
+      find.text(
+        'Comic Books Sensational Spider-Man - '
+        'Comic Books Sensational Spider-Man',
+      ),
+      findsNothing,
+    );
+  });
 
   testWidgets('catalog search shows backend catalog results', (tester) async {
     final catalogRepository = _MemoryCatalogSearchRepository([
@@ -1337,6 +1419,8 @@ Future<void> _pumpSearch(
   WidgetTester tester, {
   required PortfolioRepository repository,
   CatalogSearchRepository? catalogRepository,
+  String? displayCurrency,
+  Map<String, double>? fxRates,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -1344,6 +1428,12 @@ Future<void> _pumpSearch(
         portfolioRepositoryProvider.overrideWithValue(repository),
         if (catalogRepository != null)
           catalogSearchRepositoryProvider.overrideWithValue(catalogRepository),
+        if (displayCurrency != null)
+          displayCurrencyProvider.overrideWithValue(displayCurrency),
+        if (fxRates != null)
+          fxRatesRepositoryProvider.overrideWithValue(
+            _FixedRateFxRatesRepository(fxRates),
+          ),
       ],
       child: const MaterialApp(home: SearchScreen()),
     ),
@@ -1508,4 +1598,16 @@ void _attributionTests() {
       expect(image.attributionRequired, isFalse);
     });
   });
+}
+
+
+class _FixedRateFxRatesRepository implements FxRatesRepository {
+  const _FixedRateFxRatesRepository(this.rates);
+
+  final Map<String, double> rates;
+
+  @override
+  Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
+    return FxRateSnapshot(currentRates: rates, history: const []);
+  }
 }

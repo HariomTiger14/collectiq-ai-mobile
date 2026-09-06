@@ -72,6 +72,16 @@ class _UpgradeSheet extends ConsumerWidget {
       // PortfolioController.totalValue getter sums mixed currencies as if
       // they were one, which previously got relabeled with whatever
       // currency the user picked (fabricating up to a ~1.5x overstatement).
+      // ...and only if every one of those currencies can actually reach the
+      // target. Rates load once per session; before they arrive convertCurrent
+      // falls back to 1.0, which reintroduces exactly the mixed-currency sum
+      // described above. Fall through to the generic copy instead of naming a
+      // figure we cannot stand behind.
+      final canState = canTotalIn(
+        items.map(currencyForItem),
+        currency,
+        currentRates,
+      );
       final total = items.fold<double>(
         0,
         (sum, item) => sum + convertCurrent(
@@ -81,7 +91,7 @@ class _UpgradeSheet extends ConsumerWidget {
           currentRates: currentRates,
         ),
       );
-      if (total > 0) {
+      if (canState && total > 0) {
         final formatted = formatCollectionValue(total, currencyCode: currency);
         return (
           title: "You've secured $formatted in collectibles",

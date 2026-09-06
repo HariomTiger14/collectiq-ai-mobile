@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
@@ -61,69 +59,64 @@ class GlassBottomNavBar extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 560),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.xl),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                child: Container(
-                  height: navHeight,
-                  decoration: BoxDecoration(
-                    // Same violet as the PackLox app icon's own gradient
-                    // (sampled from assets/brand/packlox_app_icon_master.png).
-                    // Translucent, not solid -- a fully opaque fill here made
-                    // the BackdropFilter blur above completely invisible (there
-                    // was nothing behind it left to show through), so this bar
-                    // read as a flat solid pill instead of the frosted-glass
-                    // look its own name promised. Same hue, just letting the
-                    // blurred content underneath actually show.
-                    color: const Color(0xFF6211FA).withValues(alpha: 0.68),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: const Color(0xFF3B0A96).withValues(alpha: 0.5),
+              child: Container(
+                height: navHeight,
+                decoration: BoxDecoration(
+                  // Same violet as the PackLox app icon's own gradient
+                  // (sampled from assets/brand/packlox_app_icon_master.png).
+                  //
+                  // This was a translucent 0x6211FA over a BackdropFilter
+                  // blur, which meant the bar took its colour from whatever
+                  // happened to sit behind it: violet over a Portfolio card,
+                  // noticeably deeper over Discover's darker ground. The bar
+                  // is a fixed piece of chrome and should not change colour
+                  // between tabs, so this is that translucent violet
+                  // composited once over the card surface it sat on in
+                  // Portfolio -- the same look, now identical everywhere.
+                  color: const Color(0xFF4817B6),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFF3B0A96).withValues(alpha: 0.5),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.34),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.34),
-                        blurRadius: 22,
-                        offset: const Offset(0, 12),
-                      ),
-                      BoxShadow(
-                        color: PackLoxTokens.textPrimary.withValues(
-                          alpha: 0.06,
+                    BoxShadow(
+                      color: PackLoxTokens.textPrimary.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, -1),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF0A84FF).withValues(alpha: 0.14),
+                      blurRadius: 18,
+                      offset: const Offset(0, 0),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                child: Row(
+                  children: [
+                    for (var index = 0; index < items.length; index++)
+                      Expanded(
+                        child: NavBarItem(
+                          key:
+                              items[index].key ??
+                              ValueKey(
+                                '${items[index].label}-${currentIndex == index}',
+                              ),
+                          icon: items[index].icon,
+                          selectedIcon: items[index].selectedIcon,
+                          iconAsset: items[index].iconAsset,
+                          label: items[index].label,
+                          isActive: currentIndex == index,
+                          gradientStyle: items[index].gradientStyle,
+                          onTap: () => onTap(index),
                         ),
-                        blurRadius: 8,
-                        offset: const Offset(0, -1),
                       ),
-                      BoxShadow(
-                        color: const Color(0xFF0A84FF).withValues(alpha: 0.14),
-                        blurRadius: 18,
-                        offset: const Offset(0, 0),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 5,
-                  ),
-                  child: Row(
-                    children: [
-                      for (var index = 0; index < items.length; index++)
-                        Expanded(
-                          child: NavBarItem(
-                            key:
-                                items[index].key ??
-                                ValueKey(
-                                  '${items[index].label}-${currentIndex == index}',
-                                ),
-                            icon: items[index].icon,
-                            selectedIcon: items[index].selectedIcon,
-                            iconAsset: items[index].iconAsset,
-                            label: items[index].label,
-                            isActive: currentIndex == index,
-                            gradientStyle: items[index].gradientStyle,
-                            onTap: () => onTap(index),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),

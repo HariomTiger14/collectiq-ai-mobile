@@ -53,6 +53,32 @@ void main() {
     expect(navigation.currentIndex, AppShellTabController.homeTab);
   });
 
+  testWidgets('bottom navigation hides while the keyboard is open', (
+    tester,
+  ) async {
+    await tester.pumpShell();
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+
+    // The bar is a Positioned child of the shell Stack, so a keyboard inset
+    // would otherwise lift it on top of the page content.
+    await tester.pumpShell(viewInsets: const EdgeInsets.only(bottom: 336));
+
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+  });
+
+  testWidgets('bottom navigation returns as soon as the keyboard retreats', (
+    tester,
+  ) async {
+    await tester.pumpShell(viewInsets: const EdgeInsets.only(bottom: 336));
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+
+    // The dismiss animation walks the inset down over several frames. The bar
+    // must come back on the first of them, not once the inset reaches zero.
+    await tester.pumpShell(viewInsets: const EdgeInsets.only(bottom: 300));
+
+    expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+  });
+
   testWidgets('primary destinations follow F62 five item order', (
     tester,
   ) async {
@@ -416,6 +442,7 @@ extension _ShellPump on WidgetTester {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewPadding = EdgeInsets.zero,
+    EdgeInsets viewInsets = EdgeInsets.zero,
   }) async {
     await pumpWidget(
       ProviderScope(
@@ -434,6 +461,7 @@ extension _ShellPump on WidgetTester {
           disableAnimations: disableAnimations,
           textScale: textScale,
           viewPadding: viewPadding,
+          viewInsets: viewInsets,
           child: const AppShell(),
         ),
       ),
@@ -514,6 +542,7 @@ class _Harness extends StatelessWidget {
     this.disableAnimations = false,
     this.textScale = 1,
     this.viewPadding = EdgeInsets.zero,
+    this.viewInsets = EdgeInsets.zero,
   });
 
   final Widget child;
@@ -521,6 +550,7 @@ class _Harness extends StatelessWidget {
   final bool disableAnimations;
   final double textScale;
   final EdgeInsets viewPadding;
+  final EdgeInsets viewInsets;
 
   @override
   Widget build(BuildContext context) {
@@ -536,6 +566,7 @@ class _Harness extends StatelessWidget {
             textScaler: TextScaler.linear(textScale),
             viewPadding: viewPadding,
             padding: viewPadding,
+            viewInsets: viewInsets,
           );
           return MediaQuery(data: mediaQuery, child: child);
         },

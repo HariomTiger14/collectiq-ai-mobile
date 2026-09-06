@@ -8,7 +8,13 @@ class CollectorProfile {
 
   static const defaultDisplayName = 'PackLox Collector';
   static const defaultCountryCode = 'AU';
-  static const defaultPreferredCurrency = 'AUD';
+
+  /// What a collector reads in before they choose. USD because that is what
+  /// the pricing providers quote and what values are stored in --
+  /// PriceCharting and SportsCardsPro are USD-only -- so the untouched
+  /// default shows provider prices with no conversion applied at all.
+  /// Picking a country in Settings still sets the matching currency.
+  static const defaultPreferredCurrency = 'USD';
 
   final String displayName;
   final String? avatarPath;

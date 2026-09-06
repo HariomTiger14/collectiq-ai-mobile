@@ -814,13 +814,15 @@ String _portfolioValueLabel(
   if (value <= 0) {
     return _portfolioValueUnavailableLabel(item.valuationStatus);
   }
-  final converted = convertCurrent(
+  // Keeps the amount in its own currency when no rate is available, rather
+  // than relabelling an unconverted number as the display currency.
+  final converted = convertCurrentForDisplay(
     value,
     from: currency,
     to: displayCurrency,
     currentRates: currentRates,
   );
-  return _formatMoney(converted, displayCurrency);
+  return _formatMoney(converted.value, converted.currency);
 }
 
 String _portfolioValueUnavailableLabel(ValuationStatus status) {

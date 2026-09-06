@@ -17,6 +17,7 @@ import 'package:collectiq_ai/features/market/domain/entities/market_summary.dart
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_notification.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
+import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
 import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
@@ -526,8 +527,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                   color: PackLoxTokens.textPrimary,
                 ),
                 title: const Text('Take photo'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(ImageSource.camera),
+                onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
               ),
               ListTile(
                 key: const ValueKey('detail-photo-source-library'),
@@ -1512,7 +1512,8 @@ class _DetailAuthorityValueBlock extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final displayCurrency = ref.watch(displayCurrencyProvider);
     final currentRates =
-        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+        ref.watch(fxRatesProvider).asData?.value.currentRates ??
+        const {'USD': 1.0};
     final textTheme = Theme.of(context).textTheme;
     final isPending = _isValuationPending(item);
     final accentColor = isPending
@@ -2059,7 +2060,18 @@ class _DetailMarketSection extends ConsumerWidget {
           data: (value) => value,
           orElse: () => const <PortfolioValuationSnapshot>[],
         );
-    final rows = _detailMarketRows(item, snapshots);
+    // These rows are the item's value, so they follow the chosen display
+    // currency like every other amount in the app; the provider's own
+    // currency stays visible in the "Currency" row below.
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {};
+    final rows = _detailMarketRows(
+      item,
+      snapshots,
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
+    );
     final catalogSnapshot = _catalogSnapshotFor(item);
     return _DetailAuthorityPanel(
       key: const ValueKey('collectible-detail-market-section'),
@@ -2076,7 +2088,11 @@ class _DetailMarketSection extends ConsumerWidget {
           _PricingTrustPanel(item: item),
           if (catalogSnapshot != null) ...[
             const SizedBox(height: AppSpacing.md),
-            _CatalogSnapshotPanel(snapshot: catalogSnapshot),
+            _CatalogSnapshotPanel(
+              snapshot: catalogSnapshot,
+              displayCurrency: displayCurrency,
+              currentRates: currentRates,
+            ),
           ],
           const SizedBox(height: AppSpacing.md),
           if (rows.isEmpty)
@@ -2097,17 +2113,22 @@ class _DetailMarketSection extends ConsumerWidget {
   }
 }
 
-class _PricingTrustPanel extends StatelessWidget {
+class _PricingTrustPanel extends ConsumerWidget {
   const _PricingTrustPanel({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final pricing = item.pricing;
     final status = _effectiveValuationStatus(item);
     final trustColor = _pricingTrustColor(context, status);
-    final rows = _pricingTrustRows(item);
+    final rows = _pricingTrustRows(
+      item,
+      displayCurrency: ref.watch(displayCurrencyProvider),
+      currentRates:
+          ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {},
+    );
     return Container(
       key: const ValueKey('collectible-detail-pricing-trust-panel'),
       width: double.infinity,
@@ -2188,9 +2209,15 @@ class _PricingTrustPanel extends StatelessWidget {
 }
 
 class _CatalogSnapshotPanel extends StatelessWidget {
-  const _CatalogSnapshotPanel({required this.snapshot});
+  const _CatalogSnapshotPanel({
+    required this.snapshot,
+    this.displayCurrency,
+    this.currentRates = const {},
+  });
 
   final _CatalogSnapshotData snapshot;
+  final String? displayCurrency;
+  final Map<String, double> currentRates;
 
   @override
   Widget build(BuildContext context) {
@@ -2232,6 +2259,8 @@ class _CatalogSnapshotPanel extends StatelessWidget {
                 value: _displayValue(
                   pricing,
                   fallbackValue: snapshot.savedValue,
+                  displayCurrency: displayCurrency,
+                  currentRates: currentRates,
                 ),
               ),
               _SnapshotMetricChip(
@@ -2346,21 +2375,40 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       orElse: () => const <PortfolioValuationSnapshot>[],
     );
     final displayCurrency = ref.watch(displayCurrencyProvider);
-    final fxRates = ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
-    final chartPoints = _valueHistoryPoints(
-      item,
-      snapshots,
-      displayCurrency: displayCurrency,
-      rates: fxRates,
-    );
+    final fxRates =
+        ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
     final itemCurrency = item.pricing?.currency ?? 'AUD';
+    // Every figure in this panel -- both metrics, the gain/loss and each
+    // plotted point -- has to be stated in one currency. Rates arrive once
+    // per session, so until they do (or if that fetch failed) converting
+    // would leave the amounts unchanged while the labels claimed the display
+    // currency. Fall back to the panel's own single source currency when
+    // that is unambiguous; when the sources are mixed AND unconvertible, no
+    // honest series exists, so the panel says so instead of drawing one.
+    final sourceCurrencies = _valueHistorySourceCurrencies(item, snapshots);
+    final canConvertAll = canTotalIn(
+      sourceCurrencies,
+      displayCurrency,
+      fxRates.currentRates,
+    );
+    final String? panelCurrency = canConvertAll
+        ? displayCurrency
+        : (sourceCurrencies.length == 1 ? sourceCurrencies.first : null);
+    final chartPoints = panelCurrency == null
+        ? const <_ValueHistoryPoint>[]
+        : _valueHistoryPoints(
+            item,
+            snapshots,
+            displayCurrency: panelCurrency,
+            rates: fxRates,
+          );
     final baseline = _valueHistoryBaseline(item, snapshots);
     final scanValue = baseline == null
         ? 0.0
         : convertCurrent(
             baseline.value,
             from: baseline.currency,
-            to: displayCurrency,
+            to: panelCurrency ?? baseline.currency,
             currentRates: fxRates.currentRates,
           );
     // Only call it "At scan" when it really is the scan estimate; once real
@@ -2369,7 +2417,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
     final currentValue = convertCurrent(
       _currentValueFor(item),
       from: itemCurrency,
-      to: displayCurrency,
+      to: panelCurrency ?? itemCurrency,
       currentRates: fxRates.currentRates,
     );
     final delta = currentValue - scanValue;
@@ -2380,8 +2428,8 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         : isPositive
         ? HomeTokens.positive
         : Theme.of(context).colorScheme.error;
-    final movementLabel = hasMovement
-        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), displayCurrency)}'
+    final movementLabel = hasMovement && panelCurrency != null
+        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), panelCurrency)}'
         : null;
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
@@ -2421,14 +2469,18 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: baselineLabel,
-                  value: _formatMoney(scanValue, displayCurrency),
+                  value: panelCurrency == null
+                      ? 'Value unavailable'
+                      : _formatMoney(scanValue, panelCurrency),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'Current',
-                  value: _formatMoney(currentValue, displayCurrency),
+                  value: panelCurrency == null
+                      ? 'Value unavailable'
+                      : _formatMoney(currentValue, panelCurrency),
                 ),
               ),
             ],
@@ -2436,11 +2488,11 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
           // Gain/Loss gets its own full-width row instead of squeezing into
           // a third column -- its value (sign + amount + currency code) is
           // longer than the other two metrics and was clipping there.
-          if (hasMovement) ...[
+          if (hasMovement && movementLabel != null) ...[
             const SizedBox(height: AppSpacing.sm),
             _DetailValueHistoryMetric(
               label: 'Gain/Loss',
-              value: movementLabel!,
+              value: movementLabel,
               valueColor: movementColor,
               subtitle: movementPercent,
             ),
@@ -3248,11 +3300,10 @@ class _DetailAuthorityRows extends StatelessWidget {
                 child: row.valueUrl == null || row.valueUrl!.isEmpty
                     ? Text(
                         row.value,
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(
-                              color: PackLoxTokens.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: PackLoxTokens.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       )
                     : InkWell(
                         key: const ValueKey('detail-attribution-row-link'),
@@ -3299,8 +3350,10 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
 
 List<_DetailInfoRowData> _detailMarketRows(
   CollectibleItem item,
-  List<PortfolioValuationSnapshot> snapshots,
-) {
+  List<PortfolioValuationSnapshot> snapshots, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final trustedPricing = _hasTrustedPricingEvidence(item);
@@ -3314,16 +3367,25 @@ List<_DetailInfoRowData> _detailMarketRows(
       _DetailInfoRowData(
         'Current value',
         trustedPricing
-            ? _displayValue(pricing, fallbackValue: item.estimatedValue)
+            ? _displayValue(
+                pricing,
+                fallbackValue: item.estimatedValue,
+                displayCurrency: displayCurrency,
+                currentRates: currentRates,
+              )
             : 'Value unavailable',
       ),
       _DetailInfoRowData(
         (baseline?.fromScan ?? true) ? 'Value at scan' : 'Oldest tracked value',
         trustedPricing && baseline != null
-            ? _formatMoney(baseline.value, baseline.currency)
+            ? _formatMoneyIn(
+                baseline.value,
+                from: baseline.currency,
+                to: displayCurrency,
+                currentRates: currentRates,
+              )
             : 'Value unavailable',
       ),
-      _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
         _DetailInfoRowData(
           'Last refreshed',
@@ -3337,10 +3399,12 @@ List<_DetailInfoRowData> _detailMarketRows(
       _DetailInfoRowData(
         'Value range',
         trustedPricing
-            ? _formatMoneyRange(
+            ? _formatMoneyRangeIn(
                 pricing.lowEstimate,
                 pricing.highEstimate,
-                pricing.currency,
+                from: pricing.currency,
+                to: displayCurrency,
+                currentRates: currentRates,
               )
             : 'Value unavailable',
       ),
@@ -3362,7 +3426,11 @@ List<_DetailInfoRowData> _detailMarketRows(
   ];
 }
 
-List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
+List<_DetailInfoRowData> _pricingTrustRows(
+  CollectibleItem item, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final status = _effectiveValuationStatus(item);
@@ -3370,8 +3438,14 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
   final rows = <_DetailInfoRowData>[
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
     _DetailInfoRowData('Provider', _pricingProviderLabel(item)),
-    if (pricing?.currency.trim().isNotEmpty == true)
-      _DetailInfoRowData('Currency', pricing!.currency.toUpperCase()),
+    // There is deliberately no row for pricing.currency here. It names the
+    // currency the stored figure happens to be written in -- the backend
+    // converts to whatever display currency was in force at scan time
+    // (reprice_service.py -> convert_pricing_result) before saving -- which
+    // is neither the provider's currency (PriceCharting quotes in USD) nor
+    // the one the amounts beside it are shown in. It read as a
+    // contradiction: USD figures under a row saying AUD. The provider's own
+    // price is disclosed by the "Source currency value" row instead.
     _DetailInfoRowData(
       'Pricing confidence',
       _pricingConfidenceLabel(status: status, confidence: confidence),
@@ -3386,10 +3460,12 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
         (pricing.lowEstimate > 0 || pricing.highEstimate > 0))
       _DetailInfoRowData(
         'Value range',
-        _formatMoneyRange(
+        _formatMoneyRangeIn(
           pricing.lowEstimate,
           pricing.highEstimate,
-          pricing.currency,
+          from: pricing.currency,
+          to: displayCurrency,
+          currentRates: currentRates,
         ),
       ),
     _DetailInfoRowData(
@@ -3728,6 +3804,23 @@ double _currentValueFor(CollectibleItem item) {
 /// snapshot (real or catalog-history-backfilled -- pre-ownership market
 /// context is legitimate to show here, unlike on the portfolio-wide
 /// aggregate), and the current value, sorted chronologically.
+/// Every currency that contributes a figure to the Value History panel.
+///
+/// The item's own pricing currency plus each snapshot's, so the panel can
+/// ask whether one honest currency exists for all of them.
+List<String> _valueHistorySourceCurrencies(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  final currencies = <String>{(item.pricing?.currency ?? 'AUD').toUpperCase()};
+  for (final snapshot in snapshots) {
+    if ((snapshot.valueAud ?? 0) > 0) {
+      currencies.add(snapshot.currency.toUpperCase());
+    }
+  }
+  return currencies.toList(growable: false);
+}
+
 List<_ValueHistoryPoint> _valueHistoryPoints(
   CollectibleItem item,
   List<PortfolioValuationSnapshot> snapshots, {
@@ -3741,9 +3834,7 @@ List<_ValueHistoryPoint> _valueHistoryPoints(
   // the catalog-matched identity, so charting the scan estimate alongside
   // them draws a spike for a price this item was never actually worth --
   // see _valueHistoryBaseline for the full reasoning.
-  final scanValue = snapshots.any(
-    (snapshot) => (snapshot.valueAud ?? 0) > 0,
-  )
+  final scanValue = snapshots.any((snapshot) => (snapshot.valueAud ?? 0) > 0)
       ? 0.0
       : _valueAtScanFor(item);
   if (scanValue > 0) {
@@ -3913,13 +4004,16 @@ String _detailValueLabel(
   if (item.estimatedValue == 0) {
     return _formatZeroMoney(displayCurrency);
   }
-  final converted = convertCurrent(
+  // Rates load once per session; until they arrive (or if that fetch
+  // failed) an amount that cannot be converted keeps its own currency
+  // rather than being relabelled as the display one.
+  final converted = convertCurrentForDisplay(
     item.estimatedValue,
     from: item.pricing?.currency ?? 'AUD',
     to: displayCurrency,
     currentRates: currentRates,
   );
-  return _formatMoney(converted, displayCurrency);
+  return _formatMoney(converted.value, converted.currency);
 }
 
 String _formatZeroMoney(String currency) {
@@ -6335,7 +6429,15 @@ class _CreateAlertButtons extends ConsumerWidget {
       notificationState = ref.read(priceAlertNotificationControllerProvider);
     }
 
-    await repository.saveAlert(buildPriceAlert(item: item, type: type));
+    await repository.saveAlert(
+      buildPriceAlert(
+        item: item,
+        type: type,
+        displayCurrency: ref.read(displayCurrencyProvider),
+        currentRates:
+            ref.read(fxRatesProvider).asData?.value.currentRates ?? const {},
+      ),
+    );
     ref.invalidate(itemPriceAlertsProvider(item.id));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
@@ -6536,11 +6638,23 @@ class _PriceAlertRow extends ConsumerWidget {
     PriceAlert alert,
   ) async {
     final repository = ref.read(priceAlertRepositoryProvider);
-    await repository.deleteAlert(alert.id);
+    var deleted = true;
+    String? failure;
+    try {
+      await repository.deleteAlert(alert.id);
+    } on PriceAlertDeleteFailedException catch (error) {
+      // The local row is gone but the cloud still has it, so the next sync
+      // brings it back. Saying "deleted" here is what made this look like a
+      // UI bug rather than a failed write.
+      debugPrint('[PriceAlerts] delete did not reach the cloud: $error');
+      deleted = false;
+      failure =
+          "Couldn't delete that alert. Check your connection and try again.";
+    }
     ref.invalidate(itemPriceAlertsProvider(alert.itemId));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
-      _showDetailSnackBar(context, 'Price alert deleted');
+      _showDetailSnackBar(context, deleted ? 'Price alert deleted' : failure!);
     }
   }
 }
@@ -6582,15 +6696,50 @@ String? _storedAiSummaryFor(CollectibleItem item) {
   if (friendlySummary != null) {
     return friendlySummary;
   }
-  final parts = [
+  // The three stored fields overlap: some analyzer paths write the same
+  // sentence into more than one of them, which used to render as the same
+  // paragraph repeated. Keep the first occurrence of each distinct insight.
+  final seen = <String>{};
+  final parts = <String>[];
+  for (final raw in [
     _collectorSafeInsight(item.aiReasoning),
     _collectorSafeInsight(item.confidenceExplanation),
     _collectorSafeInsight(item.detectionQuality),
-  ].whereType<String>().toList(growable: false);
+  ]) {
+    if (raw == null || !seen.add(_insightDedupeKey(raw))) {
+      continue;
+    }
+    parts.add(raw);
+  }
+  final quality = _collectorSafeInsight(item.detectionQuality);
+  if (quality != null && parts.isNotEmpty && parts.last == quality) {
+    // Some analyzer paths store a bare grade such as "Partial", which reads
+    // as a stray word on its own line unless it is labelled.
+    parts[parts.length - 1] = _labelledDetectionQuality(quality);
+  }
   if (parts.isEmpty) {
     return null;
   }
   return parts.join('\n\n');
+}
+
+/// Normalizes an insight for comparison so wording that differs only in
+/// casing, spacing, or trailing punctuation still counts as a repeat.
+String _insightDedupeKey(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
+
+/// Labels a detection-quality grade that is too terse to stand alone as a
+/// sentence. Full sentences from the analyzer are left untouched.
+String _labelledDetectionQuality(String value) {
+  final trimmed = value.trim();
+  if (trimmed.contains(' ')) {
+    return trimmed;
+  }
+  final withoutTrailingDot = trimmed.endsWith('.')
+      ? trimmed.substring(0, trimmed.length - 1)
+      : trimmed;
+  return 'Detection quality: $withoutTrailingDot.';
 }
 
 String? _collectorInsightSummaryFor(CollectibleItem item) {
@@ -6689,14 +6838,6 @@ bool _isPackLoxCategoryPlaceholderPath(String path) {
   );
 }
 
-String _formatAud(double value) {
-  if (value <= 0) {
-    return 'Value unavailable';
-  }
-  final withCommas = _formatMoneyAmountWithCommas(value);
-  return '\$$withCommas';
-}
-
 Color _confidenceMeterColor(BuildContext context, double confidence) {
   if (confidence >= 0.80) {
     return const Color(0xFF16A34A);
@@ -6713,10 +6854,31 @@ String _formatDate(DateTime date) {
   return '$day/$month/${date.year}';
 }
 
-String _displayValue(PricingInfo pricing, {required double fallbackValue}) {
+String _displayValue(
+  PricingInfo pricing, {
+  required double fallbackValue,
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final value = pricing.estimatedMarketValue > 0
       ? pricing.estimatedMarketValue
       : fallbackValue;
+  // The saved displayString is written in the provider's currency, so it can
+  // only be shown when no conversion is being applied.
+  if (displayCurrency != null &&
+      displayCurrency.trim().toUpperCase() !=
+          pricing.currency.trim().toUpperCase() &&
+      canConvertCurrent(pricing.currency, displayCurrency, currentRates)) {
+    return _formatMoney(
+      convertCurrent(
+        value,
+        from: pricing.currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      ),
+      displayCurrency,
+    );
+  }
   final displayString = pricing.displayString?.trim();
   if (displayString != null &&
       displayString.isNotEmpty &&
@@ -6774,6 +6936,44 @@ String? _sourceMarketValue(PricingInfo pricing) {
     return null;
   }
   return _formatMoney(originalPrice, originalCurrency);
+}
+
+/// Formats an amount in the display currency when a rate exists, and in its
+/// own currency when one does not -- never an unconverted number wearing the
+/// display currency's label.
+String _formatMoneyIn(
+  double value, {
+  required String from,
+  required String? to,
+  required Map<String, double> currentRates,
+}) {
+  final converted = convertCurrentForDisplay(
+    value,
+    from: from,
+    to: to ?? from,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted.value, converted.currency);
+}
+
+/// The range equivalent of [_formatMoneyIn]. Both ends share one currency,
+/// so they convert together or not at all.
+String _formatMoneyRangeIn(
+  double low,
+  double high, {
+  required String from,
+  required String? to,
+  required Map<String, double> currentRates,
+}) {
+  final target = to ?? from;
+  if (!canConvertCurrent(from, target, currentRates)) {
+    return _formatMoneyRange(low, high, from);
+  }
+  return _formatMoneyRange(
+    convertCurrent(low, from: from, to: target, currentRates: currentRates),
+    convertCurrent(high, from: from, to: target, currentRates: currentRates),
+    target,
+  );
 }
 
 String _formatMoney(double value, String currency) {
@@ -6868,11 +7068,16 @@ String _formatPricingDate(DateTime? date) {
 }
 
 String _alertRuleLabel(PriceAlertRule rule) {
+  // Named in the currency the collector set it in. A bare "$1,234" was
+  // ambiguous, and _formatAud stated AUD outright, so a threshold entered in
+  // USD read as AUD.
+  String threshold() =>
+      _formatMoney(rule.amount ?? 0, rule.effectiveDisplayCurrency);
   switch (rule.type) {
     case PriceAlertRuleType.priceRisesAboveAmount:
-      return 'Rises above ${_formatAud(rule.amount ?? 0)}';
+      return 'Rises above ${threshold()}';
     case PriceAlertRuleType.priceDropsBelowAmount:
-      return 'Drops below ${_formatAud(rule.amount ?? 0)}';
+      return 'Drops below ${threshold()}';
     case PriceAlertRuleType.percentageIncrease:
       return 'Increases by ${_formatRulePercent(rule.percentage)}';
     case PriceAlertRuleType.percentageDecrease:

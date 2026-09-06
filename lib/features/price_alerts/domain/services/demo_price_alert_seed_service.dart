@@ -1,6 +1,7 @@
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
 import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
+import 'package:flutter/foundation.dart';
 
 /// Dev/QA helper that seeds a handful of *triggered* price alerts on the
 /// highest-value demo items so the notification inbox renders real content
@@ -84,7 +85,13 @@ class DemoPriceAlertSeedService {
   Future<void> clear(PriceAlertRepository repository) async {
     final alerts = await repository.getAlerts();
     for (final alert in alerts.where((a) => a.id.startsWith(_demoPrefix))) {
-      await repository.deleteAlert(alert.id);
+      try {
+        await repository.deleteAlert(alert.id);
+      } on Object catch (error) {
+        // Seeding cleanup is best-effort: one alert the cloud refuses to
+        // release must not stop the rest being cleared.
+        debugPrint('[PriceAlerts] demo clear skipped ${alert.id}: $error');
+      }
     }
   }
 
