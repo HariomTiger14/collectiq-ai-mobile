@@ -7,6 +7,8 @@ import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
+import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
+import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -359,6 +361,50 @@ void main() {
     },
   );
 
+  testWidgets('value hero waits behind a placeholder for its own history', (
+    tester,
+  ) async {
+    // Snapshots resolve after the portfolio does. While they are in flight the
+    // hero must not claim there is no history yet -- that copy is for a
+    // collection that genuinely has none.
+    final pending = Completer<PortfolioPerformance>();
+    addTearDown(() {
+      if (!pending.isCompleted) {
+        pending.complete(_emptyPerformance());
+      }
+    });
+
+    await tester.pumpWidget(
+      _homeApp(performance: pending.future),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.byKey(const ValueKey('home-value-hero-trend-loading')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-value-hero-delta-loading')),
+      findsOneWidget,
+    );
+    expect(find.text('Building value history'), findsNothing);
+    // The rest of the card is ready and must not wait on the trend.
+    expect(find.text('Review portfolio'), findsOneWidget);
+
+    pending.complete(_emptyPerformance());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.byKey(const ValueKey('home-value-hero-trend-loading')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('home-value-hero-delta-loading')),
+      findsNothing,
+    );
+  });
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {
@@ -384,9 +430,15 @@ void main() {
     // the attention strip below is the single actionable surface for it.
     expect(find.text('2 need value'), findsNothing);
     expect(find.text('Review portfolio'), findsOneWidget);
-    // No persisted value history yet, so the trend chart + period tabs are not
-    // shown and the card reports the building-history state.
-    expect(find.text('Building value history'), findsOneWidget);
+    // Value history is still resolving here (nothing fakes the history
+    // repository), so the hero shows its own placeholder rather than the
+    // building-history copy, which is reserved for a collection that really
+    // has no history. The resolved states are covered by their own tests.
+    expect(
+      find.byKey(const ValueKey('home-value-hero-trend-loading')),
+      findsOneWidget,
+    );
+    expect(find.text('Building value history'), findsNothing);
     expect(find.byKey(const ValueKey('home-value-hero-trend')), findsNothing);
 
     await _scrollUntilVisible(
@@ -566,10 +618,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 120));
 
       expect(find.byKey(const ValueKey('home-alert-button')), findsOneWidget);
-      await _scrollUntilVisible(
-        tester,
-        find.byKey(const ValueKey('home-surface-attention-strip')),
-      );
+      // The strip sits above the fold on this fixture, so it needs no
+      // scrolling; running the scroll helper on an already-visible target
+      // pushed it back out of the tree.
       expect(
         find.byKey(const ValueKey('home-surface-attention-strip')),
         findsOneWidget,
@@ -836,9 +887,12 @@ Widget _homeApp({
   VoidCallback? onScanPressed,
   VoidCallback? onPortfolioPressed,
   PortfolioRepository? repository,
+  Future<PortfolioPerformance>? performance,
 }) {
   return ProviderScope(
     overrides: [
+      if (performance != null)
+        portfolioPerformanceProvider.overrideWith((ref, items) => performance),
       if (repository != null)
         portfolioRepositoryProvider.overrideWithValue(repository),
       // Mark Home as recently auto-synced so the throttled on-appear background
@@ -857,6 +911,28 @@ Widget _homeApp({
         onPortfolioPressed: onPortfolioPressed,
       ),
     ),
+  );
+}
+
+PortfolioPerformance _emptyPerformance() {
+  const noChange = PortfolioValueChange(
+    label: '',
+    currentValue: 0,
+    previousValue: 0,
+  );
+  return const PortfolioPerformance(
+    todayChange: noChange,
+    weeklyChange: noChange,
+    monthlyChange: noChange,
+    overallChange: noChange,
+    topGainers: [],
+    topLosers: [],
+    recentlyAppreciated: [],
+    recentlyDropped: [],
+    recommendations: [],
+    dailySnapshots: [],
+    weeklySnapshots: [],
+    monthlySnapshots: [],
   );
 }
 
@@ -907,10 +983,13 @@ Widget _previewHomeApp(HomePreviewScenario scenario) {
 }
 
 Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
-  for (var i = 0; i < 8 && finder.evaluate().isEmpty; i++) {
+  // Steps are deliberately smaller than the shortest section on the page: a
+  // 260pt stride could jump a card entirely between checks, so whether this
+  // found a section depended on how the sections above it happened to add up.
+  for (var i = 0; i < 26 && finder.evaluate().isEmpty; i++) {
     await tester.drag(
       find.byKey(const PageStorageKey<String>('home-scroll-position')),
-      const Offset(0, -260),
+      const Offset(0, -120),
     );
     await tester.pump(const Duration(milliseconds: 120));
   }

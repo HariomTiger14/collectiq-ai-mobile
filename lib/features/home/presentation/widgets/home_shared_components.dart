@@ -503,23 +503,23 @@ class HomeSkeletonBlock extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SkeletonLine(
+              HomeSkeletonLine(
                 key: ValueKey('home-loading-skeleton-hero-eyebrow'),
                 width: 116,
                 height: 12,
               ),
               SizedBox(height: 24),
-              _SkeletonLine(
+              HomeSkeletonLine(
                 key: ValueKey('home-loading-skeleton-hero-title-1'),
                 width: 246,
                 height: 20,
               ),
               SizedBox(height: 10),
-              _SkeletonLine(width: 192, height: 20),
+              HomeSkeletonLine(width: 192, height: 20),
               SizedBox(height: 18),
-              _SkeletonLine(width: 276, height: 11),
+              HomeSkeletonLine(width: 276, height: 11),
               SizedBox(height: 8),
-              _SkeletonLine(width: 222, height: 11),
+              HomeSkeletonLine(width: 222, height: 11),
               Spacer(),
               _SkeletonPill(
                 key: ValueKey('home-loading-skeleton-cta'),
@@ -541,9 +541,9 @@ class HomeSkeletonBlock extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SkeletonLine(width: 154, height: 13),
+                    HomeSkeletonLine(width: 154, height: 13),
                     SizedBox(height: 10),
-                    _SkeletonLine(width: 92, height: 24),
+                    HomeSkeletonLine(width: 92, height: 24),
                   ],
                 ),
               ),
@@ -563,9 +563,9 @@ class HomeSkeletonBlock extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SkeletonLine(width: 178, height: 13),
+                    HomeSkeletonLine(width: 178, height: 13),
                     SizedBox(height: 10),
-                    _SkeletonLine(width: 236, height: 11),
+                    HomeSkeletonLine(width: 236, height: 11),
                   ],
                 ),
               ),
@@ -599,8 +599,9 @@ class _SkeletonSurface extends StatelessWidget {
   }
 }
 
-class _SkeletonLine extends StatelessWidget {
-  const _SkeletonLine({required this.width, required this.height, super.key});
+/// A placeholder bar used while a section's own data is still loading.
+class HomeSkeletonLine extends StatelessWidget {
+  const HomeSkeletonLine({required this.width, required this.height, super.key});
 
   final double width;
   final double height;

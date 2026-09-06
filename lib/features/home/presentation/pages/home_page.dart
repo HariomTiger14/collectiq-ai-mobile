@@ -276,9 +276,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _openNotificationInbox(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const NotificationInboxScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const NotificationInboxScreen()),
     );
   }
 
@@ -286,7 +284,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Pull-to-refresh: re-sync the portfolio from the cloud so server-side
     // changes (e.g. admin re-pricing) surface on Home. The controller reloads
     // its item state, which cascades to the value, movers, and recent items.
-    await ref.read(portfolioControllerProvider.notifier).syncCloudPortfolioNow();
+    await ref
+        .read(portfolioControllerProvider.notifier)
+        .syncCloudPortfolioNow();
   }
 
   void _openMover(PortfolioValueMover mover) {
@@ -313,19 +313,28 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Real value history + movers come from persisted daily snapshots. Skip in
     // preview/QA mode (the provider writes snapshots) so previews stay offline
     // and deterministic.
-    final performance = isPreview
+    final performanceAsync = isPreview
         ? null
-        : ref
-              .watch(portfolioPerformanceProvider(portfolio.items))
-              .asData
-              ?.value;
+        : ref.watch(portfolioPerformanceProvider(portfolio.items));
+    final performance = performanceAsync?.asData?.value;
+    // Snapshots resolve after the portfolio itself does. Reading only
+    // `.asData?.value` collapsed "still loading" and "no history" into the
+    // same null, so the hero claimed "Building value history" for a
+    // collection that has plenty -- then swapped in a chart. Keep the
+    // distinction and let the hero show a placeholder for its own slot.
+    final isValueHistoryLoading =
+        performanceAsync != null &&
+        performanceAsync.isLoading &&
+        !performanceAsync.hasValue;
     final triggeredAlertCount = isPreview
         ? 0
         : ref.watch(homeTriggeredAlertCountProvider).asData?.value ?? 0;
     final freeItemCap = isPreview
         ? kFreeMaxCollectibles
         : ref.watch(activePlanLimitsProvider).maxPortfolioItems;
-    final displayCurrency = isPreview ? 'AUD' : ref.watch(displayCurrencyProvider);
+    final displayCurrency = isPreview
+        ? 'AUD'
+        : ref.watch(displayCurrencyProvider);
     final fxRates = isPreview
         ? FxRateSnapshot.empty
         : ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
@@ -453,6 +462,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     topPadding: AppSpacing.lg,
                     child: _PortfolioValueHero(
                       data: homeData,
+                      isValueHistoryLoading: isValueHistoryLoading,
                       onReview:
                           widget.onPortfolioPressed ??
                           (widget.onScanPressed == null
@@ -551,9 +561,18 @@ String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
 }
 
 class _PortfolioValueHero extends StatefulWidget {
-  const _PortfolioValueHero({required this.data, this.onReview});
+  const _PortfolioValueHero({
+    required this.data,
+    this.isValueHistoryLoading = false,
+    this.onReview,
+  });
 
   final _HomeViewData data;
+
+  /// Whether the persisted value history is still being fetched. The rest of
+  /// the hero (total, trust bar, CTA) is ready before it arrives, so only the
+  /// trend and its delta wait behind a placeholder.
+  final bool isValueHistoryLoading;
   final VoidCallback? onReview;
 
   @override
@@ -625,6 +644,7 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
     final String? deltaPeriodLabel;
     final Color deltaColor;
     final IconData deltaIcon;
+    final isHistoryLoading = widget.isValueHistoryLoading;
     if (!hasValue) {
       deltaText = 'Awaiting first valuation';
       deltaPeriodLabel = null;
@@ -694,37 +714,53 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(deltaIcon, size: 16, color: deltaColor),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text.rich(
-                  TextSpan(
-                    text: deltaText,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: deltaColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    children: deltaPeriodLabel == null
-                        ? null
-                        : [
-                            TextSpan(
-                              text: '  $deltaPeriodLabel',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: HomeTokens.textMuted,
-                                fontWeight: FontWeight.w600,
+          if (isHistoryLoading)
+            const Padding(
+              key: ValueKey('home-value-hero-delta-loading'),
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: HomeSkeletonLine(width: 168, height: 14),
+            )
+          else
+            Row(
+              children: [
+                Icon(deltaIcon, size: 16, color: deltaColor),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text.rich(
+                    TextSpan(
+                      text: deltaText,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: deltaColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      children: deltaPeriodLabel == null
+                          ? null
+                          : [
+                              TextSpan(
+                                text: '  $deltaPeriodLabel',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: HomeTokens.textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          if (showChart) ...[
+              ],
+            ),
+          if (isHistoryLoading) ...[
+            const SizedBox(height: 16),
+            // Same 84pt box the chart occupies, so the card does not resize
+            // under the reader when the trend arrives.
+            const SizedBox(
+              key: ValueKey('home-value-hero-trend-loading'),
+              height: 84,
+              child: Center(child: HomeSkeletonLine(width: 240, height: 8)),
+            ),
+          ] else if (showChart) ...[
             const SizedBox(height: 16),
             _GainLossChart(
               key: const ValueKey('home-value-hero-trend'),
@@ -1152,7 +1188,10 @@ class _InsightsPreview extends StatelessWidget {
                 child: HomeMetricTile(
                   label: 'Collection value',
                   value: data.hasValuedItems
-                      ? _formatCurrency(data.totalValuedAmount, data.displayCurrency)
+                      ? _formatCurrency(
+                          data.totalValuedAmount,
+                          data.displayCurrency,
+                        )
                       : 'Pending',
                   supportingText: data.hasValuedItems
                       ? '${data.valuedItemCount} valued'
@@ -1532,7 +1571,10 @@ class _PortfolioMoversSection extends StatelessWidget {
     final tile = HomeMetricTile(
       label: positive ? 'Top gainer' : 'Top loser',
       value: mover.title,
-      supportingText: _signedCurrency(mover.absoluteChange, data.displayCurrency),
+      supportingText: _signedCurrency(
+        mover.absoluteChange,
+        data.displayCurrency,
+      ),
       supportingColor: positive ? HomeTokens.positive : HomeTokens.negative,
       compact: true,
     );
@@ -1949,12 +1991,14 @@ class _HomeViewData {
     // read the user's chosen currency at all).
     final totalValuedAmount = valuedItems.fold<double>(
       0,
-      (sum, item) => sum + convertCurrent(
-        item.estimatedValue,
-        from: currencyForItem(item),
-        to: displayCurrency,
-        currentRates: currentRates,
-      ),
+      (sum, item) =>
+          sum +
+          convertCurrent(
+            item.estimatedValue,
+            from: currencyForItem(item),
+            to: displayCurrency,
+            currentRates: currentRates,
+          ),
     );
     // Real persisted daily value history drives the trend chart + period delta.
     // Already converted to displayCurrency upstream, per-point, using the
@@ -2081,7 +2125,9 @@ void _openCollectibleDetail(
       builder: (_) => CollectibleDetailPage(
         item: item,
         onDelete: (itemId) async {
-          await ref.read(portfolioControllerProvider.notifier).removeItem(itemId);
+          await ref
+              .read(portfolioControllerProvider.notifier)
+              .removeItem(itemId);
           return true;
         },
       ),
