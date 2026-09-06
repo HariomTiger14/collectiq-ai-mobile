@@ -182,7 +182,17 @@ Map<String, dynamic> supabaseRowForPriceAlert(PriceAlert alert, String userId) {
     'portfolio_item_id': alert.itemId,
     'item_title': alert.itemTitle,
     'rule_type': rule.type.name,
-    'target_amount': rule.amount,
+    // The server compares this against an item price stored in the
+    // provider's USD, so it carries the normalized figure -- not the
+    // collector's "alert me at AUD 50".
+    //
+    // That intent (displayCurrency, the entered amount, and the rate behind
+    // the conversion) rides in raw_json, which already round-trips the whole
+    // rule. Deliberately not written as its own columns: those need a
+    // migration, and an app that writes columns the table does not have yet
+    // fails every alert save. 20260906_price_alert_currency_intent.sql adds
+    // them for admin and reporting; the app does not depend on it.
+    'target_amount': rule.comparisonAmountUsd,
     'percentage': rule.percentage,
     'baseline_value': rule.baselineValue,
     'stale_after_days': rule.staleAfterDays,
@@ -220,10 +230,17 @@ PriceAlert? priceAlertFromSupabaseRow(Map<String, dynamic> row) {
       itemTitle: row['item_title'] as String? ?? 'Collectible',
       rule: PriceAlertRule(
         type: PriceAlertRuleType.fromName(row['rule_type'] as String?),
-        amount: _number(row['target_amount']),
+        // Only reached for rows with no raw_json. display_amount is the
+        // collector's own figure when the columns exist; target_amount is the
+        // normalized comparison value, which stands in otherwise.
+        amount: _number(row['display_amount']) ?? _number(row['target_amount']),
         percentage: _number(row['percentage']),
         baselineValue: _number(row['baseline_value']),
         staleAfterDays: _int(row['stale_after_days']),
+        displayCurrency: _optionalString(row['display_currency']),
+        normalizedAmountUsd: _number(row['normalized_amount_usd']),
+        exchangeRateUsed: _number(row['exchange_rate_used']),
+        exchangeRateDate: _optionalDate(row['exchange_rate_date']),
       ),
       status: PriceAlertStatus.fromName(row['status'] as String?),
       createdAt: _date(row['created_at']),

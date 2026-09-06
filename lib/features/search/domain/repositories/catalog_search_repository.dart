@@ -35,10 +35,14 @@ abstract class CatalogSearchRepository {
   /// the trend chart and the "View full price history" screen without a
   /// second network call.
   ///
-  /// [currency] requests the backend convert pricing (and match eBay
-  /// marketplace listings) to a specific display currency -- pass the
-  /// user's CollectorProfile.preferredCurrency. Omitting it leaves prices
-  /// in their raw source currency (USD), unconverted.
+  /// [currency] selects which marketplace's eBay listings to match -- pass
+  /// the user's CollectorProfile.preferredCurrency.
+  ///
+  /// It no longer affects catalog pricing. The backend returns catalog value
+  /// and history in the provider's own USD whatever is passed here, and the
+  /// app converts for display against live dated rates; the backend used to
+  /// convert with a hardcoded static rate, which is what made stored and
+  /// displayed values disagree.
   Future<CatalogSearchResult> getCatalogDetail({
     required CatalogSearchResult result,
     int historyLimit = 90,

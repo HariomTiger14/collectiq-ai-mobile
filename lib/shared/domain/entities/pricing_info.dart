@@ -92,6 +92,13 @@ class PricingInfo {
           parseNullableDouble(json['estimatedMarketValue']) ?? 0,
       lowEstimate: parseNullableDouble(json['lowEstimate']) ?? 0,
       highEstimate: parseNullableDouble(json['highEstimate']) ?? 0,
+      // Deliberately AUD, not USD. This parses BOTH backend payloads and the
+      // app's own persisted records, and it cannot tell them apart. The
+      // backend always states a currency, so a missing one means an older
+      // locally-stored record -- and those were written when everything was
+      // AUD. Defaulting to USD here would relabel that history rather than
+      // protect against a missing field. See catalog_search_result.dart,
+      // which IS unambiguously provider data and does default to USD.
       currency: parseString(json['currency'], fallback: 'AUD'),
       pricingSource: parseString(json['pricingSource'], fallback: 'Unknown'),
       pricingConfidence: pricingConfidence > 1

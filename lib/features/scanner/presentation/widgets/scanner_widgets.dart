@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/core/navigation/app_shell_controller.dart';
@@ -1231,6 +1233,11 @@ class AiResultCard extends ConsumerWidget {
                 valuationStatus: valuationStatus,
                 valuationSource: valuationSource,
                 aiEstimatedValue: aiEstimatedValue,
+                sourceCurrency: pricing.currency,
+                displayCurrency: ref.watch(displayCurrencyProvider),
+                currentRates:
+                    ref.watch(fxRatesProvider).asData?.value.currentRates ??
+                    const {},
               ),
             ),
             if (isSaved && onViewPortfolio != null) ...[
@@ -2125,10 +2132,13 @@ String _formatMoney(double value, String currency) {
     RegExp(r'\B(?=(\d{3})+(?!\d))'),
     (match) => ',',
   );
-  if (currency.toUpperCase() == 'AUD' || currency.trim().isEmpty) {
+  final normalized = currency.trim().toUpperCase();
+  if (normalized == 'AUD') {
     return '\$$withCommas';
   }
-  return '$currency $withCommas';
+  // Empty means "not stated", and backend pricing is the provider's USD --
+  // labelling it AUD is how a USD figure got read as AUD before.
+  return '${normalized.isEmpty ? 'USD' : normalized} $withCommas';
 }
 
 String _formatPricingDate(DateTime? date) {
@@ -2189,6 +2199,9 @@ class _TrustSummaryCard extends StatelessWidget {
     this.valuationStatus = ValuationStatus.unavailable,
     this.valuationSource = 'unknown',
     this.aiEstimatedValue,
+    this.sourceCurrency = 'USD',
+    this.displayCurrency,
+    this.currentRates = const {},
   });
 
   final String pricingSource;
@@ -2204,8 +2217,27 @@ class _TrustSummaryCard extends StatelessWidget {
   final String valuationSource;
   final double? aiEstimatedValue;
 
+  /// The currency these amounts are stored in (the provider's own).
+  final String sourceCurrency;
+
+  /// The collector's chosen currency, when known.
+  final String? displayCurrency;
+  final Map<String, double> currentRates;
+
   @override
   Widget build(BuildContext context) {
+    // These were formatted as AUD outright, so a USD provider figure was
+    // relabelled -- and they ignored the collector's own currency entirely.
+    String money(double value) {
+      final converted = convertCurrentForDisplay(
+        value,
+        from: sourceCurrency,
+        to: displayCurrency ?? sourceCurrency,
+        currentRates: currentRates,
+      );
+      return _formatMoney(converted.value, converted.currency);
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final hasFrontBack =
@@ -2257,19 +2289,19 @@ class _TrustSummaryCard extends StatelessWidget {
           if (faceValue != null && faceValue! > 0)
             AppLabelValueRow(
               label: 'Face value',
-              value: _formatMoney(faceValue!, 'AUD'),
+              value: money(faceValue!),
             ),
           if (estimatedMarketValue != null &&
               valuationStatus == ValuationStatus.marketEstimated)
             AppLabelValueRow(
               label: 'Market value',
-              value: _formatMoney(estimatedMarketValue!, 'AUD'),
+              value: money(estimatedMarketValue!),
             ),
           if (aiEstimatedValue != null &&
               valuationStatus == ValuationStatus.aiEstimated)
             AppLabelValueRow(
               label: 'AI-estimated value',
-              value: _formatMoney(aiEstimatedValue!, 'AUD'),
+              value: money(aiEstimatedValue!),
             ),
           if (valuationStatus != ValuationStatus.marketEstimated &&
               valuationStatus != ValuationStatus.aiEstimated)
@@ -2711,7 +2743,8 @@ class _AlternativeMatchTile extends StatelessWidget {
 
 String _marketCurrency(MarketSummary summary) {
   if (summary.comps.isEmpty) {
-    return 'AUD';
+    // Comparable sales come from the pricing providers, which quote USD.
+    return 'USD';
   }
 
   return summary.comps.first.currency;

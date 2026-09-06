@@ -8,7 +8,10 @@ import 'package:collectiq_ai/features/subscription/domain/entities/plan_limits.d
 import 'package:collectiq_ai/features/subscription/presentation/widgets/free_collectible_counter.dart';
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ScanResultReviewEdits {
   const ScanResultReviewEdits({
@@ -38,7 +41,7 @@ class ScanResultReviewEdits {
   final String? notes;
 }
 
-class ScanResultScreen extends StatelessWidget {
+class ScanResultScreen extends ConsumerWidget {
   const ScanResultScreen({
     required this.result,
     required this.activeSlot,
@@ -77,8 +80,11 @@ class ScanResultScreen extends StatelessWidget {
   final VoidCallback? onUpgrade;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {};
     final imagePath = activeSlot?.path ?? result.thumbnail;
     final isEnhanced = activeSlot?.isEnhanced == true;
     // Scaffold already reserves space above bottomNavigationBar for body
@@ -165,7 +171,11 @@ class ScanResultScreen extends StatelessWidget {
                   _FadeInMetadata(
                     delay: const Duration(milliseconds: 90),
                     child: _ValueCard(
-                      value: _primaryValueLabel(result),
+                      value: _primaryValueLabel(
+                        result,
+                        displayCurrency: displayCurrency,
+                        currentRates: currentRates,
+                      ),
                       source: _valueSourceLabel(result),
                       secondaryValue: _sourceMarketValueLabel(result.pricing),
                     ),
@@ -534,13 +544,16 @@ class _ResultSection extends StatelessWidget {
   }
 }
 
-class _MarketEvidence extends StatelessWidget {
+class _MarketEvidence extends ConsumerWidget {
   const _MarketEvidence({required this.result});
 
   final ScanResult result;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {};
     final pricing = result.pricing;
     final explanation = pricing.pricingExplanation?.trim();
     final sourceMarketValue = _sourceMarketValueLabel(pricing);
@@ -551,11 +564,22 @@ class _MarketEvidence extends StatelessWidget {
       children: [
         _ResultRow(
           label: 'Estimated market value',
-          value: _primaryValueLabel(result),
+          value: _primaryValueLabel(
+            result,
+            displayCurrency: displayCurrency,
+            currentRates: currentRates,
+          ),
         ),
         if (sourceMarketValue != null)
           _ResultRow(label: 'Original market value', value: sourceMarketValue),
-        _ResultRow(label: 'Estimated range', value: _valueRange(result)),
+        _ResultRow(
+          label: 'Estimated range',
+          value: _valueRange(
+            result,
+            displayCurrency: displayCurrency,
+            currentRates: currentRates,
+          ),
+        ),
         _ResultRow(
           label: 'Pricing source',
           value: _displayPricingSource(result),
@@ -1566,12 +1590,28 @@ class _ResultChip extends StatelessWidget {
   }
 }
 
-String _primaryValueLabel(ScanResult result) {
+/// The scan's headline value, in the collector's display currency.
+///
+/// Backend pricing is the provider's own currency (USD for PriceCharting),
+/// so this screen has to convert like every other price surface. When no
+/// rate is available the amount keeps its own currency rather than being
+/// relabelled -- see convertCurrentForDisplay.
+String _primaryValueLabel(
+  ScanResult result, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final pricing = result.pricing;
   final value = pricing.estimatedMarketValue > 0
       ? pricing.estimatedMarketValue
       : result.estimatedValue;
-  return _formatScanValue(value, result.valuationStatus, pricing.currency);
+  return _formatScanValue(
+    value,
+    result.valuationStatus,
+    currency: pricing.currency,
+    displayCurrency: displayCurrency,
+    currentRates: currentRates,
+  );
 }
 
 String? _sourceMarketValueLabel(PricingInfo pricing) {
@@ -1589,13 +1629,23 @@ String? _sourceMarketValueLabel(PricingInfo pricing) {
 
 String _formatScanValue(
   double value,
-  ValuationStatus status, [
-  String currency = 'AUD',
-]) {
+  ValuationStatus status, {
+  // The amount's own currency, and the collector's -- kept separate so a
+  // missing rate can fall back to the former instead of relabelling.
+  String currency = 'USD',
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   if (value <= 0) {
     return _valuationStatusMessage(status);
   }
-  return _formatMoney(value, currency);
+  final converted = convertCurrentForDisplay(
+    value,
+    from: currency,
+    to: displayCurrency ?? currency,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted.value, converted.currency);
 }
 
 String _formatMoney(double value, String currency) {
@@ -1729,18 +1779,26 @@ String _fallback(String? value, String fallback) {
   return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
 }
 
-String _valueRange(ScanResult result) {
+String _valueRange(
+  ScanResult result, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
+  String format(double value) => _formatScanValue(
+    value,
+    result.valuationStatus,
+    currency: result.pricing.currency,
+    displayCurrency: displayCurrency,
+    currentRates: currentRates,
+  );
   final low = result.pricing.lowEstimate;
   final high = result.pricing.highEstimate;
   if (low > 0 && high > 0 && high >= low) {
-    return '${_formatScanValue(low, result.valuationStatus, result.pricing.currency)} - '
-        '${_formatScanValue(high, result.valuationStatus, result.pricing.currency)}';
+    return '${format(low)} - ${format(high)}';
   }
   if (result.estimatedValue > 0) {
-    final lower = result.estimatedValue * 0.82;
-    final upper = result.estimatedValue * 1.18;
-    return '${_formatScanValue(lower, result.valuationStatus, result.pricing.currency)} - '
-        '${_formatScanValue(upper, result.valuationStatus, result.pricing.currency)}';
+    return '${format(result.estimatedValue * 0.82)} - '
+        '${format(result.estimatedValue * 1.18)}';
   }
   return 'Needs market check';
 }

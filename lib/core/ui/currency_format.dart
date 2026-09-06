@@ -48,6 +48,11 @@ String formatCollectionValue(
 
 /// The currency an item's value is expressed in (its pricing currency), falling
 /// back to AUD when the item carries no explicit currency.
+///
+/// AUD rather than USD for the same reason as PricingInfo.fromJson: an item
+/// with no currency at all is an older locally-stored record, written when
+/// everything was AUD. Anything priced since carries its currency
+/// explicitly, so this fallback never applies to provider data.
 String currencyForItem(CollectibleItem item) {
   final code = item.pricing?.currency.trim().toUpperCase();
   return (code == null || code.isEmpty) ? 'AUD' : code;

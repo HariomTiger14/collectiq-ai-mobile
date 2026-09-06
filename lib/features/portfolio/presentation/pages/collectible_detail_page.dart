@@ -6429,7 +6429,15 @@ class _CreateAlertButtons extends ConsumerWidget {
       notificationState = ref.read(priceAlertNotificationControllerProvider);
     }
 
-    await repository.saveAlert(buildPriceAlert(item: item, type: type));
+    await repository.saveAlert(
+      buildPriceAlert(
+        item: item,
+        type: type,
+        displayCurrency: ref.read(displayCurrencyProvider),
+        currentRates:
+            ref.read(fxRatesProvider).asData?.value.currentRates ?? const {},
+      ),
+    );
     ref.invalidate(itemPriceAlertsProvider(item.id));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
@@ -6830,14 +6838,6 @@ bool _isPackLoxCategoryPlaceholderPath(String path) {
   );
 }
 
-String _formatAud(double value) {
-  if (value <= 0) {
-    return 'Value unavailable';
-  }
-  final withCommas = _formatMoneyAmountWithCommas(value);
-  return '\$$withCommas';
-}
-
 Color _confidenceMeterColor(BuildContext context, double confidence) {
   if (confidence >= 0.80) {
     return const Color(0xFF16A34A);
@@ -7068,11 +7068,16 @@ String _formatPricingDate(DateTime? date) {
 }
 
 String _alertRuleLabel(PriceAlertRule rule) {
+  // Named in the currency the collector set it in. A bare "$1,234" was
+  // ambiguous, and _formatAud stated AUD outright, so a threshold entered in
+  // USD read as AUD.
+  String threshold() =>
+      _formatMoney(rule.amount ?? 0, rule.effectiveDisplayCurrency);
   switch (rule.type) {
     case PriceAlertRuleType.priceRisesAboveAmount:
-      return 'Rises above ${_formatAud(rule.amount ?? 0)}';
+      return 'Rises above ${threshold()}';
     case PriceAlertRuleType.priceDropsBelowAmount:
-      return 'Drops below ${_formatAud(rule.amount ?? 0)}';
+      return 'Drops below ${threshold()}';
     case PriceAlertRuleType.percentageIncrease:
       return 'Increases by ${_formatRulePercent(rule.percentage)}';
     case PriceAlertRuleType.percentageDecrease:

@@ -13,6 +13,7 @@ import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert_n
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_notification_controller.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:collectiq_ai/features/price_alerts/domain/repositories/price_alert_repository.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -462,11 +463,16 @@ class _AlertListRow extends ConsumerWidget {
 }
 
 String _ruleLabel(PriceAlertRule rule) {
+  // Named in the currency the collector set it in. This rendered a bare
+  // "1,234" with no symbol at all, so the same label meant a different
+  // amount depending on which currency they happened to be reading in.
+  String threshold() =>
+      _formatMoney(rule.amount ?? 0, rule.effectiveDisplayCurrency);
   switch (rule.type) {
     case PriceAlertRuleType.priceRisesAboveAmount:
-      return 'Rises above ${_formatMoney(rule.amount ?? 0)}';
+      return 'Rises above ${threshold()}';
     case PriceAlertRuleType.priceDropsBelowAmount:
-      return 'Drops below ${_formatMoney(rule.amount ?? 0)}';
+      return 'Drops below ${threshold()}';
     case PriceAlertRuleType.percentageIncrease:
       return 'Increases by ${_formatPercent(rule.percentage)}';
     case PriceAlertRuleType.percentageDecrease:
@@ -480,17 +486,9 @@ String _formatPercent(double? value) {
   return '${((value ?? 0) * 100).toStringAsFixed(0)}%';
 }
 
-String _formatMoney(double value) {
+String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'value unavailable';
   }
-  final rounded = value.round().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < rounded.length; i++) {
-    if (i > 0 && (rounded.length - i) % 3 == 0) {
-      buffer.write(',');
-    }
-    buffer.write(rounded[i]);
-  }
-  return '\$$buffer';
+  return formatCollectionValue(value, currencyCode: currency, showDecimals: false);
 }
