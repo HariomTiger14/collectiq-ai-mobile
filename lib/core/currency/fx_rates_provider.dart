@@ -3,15 +3,19 @@ import 'dart:async';
 import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_cache.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_repository.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
 import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The user's chosen display currency (Settings -> Country & Currency).
-/// Defaults to AUD, matching CollectorProfile's own default -- see
-/// collector_profile.dart.
+///
+/// Falls back to CollectorProfile's own default rather than repeating a
+/// currency here: a second hardcoded default is how the app and its stored
+/// profile can disagree about what an untouched install reads in.
 final displayCurrencyProvider = Provider<String>((ref) {
   final profile = ref.watch(profileControllerProvider).value;
-  return profile?.preferredCurrency ?? 'AUD';
+  return profile?.preferredCurrency ??
+      CollectorProfile.defaultPreferredCurrency;
 });
 
 /// Rates for converting stored values into the display currency.

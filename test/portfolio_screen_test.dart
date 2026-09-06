@@ -68,7 +68,10 @@ void main() {
     // now lead directly under the title.
     expect(find.text('Your collection at a glance'), findsNothing);
     expect(find.text('Collection value'), findsOneWidget);
-    expect(find.text('\$18.00'), findsOneWidget);
+    // US$ because the display currency now defaults to USD, matching what
+    // the providers quote and what values are stored in. The amount is
+    // unchanged: the fake rates are at parity.
+    expect(find.text('US\$18.00'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
     expect(find.text('1 need value'), findsWidgets);
@@ -369,7 +372,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-zero-card')),
-        matching: find.text('\$0.00'),
+        matching: find.text('US\$0.00'),
       ),
       findsOneWidget,
     );
@@ -467,7 +470,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
-        matching: find.text('\$350.00'),
+        matching: find.text('US\$350.00'),
       ),
       findsOneWidget,
     );
@@ -1129,7 +1132,15 @@ class _FakeFxRatesRepository implements FxRatesRepository {
 
   @override
   Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
-    return FxRateSnapshot.empty;
+    // Parity for every tracked currency: conversion is then a no-op on the
+    // numbers, so these tests keep asserting the same amounts while the
+    // display currency (USD by default) decides the label. An empty snapshot
+    // would instead mean "no rate exists", which is a different state with
+    // its own placeholder.
+    return const FxRateSnapshot(
+      currentRates: {'USD': 1.0, 'AUD': 1.0, 'CAD': 1.0, 'GBP': 1.0},
+      history: [],
+    );
   }
 }
 

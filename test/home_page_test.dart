@@ -424,7 +424,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Portfolio value'), findsOneWidget);
-    expect(find.text('\$2,275.00'), findsOneWidget);
+    // US$ because the display currency defaults to USD now; the fake rates
+    // are at parity, so only the label moved.
+    expect(find.text('US\$2,275.00'), findsOneWidget);
     expect(find.text('3 of 5 items trusted'), findsOneWidget);
     // The "needs value" count is no longer duplicated as a chip in the card;
     // the attention strip below is the single actionable surface for it.
@@ -946,7 +948,15 @@ class _FakeFxRatesRepository implements FxRatesRepository {
 
   @override
   Future<FxRateSnapshot> fetchRates({DateTime? fromDate, DateTime? toDate}) async {
-    return FxRateSnapshot.empty;
+    // Parity for every tracked currency: conversion is then a no-op on the
+    // numbers, so these tests keep asserting the same amounts while the
+    // display currency (USD by default) decides the label. An empty snapshot
+    // would instead mean "no rate exists", which is a different state with
+    // its own placeholder.
+    return const FxRateSnapshot(
+      currentRates: {'USD': 1.0, 'AUD': 1.0, 'CAD': 1.0, 'GBP': 1.0},
+      history: [],
+    );
   }
 }
 

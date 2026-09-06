@@ -190,14 +190,17 @@ void main() {
       // Market & Value used to render these in the provider's USD while the
       // Value History panel right beside it converted to the display
       // currency, so one screen showed the same figure two ways.
-      expect(find.text('\$200 AUD'), findsWidgets);
-      expect(find.text('\$245 AUD'), findsWidgets);
-      expect(find.text('USD \$245'), findsNothing);
-      // Converted to the display currency (AUD, the default with no profile
-      // override) at parity, not left in the item's own USD -- this is the
-      // exact bug being fixed: a value/movement label must respect the
-      // user's chosen display currency, not just the item's stored one.
-      expect(find.text('+\$45 AUD'), findsOneWidget);
+      // The display currency defaults to USD now, and this item is priced
+      // in USD, so no conversion applies at all -- the figures are the
+      // provider's own.
+      expect(find.text('USD \$200'), findsWidgets);
+      expect(find.text('USD \$245'), findsWidgets);
+      expect(find.text('\$245 AUD'), findsNothing);
+      // The movement follows the display currency like every other figure.
+      // With the default now USD and this item priced in USD, that means no
+      // conversion at all -- the guarantee is that the label tracks the
+      // display currency, which the AUD case below pins.
+      expect(find.text('+USD \$45'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
       await _revealText(tester, 'Pricing evidence');
       expect(find.text('Pricing evidence'), findsOneWidget);
@@ -212,9 +215,9 @@ void main() {
       expect(find.text('Value saved in'), findsNothing);
       expect(find.text('Currency'), findsNothing);
       expect(find.text('Value range'), findsWidgets);
-      // The range follows the display currency too; the Currency row above
-      // is what discloses that the provider priced this in USD.
-      expect(find.text('\$220 - \$270 AUD'), findsWidgets);
+      // The range follows the display currency too -- USD by default, and
+      // this item is priced in USD, so it is shown untouched.
+      expect(find.text('USD \$220 - \$270'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },
@@ -854,7 +857,7 @@ void main() {
     // The saved snapshot is a value like any other: shown in the currency the
     // collector reads in, with the provider's own currency still disclosed by
     // the Currency row in the pricing evidence panel.
-    expect(find.text('\$161 AUD'), findsWidgets);
+    expect(find.text('USD \$161'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
     expect(
       find.text('Refresh value to save the first trusted history point.'),
