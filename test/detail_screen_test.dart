@@ -111,7 +111,8 @@ void main() {
     expect(find.text('\$490 AUD'), findsWidgets);
     // 220-270 USD becomes 440-540 AUD.
     expect(find.textContaining('440'), findsWidgets);
-    expect(find.text('USD'), findsWidgets, reason: 'provider currency row');
+    // Nothing left on the screen still labelled in the provider's currency.
+    expect(find.text('USD'), findsNothing);
   });
 
   testWidgets('an amount with no exchange rate keeps its own currency', (
@@ -204,10 +205,12 @@ void main() {
       expect(find.text('Verified'), findsOneWidget);
       expect(find.text('Provider'), findsWidgets);
       expect(find.text('Saved provider'), findsWidgets);
-      // Named for what it actually is: the currency the stored figure was
-      // written in (the backend converts before saving), not the provider's
-      // own -- PriceCharting quotes in USD.
-      expect(find.text('Value saved in'), findsWidgets);
+      // No stored-currency row: it named the currency the saved figure was
+      // written in, which is neither the provider's (PriceCharting quotes in
+      // USD) nor the one the amounts beside it now show, so it read as a
+      // contradiction.
+      expect(find.text('Value saved in'), findsNothing);
+      expect(find.text('Currency'), findsNothing);
       expect(find.text('Value range'), findsWidgets);
       // The range follows the display currency too; the Currency row above
       // is what discloses that the provider priced this in USD.

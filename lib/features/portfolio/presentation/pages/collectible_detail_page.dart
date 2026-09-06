@@ -3386,7 +3386,6 @@ List<_DetailInfoRowData> _detailMarketRows(
               )
             : 'Value unavailable',
       ),
-      _DetailInfoRowData('Value saved in', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
         _DetailInfoRowData(
           'Last refreshed',
@@ -3439,16 +3438,14 @@ List<_DetailInfoRowData> _pricingTrustRows(
   final rows = <_DetailInfoRowData>[
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
     _DetailInfoRowData('Provider', _pricingProviderLabel(item)),
-    // "Currency" read as though it labelled the figures beside it, which now
-    // follow the display currency -- so an item saved in AUD and read in USD
-    // showed USD amounts under a row saying AUD.
-    //
-    // Not the provider's own currency either: PriceCharting quotes in USD,
-    // and the backend converts to the display currency in force at scan time
-    // (reprice_service.py -> convert_pricing_result) before saving. So this
-    // is the currency the stored figure was written in, nothing more.
-    if (pricing?.currency.trim().isNotEmpty == true)
-      _DetailInfoRowData('Value saved in', pricing!.currency.toUpperCase()),
+    // There is deliberately no row for pricing.currency here. It names the
+    // currency the stored figure happens to be written in -- the backend
+    // converts to whatever display currency was in force at scan time
+    // (reprice_service.py -> convert_pricing_result) before saving -- which
+    // is neither the provider's currency (PriceCharting quotes in USD) nor
+    // the one the amounts beside it are shown in. It read as a
+    // contradiction: USD figures under a row saying AUD. The provider's own
+    // price is disclosed by the "Source currency value" row instead.
     _DetailInfoRowData(
       'Pricing confidence',
       _pricingConfidenceLabel(status: status, confidence: confidence),
