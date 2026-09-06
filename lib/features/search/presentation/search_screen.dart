@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
@@ -1661,15 +1663,20 @@ String _catalogFacetKey(String value) {
   return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 }
 
-class _CatalogResultCard extends StatelessWidget {
+class _CatalogResultCard extends ConsumerWidget {
   const _CatalogResultCard({required this.result, required this.onTap});
 
   final CatalogSearchResult result;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final value = _formatCatalogValue(result);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = _formatCatalogValue(
+      result,
+      displayCurrency: ref.watch(displayCurrencyProvider),
+      currentRates:
+          ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {},
+    );
     final hasValue = _hasCatalogValue(result);
     final subtitle = _joinCatalogFacets([
       result.category,
@@ -4754,11 +4761,29 @@ Future<void> _launchExternalLink(BuildContext context, String url) async {
   return null;
 }
 
-String _formatCatalogValue(CatalogSearchResult result) {
-  final value = result.marketValue;
-  if (value == null || value <= 0) {
+/// Formats a catalog price in the collector's display currency.
+///
+/// Catalog rows are the provider's own USD. Discover used to render them in
+/// whatever currency the backend returned, so picking AUD converted every
+/// portfolio value but left Discover in USD. Converts here, at display time,
+/// against the live dated rates -- and leaves the amount in its own currency
+/// when no rate is available rather than relabelling it.
+String _formatCatalogValue(
+  CatalogSearchResult result, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
+  final rawValue = result.marketValue;
+  if (rawValue == null || rawValue <= 0) {
     return 'Price unavailable';
   }
+  final converted = convertCurrentForDisplay(
+    rawValue,
+    from: result.currency,
+    to: displayCurrency ?? result.currency,
+    currentRates: currentRates,
+  );
+  final value = converted.value;
   final amount = _formatCatalogAmount(value);
   final withCommas = amount.replaceFirstMapped(
     RegExp(r'^\d+'),
@@ -4766,7 +4791,7 @@ String _formatCatalogValue(CatalogSearchResult result) {
         .group(0)!
         .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
   );
-  final currency = result.currency.trim().toUpperCase();
+  final currency = converted.currency;
   if (currency == 'AUD' || currency.isEmpty) {
     return '\$$withCommas AUD';
   }
