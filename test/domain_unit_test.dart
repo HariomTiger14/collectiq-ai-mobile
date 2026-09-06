@@ -2573,9 +2573,16 @@ void main() {
     test('validates supported image extensions case-insensitively', () async {
       final service = GalleryService();
 
+      // Every name here must exist in test/fixtures. 'image.Png' used to be
+      // in this list and passed only on macOS, whose filesystem is
+      // case-insensitive and resolved it to image.PNG; on Linux CI it does
+      // not exist and validateImage throws "could not be found" before it
+      // ever reaches the extension check. The remaining three still cover
+      // upper, lower and mixed-case extensions -- and a fourth fixture
+      // differing only in case cannot be committed from a macOS checkout
+      // anyway.
       for (final name in [
         'test/fixtures/image.PNG',
-        'test/fixtures/image.Png',
         'test/fixtures/image.jpg',
         'test/fixtures/image.JPEG',
       ]) {
