@@ -22,6 +22,14 @@ class FxRate {
     }
     return FxRate(date: date, currency: currency.toUpperCase(), usdRate: usdRate);
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date.toIso8601String(),
+      'currency': currency,
+      'usdRate': usdRate,
+    };
+  }
 }
 
 /// Everything fetched from `GET /api/pricing/fx-rates` in one call: each
@@ -61,5 +69,14 @@ class FxRateSnapshot {
     }
     history.sort((a, b) => a.date.compareTo(b.date));
     return FxRateSnapshot(currentRates: current, history: history);
+  }
+
+  /// The same wire shape [fromJson] reads, so a cached snapshot round-trips
+  /// through exactly the parser the network response uses.
+  Map<String, dynamic> toJson() {
+    return {
+      'current': currentRates,
+      'rates': [for (final rate in history) rate.toJson()],
+    };
   }
 }
