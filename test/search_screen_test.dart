@@ -508,6 +508,21 @@ void main() {
       expect(find.text('USD \$100.00'), findsNothing);
     });
 
+    testWidgets('evidence names the provider currency, not the display one', (
+      tester,
+    ) async {
+      await openDetail(tester, fxRates: const {'USD': 1.0, 'AUD': 2.0});
+
+      // Every price on the screen is the collector's AUD, so a row reading
+      // "Currency: USD" looked like the app had failed to switch. The row is
+      // evidence about the provider, and now says so.
+      expect(find.text('Source currency'), findsWidgets);
+      expect(find.text('Currency'), findsNothing);
+      expect(find.text('USD'), findsWidgets);
+      // ...while the headline stays in the collector's currency.
+      expect(find.text('AUD \$200.00'), findsWidgets);
+    });
+
     testWidgets('the detail range converts too', (tester) async {
       await openDetail(tester, fxRates: const {'USD': 1.0, 'AUD': 2.0});
 
@@ -739,7 +754,7 @@ void main() {
     expect(find.text('Loose / Graded'), findsOneWidget);
     expect(find.text('Pricing evidence'), findsOneWidget);
     expect(find.text('Trusted provider value'), findsOneWidget);
-    expect(find.text('Currency'), findsWidgets);
+    expect(find.text('Source currency'), findsWidgets);
     expect(find.text('High (87%)'), findsOneWidget);
     expect(find.text('Matched by title, set/product family'), findsOneWidget);
     expect(find.text('USD \$70.00 - USD \$96.00'), findsOneWidget);

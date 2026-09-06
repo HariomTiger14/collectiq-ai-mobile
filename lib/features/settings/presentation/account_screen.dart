@@ -177,7 +177,12 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                               value: subscription.entitlements.plan.displayName,
                             ),
                             _AccountDetailRow(
-                              label: 'Currency',
+                              // "Display currency": this one IS the
+                              // collector's choice, unlike the source-currency
+                              // rows on the catalog and item detail screens.
+                              // Naming both "Currency" left the reader to
+                              // work out which was which.
+                              label: 'Display currency',
                               value:
                                   profile?.preferredCurrency ??
                                   CollectorProfile.defaultPreferredCurrency,

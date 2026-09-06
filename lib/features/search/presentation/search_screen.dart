@@ -1999,7 +1999,11 @@ class _CatalogResultDetailPageState
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),
       _CatalogDetailRowData('Source', result.source),
-      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
+      // "Source currency", not "Currency": every price on this screen is in
+      // the collector's own currency, so a bare "Currency: USD" read as the
+      // app having failed to switch. This row is evidence about what the
+      // provider supplied, not a statement about the display.
+      _CatalogDetailRowData('Source currency', result.currency.toUpperCase()),
       _CatalogDetailRowData('Confidence', confidence),
       if (result.lastUpdated != null)
         _CatalogDetailRowData('Updated', _formatShortDate(result.lastUpdated!)),
@@ -2516,7 +2520,9 @@ class _CatalogTrustPanel extends StatelessWidget {
         hasValue ? 'Trusted provider value' : unavailableCopy.title,
       ),
       _CatalogDetailRowData('Source', result.source),
-      _CatalogDetailRowData('Currency', result.currency.toUpperCase()),
+      // See the identity panel: this names the provider's currency, and the
+      // prices above it are the collector's.
+      _CatalogDetailRowData('Source currency', result.currency.toUpperCase()),
       if (confidence != null)
         _CatalogDetailRowData(
           'Confidence',
