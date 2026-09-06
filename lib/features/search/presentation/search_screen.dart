@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/network/network_exceptions.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
@@ -4783,22 +4784,12 @@ String _formatCatalogValue(
     to: displayCurrency ?? result.currency,
     currentRates: currentRates,
   );
-  final value = converted.value;
-  final amount = _formatCatalogAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
+  // The app-wide format (USD $30.65). Discover used to print "$200 AUD"
+  // while the detail page printed "USD $200" for the same kind of value.
+  return formatCollectionValue(
+    converted.value,
+    currencyCode: converted.currency,
   );
-  final currency = converted.currency;
-  if (currency == 'AUD' || currency.isEmpty) {
-    return '\$$withCommas AUD';
-  }
-  if (currency == 'USD') {
-    return 'USD \$$withCommas';
-  }
-  return '$currency $withCommas';
 }
 
 bool _hasCatalogValue(CatalogSearchResult result) {
@@ -4845,10 +4836,6 @@ String _formatOptionalCatalogValue(double? value, String currency) {
   );
 }
 
-String _formatCatalogAmount(double value) {
-  final fixed = value.toStringAsFixed(2);
-  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
-}
 
 String _formatShortDate(DateTime value) {
   const months = [

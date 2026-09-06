@@ -30,28 +30,47 @@ void main() {
   }
 
   group('formatCollectionValue', () {
-    test('AUD renders as a bare \$ with thousands separators', () {
-      expect(formatCollectionValue(2275, currencyCode: 'AUD'), '\$2,275.00');
-      expect(formatCollectionValue(0), '\$0.00');
-      expect(formatCollectionValue(196538), '\$196,538.00');
+    test('every currency carries its ISO code', () {
+      // One shape everywhere. The app used to render US$30.65, C$30.65, a
+      // bare $30.65 for AUD, "$200 AUD" on Discover and "USD $200" on the
+      // detail page -- five formats for one kind of value. Worse, "$" and
+      // "US$" differ by two characters for currencies that differ by ~40%.
+      expect(formatCollectionValue(30.65, currencyCode: 'USD'), 'USD \$30.65');
+      expect(formatCollectionValue(30.65, currencyCode: 'AUD'), 'AUD \$30.65');
+      expect(formatCollectionValue(30.65, currencyCode: 'CAD'), 'CAD \$30.65');
+      expect(formatCollectionValue(30.65, currencyCode: 'GBP'), 'GBP £30.65');
     });
 
-    test('empty currency defaults to bare \$ (AUD)', () {
+    test('thousands separators and zero', () {
+      expect(
+        formatCollectionValue(2275, currencyCode: 'AUD'),
+        'AUD \$2,275.00',
+      );
+      expect(formatCollectionValue(0), 'AUD \$0.00');
+      expect(
+        formatCollectionValue(196538),
+        'AUD \$196,538.00',
+      );
+    });
+
+    test('empty currency renders a bare \$ rather than inventing a code', () {
+      // Nothing said what this amount is in, so nothing here claims to know.
       expect(formatCollectionValue(350, currencyCode: ''), '\$350.00');
     });
 
-    test('non-AUD currencies get a disambiguating prefix', () {
-      expect(formatCollectionValue(2275, currencyCode: 'USD'), 'US\$2,275.00');
-      expect(formatCollectionValue(2275, currencyCode: 'CAD'), 'C\$2,275.00');
-      expect(formatCollectionValue(2275, currencyCode: 'GBP'), '£2,275.00');
-      expect(formatCollectionValue(2275, currencyCode: 'EUR'), '€2,275.00');
-      expect(formatCollectionValue(1000, currencyCode: 'CHF'), 'CHF 1,000.00');
+    test('a currency with no symbol of its own still gets its code', () {
+      expect(
+        formatCollectionValue(1000, currencyCode: 'CHF'),
+        'CHF \$1,000.00',
+      );
+      expect(formatCollectionValue(2275, currencyCode: 'EUR'), 'EUR €2,275.00');
+      expect(formatCollectionValue(2275, currencyCode: 'JPY'), 'JPY ¥2,275.00');
     });
 
     test('never fabricates conversion — amount is passed through verbatim', () {
       // Same numeric amount, only the label changes with the currency.
-      expect(formatCollectionValue(500, currencyCode: 'USD'), 'US\$500.00');
-      expect(formatCollectionValue(500, currencyCode: 'AUD'), '\$500.00');
+      expect(formatCollectionValue(500, currencyCode: 'USD'), 'USD \$500.00');
+      expect(formatCollectionValue(500, currencyCode: 'AUD'), 'AUD \$500.00');
     });
 
     test('decimals show exact cents, not rounded to whole dollars', () {
@@ -61,22 +80,22 @@ void main() {
       // should sum to $42 even though the real total is $41.20).
       expect(
         formatCollectionValue(1234.5, currencyCode: 'AUD'),
-        '\$1,234.50',
+        'AUD \$1,234.50',
       );
       expect(
         formatCollectionValue(1.6, currencyCode: 'AUD'),
-        '\$1.60',
+        'AUD \$1.60',
       );
       expect(
         formatCollectionValue(39.6, currencyCode: 'AUD'),
-        '\$39.60',
+        'AUD \$39.60',
       );
     });
 
     test('showDecimals: false still rounds to whole dollars when requested', () {
       expect(
         formatCollectionValue(1234.5, currencyCode: 'AUD', showDecimals: false),
-        '\$1,235',
+        'AUD \$1,235',
       );
     });
   });

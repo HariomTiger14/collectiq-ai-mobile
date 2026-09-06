@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
@@ -2126,19 +2127,10 @@ String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
-  );
-  final normalized = currency.trim().toUpperCase();
-  if (normalized == 'AUD') {
-    return '\$$withCommas';
-  }
   // Empty means "not stated", and backend pricing is the provider's USD --
   // labelling it AUD is how a USD figure got read as AUD before.
-  return '${normalized.isEmpty ? 'USD' : normalized} $withCommas';
+  final code = currency.trim().isEmpty ? 'USD' : currency;
+  return formatCollectionValue(value, currencyCode: code, showDecimals: false);
 }
 
 String _formatPricingDate(DateTime? date) {

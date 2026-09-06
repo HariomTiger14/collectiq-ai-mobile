@@ -117,6 +117,28 @@ class ProfileController extends AsyncNotifier<CollectorProfile> {
     unawaited(_pushProfile(saved, uploadAvatar: true));
   }
 
+  /// Sets the currency the collector reads prices in, without touching their
+  /// country.
+  ///
+  /// Settings' "Country & Currency" picker sets both together, which is right
+  /// for that screen. The Home selector is only about how prices are read --
+  /// living in Australia and reading in USD is a legitimate combination, and
+  /// silently relocating someone because they glanced at USD is not.
+  Future<void> updatePreferredCurrency(String currencyCode) async {
+    final current = state.hasValue
+        ? state.requireValue
+        : await _repository.loadProfile();
+    final normalized = CollectorProfile.normalizeCurrency(currencyCode);
+    if (normalized == current.preferredCurrency) {
+      return;
+    }
+    final saved = await _repository.saveProfile(
+      current.copyWith(preferredCurrency: normalized),
+    );
+    state = AsyncValue.data(saved);
+    unawaited(_pushProfile(saved));
+  }
+
   Future<void> updateCountry(String countryCode) async {
     final current = state.hasValue
         ? state.requireValue

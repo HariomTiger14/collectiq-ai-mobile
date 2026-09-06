@@ -9,6 +9,9 @@ import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/home_dashboard_providers.dart';
 import 'package:collectiq_ai/features/home/domain/entities/portfolio_snapshot.dart';
 import 'package:collectiq_ai/features/home/presentation/controllers/portfolio_history_controller.dart';
+import 'package:collectiq_ai/features/profile/domain/entities/collector_profile.dart';
+import 'package:collectiq_ai/features/profile/domain/repositories/profile_repository.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:collectiq_ai/features/home/presentation/pages/home_page.dart';
 import 'package:collectiq_ai/features/portfolio/domain/repositories/portfolio_repository.dart';
 import 'package:collectiq_ai/features/portfolio/presentation/controllers/portfolio_controller.dart';
@@ -78,9 +81,9 @@ void main() {
 
       // Shows up twice: the portfolio value hero and the recent-item card's
       // own value label -- both correctly converted, not just the hero.
-      expect(find.text('\$225.00'), findsNWidgets(2));
+      expect(find.text('AUD \$225.00'), findsNWidgets(2));
       expect(find.text('\$150'), findsNothing);
-      expect(find.text('US\$150'), findsNothing);
+      expect(find.text('USD \$150.00'), findsNothing);
     },
   );
 
@@ -405,6 +408,64 @@ void main() {
     );
   });
 
+  testWidgets('the currency selector shows the current display currency', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeApp());
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final label = tester.widget<Text>(
+      find.byKey(const ValueKey('home-currency-selector-label')),
+    );
+    expect(label.data, 'USD');
+  });
+
+  testWidgets('picking a currency on Home updates the shared profile', (
+    tester,
+  ) async {
+    // Deliberately the same profile field Settings writes: a Home-only
+    // currency would let the hero and the Settings screen disagree.
+    final profileRepository = _RecordingProfileRepository();
+    await tester.pumpWidget(_homeApp(profileRepository: profileRepository));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    await tester.tap(find.byKey(const ValueKey('home-currency-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home-currency-option-AUD')));
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.saved.last.preferredCurrency, 'AUD');
+    final label = tester.widget<Text>(
+      find.byKey(const ValueKey('home-currency-selector-label')),
+    );
+    expect(label.data, 'AUD');
+  });
+
+  testWidgets('changing currency on Home re-renders the value in it', (
+    tester,
+  ) async {
+    // 1 USD = 1.5 AUD, and the seeded item is priced in USD, so switching
+    // must move the hero total, not just the selector's own label.
+    final profileRepository = _RecordingProfileRepository();
+    await tester.pumpWidget(
+      _homeApp(
+        profileRepository: profileRepository,
+        fxRates: const {'USD': 1.0, 'AUD': 1.5},
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.textContaining('USD \$'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('home-currency-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('home-currency-option-AUD')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('AUD \$'), findsWidgets);
+    expect(find.textContaining('USD \$'), findsNothing);
+  });
+
   testWidgets('default state follows frozen v0.3 with real portfolio data', (
     tester,
   ) async {
@@ -426,7 +487,7 @@ void main() {
     expect(find.text('Portfolio value'), findsOneWidget);
     // US$ because the display currency defaults to USD now; the fake rates
     // are at parity, so only the label moved.
-    expect(find.text('US\$2,275.00'), findsOneWidget);
+    expect(find.text('USD \$2,275.00'), findsOneWidget);
     expect(find.text('3 of 5 items trusted'), findsOneWidget);
     // The "needs value" count is no longer duplicated as a chip in the card;
     // the attention strip below is the single actionable surface for it.
@@ -890,9 +951,13 @@ Widget _homeApp({
   VoidCallback? onPortfolioPressed,
   PortfolioRepository? repository,
   Future<PortfolioPerformance>? performance,
+  ProfileRepository? profileRepository,
+  Map<String, double>? fxRates,
 }) {
   return ProviderScope(
     overrides: [
+      if (profileRepository != null)
+        profileRepositoryProvider.overrideWithValue(profileRepository),
       if (performance != null)
         portfolioPerformanceProvider.overrideWith((ref, items) => performance),
       if (repository != null)
@@ -903,7 +968,11 @@ Widget _homeApp({
       // Keeps FX-rate fetching out of these tests entirely (no real network
       // call, no pending Dio timer left behind when the widget tree is torn
       // down).
-      fxRatesRepositoryProvider.overrideWithValue(const _FakeFxRatesRepository()),
+      fxRatesRepositoryProvider.overrideWithValue(
+        fxRates == null
+            ? const _FakeFxRatesRepository()
+            : _FixedRateFxRatesRepository(fxRates),
+      ),
     ],
     child: MaterialApp(
       theme: AppTheme.light,
@@ -1162,4 +1231,30 @@ class _FailingThenSuccessfulPortfolioRepository implements PortfolioRepository {
 
   @override
   Future<void> upsertSyncedItem(CollectibleItem item) async {}
+}
+
+
+/// Records what was saved so a test can assert the shared profile changed,
+/// not just the label on screen.
+class _RecordingProfileRepository implements ProfileRepository {
+  final List<CollectorProfile> saved = [];
+  CollectorProfile profile = const CollectorProfile(
+    displayName: CollectorProfile.defaultDisplayName,
+  );
+
+  @override
+  Future<CollectorProfile> loadProfile() async => profile;
+
+  @override
+  Future<CollectorProfile> saveProfile(CollectorProfile next) async {
+    profile = next;
+    saved.add(next);
+    return next;
+  }
+
+  @override
+  Future<CollectorProfile> saveAvatarFromPath(String sourcePath) async {
+    profile = profile.copyWith(avatarPath: sourcePath);
+    return profile;
+  }
 }

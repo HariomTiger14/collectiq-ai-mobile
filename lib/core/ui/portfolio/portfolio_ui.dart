@@ -2,6 +2,7 @@ import 'package:collectiq_ai/core/currency/currency_conversion.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/theme/packlox_motion_theme.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/motion/motion_widgets.dart';
 import 'package:collectiq_ai/core/ui/portfolio/resilient_collectible_image.dart';
 import 'package:collectiq_ai/core/widgets/gradient_header.dart';
@@ -630,7 +631,8 @@ class _PortfolioItemDetails extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final displayCurrency = ref.watch(displayCurrencyProvider);
     final currentRates =
-        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+        ref.watch(fxRatesProvider).asData?.value.currentRates ??
+        const {'USD': 1.0};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,30 +848,8 @@ String? _sourceMarketValueLabel(PricingInfo? pricing) {
 }
 
 String _formatMoney(double value, String currency) {
-  final amount = _formatMoneyAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-  final normalizedCurrency = currency.trim().toUpperCase();
-  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
-    return '\$$withCommas AUD';
-  }
-  if (normalizedCurrency == 'USD') {
-    return 'USD \$$withCommas';
-  }
-  if (normalizedCurrency == 'GBP') {
-    return '£$withCommas';
-  }
-  if (normalizedCurrency == 'CAD') {
-    return 'CAD \$$withCommas';
-  }
-  return '$normalizedCurrency $withCommas';
-}
-
-String _formatMoneyAmount(double value) {
-  final fixed = value.toStringAsFixed(2);
-  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
+  // Delegates to the app-wide format (USD $30.65) rather than carrying its
+  // own. This used to print AUD as "$30.65 AUD" and USD as "USD $30.65" --
+  // two shapes for the same kind of value on adjacent screens.
+  return formatCollectionValue(value, currencyCode: currency);
 }

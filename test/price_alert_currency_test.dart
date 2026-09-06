@@ -114,7 +114,7 @@ void main() {
     expect(alert.rule.normalizedAmountUsd, closeTo(110, 0.001));
     expect(
       formatCollectionValue(alert.rule.amount!, currencyCode: 'USD'),
-      'US\$110.00',
+      'USD \$110.00',
     );
   });
 }

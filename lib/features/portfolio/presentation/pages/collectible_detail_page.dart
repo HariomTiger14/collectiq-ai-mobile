@@ -5,6 +5,7 @@ import 'package:collectiq_ai/core/assets/packlox_assets.dart';
 import 'package:collectiq_ai/core/cloud/cloud_service_registry.dart';
 import 'package:collectiq_ai/core/cloud/services/cloud_portfolio_sync_service.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:collectiq_ai/core/design_system/design_system.dart';
@@ -4017,20 +4018,7 @@ String _detailValueLabel(
 }
 
 String _formatZeroMoney(String currency) {
-  final normalizedCurrency = currency.trim().toUpperCase();
-  if (normalizedCurrency == 'USD') {
-    return 'USD \$0';
-  }
-  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
-    return '\$0 AUD';
-  }
-  if (normalizedCurrency == 'GBP') {
-    return '£0';
-  }
-  if (normalizedCurrency == 'CAD') {
-    return 'CAD \$0';
-  }
-  return '$normalizedCurrency 0';
+  return formatCollectionValue(0, currencyCode: currency, showDecimals: false);
 }
 
 String _detailValueStatusLabel(CollectibleItem item) {
@@ -6980,83 +6968,29 @@ String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final amount = _formatMoneyAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-  final normalizedCurrency = currency.trim().toUpperCase();
-  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
-    return '\$$withCommas AUD';
-  }
-  if (normalizedCurrency == 'USD') {
-    return 'USD \$$withCommas';
-  }
-  if (normalizedCurrency == 'GBP') {
-    return '£$withCommas';
-  }
-  if (normalizedCurrency == 'CAD') {
-    return 'CAD \$$withCommas';
-  }
-  return '$normalizedCurrency $withCommas';
+  // The app-wide format (USD $30.65). This page used to print AUD as
+  // "$30.65 AUD" and USD as "USD $30.65" -- two shapes on one screen.
+  return formatCollectionValue(value, currencyCode: currency);
 }
 
 String _formatMoneyRange(double low, double high, String currency) {
   if (low <= 0 && high <= 0) {
     return 'Value unavailable';
   }
-  final normalizedCurrency = currency.trim().toUpperCase();
-  final start = low > 0 ? _formatMoneyAmountWithCommas(low) : null;
-  final end = high > 0 ? _formatMoneyAmountWithCommas(high) : null;
-  if (start == null && end == null) {
-    return 'Value unavailable';
+  // Both ends carry the code: "AUD $220.00 - AUD $270.00". Putting it on
+  // only one end reads as though the range spans two currencies, and this
+  // page can genuinely show a converted range beside an unconverted one.
+  final start = low > 0
+      ? formatCollectionValue(low, currencyCode: currency)
+      : null;
+  final end = high > 0
+      ? formatCollectionValue(high, currencyCode: currency)
+      : null;
+  // The guard above means at least one end exists.
+  if (start != null && end != null) {
+    return '$start - $end';
   }
-  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
-    return '${_joinCurrencyRange(start, end, r'$')} AUD';
-  }
-  if (normalizedCurrency == 'USD') {
-    return 'USD ${_joinCurrencyRange(start, end, r'$')}';
-  }
-  if (normalizedCurrency == 'GBP') {
-    return _joinCurrencyRange(start, end, '£');
-  }
-  if (normalizedCurrency == 'CAD') {
-    return 'CAD ${_joinCurrencyRange(start, end, r'$')}';
-  }
-  final range = switch ((start, end)) {
-    (final String startValue, final String endValue) =>
-      '$startValue - $endValue',
-    (final String startValue, null) => startValue,
-    (null, final String endValue) => endValue,
-    _ => '',
-  };
-  return '$normalizedCurrency $range';
-}
-
-String _joinCurrencyRange(String? start, String? end, String symbol) {
-  return switch ((start, end)) {
-    (final String startValue, final String endValue) =>
-      '$symbol$startValue - $symbol$endValue',
-    (final String startValue, null) => '$symbol$startValue',
-    (null, final String endValue) => '$symbol$endValue',
-    _ => 'Value unavailable',
-  };
-}
-
-String _formatMoneyAmountWithCommas(double value) {
-  return _formatMoneyAmount(value).replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-}
-
-String _formatMoneyAmount(double value) {
-  final fixed = value.toStringAsFixed(2);
-  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
+  return start ?? end ?? 'Value unavailable';
 }
 
 String _formatPricingDate(DateTime? date) {

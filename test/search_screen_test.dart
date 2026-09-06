@@ -462,8 +462,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
-    expect(find.text('\$200 AUD'), findsOneWidget);
-    expect(find.text('USD \$100'), findsNothing);
+    expect(find.text('AUD \$200.00'), findsOneWidget);
+    expect(find.text('USD \$100.00'), findsNothing);
   });
 
   testWidgets('catalog result subtitle shows a repeated facet only once', (
@@ -540,7 +540,7 @@ void main() {
 
     expect(catalogRepository.queries, ['charizard']);
     expect(find.text('Charizard #4 Base Set'), findsOneWidget);
-    expect(find.text('USD \$161'), findsOneWidget);
+    expect(find.text('USD \$161.00'), findsOneWidget);
     expect(find.text('91% match'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('discover-catalog-placeholder-pc-charizard')),
@@ -638,14 +638,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current value'), findsOneWidget);
-    expect(find.text('USD \$82'), findsOneWidget);
+    expect(find.text('USD \$82.00'), findsOneWidget);
     expect(find.text('Loose / Graded'), findsOneWidget);
     expect(find.text('Pricing evidence'), findsOneWidget);
     expect(find.text('Trusted provider value'), findsOneWidget);
     expect(find.text('Currency'), findsWidgets);
     expect(find.text('High (87%)'), findsOneWidget);
     expect(find.text('Matched by title, set/product family'), findsOneWidget);
-    expect(find.text('USD \$70 - USD \$96'), findsOneWidget);
+    expect(find.text('USD \$70.00 - USD \$96.00'), findsOneWidget);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('catalog-detail-add-to-portfolio')),
@@ -723,7 +723,7 @@ void main() {
     expect(find.text('Price history'), findsOneWidget);
     expect(find.text('Current from 26 Jul 2026'), findsOneWidget);
     expect(find.text('25 Jul 2026 - 26 Jul 2026'), findsOneWidget);
-    expect(find.text('USD \$161'), findsWidgets);
+    expect(find.text('USD \$161.00'), findsWidgets);
     expect(find.text('pokemon'), findsWidgets);
   });
 
@@ -1143,7 +1143,7 @@ void main() {
     expect(find.text('Where to buy'), findsOneWidget);
     expect(find.text('God of War PS4 Brand New'), findsOneWidget);
     expect(find.text('New'), findsOneWidget);
-    expect(find.text('\$21.49 AUD'), findsOneWidget);
+    expect(find.text('AUD \$21.49'), findsOneWidget);
   });
 
   testWidgets(
@@ -1284,7 +1284,7 @@ void main() {
       expect(find.text('Size US M 10.5'), findsOneWidget);
       expect(find.text('1 ask'), findsOneWidget);
       expect(find.text('New'), findsNothing);
-      expect(find.text('USD \$115'), findsOneWidget);
+      expect(find.text('USD \$115.00'), findsOneWidget);
     },
   );
 

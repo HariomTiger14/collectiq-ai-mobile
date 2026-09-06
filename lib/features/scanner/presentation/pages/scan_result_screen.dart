@@ -9,6 +9,7 @@ import 'package:collectiq_ai/features/subscription/presentation/widgets/free_col
 import 'package:collectiq_ai/shared/domain/entities/pricing_info.dart';
 import 'package:collectiq_ai/shared/domain/pricing_unavailable_reason.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1652,33 +1653,10 @@ String _formatMoney(double value, String currency) {
   if (value <= 0) {
     return 'Value unavailable';
   }
-  final amount = _formatMoneyAmount(value);
-  final withCommas = amount.replaceFirstMapped(
-    RegExp(r'^\d+'),
-    (match) => match
-        .group(0)!
-        .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','),
-  );
-  final normalizedCurrency = currency.trim().toUpperCase();
-  if (normalizedCurrency == 'AUD' || normalizedCurrency.isEmpty) {
-    return '\$$withCommas AUD';
-  }
-  if (normalizedCurrency == 'USD') {
-    return 'USD \$$withCommas';
-  }
-  if (normalizedCurrency == 'GBP') {
-    return '£$withCommas';
-  }
-  if (normalizedCurrency == 'CAD') {
-    return 'CAD \$$withCommas';
-  }
-  return '$normalizedCurrency $withCommas';
+  // The app-wide format (USD $30.65) rather than this screen's own.
+  return formatCollectionValue(value, currencyCode: currency);
 }
 
-String _formatMoneyAmount(double value) {
-  final fixed = value.toStringAsFixed(2);
-  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
-}
 
 String _valuationStatusMessage(ValuationStatus status) {
   return pricingUnavailableCopy(status: status).title;

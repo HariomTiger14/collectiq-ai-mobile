@@ -63,9 +63,9 @@ void main() {
       fxRates: const {'USD': 1.0, 'AUD': 2.0},
     );
 
-    expect(find.text('\$240 AUD'), findsWidgets);
-    expect(find.text('USD \$120'), findsNothing);
-    expect(find.text('\$200 AUD - \$280 AUD'), findsWidgets);
+    expect(find.text('AUD \$240.00'), findsWidgets);
+    expect(find.text('USD \$120.00'), findsNothing);
+    expect(find.text('AUD \$200.00 - AUD \$280.00'), findsWidgets);
   });
 
   testWidgets('a scan value with no rate keeps the provider currency', (
@@ -78,7 +78,7 @@ void main() {
       fxRates: const {'USD': 1.0},
     );
 
-    expect(find.text('USD \$120'), findsWidgets);
+    expect(find.text('USD \$120.00'), findsWidgets);
     expect(find.textContaining('AUD'), findsNothing);
   });
 

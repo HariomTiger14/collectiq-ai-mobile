@@ -108,7 +108,7 @@ void main() {
     await _revealText(tester, 'Market & Value');
 
     // 245 USD at 2 AUD per USD.
-    expect(find.text('\$490 AUD'), findsWidgets);
+    expect(find.text('AUD \$490.00'), findsWidgets);
     // 220-270 USD becomes 440-540 AUD.
     expect(find.textContaining('440'), findsWidgets);
     // Nothing left on the screen still labelled in the provider's currency.
@@ -134,7 +134,7 @@ void main() {
         )
         .data!;
 
-    expect(value, 'USD \$245');
+    expect(value, 'USD \$245.00');
     expect(value, isNot(contains('AUD')));
   });
 
@@ -193,14 +193,14 @@ void main() {
       // The display currency defaults to USD now, and this item is priced
       // in USD, so no conversion applies at all -- the figures are the
       // provider's own.
-      expect(find.text('USD \$200'), findsWidgets);
-      expect(find.text('USD \$245'), findsWidgets);
-      expect(find.text('\$245 AUD'), findsNothing);
+      expect(find.text('USD \$200.00'), findsWidgets);
+      expect(find.text('USD \$245.00'), findsWidgets);
+      expect(find.text('AUD \$245.00'), findsNothing);
       // The movement follows the display currency like every other figure.
       // With the default now USD and this item priced in USD, that means no
       // conversion at all -- the guarantee is that the label tracks the
       // display currency, which the AUD case below pins.
-      expect(find.text('+USD \$45'), findsOneWidget);
+      expect(find.text('+USD \$45.00'), findsOneWidget);
       expect(find.text('+22.5%'), findsOneWidget);
       await _revealText(tester, 'Pricing evidence');
       expect(find.text('Pricing evidence'), findsOneWidget);
@@ -217,7 +217,9 @@ void main() {
       expect(find.text('Value range'), findsWidgets);
       // The range follows the display currency too -- USD by default, and
       // this item is priced in USD, so it is shown untouched.
-      expect(find.text('USD \$220 - \$270'), findsWidgets);
+      // Both ends carry the code: a range reading "USD $220.00 - $270.00"
+      // leaves the second figure's currency implied.
+      expect(find.text('USD \$220.00 - USD \$270.00'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },
@@ -589,7 +591,7 @@ void main() {
           lastUpdated: DateTime.utc(2026, 8, 24, 16),
           valuationStatus: ValuationStatus.marketEstimated,
           valuationSource: 'PriceCharting',
-          displayString: '\$62.00 AUD',
+          displayString: 'AUD \$62.00',
           originalPrice: 41.0,
           originalCurrency: 'USD',
           exchangeRateUsed: 1.52,
@@ -857,7 +859,7 @@ void main() {
     // The saved snapshot is a value like any other: shown in the currency the
     // collector reads in, with the provider's own currency still disclosed by
     // the Currency row in the pricing evidence panel.
-    expect(find.text('USD \$161'), findsWidgets);
+    expect(find.text('USD \$161.00'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
     expect(
       find.text('Refresh value to save the first trusted history point.'),
@@ -1789,7 +1791,7 @@ CollectibleItem _catalogSnapshotItem() {
       valuationStrategy: 'catalog_lookup',
       attributionText: 'Pricing data by PriceCharting',
       attributionUrl: 'https://www.pricecharting.com/offers?product=3666974',
-      displayString: 'USD \$161',
+      displayString: 'USD \$161.00',
     ),
     valueAtScan: 161,
     lastValueRefreshedAt: null,

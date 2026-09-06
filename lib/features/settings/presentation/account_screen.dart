@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:collectiq_ai/core/currency/currency_conversion.dart';
+import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/theme/design_system.dart';
 import 'package:collectiq_ai/core/ui/hero/gradient_hero_header.dart';
@@ -53,9 +56,27 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final email = user?.email;
 
     final valuedItems = portfolio.items.where((i) => i.hasTrustedValuation);
+    // Converted per item before summing, like every other total in the app.
+    // This used to add mixed currencies together and print the result with a
+    // bare "$", so a USD item and an AUD item were treated as the same unit.
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {};
+    final canStateTotal = canTotalIn(
+      valuedItems.map(currencyForItem),
+      displayCurrency,
+      currentRates,
+    );
     final trackedValue = valuedItems.fold<double>(
       0,
-      (sum, item) => sum + item.estimatedValue,
+      (sum, item) =>
+          sum +
+          convertCurrent(
+            item.estimatedValue,
+            from: currencyForItem(item),
+            to: displayCurrency,
+            currentRates: currentRates,
+          ),
     );
     final collectingSince = _collectingSince(portfolio.items);
 
@@ -125,8 +146,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                   width: tileWidth,
                                   child: HomeMetricTile(
                                     label: 'Value tracked',
-                                    value: _formatMoney(trackedValue),
-                                    supportingText: 'Estimated',
+                                    value: canStateTotal
+                                        ? _formatMoney(
+                                            trackedValue,
+                                            displayCurrency,
+                                          )
+                                        : '--',
+                                    supportingText: canStateTotal
+                                        ? 'Estimated'
+                                        : 'Updating rates',
                                   ),
                                 ),
                               ],
@@ -192,13 +220,14 @@ String? _collectingSince(List<CollectibleItem> items) {
   return '${months[earliest.month - 1]} ${earliest.year}';
 }
 
-String _formatMoney(double value) {
-  final whole = value.toStringAsFixed(0);
-  final withCommas = whole.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (match) => ',',
+String _formatMoney(double value, String currency) {
+  // Was a bare "$1,234" with no currency at all, which disagreed with the
+  // Portfolio tile as soon as the collector read in anything but AUD.
+  return formatCollectionValue(
+    value,
+    currencyCode: currency,
+    showDecimals: false,
   );
-  return '\$$withCommas';
 }
 
 class _AccountIdentityHeader extends StatelessWidget {

@@ -9,40 +9,50 @@ import 'package:collectiq_ai/shared/domain/entities/collectible_item.dart';
 /// what counts as "no real change".
 const meaningfulValueChangeThreshold = 0.005;
 
-/// Compact collection-value formatting shared by the Home and Portfolio value
-/// surfaces (hero total, metric tiles, per-item value labels).
+/// The canonical money format for every collectible, portfolio, scan, alert
+/// and catalog value in the app: `USD $30.65`, `AUD $30.65`, `CAD $30.65`,
+/// `GBP £30.65`.
 ///
-/// Honesty first: this formats an amount in the currency the value is *already*
-/// in — it never converts between currencies (no fabricated FX). Values arrive
-/// pre-converted from the pricing backend when a display currency was requested
-/// (see `ScanPricingQuoteService`), so the currency carried on each item is the
-/// truth. `AUD` renders as a bare `$` to preserve the app's established compact
-/// style; every other currency gets a disambiguating prefix so a USD/GBP value
-/// can never masquerade as plain dollars.
+/// One format everywhere, and always an explicit ISO code. The app used to
+/// carry five: `US$30.65`, `C$30.65`, a bare `$30.65` for AUD, `$200 AUD` on
+/// Discover and `USD $200` on the detail page — the same amount reading
+/// differently depending on which screen you were on. Worse, the bare `$` for
+/// AUD and the `US$` for USD are a single character apart, which is a poor
+/// way to distinguish two currencies that differ by ~40%.
+///
+/// Honesty first: this formats an amount in the currency the value is
+/// *already* in — it never converts (no fabricated FX). Callers convert
+/// first, and hand the resulting currency here; see `convertCurrentForDisplay`
+/// in currency_conversion.dart, which returns both.
+///
+/// Not for subscription prices. Those come from App Store / Play Store
+/// storefronts already formatted for the buyer's region, and must be shown
+/// exactly as the store gives them.
 String formatCollectionValue(
   double value, {
   String currencyCode = 'AUD',
   bool showDecimals = true,
 }) {
   final amount = _withThousands(value, showDecimals);
+  final code = currencyCode.trim().toUpperCase();
+  final symbol = currencySymbolFor(code);
+  return code.isEmpty ? '\$$amount' : '$code $symbol$amount';
+}
+
+/// The symbol to sit between an ISO code and the digits.
+///
+/// Deliberately the plain `$` for every dollar currency: the code in front is
+/// what distinguishes them, so `US$` or `C$` here would say it twice.
+String currencySymbolFor(String currencyCode) {
   switch (currencyCode.trim().toUpperCase()) {
-    case 'AUD':
-    case '':
-      return '\$$amount';
-    case 'USD':
-      return 'US\$$amount';
-    case 'CAD':
-      return 'C\$$amount';
-    case 'NZD':
-      return 'NZ\$$amount';
     case 'GBP':
-      return '£$amount';
+      return '£';
     case 'EUR':
-      return '€$amount';
+      return '€';
     case 'JPY':
-      return '¥$amount';
+      return '¥';
     default:
-      return '${currencyCode.trim().toUpperCase()} $amount';
+      return '\$';
   }
 }
 

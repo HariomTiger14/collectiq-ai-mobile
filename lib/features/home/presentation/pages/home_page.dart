@@ -8,6 +8,8 @@ import 'package:collectiq_ai/core/theme/app_theme.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
 import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
+import 'package:collectiq_ai/features/profile/presentation/controllers/profile_controller.dart';
+
 import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/ui/navigation/glass_bottom_nav_bar.dart';
 import 'package:collectiq_ai/features/home/domain/entities/collector_dashboard_analytics.dart';
@@ -573,6 +575,103 @@ String _subtitleFor(PortfolioState portfolio, _HomeViewData data) {
   return 'All ${data.itemCount} ${data.itemCount == 1 ? 'item is' : 'items are'} valued and protected.';
 }
 
+/// The currencies Settings offers, in the same order.
+const _homeCurrencyOptions = <({String code, String label})>[
+  (code: 'AUD', label: 'Australian dollar'),
+  (code: 'USD', label: 'US dollar'),
+  (code: 'CAD', label: 'Canadian dollar'),
+  (code: 'GBP', label: 'British pound'),
+];
+
+/// Compact currency control on the portfolio value card.
+///
+/// Writes the same profile field Settings does -- there is deliberately no
+/// Home-only currency state, because two sources of truth for "what currency
+/// am I reading in" is how a total and an item price end up disagreeing.
+/// Everything on Home reads displayCurrencyProvider, so the total, delta,
+/// recent item prices and chart labels all follow from this one write.
+class _HomeCurrencySelector extends ConsumerWidget {
+  const _HomeCurrencySelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(displayCurrencyProvider);
+    return Semantics(
+      button: true,
+      label: 'Display currency, $current',
+      child: PopupMenuButton<String>(
+        key: const ValueKey('home-currency-selector'),
+        tooltip: 'Change display currency',
+        initialValue: current,
+        color: HomeTokens.surfaceInteractive,
+        position: PopupMenuPosition.under,
+        onSelected: (code) => ref
+            .read(profileControllerProvider.notifier)
+            .updatePreferredCurrency(code),
+        itemBuilder: (context) => [
+          for (final option in _homeCurrencyOptions)
+            PopupMenuItem<String>(
+              key: ValueKey('home-currency-option-${option.code}'),
+              value: option.code,
+              child: Row(
+                children: [
+                  Text(
+                    option.code,
+                    style: const TextStyle(
+                      color: HomeTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      option.label,
+                      style: const TextStyle(color: HomeTokens.textSecondary),
+                    ),
+                  ),
+                  if (option.code == current)
+                    const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: HomeTokens.accent,
+                    ),
+                ],
+              ),
+            ),
+        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: HomeTokens.surfaceInteractive,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: HomeTokens.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                current,
+                key: const ValueKey('home-currency-selector-label'),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: HomeTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.expand_more_rounded,
+                size: 16,
+                color: HomeTokens.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PortfolioValueHero extends StatefulWidget {
   const _PortfolioValueHero({
     required this.data,
@@ -708,13 +807,22 @@ class _PortfolioValueHeroState extends State<_PortfolioValueHero> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Portfolio value',
-            style: textTheme.labelLarge?.copyWith(
-              color: const Color(0xFF67B6FF),
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.4,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Portfolio value',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF67B6FF),
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+              // Changing currency was buried three taps deep in Settings,
+              // even though it changes every number on this card.
+              const _HomeCurrencySelector(),
+            ],
           ),
           const SizedBox(height: 10),
           if (hasValue && widget.isTotalPending)

@@ -71,7 +71,7 @@ void main() {
     // US$ because the display currency now defaults to USD, matching what
     // the providers quote and what values are stored in. The amount is
     // unchanged: the fake rates are at parity.
-    expect(find.text('US\$18.00'), findsOneWidget);
+    expect(find.text('USD \$18.00'), findsOneWidget);
     expect(find.text('Collection items'), findsOneWidget);
     expect(find.text('3'), findsWidgets);
     expect(find.text('1 need value'), findsWidgets);
@@ -372,7 +372,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-zero-card')),
-        matching: find.text('US\$0.00'),
+        matching: find.text('USD \$0.00'),
       ),
       findsOneWidget,
     );
@@ -470,7 +470,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('portfolio-grid-item-uploading-card')),
-        matching: find.text('US\$350.00'),
+        matching: find.text('USD \$350.00'),
       ),
       findsOneWidget,
     );
