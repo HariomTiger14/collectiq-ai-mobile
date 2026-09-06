@@ -3695,7 +3695,7 @@ _CatalogSnapshotData? _catalogSnapshotFor(CollectibleItem item) {
   final attribution =
       _clean(pricing.attributionText) ??
       (source.contains('pricecharting')
-          ? 'Pricing data by PriceCharting'
+          ? 'Powered by PriceCharting'
           : 'Pricing data by ${pricing.pricingSource}');
   return _CatalogSnapshotData(
     pricing: pricing,

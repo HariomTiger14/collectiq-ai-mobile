@@ -4336,7 +4336,12 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
   final low = result.lowEstimate ?? value;
   final high = result.highEstimate ?? value;
   final confidence = (result.confidence?.clamp(0, 1) ?? 0.72).toDouble();
-  final attribution = result.attribution ?? 'Pricing data by ${result.source}';
+  final attribution =
+      result.attribution ??
+      (result.source == 'PriceCharting'
+          // Contractual wording -- see _attribution_for in the backend.
+          ? 'Powered by PriceCharting'
+          : 'Pricing data by ${result.source}');
   final imagePath =
       result.imageUrl ??
       _placeholderStyle(
