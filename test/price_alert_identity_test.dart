@@ -1,12 +1,12 @@
-/// One alert per item per rule type.
-///
-/// The id used to carry microsecondsSinceEpoch, so every tap of "Alert if
-/// value rises 10%" minted a fresh id and a fresh row. Observed in production
-/// on 2026-09-05: three identical "Increases by 10%" alerts on one item,
-/// created at 17:26, 21:59 and 23:07 — one per tap.
-///
-/// It also broke deletion: the cloud delete upserts on (id, user_id) to mark
-/// the row disabled, and a timestamped id gave it nothing stable to match.
+// One alert per item per rule type.
+//
+// The id used to carry microsecondsSinceEpoch, so every tap of "Alert if
+// value rises 10%" minted a fresh id and a fresh row. Observed in production
+// on 2026-09-05: three identical "Increases by 10%" alerts on one item,
+// created at 17:26, 21:59 and 23:07 — one per tap.
+//
+// It also broke deletion: the cloud delete upserts on (id, user_id) to mark
+// the row disabled, and a timestamped id gave it nothing stable to match.
 import 'package:collectiq_ai/features/price_alerts/domain/entities/price_alert.dart';
 import 'package:collectiq_ai/features/price_alerts/presentation/controllers/price_alert_providers.dart';
 import 'package:flutter_test/flutter_test.dart';

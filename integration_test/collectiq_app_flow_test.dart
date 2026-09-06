@@ -205,7 +205,7 @@ Future<void> _pumpCollectIqAppWithBlockedUsage(WidgetTester tester) async {
         usageLimitConfigProvider.overrideWithValue(
           const UsageLimitConfig(
             developmentUnlimited: false,
-            dailyFreeScanLimit: 1,
+            monthlyFreeScanLimit: 1,
           ),
         ),
         usageRepositoryProvider.overrideWithValue(
@@ -248,19 +248,30 @@ class _MemoryUsageRepository implements UsageRepository {
   _MemoryUsageRepository({int initialCount = 0}) : count = initialCount;
 
   int count;
+  int priceRefreshes = 0;
 
   @override
-  Future<int> scansUsedToday() async => count;
+  Future<int> scansUsedThisMonth() async => count;
 
   @override
-  Future<int> incrementScansUsedToday() async {
+  Future<int> incrementScansUsedThisMonth() async {
     count += 1;
     return count;
   }
 
   @override
+  Future<int> priceRefreshesUsedThisMonth() async => priceRefreshes;
+
+  @override
+  Future<int> incrementPriceRefreshesThisMonth() async {
+    priceRefreshes += 1;
+    return priceRefreshes;
+  }
+
+  @override
   Future<void> resetUsage() async {
     count = 0;
+    priceRefreshes = 0;
   }
 }
 

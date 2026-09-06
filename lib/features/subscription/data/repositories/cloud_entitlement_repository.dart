@@ -86,7 +86,7 @@ class CloudEntitlementRepository implements EntitlementRepository {
         data: {
           'plan': plan.name,
           'source': source ?? 'mock',
-          if (purchaseToken != null) 'purchaseToken': purchaseToken,
+          'purchaseToken': ?purchaseToken,
         },
         options: Options(
           headers: {'Authorization': 'Bearer $token'},

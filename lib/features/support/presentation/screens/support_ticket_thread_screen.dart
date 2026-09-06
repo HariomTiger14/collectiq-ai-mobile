@@ -339,8 +339,8 @@ String _twoDigits(int value) => value.toString().padLeft(2, '0');
 /// Formats a message's ISO-8601 `createdAt` for display: just the time for
 /// a message from today, "Yesterday" + time for yesterday, otherwise the
 /// date and time -- no external `intl` dependency needed.
-/// Formats a message timestamp as a bare time for today, "Yesterday, <time>"
-/// for yesterday, and "<Mon> <day>, <time>" for anything older.
+/// Formats a message timestamp as a bare time for today, `Yesterday, <time>`
+/// for yesterday, and `<Mon> <day>, <time>` for anything older.
 ///
 /// [now] exists so tests can pin the reference point. Without it these
 /// relative labels can only be tested against the wall clock, which made the

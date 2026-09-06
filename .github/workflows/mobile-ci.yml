@@ -1,0 +1,48 @@
+name: Mobile CI
+
+# Runs the checks that previously only ran on someone's laptop. Merges to main
+# used to depend on remembering to run them; the only checks GitHub reported
+# were Cloudflare deploy previews, which build nothing from this repo's tests.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # A new push to the same branch supersedes an in-flight run.
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Pinned to the version the project is developed against, so CI
+          # cannot pass on a toolchain nobody is using. Bump deliberately.
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # No `dart format --set-exit-if-changed` step. 69 of 345 files are
+      # currently unformatted, so adding it would either fail every run or
+      # force a mass reformat that buries real history in blame. Worth doing
+      # as its own deliberate commit, not as a side effect of adding CI.
+
+      - name: Analyze
+        # No tolerance and no exclusions: the tree is at zero issues as of
+        # 2026-09-06, including infos. If this starts failing, fix the issue
+        # or make the suppression explicit and justified in analysis_options
+        # -- do not weaken this flag.
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - name: Test
+        run: flutter test --reporter expanded

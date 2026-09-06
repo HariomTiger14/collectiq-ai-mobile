@@ -45,7 +45,7 @@ class SupportTicketRepository {
         'category': category,
         'subject': subject,
         'message': message,
-        if (referencedItemId != null) 'referencedItemId': referencedItemId,
+        'referencedItemId': ?referencedItemId,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},

@@ -37,8 +37,8 @@ class ApiCatalogSearchRepository implements CatalogSearchRepository {
           'categoryGroup': categoryGroup,
         if (subcategory != null && subcategory.isNotEmpty)
           'subcategory': subcategory,
-        if (minPrice != null) 'minPrice': minPrice,
-        if (maxPrice != null) 'maxPrice': maxPrice,
+        'minPrice': ?minPrice,
+        'maxPrice': ?maxPrice,
         if (source != null && source.isNotEmpty) 'source': source,
       },
     );
