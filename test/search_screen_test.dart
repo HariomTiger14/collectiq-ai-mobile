@@ -429,6 +429,103 @@ void main() {
     },
   );
 
+  group('catalog detail currency', () {
+    // KicksDB/PriceCharting price this at USD 100; the collector reads AUD,
+    // worth half a USD here.
+    final result = CatalogSearchResult(
+      id: 'pc-detail-fx',
+      title: 'Charizard #4 Base Set',
+      category: 'Pokemon Cards',
+      source: 'PriceCharting',
+      currency: 'USD',
+      marketValue: 100,
+      lowEstimate: 80,
+      highEstimate: 120,
+      confidence: 0.9,
+      attribution: 'Pricing data by PriceCharting',
+      history: [
+        CatalogPriceHistoryPoint(
+          validFrom: DateTime.utc(2026, 8, 1),
+          isCurrent: true,
+          currency: 'USD',
+          marketValue: 100,
+        ),
+      ],
+    );
+
+    Future<void> openDetail(
+      WidgetTester tester, {
+      required Map<String, double> fxRates,
+    }) async {
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([result]),
+        displayCurrency: 'AUD',
+        fxRates: fxRates,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-detail-fx')),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the row and the detail agree on the currency', (tester) async {
+      // The row converted and the detail did not, so one catalog item read
+      // AUD in the results and USD once opened.
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([result]),
+        displayCurrency: 'AUD',
+        fxRates: const {'USD': 1.0, 'AUD': 2.0},
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(find.text('AUD \$200.00'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-detail-fx')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('catalog-result-detail-screen')),
+        findsOneWidget,
+      );
+      expect(find.text('AUD \$200.00'), findsWidgets);
+      expect(find.text('USD \$100.00'), findsNothing);
+    });
+
+    testWidgets('the detail range converts too', (tester) async {
+      await openDetail(tester, fxRates: const {'USD': 1.0, 'AUD': 2.0});
+
+      // 80-120 USD becomes 160-240 AUD.
+      expect(find.textContaining('AUD \$160.00'), findsWidgets);
+      expect(find.textContaining('AUD \$240.00'), findsWidgets);
+    });
+
+    testWidgets('with no rate the detail keeps the provider currency', (
+      tester,
+    ) async {
+      await openDetail(tester, fxRates: const {'USD': 1.0});
+
+      expect(find.text('USD \$100.00'), findsWidgets);
+      expect(find.textContaining('AUD'), findsNothing);
+    });
+  });
+
   testWidgets('catalog prices follow the chosen display currency', (
     tester,
   ) async {

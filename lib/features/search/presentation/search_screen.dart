@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:collectiq_ai/core/assets/packlox_assets.dart';
+import 'package:collectiq_ai/core/currency/fx_rate.dart';
 import 'package:collectiq_ai/core/currency/currency_conversion.dart';
 import 'package:collectiq_ai/core/ui/currency_format.dart';
 import 'package:collectiq_ai/core/currency/fx_rates_provider.dart';
@@ -1849,9 +1850,7 @@ class _CatalogMetaPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: HomeTokens.surfaceInteractive.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: HomeTokens.border.withValues(alpha: 0.8),
-          ),
+          border: Border.all(color: HomeTokens.border.withValues(alpha: 0.8)),
         ),
         child: Text(
           label,
@@ -1978,14 +1977,24 @@ class _CatalogResultDetailPageState
   @override
   Widget build(BuildContext context) {
     final result = _result;
-    final value = _formatCatalogValue(result);
+    // The list row converted and this page did not, so the same catalog item
+    // read AUD $198.51 in the results and USD $143.00 once opened.
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final fxRates =
+        ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    final value = _formatCatalogValue(
+      result,
+      displayCurrency: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
     final confidence = result.confidence == null
         ? 'Not supplied'
         : '${(result.confidence!.clamp(0, 1) * 100).round()}%';
     final rows = [
       _CatalogDetailRowData('Category', result.category),
       if (_clean(result.setName) != null &&
-          _catalogFacetKey(result.setName!) != _catalogFacetKey(result.category))
+          _catalogFacetKey(result.setName!) !=
+              _catalogFacetKey(result.category))
         _CatalogDetailRowData('Set / product family', result.setName!.trim()),
       if (_clean(result.identifier) != null)
         _CatalogDetailRowData('Identifier', result.identifier!.trim()),
@@ -2210,7 +2219,11 @@ class _CatalogResultDetailPageState
                             const SizedBox(height: 18),
                             _CatalogValuePanel(result: result, value: value),
                             const SizedBox(height: 14),
-                            _CatalogTrustPanel(result: result),
+                            _CatalogTrustPanel(
+                              result: result,
+                              displayCurrency: displayCurrency,
+                              currentRates: fxRates.currentRates,
+                            ),
                             if (result.marketplaceListings.isNotEmpty) ...[
                               const SizedBox(height: 14),
                               _CatalogMarketplaceListingsPanel(
@@ -2224,6 +2237,8 @@ class _CatalogResultDetailPageState
                               isLoading: _isLoadingDetail,
                               errorMessage: _detailError,
                               currency: result.currency,
+                              displayCurrency: displayCurrency,
+                              fxRates: fxRates,
                             ),
                             const SizedBox(height: 14),
                             _CatalogHistoryPanel(
@@ -2231,6 +2246,8 @@ class _CatalogResultDetailPageState
                               history: result.history,
                               isLoading: _isLoadingDetail,
                               errorMessage: _detailError,
+                              displayCurrency: displayCurrency,
+                              fxRates: fxRates,
                             ),
                             const SizedBox(height: 14),
                             _SurfaceCard(
@@ -2475,7 +2492,14 @@ class _CatalogValuePanel extends StatelessWidget {
 }
 
 class _CatalogTrustPanel extends StatelessWidget {
-  const _CatalogTrustPanel({required this.result});
+  const _CatalogTrustPanel({
+    required this.result,
+    this.displayCurrency,
+    this.currentRates = const {},
+  });
+
+  final String? displayCurrency;
+  final Map<String, double> currentRates;
 
   final CatalogSearchResult result;
 
@@ -2502,7 +2526,9 @@ class _CatalogTrustPanel extends StatelessWidget {
         _CatalogDetailRowData('Match basis', _catalogMatchBasis(result)),
       _CatalogDetailRowData(
         'Loose / Graded',
-        '${_formatOptionalCatalogValue(result.lowEstimate, result.currency)} - ${_formatOptionalCatalogValue(result.highEstimate, result.currency)}',
+        '${_formatOptionalCatalogValue(result.lowEstimate, result.currency, displayCurrency: displayCurrency, currentRates: currentRates)}'
+            ' - '
+            '${_formatOptionalCatalogValue(result.highEstimate, result.currency, displayCurrency: displayCurrency, currentRates: currentRates)}',
       ),
       if (result.lastUpdated != null)
         _CatalogDetailRowData(
@@ -2800,6 +2826,12 @@ class _CatalogMarketplaceListingRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
+                // Deliberately the listing's own currency, unconverted: this
+                // is a real asking price on a specific marketplace, and what
+                // a buyer would actually pay there. Converting it would
+                // misrepresent the listing. Tracked as an open product
+                // decision -- see docs/BACKEND_SIT_DEPLOYMENT.md, "Known
+                // currency follow-ups".
                 _formatOptionalCatalogValue(listing.price, listing.currency),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: PackLoxTokens.textPrimary,
@@ -2832,14 +2864,48 @@ class _CatalogChartPoint {
 /// usable market value, since the backend documents [history] as
 /// "newest first when supplied" -- never assume that ordering holds.
 List<_CatalogChartPoint> _catalogChartPoints(
-  List<CatalogPriceHistoryPoint> history,
-) {
+  List<CatalogPriceHistoryPoint> history, {
+  String? displayCurrency,
+  FxRateSnapshot fxRates = FxRateSnapshot.empty,
+}) {
+  // Each point converts at the rate in effect on its own date. Using today's
+  // rate for every point would bend the line's shape with an FX move that
+  // never happened on those dates -- the chart is meant to show the item's
+  // price changing, not the currency's.
+  double convert(CatalogPriceHistoryPoint point) {
+    final target = displayCurrency ?? point.currency;
+    if (!canConvertCurrent(point.currency, target, fxRates.currentRates)) {
+      return point.marketValue!;
+    }
+    return convertHistorical(
+      point.marketValue!,
+      from: point.currency,
+      to: target,
+      date: point.validFrom,
+      rates: fxRates,
+    );
+  }
+
   final points = [
     for (final point in history)
       if (point.marketValue != null && point.marketValue! > 0)
-        _CatalogChartPoint(date: point.validFrom, value: point.marketValue!),
+        _CatalogChartPoint(date: point.validFrom, value: convert(point)),
   ]..sort((a, b) => a.date.compareTo(b.date));
   return points;
+}
+
+/// The currency a converted catalog chart or history list is actually in:
+/// the collector's, when every point can reach it, and the source currency
+/// when it cannot -- never a label on an unconverted number.
+String _effectiveCatalogCurrency(
+  String sourceCurrency, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
+  final target = displayCurrency ?? sourceCurrency;
+  return canConvertCurrent(sourceCurrency, target, currentRates)
+      ? target
+      : sourceCurrency;
 }
 
 /// Card wrapping [_CatalogHistoryChart] with the surrounding loading/error/
@@ -2853,16 +2919,29 @@ class _CatalogHistoryChartPanel extends StatelessWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.currency,
+    this.displayCurrency,
+    this.fxRates = FxRateSnapshot.empty,
   });
 
   final List<CatalogPriceHistoryPoint> history;
   final bool isLoading;
   final String? errorMessage;
   final String currency;
+  final String? displayCurrency;
+  final FxRateSnapshot fxRates;
 
   @override
   Widget build(BuildContext context) {
-    final points = _catalogChartPoints(history);
+    final points = _catalogChartPoints(
+      history,
+      displayCurrency: displayCurrency,
+      fxRates: fxRates,
+    );
+    final chartCurrency = _effectiveCatalogCurrency(
+      currency,
+      displayCurrency: displayCurrency,
+      currentRates: fxRates.currentRates,
+    );
     return _SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2908,7 +2987,10 @@ class _CatalogHistoryChartPanel extends StatelessWidget {
             SizedBox(
               height: 200,
               width: double.infinity,
-              child: _CatalogHistoryChart(points: points, currency: currency),
+              child: _CatalogHistoryChart(
+                points: points,
+                currency: chartCurrency,
+              ),
             ),
         ],
       ),
@@ -3292,12 +3374,16 @@ class _CatalogHistoryPanel extends StatelessWidget {
     required this.history,
     required this.isLoading,
     required this.errorMessage,
+    this.displayCurrency,
+    this.fxRates = FxRateSnapshot.empty,
   });
 
   final String itemTitle;
   final List<CatalogPriceHistoryPoint> history;
   final bool isLoading;
   final String? errorMessage;
+  final String? displayCurrency;
+  final FxRateSnapshot fxRates;
 
   @override
   Widget build(BuildContext context) {
@@ -3322,7 +3408,11 @@ class _CatalogHistoryPanel extends StatelessWidget {
           const SizedBox(height: 10),
           if (visible.isNotEmpty) ...[
             for (final point in visible) ...[
-              _CatalogHistoryRow(point: point),
+              _CatalogHistoryRow(
+                point: point,
+                displayCurrency: displayCurrency,
+                fxRates: fxRates,
+              ),
               if (point != visible.last)
                 const Divider(color: HomeTokens.border, height: 18),
             ],
@@ -3335,6 +3425,8 @@ class _CatalogHistoryPanel extends StatelessWidget {
                     builder: (_) => _CatalogFullPriceHistoryPage(
                       itemTitle: itemTitle,
                       history: history,
+                      displayCurrency: displayCurrency,
+                      fxRates: fxRates,
                     ),
                   ),
                 ),
@@ -3386,7 +3478,12 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
   const _CatalogFullPriceHistoryPage({
     required this.itemTitle,
     required this.history,
+    this.displayCurrency,
+    this.fxRates = FxRateSnapshot.empty,
   });
+
+  final String? displayCurrency;
+  final FxRateSnapshot fxRates;
 
   final String itemTitle;
   final List<CatalogPriceHistoryPoint> history;
@@ -3429,7 +3526,11 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final point in mergedHistory) ...[
-                    _CatalogHistoryRow(point: point),
+                    _CatalogHistoryRow(
+                      point: point,
+                      displayCurrency: displayCurrency,
+                      fxRates: fxRates,
+                    ),
                     if (point != mergedHistory.last)
                       const Divider(color: HomeTokens.border, height: 18),
                   ],
@@ -3444,15 +3545,24 @@ class _CatalogFullPriceHistoryPage extends StatelessWidget {
 }
 
 class _CatalogHistoryRow extends StatelessWidget {
-  const _CatalogHistoryRow({required this.point});
+  const _CatalogHistoryRow({
+    required this.point,
+    this.displayCurrency,
+    this.fxRates = FxRateSnapshot.empty,
+  });
 
   final CatalogPriceHistoryPoint point;
+  final String? displayCurrency;
+  final FxRateSnapshot fxRates;
 
   @override
   Widget build(BuildContext context) {
-    final value = _formatOptionalCatalogValue(
+    final value = _formatHistoricalCatalogValue(
       point.marketValue,
       point.currency,
+      date: point.validFrom,
+      displayCurrency: displayCurrency,
+      rates: fxRates,
     );
     final range = point.isCurrent
         ? 'Current from ${_formatShortDate(point.validFrom)}'
@@ -3592,10 +3702,7 @@ class _CatalogPlaceholderThumbnail extends StatelessWidget {
 /// like Numista credit each contributor separately, and the credit must
 /// travel with the picture it belongs to.
 class _CatalogImageGallery extends StatefulWidget {
-  const _CatalogImageGallery({
-    required this.result,
-    required this.isCardArt,
-  });
+  const _CatalogImageGallery({required this.result, required this.isCardArt});
 
   final CatalogSearchResult result;
   final bool isCardArt;
@@ -3689,9 +3796,7 @@ class _CatalogImageGalleryState extends State<_CatalogImageGallery> {
                 width: i == _index ? 18 : 7,
                 height: 7,
                 decoration: BoxDecoration(
-                  color: i == _index
-                      ? PackLoxTokens.cyan
-                      : HomeTokens.border,
+                  color: i == _index ? PackLoxTokens.cyan : HomeTokens.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -4252,6 +4357,9 @@ CollectibleItem _catalogResultToPortfolioItem(CatalogSearchResult result) {
     valuationStrategy: 'catalog_lookup',
     attributionText: attribution,
     attributionUrl: result.productUrl,
+    // Deliberately NOT display-converted: this builds the item that gets
+    // saved, and a stored value must stay in the provider's own currency.
+    // Display conversion happens when it is read back.
     displayString: value > 0 ? _formatCatalogValue(result) : null,
   );
   return CollectibleItem(
@@ -4678,10 +4786,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
                     'Photo: ${_attributionFor(_index)}',
                     key: const ValueKey('fullscreen-image-attribution'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ),
               ),
@@ -4820,7 +4925,12 @@ String _catalogMatchBasis(CatalogSearchResult result) {
   return 'Matched by ${parts.join(', ')}';
 }
 
-String _formatOptionalCatalogValue(double? value, String currency) {
+String _formatOptionalCatalogValue(
+  double? value,
+  String currency, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   if (value == null || value <= 0) {
     return 'Not supplied';
   }
@@ -4833,9 +4943,41 @@ String _formatOptionalCatalogValue(double? value, String currency) {
       currency: currency,
       marketValue: value,
     ),
+    displayCurrency: displayCurrency,
+    currentRates: currentRates,
   );
 }
 
+/// A dated catalog price, in the collector's currency.
+///
+/// Uses the rate in effect on the point's own date rather than today's, so
+/// switching currency cannot bend the shape of a price history chart with an
+/// FX move that never happened on those dates.
+String _formatHistoricalCatalogValue(
+  double? value,
+  String currency, {
+  required DateTime date,
+  String? displayCurrency,
+  FxRateSnapshot rates = FxRateSnapshot.empty,
+}) {
+  if (value == null || value <= 0) {
+    return 'Not supplied';
+  }
+  final target = displayCurrency ?? currency;
+  if (!canConvertCurrent(currency, target, rates.currentRates)) {
+    return formatCollectionValue(value, currencyCode: currency);
+  }
+  return formatCollectionValue(
+    convertHistorical(
+      value,
+      from: currency,
+      to: target,
+      date: date,
+      rates: rates,
+    ),
+    currencyCode: target,
+  );
+}
 
 String _formatShortDate(DateTime value) {
   const months = [
