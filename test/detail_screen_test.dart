@@ -75,6 +75,23 @@ void main() {
     },
   );
 
+  testWidgets('value history states its figures in a currency it can back', (
+    tester,
+  ) async {
+    // With no AUD rate, every figure in the panel stays in the item's own
+    // USD rather than being relabelled -- the chart included, since a
+    // series plotted at an implicit 1.0 would carry an AUD axis.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      fxRates: const {'USD': 1.0},
+    );
+    await _revealText(tester, 'Value History');
+
+    expect(find.textContaining('AUD'), findsNothing);
+    expect(find.textContaining('USD \$'), findsWidgets);
+  });
+
   testWidgets('an amount with no exchange rate keeps its own currency', (
     tester,
   ) async {

@@ -2348,20 +2348,38 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
     );
     final displayCurrency = ref.watch(displayCurrencyProvider);
     final fxRates = ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
-    final chartPoints = _valueHistoryPoints(
-      item,
-      snapshots,
-      displayCurrency: displayCurrency,
-      rates: fxRates,
-    );
     final itemCurrency = item.pricing?.currency ?? 'AUD';
+    // Every figure in this panel -- both metrics, the gain/loss and each
+    // plotted point -- has to be stated in one currency. Rates arrive once
+    // per session, so until they do (or if that fetch failed) converting
+    // would leave the amounts unchanged while the labels claimed the display
+    // currency. Fall back to the panel's own single source currency when
+    // that is unambiguous; when the sources are mixed AND unconvertible, no
+    // honest series exists, so the panel says so instead of drawing one.
+    final sourceCurrencies = _valueHistorySourceCurrencies(item, snapshots);
+    final canConvertAll = canTotalIn(
+      sourceCurrencies,
+      displayCurrency,
+      fxRates.currentRates,
+    );
+    final String? panelCurrency = canConvertAll
+        ? displayCurrency
+        : (sourceCurrencies.length == 1 ? sourceCurrencies.first : null);
+    final chartPoints = panelCurrency == null
+        ? const <_ValueHistoryPoint>[]
+        : _valueHistoryPoints(
+            item,
+            snapshots,
+            displayCurrency: panelCurrency,
+            rates: fxRates,
+          );
     final baseline = _valueHistoryBaseline(item, snapshots);
     final scanValue = baseline == null
         ? 0.0
         : convertCurrent(
             baseline.value,
             from: baseline.currency,
-            to: displayCurrency,
+            to: panelCurrency ?? baseline.currency,
             currentRates: fxRates.currentRates,
           );
     // Only call it "At scan" when it really is the scan estimate; once real
@@ -2370,7 +2388,7 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
     final currentValue = convertCurrent(
       _currentValueFor(item),
       from: itemCurrency,
-      to: displayCurrency,
+      to: panelCurrency ?? itemCurrency,
       currentRates: fxRates.currentRates,
     );
     final delta = currentValue - scanValue;
@@ -2381,8 +2399,8 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
         : isPositive
         ? HomeTokens.positive
         : Theme.of(context).colorScheme.error;
-    final movementLabel = hasMovement
-        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), displayCurrency)}'
+    final movementLabel = hasMovement && panelCurrency != null
+        ? '${isPositive ? '+' : '-'}${_formatMoney(delta.abs(), panelCurrency)}'
         : null;
     final movementPercent = hasMovement && scanValue > 0
         ? '${isPositive ? '+' : '-'}${((delta.abs() / scanValue) * 100).toStringAsFixed(1)}%'
@@ -2422,14 +2440,18 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: baselineLabel,
-                  value: _formatMoney(scanValue, displayCurrency),
+                  value: panelCurrency == null
+                      ? 'Value unavailable'
+                      : _formatMoney(scanValue, panelCurrency),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _DetailValueHistoryMetric(
                   label: 'Current',
-                  value: _formatMoney(currentValue, displayCurrency),
+                  value: panelCurrency == null
+                      ? 'Value unavailable'
+                      : _formatMoney(currentValue, panelCurrency),
                 ),
               ),
             ],
@@ -2437,11 +2459,11 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
           // Gain/Loss gets its own full-width row instead of squeezing into
           // a third column -- its value (sign + amount + currency code) is
           // longer than the other two metrics and was clipping there.
-          if (hasMovement) ...[
+          if (hasMovement && movementLabel != null) ...[
             const SizedBox(height: AppSpacing.sm),
             _DetailValueHistoryMetric(
               label: 'Gain/Loss',
-              value: movementLabel!,
+              value: movementLabel,
               valueColor: movementColor,
               subtitle: movementPercent,
             ),
@@ -3729,6 +3751,23 @@ double _currentValueFor(CollectibleItem item) {
 /// snapshot (real or catalog-history-backfilled -- pre-ownership market
 /// context is legitimate to show here, unlike on the portfolio-wide
 /// aggregate), and the current value, sorted chronologically.
+/// Every currency that contributes a figure to the Value History panel.
+///
+/// The item's own pricing currency plus each snapshot's, so the panel can
+/// ask whether one honest currency exists for all of them.
+List<String> _valueHistorySourceCurrencies(
+  CollectibleItem item,
+  List<PortfolioValuationSnapshot> snapshots,
+) {
+  final currencies = <String>{(item.pricing?.currency ?? 'AUD').toUpperCase()};
+  for (final snapshot in snapshots) {
+    if ((snapshot.valueAud ?? 0) > 0) {
+      currencies.add(snapshot.currency.toUpperCase());
+    }
+  }
+  return currencies.toList(growable: false);
+}
+
 List<_ValueHistoryPoint> _valueHistoryPoints(
   CollectibleItem item,
   List<PortfolioValuationSnapshot> snapshots, {
