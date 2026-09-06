@@ -517,6 +517,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               ],
                               if (_catalogResults
                                   .take(20)
+                                  .any(_isPriceChartingResult)) ...[
+                                const SizedBox(height: 2),
+                                const _PriceChartingAttributionLine(),
+                              ],
+                              if (_catalogResults
+                                  .take(20)
                                   .any(_isVideoGameResultWithArt)) ...[
                                 const SizedBox(height: 2),
                                 const _RawgAttributionLine(),
@@ -1616,6 +1622,52 @@ class _RebrickableAttributionLine extends StatelessWidget {
 /// where RAWG data/images are used — the About-screen credit alone does
 /// not satisfy that, so this renders directly under video-game imagery
 /// in search results and on the detail page.
+/// True when this row's price came from PriceCharting.
+///
+/// Keyed off `source`, which the backend sets from the row's own
+/// `source_provider` -- deliberately not off `category`. PR #38 keyed the
+/// RAWG credit off category and it silently never rendered, because live
+/// rows carry PriceCharting *genre* values ("Action & Adventure") rather
+/// than anything containing "video game".
+bool _isPriceChartingResult(CatalogSearchResult result) {
+  return result.source == 'PriceCharting';
+}
+
+/// PriceCharting requires attribution wherever their price data appears.
+///
+/// Their Terms allow Price Data to be referenced externally only if
+/// "PriceCharting is clearly cited as the source" AND "a visible hyperlink
+/// to PriceCharting is included". Consumer apps sit outside that clause
+/// entirely and need express written permission, which PackLox holds on
+/// condition of a "Powered by PriceCharting" mark plus a linkback.
+///
+/// Discover result rows show prices but had neither: the source pill is a
+/// plain Container with no gesture handler. This line supplies both, once
+/// per screen, without changing row layout.
+class _PriceChartingAttributionLine extends StatelessWidget {
+  const _PriceChartingAttributionLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const ValueKey('pricecharting-attribution-link'),
+      onTap: () => _launchExternalLink(context, 'https://www.pricecharting.com/'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          'Powered by PriceCharting',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: PackLoxTokens.textSecondary,
+            decoration: TextDecoration.underline,
+            decorationColor: PackLoxTokens.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RawgAttributionLine extends StatelessWidget {
   const _RawgAttributionLine();
 
@@ -2145,6 +2197,10 @@ class _CatalogResultDetailPageState
                                 );
                               },
                             ),
+                            if (_isPriceChartingResult(result)) ...[
+                              const SizedBox(height: 8),
+                              const _PriceChartingAttributionLine(),
+                            ],
                             if (_isVideoGameResultWithArt(result)) ...[
                               const SizedBox(height: 8),
                               const _RawgAttributionLine(),
