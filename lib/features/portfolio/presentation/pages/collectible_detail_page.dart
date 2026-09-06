@@ -2060,7 +2060,18 @@ class _DetailMarketSection extends ConsumerWidget {
           data: (value) => value,
           orElse: () => const <PortfolioValuationSnapshot>[],
         );
-    final rows = _detailMarketRows(item, snapshots);
+    // These rows are the item's value, so they follow the chosen display
+    // currency like every other amount in the app; the provider's own
+    // currency stays visible in the "Currency" row below.
+    final displayCurrency = ref.watch(displayCurrencyProvider);
+    final currentRates =
+        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {};
+    final rows = _detailMarketRows(
+      item,
+      snapshots,
+      displayCurrency: displayCurrency,
+      currentRates: currentRates,
+    );
     final catalogSnapshot = _catalogSnapshotFor(item);
     return _DetailAuthorityPanel(
       key: const ValueKey('collectible-detail-market-section'),
@@ -2077,7 +2088,11 @@ class _DetailMarketSection extends ConsumerWidget {
           _PricingTrustPanel(item: item),
           if (catalogSnapshot != null) ...[
             const SizedBox(height: AppSpacing.md),
-            _CatalogSnapshotPanel(snapshot: catalogSnapshot),
+            _CatalogSnapshotPanel(
+              snapshot: catalogSnapshot,
+              displayCurrency: displayCurrency,
+              currentRates: currentRates,
+            ),
           ],
           const SizedBox(height: AppSpacing.md),
           if (rows.isEmpty)
@@ -2098,17 +2113,22 @@ class _DetailMarketSection extends ConsumerWidget {
   }
 }
 
-class _PricingTrustPanel extends StatelessWidget {
+class _PricingTrustPanel extends ConsumerWidget {
   const _PricingTrustPanel({required this.item});
 
   final CollectibleItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final pricing = item.pricing;
     final status = _effectiveValuationStatus(item);
     final trustColor = _pricingTrustColor(context, status);
-    final rows = _pricingTrustRows(item);
+    final rows = _pricingTrustRows(
+      item,
+      displayCurrency: ref.watch(displayCurrencyProvider),
+      currentRates:
+          ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {},
+    );
     return Container(
       key: const ValueKey('collectible-detail-pricing-trust-panel'),
       width: double.infinity,
@@ -2189,9 +2209,15 @@ class _PricingTrustPanel extends StatelessWidget {
 }
 
 class _CatalogSnapshotPanel extends StatelessWidget {
-  const _CatalogSnapshotPanel({required this.snapshot});
+  const _CatalogSnapshotPanel({
+    required this.snapshot,
+    this.displayCurrency,
+    this.currentRates = const {},
+  });
 
   final _CatalogSnapshotData snapshot;
+  final String? displayCurrency;
+  final Map<String, double> currentRates;
 
   @override
   Widget build(BuildContext context) {
@@ -2233,6 +2259,8 @@ class _CatalogSnapshotPanel extends StatelessWidget {
                 value: _displayValue(
                   pricing,
                   fallbackValue: snapshot.savedValue,
+                  displayCurrency: displayCurrency,
+                  currentRates: currentRates,
                 ),
               ),
               _SnapshotMetricChip(
@@ -3322,8 +3350,10 @@ List<_DetailInfoRowData> _detailMetadataRows(CollectibleItem item) {
 
 List<_DetailInfoRowData> _detailMarketRows(
   CollectibleItem item,
-  List<PortfolioValuationSnapshot> snapshots,
-) {
+  List<PortfolioValuationSnapshot> snapshots, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final trustedPricing = _hasTrustedPricingEvidence(item);
@@ -3337,13 +3367,23 @@ List<_DetailInfoRowData> _detailMarketRows(
       _DetailInfoRowData(
         'Current value',
         trustedPricing
-            ? _displayValue(pricing, fallbackValue: item.estimatedValue)
+            ? _displayValue(
+                pricing,
+                fallbackValue: item.estimatedValue,
+                displayCurrency: displayCurrency,
+                currentRates: currentRates,
+              )
             : 'Value unavailable',
       ),
       _DetailInfoRowData(
         (baseline?.fromScan ?? true) ? 'Value at scan' : 'Oldest tracked value',
         trustedPricing && baseline != null
-            ? _formatMoney(baseline.value, baseline.currency)
+            ? _formatMoneyIn(
+                baseline.value,
+                from: baseline.currency,
+                to: displayCurrency,
+                currentRates: currentRates,
+              )
             : 'Value unavailable',
       ),
       _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
@@ -3360,10 +3400,12 @@ List<_DetailInfoRowData> _detailMarketRows(
       _DetailInfoRowData(
         'Value range',
         trustedPricing
-            ? _formatMoneyRange(
+            ? _formatMoneyRangeIn(
                 pricing.lowEstimate,
                 pricing.highEstimate,
-                pricing.currency,
+                from: pricing.currency,
+                to: displayCurrency,
+                currentRates: currentRates,
               )
             : 'Value unavailable',
       ),
@@ -3385,7 +3427,11 @@ List<_DetailInfoRowData> _detailMarketRows(
   ];
 }
 
-List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
+List<_DetailInfoRowData> _pricingTrustRows(
+  CollectibleItem item, {
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final pricing = item.pricing;
   final market = item.marketSummary;
   final status = _effectiveValuationStatus(item);
@@ -3409,10 +3455,12 @@ List<_DetailInfoRowData> _pricingTrustRows(CollectibleItem item) {
         (pricing.lowEstimate > 0 || pricing.highEstimate > 0))
       _DetailInfoRowData(
         'Value range',
-        _formatMoneyRange(
+        _formatMoneyRangeIn(
           pricing.lowEstimate,
           pricing.highEstimate,
-          pricing.currency,
+          from: pricing.currency,
+          to: displayCurrency,
+          currentRates: currentRates,
         ),
       ),
     _DetailInfoRowData(
@@ -6805,10 +6853,31 @@ String _formatDate(DateTime date) {
   return '$day/$month/${date.year}';
 }
 
-String _displayValue(PricingInfo pricing, {required double fallbackValue}) {
+String _displayValue(
+  PricingInfo pricing, {
+  required double fallbackValue,
+  String? displayCurrency,
+  Map<String, double> currentRates = const {},
+}) {
   final value = pricing.estimatedMarketValue > 0
       ? pricing.estimatedMarketValue
       : fallbackValue;
+  // The saved displayString is written in the provider's currency, so it can
+  // only be shown when no conversion is being applied.
+  if (displayCurrency != null &&
+      displayCurrency.trim().toUpperCase() !=
+          pricing.currency.trim().toUpperCase() &&
+      canConvertCurrent(pricing.currency, displayCurrency, currentRates)) {
+    return _formatMoney(
+      convertCurrent(
+        value,
+        from: pricing.currency,
+        to: displayCurrency,
+        currentRates: currentRates,
+      ),
+      displayCurrency,
+    );
+  }
   final displayString = pricing.displayString?.trim();
   if (displayString != null &&
       displayString.isNotEmpty &&
@@ -6866,6 +6935,44 @@ String? _sourceMarketValue(PricingInfo pricing) {
     return null;
   }
   return _formatMoney(originalPrice, originalCurrency);
+}
+
+/// Formats an amount in the display currency when a rate exists, and in its
+/// own currency when one does not -- never an unconverted number wearing the
+/// display currency's label.
+String _formatMoneyIn(
+  double value, {
+  required String from,
+  required String? to,
+  required Map<String, double> currentRates,
+}) {
+  final converted = convertCurrentForDisplay(
+    value,
+    from: from,
+    to: to ?? from,
+    currentRates: currentRates,
+  );
+  return _formatMoney(converted.value, converted.currency);
+}
+
+/// The range equivalent of [_formatMoneyIn]. Both ends share one currency,
+/// so they convert together or not at all.
+String _formatMoneyRangeIn(
+  double low,
+  double high, {
+  required String from,
+  required String? to,
+  required Map<String, double> currentRates,
+}) {
+  final target = to ?? from;
+  if (!canConvertCurrent(from, target, currentRates)) {
+    return _formatMoneyRange(low, high, from);
+  }
+  return _formatMoneyRange(
+    convertCurrent(low, from: from, to: target, currentRates: currentRates),
+    convertCurrent(high, from: from, to: target, currentRates: currentRates),
+    target,
+  );
 }
 
 String _formatMoney(double value, String currency) {

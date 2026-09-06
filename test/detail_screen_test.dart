@@ -92,6 +92,28 @@ void main() {
     expect(find.textContaining('USD \$'), findsWidgets);
   });
 
+  testWidgets('market and evidence rows follow the chosen display currency', (
+    tester,
+  ) async {
+    // The item is priced by the provider in USD; the collector reads in AUD.
+    // These rows are the item's value, so they convert like every other
+    // amount -- only the row that exists to disclose the provider's own
+    // currency stays USD.
+    await _pumpDetail(
+      tester,
+      _authorityItem(),
+      displayCurrency: 'AUD',
+      fxRates: const {'USD': 1.0, 'AUD': 2.0},
+    );
+    await _revealText(tester, 'Market & Value');
+
+    // 245 USD at 2 AUD per USD.
+    expect(find.text('\$490 AUD'), findsWidgets);
+    // 220-270 USD becomes 440-540 AUD.
+    expect(find.textContaining('440'), findsWidgets);
+    expect(find.text('USD'), findsWidgets, reason: 'provider currency row');
+  });
+
   testWidgets('an amount with no exchange rate keeps its own currency', (
     tester,
   ) async {
@@ -164,8 +186,12 @@ void main() {
       expect(find.text('At scan'), findsOneWidget);
       expect(find.text('Current'), findsOneWidget);
       expect(find.text('Gain/Loss'), findsOneWidget);
-      expect(find.text('USD \$200'), findsWidgets);
-      expect(find.text('USD \$245'), findsWidgets);
+      // Market & Value used to render these in the provider's USD while the
+      // Value History panel right beside it converted to the display
+      // currency, so one screen showed the same figure two ways.
+      expect(find.text('\$200 AUD'), findsWidgets);
+      expect(find.text('\$245 AUD'), findsWidgets);
+      expect(find.text('USD \$245'), findsNothing);
       // Converted to the display currency (AUD, the default with no profile
       // override) at parity, not left in the item's own USD -- this is the
       // exact bug being fixed: a value/movement label must respect the
@@ -180,7 +206,9 @@ void main() {
       expect(find.text('Saved provider'), findsWidgets);
       expect(find.text('Currency'), findsWidgets);
       expect(find.text('Value range'), findsWidgets);
-      expect(find.text('USD \$220 - \$270'), findsWidgets);
+      // The range follows the display currency too; the Currency row above
+      // is what discloses that the provider priced this in USD.
+      expect(find.text('\$220 - \$270 AUD'), findsWidgets);
       expect(find.text('Portfolio record'), findsWidgets);
       expect(find.text('Collectible Details'), findsNothing);
     },
@@ -817,7 +845,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Snapshot value'), findsOneWidget);
-    expect(find.text('USD \$161'), findsWidgets);
+    // The saved snapshot is a value like any other: shown in the currency the
+    // collector reads in, with the provider's own currency still disclosed by
+    // the Currency row in the pricing evidence panel.
+    expect(find.text('\$161 AUD'), findsWidgets);
     expect(find.text('Gain/Loss'), findsNothing);
     expect(
       find.text('Refresh value to save the first trusted history point.'),
@@ -1230,6 +1261,7 @@ Future<void> _pumpDetail(
   SyncQueueRepository? syncQueueRepository,
   ApiClient? apiClient,
   Map<String, double>? fxRates,
+  String? displayCurrency,
   PlanLimits? planLimits,
   SharedPreferencesValuationSnapshotRepository? valuationSnapshotRepository,
 }) async {
@@ -1269,6 +1301,8 @@ Future<void> _pumpDetail(
         // every pre-existing dollar-amount assertion in this file valid --
         // converting at parity only changes which currency label is shown,
         // never the number.
+        if (displayCurrency != null)
+          displayCurrencyProvider.overrideWithValue(displayCurrency),
         fxRatesRepositoryProvider.overrideWithValue(
           _FixedRateFxRatesRepository(
             fxRates ??
