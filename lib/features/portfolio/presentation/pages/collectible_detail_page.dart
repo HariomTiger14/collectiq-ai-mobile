@@ -527,8 +527,7 @@ class _CollectibleDetailPageState extends ConsumerState<CollectibleDetailPage> {
                   color: PackLoxTokens.textPrimary,
                 ),
                 title: const Text('Take photo'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(ImageSource.camera),
+                onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
               ),
               ListTile(
                 key: const ValueKey('detail-photo-source-library'),
@@ -1513,7 +1512,8 @@ class _DetailAuthorityValueBlock extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final displayCurrency = ref.watch(displayCurrencyProvider);
     final currentRates =
-        ref.watch(fxRatesProvider).asData?.value.currentRates ?? const {'USD': 1.0};
+        ref.watch(fxRatesProvider).asData?.value.currentRates ??
+        const {'USD': 1.0};
     final textTheme = Theme.of(context).textTheme;
     final isPending = _isValuationPending(item);
     final accentColor = isPending
@@ -2375,7 +2375,8 @@ class _DetailValueHistoryPanel extends ConsumerWidget {
       orElse: () => const <PortfolioValuationSnapshot>[],
     );
     final displayCurrency = ref.watch(displayCurrencyProvider);
-    final fxRates = ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
+    final fxRates =
+        ref.watch(fxRatesProvider).asData?.value ?? FxRateSnapshot.empty;
     final itemCurrency = item.pricing?.currency ?? 'AUD';
     // Every figure in this panel -- both metrics, the gain/loss and each
     // plotted point -- has to be stated in one currency. Rates arrive once
@@ -3299,11 +3300,10 @@ class _DetailAuthorityRows extends StatelessWidget {
                 child: row.valueUrl == null || row.valueUrl!.isEmpty
                     ? Text(
                         row.value,
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(
-                              color: PackLoxTokens.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: PackLoxTokens.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       )
                     : InkWell(
                         key: const ValueKey('detail-attribution-row-link'),
@@ -3386,7 +3386,7 @@ List<_DetailInfoRowData> _detailMarketRows(
               )
             : 'Value unavailable',
       ),
-      _DetailInfoRowData('Currency', pricing.currency.toUpperCase()),
+      _DetailInfoRowData('Value saved in', pricing.currency.toUpperCase()),
       if (item.lastValueRefreshedAt != null)
         _DetailInfoRowData(
           'Last refreshed',
@@ -3439,8 +3439,16 @@ List<_DetailInfoRowData> _pricingTrustRows(
   final rows = <_DetailInfoRowData>[
     _DetailInfoRowData('Status', _pricingTrustTitle(status)),
     _DetailInfoRowData('Provider', _pricingProviderLabel(item)),
+    // "Currency" read as though it labelled the figures beside it, which now
+    // follow the display currency -- so an item saved in AUD and read in USD
+    // showed USD amounts under a row saying AUD.
+    //
+    // Not the provider's own currency either: PriceCharting quotes in USD,
+    // and the backend converts to the display currency in force at scan time
+    // (reprice_service.py -> convert_pricing_result) before saving. So this
+    // is the currency the stored figure was written in, nothing more.
     if (pricing?.currency.trim().isNotEmpty == true)
-      _DetailInfoRowData('Currency', pricing!.currency.toUpperCase()),
+      _DetailInfoRowData('Value saved in', pricing!.currency.toUpperCase()),
     _DetailInfoRowData(
       'Pricing confidence',
       _pricingConfidenceLabel(status: status, confidence: confidence),
@@ -3829,9 +3837,7 @@ List<_ValueHistoryPoint> _valueHistoryPoints(
   // the catalog-matched identity, so charting the scan estimate alongside
   // them draws a spike for a price this item was never actually worth --
   // see _valueHistoryBaseline for the full reasoning.
-  final scanValue = snapshots.any(
-    (snapshot) => (snapshot.valueAud ?? 0) > 0,
-  )
+  final scanValue = snapshots.any((snapshot) => (snapshot.valueAud ?? 0) > 0)
       ? 0.0
       : _valueAtScanFor(item);
   if (scanValue > 0) {
@@ -6637,15 +6643,13 @@ class _PriceAlertRow extends ConsumerWidget {
       // UI bug rather than a failed write.
       debugPrint('[PriceAlerts] delete did not reach the cloud: $error');
       deleted = false;
-      failure = "Couldn't delete that alert. Check your connection and try again.";
+      failure =
+          "Couldn't delete that alert. Check your connection and try again.";
     }
     ref.invalidate(itemPriceAlertsProvider(alert.itemId));
     ref.invalidate(priceAlertSummaryProvider);
     if (context.mounted) {
-      _showDetailSnackBar(
-        context,
-        deleted ? 'Price alert deleted' : failure!,
-      );
+      _showDetailSnackBar(context, deleted ? 'Price alert deleted' : failure!);
     }
   }
 }

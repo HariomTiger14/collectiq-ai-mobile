@@ -204,7 +204,10 @@ void main() {
       expect(find.text('Verified'), findsOneWidget);
       expect(find.text('Provider'), findsWidgets);
       expect(find.text('Saved provider'), findsWidgets);
-      expect(find.text('Currency'), findsWidgets);
+      // Named for what it actually is: the currency the stored figure was
+      // written in (the backend converts before saving), not the provider's
+      // own -- PriceCharting quotes in USD.
+      expect(find.text('Value saved in'), findsWidgets);
       expect(find.text('Value range'), findsWidgets);
       // The range follows the display currency too; the Currency row above
       // is what discloses that the provider priced this in USD.

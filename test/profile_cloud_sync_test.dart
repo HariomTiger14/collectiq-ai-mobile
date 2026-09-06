@@ -10,7 +10,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('build merges the cloud profile over the local cache', () async {
+  test('build serves the local cache before the cloud answers', () async {
+    // The first frame must not wait on the network: while it did, every
+    // reader of displayCurrencyProvider fell back to AUD, so a collector who
+    // reads in USD saw Home render in AUD and then switch.
     final repo = _FakeProfileRepository(
       const CollectorProfile(displayName: 'Local Name'),
     );
@@ -21,7 +24,26 @@ void main() {
 
     final profile = await container.read(profileControllerProvider.future);
 
-    expect(profile.displayName, 'Cloud Name');
+    expect(profile.displayName, 'Local Name');
+  });
+
+  test('build merges the cloud profile over the local cache', () async {
+    final repo = _FakeProfileRepository(
+      const CollectorProfile(displayName: 'Local Name'),
+    );
+    final sync = _FakeProfileSync(
+      snapshot: const CloudProfileSnapshot(displayName: 'Cloud Name'),
+    );
+    final container = _container(repo, sync);
+
+    await container.read(profileControllerProvider.future);
+    // The merge runs after the first value is served, so let it land.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      container.read(profileControllerProvider).value!.displayName,
+      'Cloud Name',
+    );
     expect(repo.saved.last.displayName, 'Cloud Name');
   });
 
