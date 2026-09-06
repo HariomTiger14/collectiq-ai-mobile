@@ -480,7 +480,7 @@ final _qaCatalogResult = CatalogSearchResult(
   highEstimate: 4.47,
   confidence: 0.82,
   lastUpdated: DateTime.utc(2026, 7, 26, 1, 18),
-  attribution: 'Pricing data by PriceCharting',
+  attribution: 'Powered by PriceCharting',
   history: <CatalogPriceHistoryPoint>[
     CatalogPriceHistoryPoint(
       validFrom: DateTime.utc(2026, 7, 26, 1, 18),
@@ -511,7 +511,7 @@ final _qaCatalogPortfolioItem = CollectibleItem(
   cardNumber: '10',
   notes:
       'Catalog ID: 3666974\nSource: PriceCharting\n'
-      'Pricing data by PriceCharting',
+      'Powered by PriceCharting',
   valuationStatus: ValuationStatus.marketEstimated,
   valuationSource: 'pricecharting',
   valueAtScan: 3.89,
@@ -530,7 +530,7 @@ final _qaCatalogPortfolioItem = CollectibleItem(
         'Saved from PackLox catalog search as a dated portfolio snapshot.',
     reasonCode: 'CATALOG_SEARCH_MATCH',
     valuationStrategy: 'catalog_lookup',
-    attributionText: 'Pricing data by PriceCharting',
+    attributionText: 'Powered by PriceCharting',
     displayString: 'USD \$3.89',
   ),
 );
