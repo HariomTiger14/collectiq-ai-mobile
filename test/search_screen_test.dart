@@ -840,6 +840,79 @@ void main() {
   });
 
   testWidgets(
+    'an older history point with no end date reads as a date, not "ended"',
+    (tester) async {
+      // The chart reads point snapshots, so validTo is null on every point
+      // the backend sends (#212). Rendering that as "3 Sep 2026 - ended" read
+      // as though the price had been withdrawn, when it only meant "not the
+      // latest point". All three shapes are asserted together because the
+      // bug was in the branch between them.
+      await _pumpSearch(
+        tester,
+        repository: _MemoryPortfolioRepository([]),
+        catalogRepository: _MemoryCatalogSearchRepository([
+          CatalogSearchResult(
+            id: 'pc-charizard',
+            title: 'Charizard #4 Base Set',
+            category: 'Pokemon Cards',
+            source: 'PriceCharting',
+            setName: 'Base Set',
+            currency: 'USD',
+            marketValue: 161,
+            confidence: 0.91,
+            lastUpdated: DateTime(2026, 9, 11),
+            attribution: 'Pricing data by PriceCharting',
+            history: [
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime(2026, 9, 11),
+                isCurrent: true,
+                currency: 'USD',
+                marketValue: 161,
+                sourceFile: 'pokemon.csv',
+              ),
+              // A snapshot: no end date, and none is coming.
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime(2026, 9, 3),
+                currency: 'USD',
+                marketValue: 150,
+                sourceFile: 'pokemon.csv',
+              ),
+              // A genuine range, if anything ever sends one again.
+              CatalogPriceHistoryPoint(
+                validFrom: DateTime(2026, 8, 20),
+                validTo: DateTime(2026, 8, 25),
+                currency: 'USD',
+                marketValue: 140,
+                sourceFile: 'pokemon.csv',
+              ),
+            ],
+          ),
+        ]),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('discover-search-input')),
+        'charizard',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('discover-catalog-result-pc-charizard')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Current from 11 Sep 2026'), findsOneWidget);
+      expect(find.text('3 Sep 2026'), findsOneWidget);
+      expect(find.text('20 Aug 2026 - 25 Aug 2026'), findsOneWidget);
+      expect(
+        find.textContaining('ended'),
+        findsNothing,
+        reason: 'a snapshot with no end date must not read as withdrawn',
+      );
+    },
+  );
+
+  testWidgets(
     'saving a catalog result seeds its value-history chart from the '
     'catalog\'s own price history, with no server round-trip',
     (tester) async {
@@ -968,8 +1041,8 @@ void main() {
 
       // Inline: only the 5 most recent history rows, newest first.
       expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
-      expect(find.text('23 Jul 2026 - ended'), findsOneWidget);
-      expect(find.text('22 Jul 2026 - ended'), findsNothing);
+      expect(find.text('23 Jul 2026'), findsOneWidget);
+      expect(find.text('22 Jul 2026'), findsNothing);
       await tester.ensureVisible(
         find.byKey(const ValueKey('catalog-view-full-price-history')),
       );
@@ -985,8 +1058,8 @@ void main() {
       // (the memory repository only returns data once, on getCatalogDetail).
       expect(find.text('Charizard #4 Base Set'), findsOneWidget);
       expect(find.text('Current from 27 Jul 2026'), findsOneWidget);
-      expect(find.text('22 Jul 2026 - ended'), findsOneWidget);
-      expect(find.text('20 Jul 2026 - ended'), findsOneWidget);
+      expect(find.text('22 Jul 2026'), findsOneWidget);
+      expect(find.text('20 Jul 2026'), findsOneWidget);
     },
   );
 
