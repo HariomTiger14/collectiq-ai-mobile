@@ -3570,9 +3570,23 @@ class _CatalogHistoryRow extends StatelessWidget {
       displayCurrency: displayCurrency,
       rates: fxRates,
     );
-    final range = point.isCurrent
-        ? 'Current from ${_formatShortDate(point.validFrom)}'
-        : '${_formatShortDate(point.validFrom)} - ${point.validTo == null ? 'ended' : _formatShortDate(point.validTo!)}';
+    // The chart reads point snapshots, not SCD2 rows with a validity window,
+    // so validTo is null on every point the backend sends today (#212). The
+    // old copy rendered that as "3 Sep 2026 - ended", which reads as though
+    // the price was withdrawn. It only ever meant "not the latest point".
+    //
+    // A non-current point with no validTo is just an observation on a date, so
+    // that is what it says. The from-to form is kept for anything that still
+    // carries a real range rather than assuming nothing ever will.
+    final String range;
+    if (point.isCurrent) {
+      range = 'Current from ${_formatShortDate(point.validFrom)}';
+    } else if (point.validTo == null) {
+      range = _formatShortDate(point.validFrom);
+    } else {
+      range =
+          '${_formatShortDate(point.validFrom)} - ${_formatShortDate(point.validTo!)}';
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
